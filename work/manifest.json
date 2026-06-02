@@ -1,0 +1,29 @@
+{
+  "name": "Laith Work Dashboard",
+  "short_name": "LA Work",
+  "description": "Teaching and boarding house work dashboard",
+  "start_url": "/work/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%23000'/><text x='96' y='130' font-family='system-ui,sans-serif' font-weight='700' font-size='90' text-anchor='middle' fill='%23fff'>LA</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' fill='%23000'/><text x='256' y='340' font-family='system-ui,sans-serif' font-weight='700' font-size='240' text-anchor='middle' fill='%23fff'>LA</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": [
+    "productivity",
+    "education"
+  ],
+  "scope": "/work/"
+}
