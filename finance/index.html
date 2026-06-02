@@ -4330,11 +4330,11 @@ async function sbPull(){
     }
     var remote=rows[0].data;
     var remoteV=remote.version||0;
-    var remoteDevice=remote.deviceId||'';
     var localV=sbGetLocalVer();
-    // STRICT: only apply if remote is strictly newer AND from a different device
-    // If local version >= remote version, local data wins — never overwrite
-    var shouldApply=remoteV>localV&&remoteDevice!==sbDeviceId();
+    // Apply remote data unless we have local unsaved changes pending right now.
+    // Timestamp comparison is removed — it was causing the phone to permanently
+    // ignore laptop changes once the phone had ever saved anything.
+    var shouldApply=remoteV>localV&&!_sbDirty;
     if(shouldApply){
       var d=remote.data;
       if(d.S&&typeof d.S==='object')Object.assign(S,d.S);
@@ -4397,7 +4397,7 @@ showView=function(v){_origShowView(v);};
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('/finance/service-worker.js')
+      navigator.serviceWorker.register('/service-worker.js')
         .then(function (reg) { console.log('[SW] Registered, scope:', reg.scope); })
         .catch(function (err) { console.warn('[SW] Registration failed:', err); });
     });
