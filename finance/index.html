@@ -4330,11 +4330,10 @@ async function sbPull(){
     }
     var remote=rows[0].data;
     var remoteV=remote.version||0;
-    var localV=sbGetLocalVer();
-    // Apply remote data unless we have local unsaved changes pending right now.
-    // Timestamp comparison is removed — it was causing the phone to permanently
-    // ignore laptop changes once the phone had ever saved anything.
-    var shouldApply=remoteV>localV&&!_sbDirty;
+    // Always apply remote data unless we have local unsaved changes pending.
+    // Version comparison removed — phone's local version was always newer,
+    // permanently blocking pulls from other devices.
+    var shouldApply=!_sbDirty;
     if(shouldApply){
       var d=remote.data;
       if(d.S&&typeof d.S==='object')Object.assign(S,d.S);
