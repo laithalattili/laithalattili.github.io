@@ -4202,7 +4202,9 @@ document.addEventListener('DOMContentLoaded',function(){
     discSt.linkedBudgetCats=Object.keys(S.budgets);
     salFixed=true;
   }
-  if(salFixed)autosave();
+  if(salFixed){
+    try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState}));}catch(e){console.warn('migration save',e);}
+  }
   document.querySelectorAll('.nav-item[data-view],.bi[data-view],.bi-log[data-view]').forEach(function(el){el.addEventListener('click',function(){showView(el.dataset.view);});});
   var ld=document.getElementById('log-date');if(ld)ld.value=today().toISOString().split('T')[0];
   renderLogCurToggle();
