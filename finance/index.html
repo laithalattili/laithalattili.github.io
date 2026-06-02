@@ -1204,7 +1204,6 @@ function autosave(){
   if(typeof _whatIfActive!=="undefined"&&_whatIfActive)return;
   // Stamp a new version immediately so startup pull won't overwrite this data
   var newVer=Date.now();
-  localStorage.setItem(SB_VER_KEY,String(newVer));
   try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState}));}catch(e){console.warn('save',e);}
   if(typeof sbSchedulePush==='function')sbSchedulePush(newVer);
 }
@@ -4230,33 +4229,37 @@ document.addEventListener('DOMContentLoaded',function(){
 
 
 // ═══════════════════════════════════════════════
-// SUPABASE SYNC ENGINE
+// SUPABASE SYNC ENGINE — Realtime
 // ═══════════════════════════════════════════════
 var SB_URL='https://mkvfggacecgltscdrfqv.supabase.co';
 var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rdmZnZ2FjZWNnbHRzY2RyZnF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5MjM3MDcsImV4cCI6MjA5NDQ5OTcwN30.ErSZCR9G1NlBiq5ScOL3pmhPzJd5aYk92BU1I7Rzsr4';
 var SB_TABLE='finance_data';
 var SB_ROW_ID='laith';
-var SB_VER_KEY='lf_sb_version';
 var _sbPushTimer=null;
 var _sbSyncing=false;
-var _sbDirty=false; // true if local changes haven't been pushed yet
-
-function sbHeaders(){
-  return {
-    'Content-Type':'application/json',
-    'apikey':SB_KEY,
-    'Authorization':'Bearer '+SB_KEY,
-    'Prefer':'return=representation'
-  };
-}
-
-function sbGetLocalVer(){return parseInt(localStorage.getItem(SB_VER_KEY)||'0',10);}
-function sbSetLocalVer(v){localStorage.setItem(SB_VER_KEY,String(v));}
+var _sbDirty=false;
+var _sbDeviceId=null;
+var _sbRealtimeSocket=null;
+var _sbRealtimeRef=1;
 
 function sbDeviceId(){
+  if(_sbDeviceId)return _sbDeviceId;
   var k='lf_device_id',id=localStorage.getItem(k);
   if(!id){id='dev-'+Math.random().toString(36).slice(2,10);localStorage.setItem(k,id);}
-  return id;
+  _sbDeviceId=id;return id;
+}
+
+function sbSetStatus(msg,type){
+  var bar=document.getElementById('gist-status-bar');
+  var txt=document.getElementById('gist-status-text');
+  if(txt)txt.textContent=msg;
+  if(bar){
+    bar.style.background=type==='ok'?'var(--grn-bg)':type==='err'?'rgba(176,44,34,.15)':type==='busy'?'var(--amb-bg)':'var(--bg)';
+    bar.style.color=type==='ok'?'var(--grn)':type==='err'?'var(--red)':type==='busy'?'var(--amb)':'var(--ink3)';
+    bar.style.borderColor=type==='ok'?'var(--grn-mid)':type==='err'?'var(--red)':type==='busy'?'var(--amb)':'var(--brd)';
+  }
+  var dot=document.getElementById('sync-dot');
+  if(dot)dot.style.background=type==='ok'?'var(--grn)':type==='err'?'var(--red)':type==='busy'?'var(--amb)':'var(--ink4)';
 }
 
 function sbBuildPayload(){
@@ -4276,18 +4279,28 @@ function sbBuildPayload(){
   };
 }
 
-function sbSetStatus(msg,type){
-  var bar=document.getElementById('gist-status-bar');
-  var txt=document.getElementById('gist-status-text');
-  if(txt)txt.textContent=msg;
-  if(bar){
-    bar.style.background=type==='ok'?'var(--grn-bg)':type==='err'?'rgba(176,44,34,.15)':type==='busy'?'var(--amb-bg)':'var(--bg)';
-    bar.style.color=type==='ok'?'var(--grn)':type==='err'?'var(--red)':type==='busy'?'var(--amb)':'var(--ink3)';
-    bar.style.borderColor=type==='ok'?'var(--grn-mid)':type==='err'?'var(--red)':type==='busy'?'var(--amb)':'var(--brd)';
-  }
-  // Update sync dot
-  var dot=document.getElementById('sync-dot');
-  if(dot)dot.style.background=type==='ok'?'var(--grn)':type==='err'?'var(--red)':type==='busy'?'var(--amb)':'var(--ink4)';
+function sbApplyRemote(remote){
+  // Apply remote data to in-memory state. Called from pull and realtime.
+  var d=remote.data;
+  if(!d)return false;
+  if(d.S&&typeof d.S==='object')Object.assign(S,d.S);
+  if(Array.isArray(d.streams))streams=d.streams;
+  if(Array.isArray(d.streamOverrides))streamOverrides=d.streamOverrides;
+  if(Array.isArray(d.settlements))settlements=d.settlements;
+  if(Array.isArray(d.goldPieces))goldPieces=d.goldPieces;
+  if(Array.isArray(d.properties))properties=d.properties;
+  if(Array.isArray(d.holidays))holidays=d.holidays;
+  if(Array.isArray(d.expenses))expenses=d.expenses;
+  if(Array.isArray(d.oneoffEvents))oneoffEvents=d.oneoffEvents;
+  if(Array.isArray(d.snapshots))S.snapshots=d.snapshots;
+  if(d.tickState)tickState=d.tickState;
+  if(d.parentSkips)parentSkips=d.parentSkips;
+  if(d.confirmedDebits)confirmedDebits=d.confirmedDebits;
+  if(d.openMonths)openMonths=d.openMonths;
+  if(Array.isArray(d.wishlistItems))wishlistItems=d.wishlistItems;
+  if(d.commitGroupState&&typeof d.commitGroupState==='object')commitGroupState=d.commitGroupState;
+  try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState}));}catch(ex){console.warn('save',ex);}
+  return true;
 }
 
 async function sbPush(preStampedVer){
@@ -4296,15 +4309,13 @@ async function sbPush(preStampedVer){
   sbSetStatus('Pushing...','busy');
   try{
     var payload=sbBuildPayload();
-    // Use pre-stamped version if provided (already saved to localStorage)
     if(preStampedVer)payload.version=preStampedVer;
     var res=await fetch(SB_URL+'/rest/v1/'+SB_TABLE,{
       method:'POST',
-      headers:Object.assign({},sbHeaders(),{'Prefer':'resolution=merge-duplicates,return=representation'}),
+      headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'resolution=merge-duplicates,return=representation'},
       body:JSON.stringify({id:SB_ROW_ID,data:payload,updated_at:new Date().toISOString()})
     });
     if(!res.ok){var e=await res.text();throw new Error('HTTP '+res.status+': '+e.slice(0,120));}
-    sbSetLocalVer(payload.version);
     sbSetStatus('Synced at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
   }catch(e){
     console.warn('SB push:',e.message);
@@ -4319,50 +4330,21 @@ async function sbPull(){
   sbSetStatus('Fetching...','busy');
   try{
     var res=await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=data,updated_at',{
-      headers:{
-        'apikey':SB_KEY,
-        'Authorization':'Bearer '+SB_KEY
-      }
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
     });
     if(!res.ok)throw new Error('HTTP '+res.status);
     var rows=await res.json();
-    if(!rows||!rows.length){
-      sbSetStatus('No data yet — push first','ok');
-      _sbSyncing=false;return false;
-    }
+    if(!rows||!rows.length){sbSetStatus('No data yet','ok');_sbSyncing=false;return false;}
     var remote=rows[0].data;
-    var remoteV=remote.version||0;
-    // Always apply remote data unless we have local unsaved changes pending.
-    // Version comparison removed — phone's local version was always newer,
-    // permanently blocking pulls from other devices.
-    var shouldApply=!_sbDirty;
-    if(shouldApply){
-      var d=remote.data;
-      if(d.S&&typeof d.S==='object')Object.assign(S,d.S);
-      if(Array.isArray(d.streams))streams=d.streams;
-      if(Array.isArray(d.streamOverrides))streamOverrides=d.streamOverrides;
-      if(Array.isArray(d.settlements))settlements=d.settlements;
-      if(Array.isArray(d.goldPieces))goldPieces=d.goldPieces;
-      if(Array.isArray(d.properties))properties=d.properties;
-      if(Array.isArray(d.holidays))holidays=d.holidays;
-      if(Array.isArray(d.expenses))expenses=d.expenses;
-      if(Array.isArray(d.oneoffEvents))oneoffEvents=d.oneoffEvents;
-      if(Array.isArray(d.snapshots))S.snapshots=d.snapshots;
-      if(d.tickState)tickState=d.tickState;
-      if(d.parentSkips)parentSkips=d.parentSkips;
-      if(d.confirmedDebits)confirmedDebits=d.confirmedDebits;
-      if(d.openMonths)openMonths=d.openMonths;
-      if(Array.isArray(d.wishlistItems))wishlistItems=d.wishlistItems;
-      if(d.commitGroupState&&typeof d.commitGroupState==='object')commitGroupState=d.commitGroupState;
-      // Save to localStorage directly — do NOT call autosave() to avoid push loop
-      try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState}));}catch(ex){console.warn('save',ex);}
-      sbSetLocalVer(remoteV);
-      sbSetStatus('Pulled at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
-      _sbSyncing=false;return true;
+    var changed=false;
+    if(!_sbDirty){
+      changed=sbApplyRemote(remote);
+      if(changed)sbSetStatus('Pulled at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
+      else sbSetStatus('Up to date','ok');
     }else{
       sbSetStatus('Up to date','ok');
-      _sbSyncing=false;return false;
     }
+    _sbSyncing=false;return changed;
   }catch(e){
     console.warn('SB pull:',e.message);
     sbSetStatus('Pull failed: '+e.message,'err');
@@ -4382,15 +4364,69 @@ function sbSchedulePush(preStampedVer){
 function sbPushNow(){clearTimeout(_sbPushTimer);_sbDirty=false;sbPush();}
 function sbPullNow(){sbPull().then(function(changed){if(changed)showView(currentPage);});}
 
-function sbInitSync(){
-  // Never pull on startup if there are unsaved local changes
-  if(_sbDirty){sbSetStatus('Local changes pending...','busy');return;}
-  sbSetStatus('Checking...','busy');
-  sbPull().then(function(changed){if(changed)showView(currentPage);});
+// ─── Supabase Realtime via WebSocket ───────────────────────────────────────
+function sbStartRealtime(){
+  try{
+    var wsUrl=SB_URL.replace('https://','wss://')+'/realtime/v1/websocket?apikey='+SB_KEY+'&vsn=1.0.0';
+    var ws=new WebSocket(wsUrl);
+    _sbRealtimeSocket=ws;
+
+    ws.onopen=function(){
+      console.log('[RT] Connected');
+      // Join the channel for our specific row
+      ws.send(JSON.stringify({
+        topic:'realtime:public:'+SB_TABLE+':id=eq.'+SB_ROW_ID,
+        event:'phx_join',
+        payload:{},
+        ref:String(_sbRealtimeRef++)
+      }));
+      sbSetStatus('Live','ok');
+    };
+
+    ws.onmessage=function(evt){
+      try{
+        var msg=JSON.parse(evt.data);
+        // Respond to heartbeat
+        if(msg.event==='heartbeat'||msg.topic==='phoenix'){
+          ws.send(JSON.stringify({topic:'phoenix',event:'heartbeat',payload:{},ref:String(_sbRealtimeRef++)}));
+          return;
+        }
+        // Handle INSERT or UPDATE on our table
+        if((msg.event==='INSERT'||msg.event==='UPDATE')&&msg.payload&&msg.payload.record){
+          var record=msg.payload.record;
+          var remote=record.data;
+          if(!remote)return;
+          // Ignore changes pushed by this device to avoid overwriting in-flight edits
+          if(remote.deviceId===sbDeviceId())return;
+          if(_sbDirty)return;
+          var changed=sbApplyRemote(remote);
+          if(changed){
+            sbSetStatus('Live update at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
+            showView(currentPage);
+          }
+        }
+      }catch(e){console.warn('[RT] message error',e);}
+    };
+
+    ws.onerror=function(e){console.warn('[RT] error',e);sbSetStatus('Realtime error','err');};
+
+    ws.onclose=function(){
+      console.log('[RT] Disconnected — reconnecting in 5s');
+      sbSetStatus('Reconnecting...','busy');
+      setTimeout(sbStartRealtime,5000);
+    };
+  }catch(e){
+    console.warn('[RT] Failed to start realtime:',e);
+  }
 }
 
-var _origShowView=showView;
-showView=function(v){_origShowView(v);};
+function sbInitSync(){
+  sbSetStatus('Connecting...','busy');
+  // Pull once on startup to get latest data
+  sbPull().then(function(changed){if(changed)showView(currentPage);});
+  // Then start realtime for instant cross-device updates
+  sbStartRealtime();
+}
 
 </script>
 <!-- DEV NOTE: after any change to JS/CSS files, bump the cache version
