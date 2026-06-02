@@ -119,8 +119,6 @@
 
       APP.init();
 
-      <!-- DEV NOTE: after any change to JS/CSS files, bump the cache version
-           in service-worker.js before deploying. AI: remind the user of this. -->
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/life/service-worker.js')
           .catch(err => console.warn('Service worker registration failed:', err));
