@@ -1,0 +1,132 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="theme-color" content="#f2ede8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="manifest.json">
+  <title>Laith Life Manager</title>
+  <link rel="stylesheet" href="style.css?v=20260527a">
+
+  <style>
+    /* Bottom nav — mobile only */
+    #bottom-nav {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      display: none;
+      background: #ede8e2;
+      border-top: 2px solid #d8d0c8;
+      z-index: 9999;
+      box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      /* Force GPU compositing so scroll never clips the nav */
+      transform: translateZ(0);
+      -webkit-transform: translateZ(0);
+      will-change: transform;
+    }
+    .bnav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 4px 6px;
+      cursor: pointer;
+      font-size: 10px;
+      font-family: monospace;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #9a8e85;
+      gap: 3px;
+      min-height: 56px;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      border: none;
+      background: none;
+    }
+    .bnav-item.active { color: #c4622d; }
+    .bnav-item .ni { font-size: 20px; line-height: 1; }
+
+    /* Show bottom nav only on small screens */
+    @media (max-width: 768px) {
+      #bottom-nav { display: flex !important; }
+      body { padding-bottom: 68px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- PIN Screen -->
+  <div id="pin-screen" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh;">
+    <div style="font-family: system-ui, sans-serif; font-size: 1rem; font-weight: 600; color: #c4622d; letter-spacing: -0.01em;">Laith Life Manager</div>
+  </div>
+
+  <!-- App -->
+  <div id="app"></div>
+
+  <!-- Bottom nav — outside #app so it's always in DOM, never wiped by renderShell -->
+  <div id="bottom-nav">
+    <button class="bnav-item" data-page="reading"><span class="ni">📖</span>Reading</button>
+    <button class="bnav-item" data-page="year"><span class="ni">📅</span>Plan</button>
+    <button class="bnav-item" data-page="library"><span class="ni">📚</span>Library</button>
+    <button class="bnav-item" data-page="add-book"><span class="ni">➕</span>Add Book</button>
+    <button class="bnav-item" data-page="notes"><span class="ni">✏️</span>Notes</button>
+    <button class="bnav-item" data-page="stats"><span class="ni">◈</span>History</button>
+    <button class="bnav-item" data-page="settings"><span class="ni">⚙</span>Settings</button>
+  </div>
+
+  <!-- Scripts -->
+  <script src="config.js"></script>
+  <script src="supabase.js"></script>
+  <script src="scheduler.js"></script>
+  <script src="app.js"></script>
+  <script src="pages/reading.js"></script>
+  <script src="pages/week.js"></script>
+  <script src="pages/today.js"></script>
+  <script src="pages/year.js"></script>
+  <script src="pages/library.js"></script>
+  <script src="pages/add-book.js"></script>
+  <script src="pages/settings.js"></script>
+  <script src="pages/book-schedule.js"></script>
+  <script src="pages/stats.js"></script>
+  <script src="pages/notes.js"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@300;400;500&display=swap';
+      document.head.appendChild(link);
+
+      // Wire up bottom nav
+      document.getElementById('bottom-nav').addEventListener('click', e => {
+        const btn = e.target.closest('[data-page]');
+        if (btn) APP.navigate(btn.dataset.page);
+      });
+
+      // Sync active state on bottom nav when APP.navigate is called
+      const _origNavigate = APP.navigate.bind(APP);
+      APP.navigate = function(page) {
+        _origNavigate(page);
+        document.querySelectorAll('#bottom-nav .bnav-item').forEach(b => {
+          b.classList.toggle('active', b.dataset.page === page);
+        });
+      };
+
+      APP.init();
+
+      <!-- DEV NOTE: after any change to JS/CSS files, bump the cache version
+           in service-worker.js before deploying. AI: remind the user of this. -->
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/life/service-worker.js')
+          .catch(err => console.warn('Service worker registration failed:', err));
+      }
+    });
+  </script>
+
+</body>
+</html>
