@@ -205,22 +205,26 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .cal-view-btn.active{background:#fff;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.1)}
 .cal-expand-btn{font-size:11px;padding:4px 10px;background:#fff;border:1px solid var(--border);border-radius:var(--rsm);color:var(--text2);cursor:pointer;margin-bottom:.5rem}
 .cal-grid{display:grid;grid-template-columns:28px repeat(7,1fr);gap:1px}
+.cal-dow-row{display:grid;grid-template-columns:28px repeat(7,1fr);gap:1px;position:sticky;top:136px;z-index:30;background:#f0f2f5;padding:2px 0;margin-bottom:1px;border-bottom:1px solid var(--border)}
+.cal-month-block{position:relative}
+.cal-month-sticky{position:sticky;top:100px;z-index:20;background:#f0f2f5;padding-bottom:2px;margin-bottom:1px}
+.cal-dow-row-month{display:grid;grid-template-columns:28px repeat(7,1fr);gap:1px;border-bottom:1px solid var(--border);padding:2px 0}
 .cal-wnum{font-size:8px;font-weight:600;color:#adb5bd;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:3px 1px;line-height:1.2;cursor:default}
 .cal-wnum .wn{color:var(--text3);font-size:9px;font-weight:700}
 .cal-wnum .wl{font-size:8px;color:#adb5bd}
 .cal-dow{font-size:10px;font-weight:600;color:var(--text3);text-align:center;padding:3px 0;text-transform:uppercase}
 .cal-dow.weekend{color:#c92a2a}
-.cal-day{min-height:38px;padding:2px 2px 3px;border-radius:var(--rxs);cursor:pointer;transition:background .1s}
+.cal-day{min-height:38px;padding:2px 2px 3px;border-radius:var(--rxs);cursor:pointer;transition:background .1s;text-align:center}
 .cal-day.expanded{min-height:54px}
 .cal-day:hover{background:var(--bg3)}
 .cal-day.today{background:var(--inf-bg);border:1px solid var(--inf-bd)}
 .cal-day.today .cal-dn{color:var(--inf-tx);font-weight:700}
 .cal-day.other-month .cal-dn{color:#ced4da}
-.cal-day.weekend-day{background:#fafafa}
-.cal-day.holiday{background:#fff0f6}
+.cal-day.weekend-day{background:#dbe4ff}
+.cal-day.holiday{background:#d3f9d8;border:1px solid #8ce99a}
 .cal-day.selected{outline:2px solid #f59f00!important;outline-offset:-2px;z-index:1;position:relative}
 .cal-day.selected .cal-dn{font-weight:700;color:#7d5800}
-.cal-dn{font-size:11px;color:var(--text);margin-bottom:1px;font-weight:500}
+.cal-dn{font-size:11px;color:var(--text);margin-bottom:1px;font-weight:500;text-align:center}
 .cal-dots{display:flex;flex-wrap:wrap;gap:2px;margin-top:1px}
 .dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
 .dot-aor{background:#1971c2}.dot-tutor{background:#f59f00}.dot-duty{background:#7048e8}.dot-deadline{background:#e03131}.dot-holiday{background:#e64980}
@@ -1037,7 +1041,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
     <div id="mc-date-display" style="font-size:11px;color:#495057;margin-top:3px"></div>
     <button class="date-reset-btn" onclick="resetMcDate()">↺ Today</button>
   </div>
-  <div class="date-row"><input type="text" id="mc-time" placeholder="Time Observed"></div>
+  <div class="date-row"><input type="text" id="mc-time" placeholder="Time Observed" value="07:59–08:10"></div>
   <button class="mark-all-y-btn" onclick="markAllY()">✓ Mark All Tutors As Y</button>
   <div id="tutor-checks"></div>
   <div class="input-row" style="margin-top:.75rem">
@@ -1138,6 +1142,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
       <div class="cal-title" id="cal-title"></div>
       <button class="cal-nav" onclick="calNav(1)">›</button>
     </div>
+    <div class="cal-dow-row" id="cal-dow-sticky"></div>
     <div class="cal-grid" id="cal-grid"></div>
   </div>
   <div id="cal-continuous" style="display:none"></div>
@@ -2196,7 +2201,7 @@ function pinPress(d){
   if(pinEntry.length>=6)return;
   pinEntry+=d;updatePinDots('pd',pinEntry.length);
   if(pinEntry.length===6)setTimeout(()=>{
-    if(pinEntry===CORRECT_PIN){setPinRemember();document.getElementById('pin-screen').style.display='none';showSyncLoader();supaLoad().then(()=>{hideSyncLoader();document.getElementById('main-app').style.display='block';document.getElementById('sticky-header').classList.add('visible');initApp();});}
+    if(pinEntry===CORRECT_PIN){setPinRemember();document.getElementById('pin-screen').style.display='none';showSyncLoader();const _supaTimeout=setTimeout(()=>{hideSyncLoader();if(document.getElementById('main-app').style.display!=='block'){document.getElementById('main-app').style.display='block';document.getElementById('sticky-header').classList.add('visible');initApp();}},5000);supaLoad().then(()=>{clearTimeout(_supaTimeout);hideSyncLoader();document.getElementById('main-app').style.display='block';document.getElementById('sticky-header').classList.add('visible');initApp();});}
     else{document.getElementById('pin-error').textContent='Incorrect PIN.';pinEntry='';updatePinDots('pd',0);setTimeout(()=>document.getElementById('pin-error').textContent='',2000);}
   },200);
 }
@@ -22532,6 +22537,11 @@ function _amTutorMtgHtml(ctx,nowStr){
   });
 
   // Generate Word Doc button
+  // Hide the Export and Edit plan buttons from AM header for tmtg
+  const _amExpBtn=document.querySelector('.panel-hdr-actions .panel-hdr-btn');
+  if(_amExpBtn)_amExpBtn.style.display='none';
+  const _amEditBtn=document.querySelectorAll('.panel-hdr-actions .panel-hdr-btn')[1];
+  if(_amEditBtn)_amEditBtn.style.display='none';
   html+=`<button onclick="tmtgGenerateDocx('${tutorName}','${today}')" style="width:100%;padding:10px;background:#1d4ed8;border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px">⬇ Generate Word Document</button>`;
   html+=_amNextHtml(amGetNext());
   return html;
@@ -23988,6 +23998,7 @@ function setCalView(view,btn){
   document.querySelectorAll('.cal-view-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
   document.getElementById('cal-monthly').style.display=view==='monthly'?'block':'none';
   document.getElementById('cal-continuous').style.display=view==='continuous'?'block':'none';
+  const _ds=document.getElementById('cal-dow-sticky');if(_ds)_ds.style.display=view==='monthly'?'grid':'none';
   document.getElementById('cal-event-panel').style.display='none';
   if(view==='continuous')renderContinuous();else renderCalendar();
 }
@@ -24007,18 +24018,21 @@ function renderCalGrid(year,month,container){
   const fd=new Date(year,month,1).getDay(),fdAdj=(fd+6)%7;
   const dim=new Date(year,month+1,0).getDate(),td=new Date();
   const dows=['Mo','Tu','We','Th','Fr','Sa','Su'];
-  // Header: blank week-num cell + day headers
-  let h='<div class="cal-wnum" style="font-size:8px;color:#ced4da">W</div>';
-  h+=dows.map((d,i)=>`<div class="cal-dow${i>=5?' weekend':''}">${d}</div>`).join('');
+  // Populate sticky DOW header row (monthly view only)
+  const _dowSticky=document.getElementById('cal-dow-sticky');
+  if(_dowSticky&&container.id==='cal-grid'){_dowSticky.style.display='grid';_dowSticky.innerHTML='<div class="cal-wnum" style="font-size:8px;color:#ced4da">W</div>'+dows.map((d,i)=>`<div class="cal-dow${i>=5?' weekend':''}">${d}</div>`).join('');}
+  else if(_dowSticky&&container.id==='cal-grid'){_dowSticky.style.display='none';}
+  // Header row inside grid: not used (monthly has sticky row above, continuous has per-month row)
+  let h='';
   const pv=new Date(year,month,0).getDate();
   // Track which row (week) we are on to insert week number
   let cellCount=fdAdj; // cells already placed (prev month padding)
-  // Prev month padding — need week num for first row
+  // First row week number cell — always needed
+  const firstRowMon=fdAdj>0?new Date(year,month,1-fdAdj):new Date(year,month,1);
+  const firstWi=getCalWeekInfo(firstRowMon);
+  h+=`<div class="cal-wnum"><span class="wn">${firstWi.wNum>0?firstWi.wNum:''}</span><span class="wl">${firstWi.wNum>0?firstWi.wLetter:''}</span></div>`;
+  // Prev month padding cells
   if(fdAdj>0){
-    // First row starts on a Monday that is before the 1st
-    const firstRowMon=new Date(year,month,1-fdAdj);
-    const wi=getCalWeekInfo(firstRowMon);
-    h+=`<div class="cal-wnum"><span class="wn">${wi.wNum>0?wi.wNum:''}</span><span class="wl">${wi.wNum>0?wi.wLetter:''}</span></div>`;
     for(let i=fdAdj-1;i>=0;i--)h+=`<div class="cal-day other-month${calExpanded?' expanded':''}"><div class="cal-dn">${pv-i}</div></div>`;
   }
   for(let d=1;d<=dim;d++){
@@ -24068,8 +24082,10 @@ function renderCalendar(){
 function renderContinuous(){
   const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const cont=document.getElementById('cal-continuous');
+  const dowHtml='<div class="cal-dow-row-month"><div class="cal-wnum" style="font-size:8px;color:#ced4da">W</div>'+
+    ['Mo','Tu','We','Th','Fr','Sa','Su'].map((d,i)=>`<div class="cal-dow${i>=5?' weekend':''}">${d}</div>`).join('')+'</div>';
   let html='',y=2026,m=4;
-  while(!(y===2027&&m>6)){html+=`<div class="cal-month-block"><div class="cal-month-title">${months[m]} ${y}</div><div class="cal-grid" id="cg-${y}-${m}"></div></div>`;m++;if(m>11){m=0;y++;}}
+  while(!(y===2027&&m>6)){html+=`<div class="cal-month-block"><div class="cal-month-sticky"><div class="cal-month-title" style="margin-bottom:3px">${months[m]} ${y}</div>${dowHtml}</div><div class="cal-grid" id="cg-${y}-${m}"></div></div>`;m++;if(m>11){m=0;y++;}}
   cont.innerHTML=html;y=2026;m=4;
   while(!(y===2027&&m>6)){renderCalGrid(y,m,document.getElementById('cg-'+y+'-'+m));m++;if(m>11){m=0;y++;}}
 }
@@ -26286,6 +26302,7 @@ function showTab(name,btn){
   if(name==='sched')renderTimetable();
   if(name==='workflows')showWorkflowList();
   if(name==='lists'){renderHawkingList();renderTeachingTab();}
+  if(name==='8am'){const mct=document.getElementById('mc-time');if(mct)mct.value=sv('mc-default-time')||'07:59–08:10';}
   updateGlobalDefaultBtn();
 }
 function showWorkflowList(){document.getElementById('workflow-list').style.display='block';document.querySelectorAll('.workflow-panel').forEach(p=>p.classList.remove('active'));renderCustomFlowsList();}
@@ -26974,7 +26991,7 @@ function initApp(){
   renderCalendar();
   if(_activeMainTab==='lists'){renderHawkingList();renderTeachingTab();}
   resetMcDate();
-  const mct=document.getElementById('mc-time');if(mct)mct.value=sv('mc-default-time')||'07:59–08:10';
+  const mct=document.getElementById('mc-time');if(mct)mct.value=sv('mc-default-time')||'07:59–08:10'; // always refresh from settings
   const pmt=document.getElementById('pm-timing');if(pmt)pmt.value='No Specific Preference';
   // Clock already started at page load
   updateGlobalDefaultBtn();
@@ -28707,6 +28724,8 @@ function amRender(){
     const prevVal=prevInp?prevInp.value:'';
     const isLesson=cat.mode==='lesson'||tp==='lesson';
     const isTutorMtg=cat.mode==='tutormtg'||tp==='tmtg';
+    // Show/hide header buttons depending on slot type
+    document.querySelectorAll('.panel-hdr-actions .panel-hdr-btn').forEach(b=>b.style.display=isTutorMtg?'none':'');
     body.innerHTML=isTutorMtg?_amTutorMtgHtml(ctx,nowStr):isLesson?_amLessonHtml(ctx,nowStr):_amCommitHtml(ctx,nowStr,offset,slotIdx,dayName);
     const newInp=document.getElementById('am-live-inp');
     if(newInp&&prevVal){newInp.value=prevVal;}
