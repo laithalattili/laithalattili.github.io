@@ -142,19 +142,241 @@ PAGES.coursesLibrary = async (container, app) => {
   );
 };
 
-// ── Courses Plan ──────────────────────────────────────────────
+// ── Courses Plan Tab ──────────────────────────────────────────
 PAGES.coursesPlan = async (container, app) => {
-  container.innerHTML = `
-    <div style="text-align:center;padding:3rem 1rem;color:var(--text3);">
-      <div style="font-size:2rem;margin-bottom:0.75rem;">🎓</div>
-      <div style="font-family:var(--mono);font-size:0.7rem;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:0.5rem;">Course Scheduling</div>
-      <div style="font-size:0.85rem;line-height:1.6;">
-        Schedule episodes per week and track progress toward completion.<br>
-        Coming in the next build.
+  container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+
+  let plan = [], courses = [], logs = [];
+  try {
+    plan    = await DB.query('course_plan', { order: 'planned_date.asc' });
+    courses = await DB.query('courses',     { order: 'title.asc' });
+    logs    = await DB.query('course_log',  { order: 'date.desc' });
+  } catch(e) {
+    container.innerHTML = `<div style="color:var(--error)">${e.message}</div>`;
+    return;
+  }
+
+  const courseMap = {};
+  courses.forEach(c => courseMap[c.id] = c);
+
+  // Last episode done per course
+  const lastDone = {};
+  logs.forEach(l => { lastDone[l.course_id] = Math.max(lastDone[l.course_id]||0, l.episode); });
+
+  const today = new Date().toISOString().split('T')[0];
+  const upcoming = plan.filter(p => p.planned_date >= today && !p.done);
+  const overdue  = plan.filter(p => p.planned_date < today && !p.done);
+  const done     = plan.filter(p => p.done);
+
+  const formatDate = (dateStr) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+  };
+
+  const getWeekKey = (dateStr) => {
+    const d = new Date(dateStr);
+    const day = d.getDay() || 7;
+    const mon = new Date(d);
+    mon.setDate(d.getDate() - day + 1);
+    return mon.toISOString().split('T')[0];
+  };
+
+  const formatWeek = (weekStart) => {
+    const d = new Date(weekStart);
+    const end = new Date(d); end.setDate(d.getDate() + 6);
+    return `${d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})} — ${end.toLocaleDateString('en-GB',{day:'numeric',month:'short'})}`;
+  };
+
+  const byWeek = {};
+  upcoming.forEach(p => {
+    const wk = getWeekKey(p.planned_date);
+    if (!byWeek[wk]) byWeek[wk] = [];
+    byWeek[wk].push(p);
+  });
+
+  const renderPlanItem = (p, showMark = true) => {
+    const c = courseMap[p.course_id] || {};
+    const isOverdue = !p.done && p.planned_date < today;
+    const epLabel = p.episode ? `Ep ${p.episode}` : 'Episode';
+    const progress = c.total_episodes && p.episode
+      ? `<span style="font-family:var(--mono);font-size:0.6rem;color:var(--text3);">${p.episode}/${c.total_episodes}</span>`
+      : '';
+    return `
+      <div class="book-item" style="${p.done?'opacity:0.5':''}">
+        <div class="book-cover" style="background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:1.1rem;min-width:48px;width:48px;">🎓</div>
+        <div class="book-info">
+          <div class="book-title">${c.title||'Unknown course'}</div>
+          <div class="book-author">${formatDate(p.planned_date)} · ${epLabel}${c.source?' · '+c.source:''}</div>
+          <div style="display:flex;gap:0.4rem;align-items:center;margin-top:0.2rem;">
+            ${progress}
+            ${isOverdue?'<span style="font-family:var(--mono);font-size:0.58rem;color:var(--error);">overdue</span>':''}
+            ${p.notes?`<span style="font-size:0.72rem;color:var(--text3);">${p.notes}</span>`:''}
+          </div>
+        </div>
+        <div class="book-right" style="gap:0.3rem;">
+          ${showMark && !p.done ? `<button class="btn btn-secondary btn-sm btn-mark-ep-done" data-id="${p.id}" data-course="${p.course_id}" data-ep="${p.episode||1}" title="Mark done">✓</button>` : ''}
+          <button class="btn btn-secondary btn-sm btn-delete-cp" data-id="${p.id}" style="color:var(--error);">×</button>
+        </div>
       </div>
+    `;
+  };
+
+  container.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+      <span style="font-family:var(--mono);font-size:0.65rem;color:var(--text3);">${upcoming.length} upcoming · ${done.length} done</span>
+      <button class="btn btn-secondary btn-sm" id="btn-schedule-ep">+ Schedule</button>
     </div>
+
+    ${overdue.length ? `
+      <div style="font-family:var(--mono);font-size:0.62rem;color:var(--error);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.4rem;">Overdue (${overdue.length})</div>
+      ${overdue.map(p => renderPlanItem(p)).join('')}
+      <div style="height:0.75rem;"></div>
+    ` : ''}
+
+    ${upcoming.length === 0 && overdue.length === 0 ? `
+      <div class="empty">
+        <div style="font-size:2rem;margin-bottom:0.5rem;">🎓</div>
+        <div class="empty-text">No episodes scheduled</div>
+        <div style="font-size:0.82rem;color:var(--text3);margin-top:0.25rem;">Tap + Schedule to plan a session</div>
+      </div>
+    ` : ''}
+
+    ${Object.keys(byWeek).sort().map(wk => `
+      <div style="font-family:var(--mono);font-size:0.62rem;color:var(--accent);letter-spacing:0.1em;text-transform:uppercase;margin:0.75rem 0 0.4rem;">
+        ${formatWeek(wk)}
+      </div>
+      ${byWeek[wk].map(p => renderPlanItem(p)).join('')}
+    `).join('')}
+
+    ${done.length ? `
+      <div style="font-family:var(--mono);font-size:0.62rem;color:var(--text3);letter-spacing:0.1em;text-transform:uppercase;margin:1.5rem 0 0.4rem;cursor:pointer;" id="toggle-done-courses">
+        ▶ Done (${done.length})
+      </div>
+      <div id="done-courses-list" style="display:none;">
+        ${done.map(p => renderPlanItem(p, false)).join('')}
+      </div>
+    ` : ''}
   `;
+
+  document.getElementById('toggle-done-courses')?.addEventListener('click', e => {
+    const list = document.getElementById('done-courses-list');
+    const visible = list.style.display !== 'none';
+    list.style.display = visible ? 'none' : 'block';
+    e.target.textContent = e.target.textContent.replace(visible?'▼':'▶', visible?'▶':'▼');
+  });
+
+  // Mark episode done
+  document.querySelectorAll('.btn-mark-ep-done').forEach(btn =>
+    btn.addEventListener('click', async () => {
+      const courseId = btn.dataset.course;
+      const episode  = parseInt(btn.dataset.ep);
+      try {
+        await DB.update('course_plan', btn.dataset.id, { done: true });
+        await DB.insert('course_log', { course_id: courseId, episode, date: today });
+        const c = courseMap[courseId];
+        if (c) {
+          if (c.status === 'to-watch') await DB.update('courses', courseId, { status: 'in-progress', updated_at: new Date().toISOString() });
+          if (c.total_episodes && episode >= c.total_episodes) {
+            await DB.update('courses', courseId, { status: 'completed', updated_at: new Date().toISOString() });
+            app.notify('Course completed!', 'success');
+          } else { app.notify('Episode done', 'success'); }
+        }
+        PAGES.coursesPlan(container, app);
+      } catch(e) { app.notify('Error: '+e.message,'error'); }
+    })
+  );
+
+  // Delete plan item
+  document.querySelectorAll('.btn-delete-cp').forEach(btn =>
+    btn.addEventListener('click', async () => {
+      try {
+        await DB.delete('course_plan', btn.dataset.id);
+        PAGES.coursesPlan(container, app);
+      } catch(e) { app.notify('Error: '+e.message,'error'); }
+    })
+  );
+
+  // Schedule an episode
+  document.getElementById('btn-schedule-ep').addEventListener('click', () => {
+    const active = courses.filter(c => c.status !== 'completed');
+    const nextSession = (() => {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      return d.toISOString().split('T')[0];
+    })();
+
+    app.showModal(`
+      <div class="modal-title">Schedule Episode</div>
+      <div class="form-group">
+        <label>Course *</label>
+        <select id="sc-course" style="font-size:0.82rem;">
+          ${active.map(c => `<option value="${c.id}">${c.title}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Episode Number</label>
+        <input type="number" id="sc-ep" min="1" value="1" placeholder="Leave blank for next episode">
+      </div>
+      <div class="form-group">
+        <label>Date *</label>
+        <input type="date" id="sc-date" value="${nextSession}">
+      </div>
+      <div class="form-group">
+        <label>Notes (optional)</label>
+        <input type="text" id="sc-notes" placeholder="e.g. before breakfast">
+      </div>
+      <div style="display:flex;gap:0.5rem;margin-top:1rem;">
+        <button class="btn btn-primary" id="btn-save-cp">Schedule</button>
+        <button class="btn btn-secondary" onclick="APP.closeModal()">Cancel</button>
+      </div>
+    `);
+
+    // Auto-fill next episode when course selected
+    const fillNextEp = () => {
+      const courseId = document.getElementById('sc-course').value;
+      const next = (lastDone[courseId] || 0) + 1;
+      document.getElementById('sc-ep').value = next;
+    };
+    fillNextEp();
+    document.getElementById('sc-course').addEventListener('change', fillNextEp);
+
+    document.getElementById('btn-save-cp').addEventListener('click', async () => {
+      const courseId = document.getElementById('sc-course').value;
+      const date     = document.getElementById('sc-date').value;
+      const episode  = parseInt(document.getElementById('sc-ep').value) || null;
+      if (!courseId || !date) { app.notify('Select a course and date','error'); return; }
+      try {
+        await DB.insert('course_plan', {
+          course_id:    courseId,
+          planned_date: date,
+          episode,
+          notes:        document.getElementById('sc-notes').value.trim() || null,
+          done:         false,
+          created_at:   new Date().toISOString()
+        });
+
+        // Write to omni_schedule_feed
+        const c = courseMap[courseId];
+        try {
+          await DB.insert('omni_schedule_feed', {
+            date:       date,
+            type:       'course',
+            title:      c ? `${c.title}${episode?' — Ep '+episode:''}` : 'Course episode',
+            source_app: 'life',
+            source_id:  courseId,
+            meta:       JSON.stringify({ episode }),
+            created_at: new Date().toISOString()
+          });
+        } catch(e) { /* omni feed optional */ }
+
+        app.closeModal();
+        app.notify('Episode scheduled','success');
+        PAGES.coursesPlan(container, app);
+      } catch(e) { app.notify('Error: '+e.message,'error'); }
+    });
+  });
 };
+
 
 // ── Courses Log ───────────────────────────────────────────────
 PAGES.coursesLog = async (container, app) => {

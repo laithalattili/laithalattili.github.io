@@ -177,19 +177,261 @@ PAGES.filmsLibrary = async (container, app) => {
   );
 };
 
-// ── Films Plan ────────────────────────────────────────────────
+// ── Films Plan Tab ────────────────────────────────────────────
 PAGES.filmsPlan = async (container, app) => {
-  container.innerHTML = `
-    <div style="text-align:center;padding:3rem 1rem;color:var(--text3);">
-      <div style="font-size:2rem;margin-bottom:0.75rem;">🎬</div>
-      <div style="font-family:var(--mono);font-size:0.7rem;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:0.5rem;">Film Scheduling</div>
-      <div style="font-size:0.85rem;line-height:1.6;">
-        Plan which films to watch and when — evenings, weeks, months.<br>
-        Coming in the next build.
+  container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+
+  let plan = [], films = [], watchLog = [];
+  try {
+    plan     = await DB.query('film_plan',  { order: 'planned_date.asc' });
+    films    = await DB.query('films',      { order: 'title.asc' });
+    watchLog = await DB.query('watch_log',  { order: 'date.desc' });
+  } catch(e) {
+    container.innerHTML = `<div style="color:var(--error)">${e.message}</div>`;
+    return;
+  }
+
+  const filmMap = {};
+  films.forEach(f => filmMap[f.id] = f);
+  const watchedIds = new Set(watchLog.map(l => l.film_id));
+
+  const today = new Date().toISOString().split('T')[0];
+
+  // Group plan by week
+  const getWeekKey = (dateStr) => {
+    const d = new Date(dateStr);
+    const day = d.getDay() || 7;
+    const mon = new Date(d);
+    mon.setDate(d.getDate() - day + 1);
+    return mon.toISOString().split('T')[0];
+  };
+
+  const byWeek = {};
+  plan.forEach(p => {
+    const wk = getWeekKey(p.planned_date);
+    if (!byWeek[wk]) byWeek[wk] = [];
+    byWeek[wk].push(p);
+  });
+
+  const upcoming = plan.filter(p => p.planned_date >= today && !p.done);
+  const overdue  = plan.filter(p => p.planned_date < today && !p.done);
+  const done     = plan.filter(p => p.done);
+
+  const formatWeek = (weekStart) => {
+    const d = new Date(weekStart);
+    const end = new Date(d);
+    end.setDate(d.getDate() + 6);
+    return `${d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})} — ${end.toLocaleDateString('en-GB',{day:'numeric',month:'short'})}`;
+  };
+
+  const formatDate = (dateStr) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+  };
+
+  const timeIcon = { morning:'🌅', afternoon:'🌤', evening:'🌙', any:'◈' };
+
+  const renderPlanItem = (p, showMark = true) => {
+    const f = filmMap[p.film_id] || {};
+    const dur = f.runtime_mins ? `<span style="font-family:var(--mono);font-size:0.6rem;color:var(--text3);">${f.runtime_mins}min</span>` : '';
+    const overdue = !p.done && p.planned_date < today;
+    return `
+      <div class="book-item plan-item ${p.done?'opacity:0.5':''}" data-id="${p.id}" style="${p.done?'opacity:0.5':''}">
+        <div class="book-cover" style="background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:1.1rem;min-width:48px;width:48px;">
+          ${timeIcon[p.time_of_day]||'🎬'}
+        </div>
+        <div class="book-info">
+          <div class="book-title">${f.title||'Unknown film'}</div>
+          <div class="book-author">${formatDate(p.planned_date)}${f.director?' · '+f.director:''}</div>
+          <div style="display:flex;gap:0.4rem;align-items:center;margin-top:0.2rem;">
+            ${dur}
+            ${overdue?'<span style="font-family:var(--mono);font-size:0.58rem;color:var(--error);">overdue</span>':''}
+            ${p.notes?`<span style="font-size:0.72rem;color:var(--text3);">${p.notes}</span>`:''}
+          </div>
+        </div>
+        <div class="book-right" style="gap:0.3rem;">
+          ${showMark && !p.done ? `<button class="btn btn-secondary btn-sm btn-mark-done" data-id="${p.id}" data-film="${p.film_id}" title="Mark watched">✓</button>` : ''}
+          <button class="btn btn-secondary btn-sm btn-delete-plan" data-id="${p.id}" style="color:var(--error);">×</button>
+        </div>
       </div>
+    `;
+  };
+
+  container.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+      <div>
+        <span style="font-family:var(--mono);font-size:0.65rem;color:var(--text3);">${upcoming.length} upcoming · ${done.length} watched</span>
+      </div>
+      <button class="btn btn-secondary btn-sm" id="btn-schedule-film">+ Schedule</button>
     </div>
+
+    ${overdue.length ? `
+      <div style="font-family:var(--mono);font-size:0.62rem;color:var(--error);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.4rem;">
+        Overdue (${overdue.length})
+      </div>
+      ${overdue.map(p => renderPlanItem(p)).join('')}
+      <div style="height:0.75rem;"></div>
+    ` : ''}
+
+    ${upcoming.length === 0 && overdue.length === 0 ? `
+      <div class="empty">
+        <div style="font-size:2rem;margin-bottom:0.5rem;">🎬</div>
+        <div class="empty-text">No films scheduled yet</div>
+        <div style="font-size:0.82rem;color:var(--text3);margin-top:0.25rem;">Tap + Schedule to plan an evening</div>
+      </div>
+    ` : ''}
+
+    ${Object.keys(byWeek).filter(wk => byWeek[wk].some(p => p.planned_date >= today && !p.done)).sort().map(wk => `
+      <div style="font-family:var(--mono);font-size:0.62rem;color:var(--accent);letter-spacing:0.1em;text-transform:uppercase;margin:0.75rem 0 0.4rem;">
+        ${formatWeek(wk)}
+      </div>
+      ${byWeek[wk].filter(p => p.planned_date >= today && !p.done).map(p => renderPlanItem(p)).join('')}
+    `).join('')}
+
+    ${done.length ? `
+      <div style="font-family:var(--mono);font-size:0.62rem;color:var(--text3);letter-spacing:0.1em;text-transform:uppercase;margin:1.5rem 0 0.4rem;cursor:pointer;" id="toggle-done-films">
+        ▶ Done (${done.length})
+      </div>
+      <div id="done-films-list" style="display:none;">
+        ${done.map(p => renderPlanItem(p, false)).join('')}
+      </div>
+    ` : ''}
   `;
+
+  // Toggle done section
+  document.getElementById('toggle-done-films')?.addEventListener('click', e => {
+    const list = document.getElementById('done-films-list');
+    const visible = list.style.display !== 'none';
+    list.style.display = visible ? 'none' : 'block';
+    e.target.textContent = e.target.textContent.replace(visible?'▼':'▶', visible?'▶':'▼');
+  });
+
+  // Mark as done
+  document.querySelectorAll('.btn-mark-done').forEach(btn =>
+    btn.addEventListener('click', async () => {
+      try {
+        await DB.update('film_plan', btn.dataset.id, { done: true });
+        // Also log the watch
+        const filmId = btn.dataset.film;
+        const film = filmMap[filmId];
+        if (film && !watchedIds.has(filmId)) {
+          await DB.insert('watch_log', {
+            film_id: filmId,
+            date: today,
+            session: 1
+          });
+          if (film.status === 'to-watch') {
+            await DB.update('films', filmId, { status: 'watched', updated_at: new Date().toISOString() });
+          }
+        }
+        app.notify('Marked as watched', 'success');
+        PAGES.filmsPlan(container, app);
+      } catch(e) { app.notify('Error: '+e.message, 'error'); }
+    })
+  );
+
+  // Delete plan item
+  document.querySelectorAll('.btn-delete-plan').forEach(btn =>
+    btn.addEventListener('click', async () => {
+      try {
+        await DB.delete('film_plan', btn.dataset.id);
+        PAGES.filmsPlan(container, app);
+      } catch(e) { app.notify('Error: '+e.message, 'error'); }
+    })
+  );
+
+  // Schedule a film
+  document.getElementById('btn-schedule-film').addEventListener('click', () => {
+    const toWatch = films.filter(f => f.status === 'to-watch' || f.status === 'owned');
+    const nextFriday = (() => {
+      const d = new Date();
+      const day = d.getDay();
+      const diff = (5 - day + 7) % 7 || 7;
+      d.setDate(d.getDate() + diff);
+      return d.toISOString().split('T')[0];
+    })();
+
+    app.showModal(`
+      <div class="modal-title">Schedule a Film</div>
+      <div class="form-group">
+        <label>Film *</label>
+        <div class="search-bar" style="margin-bottom:0.3rem;">
+          <span class="search-icon">⌕</span>
+          <input type="text" id="sf-search" placeholder="Search to-watch films...">
+        </div>
+        <select id="sf-film" size="5" style="height:auto;font-size:0.82rem;">
+          ${toWatch.map(f => `<option value="${f.id}">${f.title}${f.year?' ('+f.year+')':''}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Date *</label>
+        <input type="date" id="sf-date" value="${nextFriday}">
+      </div>
+      <div class="form-group">
+        <label>Time of day</label>
+        <select id="sf-time">
+          <option value="evening">Evening 🌙</option>
+          <option value="afternoon">Afternoon 🌤</option>
+          <option value="morning">Morning 🌅</option>
+          <option value="any">Any time</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Notes (optional)</label>
+        <input type="text" id="sf-notes" placeholder="e.g. watch with subtitles">
+      </div>
+      <div style="display:flex;gap:0.5rem;margin-top:1rem;">
+        <button class="btn btn-primary" id="btn-save-plan">Schedule</button>
+        <button class="btn btn-secondary" onclick="APP.closeModal()">Cancel</button>
+      </div>
+    `);
+
+    // Live search filter
+    document.getElementById('sf-search').addEventListener('input', e => {
+      const q = e.target.value.toLowerCase();
+      const filtered = toWatch.filter(f => (f.title||'').toLowerCase().includes(q) || (f.director||'').toLowerCase().includes(q));
+      document.getElementById('sf-film').innerHTML = filtered
+        .map(f => `<option value="${f.id}">${f.title}${f.year?' ('+f.year+')':''}</option>`)
+        .join('');
+    });
+
+    document.getElementById('btn-save-plan').addEventListener('click', async () => {
+      const filmId = document.getElementById('sf-film').value;
+      const date   = document.getElementById('sf-date').value;
+      if (!filmId || !date) { app.notify('Select a film and date','error'); return; }
+      try {
+        const entry = {
+          film_id:      filmId,
+          planned_date: date,
+          time_of_day:  document.getElementById('sf-time').value,
+          notes:        document.getElementById('sf-notes').value.trim() || null,
+          done:         false,
+          created_at:   new Date().toISOString()
+        };
+        await DB.insert('film_plan', entry);
+
+        // Write to omni_schedule_feed
+        const f = filmMap[filmId];
+        try {
+          await DB.insert('omni_schedule_feed', {
+            date:       date,
+            type:       'film',
+            title:      f ? f.title : 'Film',
+            source_app: 'life',
+            source_id:  filmId,
+            meta:       JSON.stringify({ time_of_day: entry.time_of_day, runtime_mins: f?.runtime_mins }),
+            created_at: new Date().toISOString()
+          });
+        } catch(e) { /* omni feed optional */ }
+
+        app.closeModal();
+        app.notify('Film scheduled','success');
+        PAGES.filmsPlan(container, app);
+      } catch(e) { app.notify('Error: '+e.message,'error'); }
+    });
+  });
 };
+
 
 // ── Films Log ─────────────────────────────────────────────────
 PAGES.filmsLog = async (container, app) => {
