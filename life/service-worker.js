@@ -5,7 +5,7 @@
 // AI ASSISTANT: if you are helping with a deployment or any file changes,
 // remind the user to bump the CACHE_NAME version before pushing.
 
-const CACHE_NAME = 'life-manager-v12';
+const CACHE_NAME = 'life-manager-v14';
 
 const STATIC_ASSETS = [
   '/life/',
@@ -26,6 +26,9 @@ const STATIC_ASSETS = [
   '/life/pages/today.js',
   '/life/pages/week.js',
   '/life/pages/book-schedule.js',
+  '/life/pages/films.js',
+  '/life/pages/courses.js',
+  '/life/pages/lists.js',
   // Google Fonts — cached so app looks right offline too
   'https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@300;400;500&display=swap',
 ];

@@ -707,3 +707,16 @@ select option { background: var(--bg3); }
   margin-left: 0.3rem;
   font-weight: 500;
 }
+
+/* ── Nav section labels ─────────────────────────────────── */
+.nav-section-label {
+  padding: 0.6rem 1rem 0.2rem;
+  font-family: var(--mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text3);
+  opacity: 0.5;
+  white-space: nowrap;
+  user-select: none;
+}

@@ -210,12 +210,18 @@ const APP = {
         </div>
       </header>
       <nav id="main-nav">
+        <div class="nav-section-label">Books</div>
         <div class="nav-item" data-page="reading">Reading</div>
         <div class="nav-item" data-page="year">Year Plan</div>
         <div class="nav-item" data-page="library">Library</div>
         <div class="nav-item" data-page="add-book">+ Book</div>
         <div class="nav-item" data-page="stats">Past Years</div>
         <div class="nav-item" data-page="notes">Notes</div>
+        <div class="nav-section-label">Media</div>
+        <div class="nav-item" data-page="films">Films</div>
+        <div class="nav-item" data-page="courses">Courses</div>
+        <div class="nav-item" data-page="lists">Lists</div>
+        <div class="nav-section-label">App</div>
         <div class="nav-item" data-page="settings">Settings</div>
       </nav>
       <main id="main-content">
@@ -313,30 +319,16 @@ const APP = {
     const today = SCHEDULER.formatDate(new Date());
     const updates = new Map(); // book.id -> correct status
 
-    // Books with a schedule entry: derive status from page progress first, then dates
+    // Books with a schedule entry: derive status from dates
     for (const s of this.schedule) {
       const qItem = this.yearQueue.find(q => q.id === s.queueId);
       if (!qItem || !qItem.book) continue;
       const book = qItem.book;
-      const totalPages = parseInt(book.pages) || 200;
-      const currentPage = parseInt(qItem.current_page) || 0;
-      const bookLogs = this.readingLog.filter(l => l.book_id === book.id && l.is_review);
-      const reviewPagesLogged = bookLogs.reduce((sum, l) => sum + (l.pages_read || 0), 0);
-
       let correctStatus;
-      if (currentPage >= totalPages && reviewPagesLogged >= totalPages) {
-        correctStatus = 'completed';
-      } else if (currentPage >= totalPages) {
-        correctStatus = 'review';
-      } else if (s.reviewEnd < today) {
-        correctStatus = 'completed';
-      } else if (s.reviewStart <= today && s.reviewEnd >= today) {
-        correctStatus = 'review';
-      } else if (s.readStart <= today && s.readEnd >= today) {
-        correctStatus = 'reading';
-      } else {
-        correctStatus = 'to-read';
-      }
+      if (s.reviewEnd < today)                                                    correctStatus = 'completed';
+      else if (s.reviewStart <= today && s.reviewEnd >= today)                    correctStatus = 'review';
+      else if (s.readStart <= today && s.readEnd >= today)                        correctStatus = 'reading';
+      else                                                                        correctStatus = 'to-read';
       if (book.status !== correctStatus) updates.set(book.id, correctStatus);
     }
 
@@ -399,6 +391,9 @@ const APP = {
       case 'stats':    PAGES.stats(main, this); break;
       case 'notes':    PAGES.notes(main, this); break;
       case 'settings': PAGES.settings(main, this); break;
+      case 'films':    PAGES.films(main, this); break;
+      case 'courses':  PAGES.courses(main, this); break;
+      case 'lists':    PAGES.listsPage(main, this); break;
     }
   },
 
