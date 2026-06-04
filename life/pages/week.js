@@ -367,9 +367,6 @@ PAGES.showDayDetail = (dateStr, app, weekOffset = 0) => {
           const entry = { book_id: plan.book.bookId, date: dateStr, pages_planned: plan.pagesPlanned, pages_read: pages, is_review: plan.type === 'review', notes: '', current_page_after: endPage };
           if (plan.logId) await DB.update('reading_log', plan.logId, entry);
           else await DB.insert('reading_log', entry);
-          // Fix: update current_page on the queue item
-          const qItem = app.yearQueue.find(q => q.book_id === plan.book.bookId);
-          if (qItem) await DB.update('yearly_queue', qItem.id, { current_page: endPage });
           app.closeModal();
           app.notify('Logged ✓', 'success');
           await app.refreshData();
@@ -403,9 +400,6 @@ PAGES.showDayDetail = (dateStr, app, weekOffset = 0) => {
           }
           d = SCHEDULER.addDays(d, 1);
         }
-        // Fix: update current_page on the queue item
-        const qItem = app.yearQueue.find(q => q.book_id === bookId);
-        if (qItem) await DB.update('yearly_queue', qItem.id, { current_page: targetPage });
         app.closeModal();
         app.notify('Week logged ✓', 'success');
         await app.refreshData();
@@ -462,15 +456,6 @@ PAGES.showDayDetail = (dateStr, app, weekOffset = 0) => {
             };
             if (plan.logId) await DB.update('reading_log', plan.logId, logEntry);
             else await DB.insert('reading_log', logEntry);
-          }
-        }
-        // Fix: update current_page on each book's queue item
-        for (let idx = 0; idx < dayPlans.length; idx++) {
-          const plan = dayPlans[idx];
-          const endPageVal = parseInt(document.querySelector(`.inp-end[data-idx="${idx}"]`)?.value) || null;
-          if (endPageVal) {
-            const qItem = app.yearQueue.find(q => q.book_id === plan.book.bookId);
-            if (qItem) await DB.update('yearly_queue', qItem.id, { current_page: endPageVal });
           }
         }
         app.closeModal();

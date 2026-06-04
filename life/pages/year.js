@@ -543,11 +543,11 @@ PAGES.removeFromYear = async (queueId, app) => {
   app.showModal(`
     <div class="modal-title">Remove from Year Plan?</div>
     <div style="font-size:0.85rem;color:var(--text2);margin-bottom:1.5rem;">
-      The book will be removed from this year's plan. <strong>All reading logs for this book will also be permanently deleted.</strong>
+      The book will be removed from this year's plan. Reading logs are kept.
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="APP.closeModal()">Cancel</button>
-      <button class="btn btn-danger" id="btn-confirm-remove">Remove & Delete Logs</button>
+      <button class="btn btn-danger" id="btn-confirm-remove">Remove</button>
     </div>
   `);
   setTimeout(() => {
@@ -555,10 +555,7 @@ PAGES.removeFromYear = async (queueId, app) => {
       app.closeModal();
       try {
         await PAGES._promoteMainBookIfNeeded(queueId, app);
-        const qItem = app.yearQueue.find(q => q.id === queueId);
-        const bookId = qItem?.book_id;
         await DB.delete('yearly_queue', queueId);
-        if (bookId) await DB.deleteWhere('reading_log', 'book_id', bookId);
         app.notify('Removed', 'success');
         await app.refreshData();
         PAGES.year(document.getElementById('main-content'), app);
