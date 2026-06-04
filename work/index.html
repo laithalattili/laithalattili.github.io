@@ -4169,12 +4169,16 @@ function markStep(cb){const n=document.getElementById('sn-'+cb.id);if(n)n.classL
 // ── AUTOCOMPLETE ──────────────────────────────────────
 function acInput(px){
   const v=document.getElementById(px+'-student').value.toLowerCase().trim(),l=document.getElementById(px+'-ac');
-  if(!v){l.style.display='none';return;}
+  if(!v){if(l)l.style.display='none';return;}
   const all=getAllStudentsWithTutor();
   const m=all.filter(s=>s.name.toLowerCase().includes(v)).slice(0,6);
-  if(!m.length){l.style.display='none';return;}
-  l.innerHTML=m.map(s=>`<div class="ac-item" onmousedown="selectStu('${px}','${s.name}','${s.tutor}','${s.email}','${s.first}','${s.grade}')"><div>${s.name} <span style="font-size:10px;color:#868e96">${s.grade}</span></div><div class="ac-sub">Tutor: ${s.tutor}</div></div>`).join('');
-  l.style.display='block';
+  if(!m.length){if(l)l.style.display='none';return;}
+  if(px==='cfv'){
+    l.innerHTML=m.map(s=>`<div class="ac-item" onmousedown="cfvSelectStudent('${s.name}','${s.tutor}','${s.email}','${s.first}','${s.grade}')"><div>${s.name} <span style="font-size:10px;color:#868e96">${s.grade}</span></div><div class="ac-sub">Tutor: ${s.tutor}</div></div>`).join('');
+  } else {
+    l.innerHTML=m.map(s=>`<div class="ac-item" onmousedown="selectStu('${px}','${s.name}','${s.tutor}','${s.email}','${s.first}','${s.grade}')"><div>${s.name} <span style="font-size:10px;color:#868e96">${s.grade}</span></div><div class="ac-sub">Tutor: ${s.tutor}</div></div>`).join('');
+  }
+  if(l)l.style.display='block';
 }
 function hideAC(px){const l=document.getElementById(px+'-ac');if(l)l.style.display='none';}
 function selectStu(px,name,tutor,email,first,grade){
@@ -7344,22 +7348,7 @@ function selectStu(px,name,tutor,email,first,grade){
   _origSelectStu(px,name,tutor,email,first,grade);
 }
 
-// Override acInput to also handle cfv prefix
-const _origAcInput=acInput;
-function acInput(px){
-  if(px==='cfv'){
-    const v=document.getElementById('cfv-student').value.toLowerCase().trim();
-    const l=document.getElementById('cfv-ac');
-    if(!v){l.style.display='none';return;}
-    const all=getAllStudentsWithTutor();
-    const m=all.filter(s=>s.name.toLowerCase().includes(v)).slice(0,6);
-    if(!m.length){l.style.display='none';return;}
-    l.innerHTML=m.map(s=>`<div class="ac-item" onmousedown="cfvSelectStudent('${s.name}','${s.tutor}','${s.email}','${s.first}','${s.grade}')"><div>${s.name} <span style="font-size:10px;color:#868e96">${s.grade}</span></div><div class="ac-sub">Tutor: ${s.tutor}</div></div>`).join('');
-    l.style.display='block';
-    return;
-  }
-  _origAcInput(px);
-}
+// acInput cfv case merged into original acInput above
 
 // ── Extra blocks in built-in flow views ─────────────
 function _renderBuiltinExtraBlocks(flowId, container){
