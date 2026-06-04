@@ -5,7 +5,7 @@
 // AI ASSISTANT: if you are helping with a deployment or any file changes,
 // remind the user to bump the CACHE_NAME version before pushing.
 
-const CACHE_NAME = 'life-manager-v14';
+const CACHE_NAME = 'life-manager-v15';
 
 const STATIC_ASSETS = [
   '/life/',
@@ -26,6 +26,7 @@ const STATIC_ASSETS = [
   '/life/pages/today.js',
   '/life/pages/week.js',
   '/life/pages/book-schedule.js',
+  '/life/pages/books.js',
   '/life/pages/films.js',
   '/life/pages/courses.js',
   '/life/pages/lists.js',

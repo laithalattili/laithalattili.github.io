@@ -210,18 +210,11 @@ const APP = {
         </div>
       </header>
       <nav id="main-nav">
-        <div class="nav-section-label">Books</div>
         <div class="nav-item" data-page="reading">Reading</div>
-        <div class="nav-item" data-page="year">Year Plan</div>
-        <div class="nav-item" data-page="library">Library</div>
-        <div class="nav-item" data-page="add-book">+ Book</div>
-        <div class="nav-item" data-page="stats">Past Years</div>
-        <div class="nav-item" data-page="notes">Notes</div>
-        <div class="nav-section-label">Media</div>
+        <div class="nav-item" data-page="books">Books</div>
         <div class="nav-item" data-page="films">Films</div>
         <div class="nav-item" data-page="courses">Courses</div>
         <div class="nav-item" data-page="lists">Lists</div>
-        <div class="nav-section-label">App</div>
         <div class="nav-item" data-page="settings">Settings</div>
       </nav>
       <main id="main-content">
@@ -384,16 +377,18 @@ const APP = {
     main.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
 
     switch (page) {
-      case 'reading': PAGES.reading(main, this); break;
-      case 'year':    PAGES.year(main, this); break;
-      case 'library': PAGES.library(main, this); break;
-      case 'add-book': PAGES.addBook(main, this); break;
-      case 'stats':    PAGES.stats(main, this); break;
-      case 'notes':    PAGES.notes(main, this); break;
-      case 'settings': PAGES.settings(main, this); break;
+      case 'reading':  PAGES.reading(main, this); break;
+      case 'books':    PAGES.books(main, this); break;
       case 'films':    PAGES.films(main, this); break;
       case 'courses':  PAGES.courses(main, this); break;
       case 'lists':    PAGES.listsPage(main, this); break;
+      case 'settings': PAGES.settings(main, this); break;
+      // still reachable via books module tabs:
+      case 'year':     PAGES.year(main, this); break;
+      case 'library':  PAGES.library(main, this); break;
+      case 'add-book': PAGES.addBook(main, this); break;
+      case 'stats':    PAGES.stats(main, this); break;
+      case 'notes':    PAGES.notes(main, this); break;
     }
   },
 
