@@ -4096,7 +4096,7 @@ function setMcDate(){
   const fmt=days[d.getDay()]+' '+d.getDate()+' '+months[d.getMonth()]+' '+d.getFullYear();
   if(hidden)hidden.value=fmt;
   if(display)display.textContent=fmt;
-  updateMcEmail&&updateMcEmail();
+  typeof updateMcEmail!=='undefined'&&updateMcEmail();
 }
 function resetMcDate(){
   const today=new Date().toISOString().split('T')[0];
