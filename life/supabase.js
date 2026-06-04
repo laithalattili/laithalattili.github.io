@@ -56,6 +56,14 @@ const DB = {
     return true;
   },
 
+  async deleteWhere(table, field, value) {
+    const res = await fetch(`${this.url}/rest/v1/${table}?${field}=eq.${value}`, {
+      method: 'DELETE', headers: this.headers()
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return true;
+  },
+
   async upsert(table, data, onConflict = 'id') {
     const res = await fetch(`${this.url}/rest/v1/${table}?on_conflict=${onConflict}`, {
       method: 'POST',
