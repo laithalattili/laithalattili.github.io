@@ -845,6 +845,11 @@ window.addEventListener('unhandledrejection',function(e){
   var o=document.getElementById('err-overlay');
   if(o){o.style.display='block';o.textContent=(o.textContent||'')+'PROMISE REJECTION: '+(e.reason&&e.reason.stack?e.reason.stack:String(e.reason));}
 });
+// Safety stubs in case main script hasn't loaded yet
+function pinPress(d){
+  // Drain any queued presses from before script loaded
+  if(window._pinQueue&&window._pinQueue.length){const q=window._pinQueue;window._pinQueue=[];q.forEach(x=>pinPress(x));}window._pinQueue=window._pinQueue||[];window._pinQueue.push(d);}
+function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
 </script>
 
 <!-- PIN SCREEN -->
@@ -4182,6 +4187,7 @@ function acInput(px){
 }
 function hideAC(px){const l=document.getElementById(px+'-ac');if(l)l.style.display='none';}
 function selectStu(px,name,tutor,email,first,grade){
+  if(px==='cfv'){cfvSelectStudent(name,tutor,email,first,grade);return;}
   document.getElementById(px+'-student').value=name;
   const ti=document.getElementById(px+'-tutor');if(ti)ti.value=tutor;
   const h=document.getElementById(px+'-hint');if(h){h.textContent='Tutor: '+tutor+' · '+grade;h.style.display='block';}
@@ -7341,12 +7347,7 @@ function cfvSelectStudent(name,tutor,email,first,grade){
   if(inp)inp.value=name;
 }
 
-// Override selectStu to also handle cfv prefix
-const _origSelectStu=selectStu;
-function selectStu(px,name,tutor,email,first,grade){
-  if(px==='cfv'){cfvSelectStudent(name,tutor,email,first,grade);return;}
-  _origSelectStu(px,name,tutor,email,first,grade);
-}
+// selectStu cfv case merged into original above
 
 // acInput cfv case merged into original acInput above
 
