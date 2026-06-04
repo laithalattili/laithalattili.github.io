@@ -8066,13 +8066,13 @@ function amGetNext(){
 }
 function _fmtCd(mins){
   const tot=Math.round(mins*60),ot=tot<0,ab=Math.abs(tot);
-  const useLong=S.amCdLong||false;
-  if(useLong){
-    const h=Math.floor(ab/3600),m=Math.floor((ab%3600)/60),s=ab%60;
-    return{str:(ot?'+':'')+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0'),ot};
+  const useCompact=S.amCdLong||false; // amCdLong now means compact MM:SS
+  const h=Math.floor(ab/3600),m=Math.floor((ab%3600)/60),s=ab%60;
+  if(useCompact){
+    const tm=Math.floor(ab/60);
+    return{str:(ot?'+':'')+String(tm).padStart(2,'0')+':'+String(s).padStart(2,'0'),ot};
   }
-  const m=Math.floor(ab/60),s=ab%60;
-  return{str:(ot?'+':'')+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0'),ot};
+  return{str:(ot?'+':'')+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0'),ot};
 }
 function toggleAmCdFormat(){
   S.amCdLong=!(S.amCdLong||false);saveSettings();_amLastCtxKey='';amRender();
@@ -8599,7 +8599,7 @@ function amRender(){
     } else {
       const nv=document.getElementById('am-now-val-el');if(nv)nv.textContent=nowStr;
       const fc=document.getElementById('am-free-cd-el');const next=amGetNext();
-      if(fc&&next){const{str}=_fmtCd(next.minUntil);fc.textContent=str;}
+      if(fc&&next){const tot=Math.round(next.minUntil*60),ab=Math.abs(tot),hh=Math.floor(ab/3600),mm=Math.floor((ab%3600)/60),ss=ab%60;fc.textContent=String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');}
     }
     return;
   }
@@ -8682,7 +8682,7 @@ function amRender(){
 
 function _amTimeRow(nowStr,rem){
   const{str,ot}=_fmtCd(rem);
-  const fmtHint=S.amCdLong?'tap · MM:SS':'tap · HH:MM:SS';
+  const fmtHint=S.amCdLong?'tap · HH:MM:SS':'tap · MM:SS';
   return`<div class="am-time-row">
     <div class="am-cd-block" onclick="toggleAmCdFormat()" title="${fmtHint}">
       <div class="am-cd-val${ot?' overtime':''}" id="am-cd-val-el">${str}</div>
@@ -8702,7 +8702,8 @@ function _amProgBar(pct,st,et){
 
 function _amNextHtml(next){
   if(!next)return`<div class="am-next-card"><div class="am-next-lbl">After this</div><div style="font-size:12px;color:#777;text-align:center;padding:.25rem">No more commitments today</div></div>`;
-  const{str}=_fmtCd(next.minUntil);
+  const tot2=Math.round(next.minUntil*60),ab2=Math.abs(tot2),hh2=Math.floor(ab2/3600),mm2=Math.floor((ab2%3600)/60),ss2=ab2%60;
+  const str=String(hh2).padStart(2,'0')+':'+String(mm2).padStart(2,'0')+':'+String(ss2).padStart(2,'0');
   return`<div class="am-next-card"><div class="am-next-lbl">Up Next · in ${str}</div><div class="am-next-row"><div class="am-next-dot" style="background:${next.cat.color}"></div><span class="am-next-name">${next.label}</span><span class="am-next-time">${next.st}</span></div></div>`;
 }
 
@@ -8811,7 +8812,7 @@ function amAddLiveItem(){
 
 function _amFreeHtml(nowStr){
   const next=amGetNext();
-  const{str}=next?_fmtCd(next.minUntil):{str:'—'};
+  const str=next?(()=>{const tot=Math.round(next.minUntil*60),ab=Math.abs(tot),hh=Math.floor(ab/3600),mm=Math.floor((ab%3600)/60),ss=ab%60;return String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0')})():'—';
   if(!next)return`<div class="am-time-row"><div class="am-now-block"><div class="am-now-lbl">Now</div><div class="am-now-val" id="am-now-val-el">${nowStr}</div></div></div><div class="am-free-card" style="margin-top:.75rem"><div class="am-free-lbl">No more commitments today</div></div>`;
   const h=Math.floor(next.minUntil/60),m=Math.round(next.minUntil%60);
   const human=h>0?`${h}h ${m}m`:m===1?'1 minute':`${m} minutes`;
