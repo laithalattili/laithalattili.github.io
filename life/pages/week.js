@@ -367,6 +367,7 @@ PAGES.showDayDetail = (dateStr, app, weekOffset = 0) => {
           const entry = { book_id: plan.book.bookId, date: dateStr, pages_planned: plan.pagesPlanned, pages_read: pages, is_review: plan.type === 'review', notes: '', current_page_after: endPage };
           if (plan.logId) await DB.update('reading_log', plan.logId, entry);
           else await DB.insert('reading_log', entry);
+          if (endPage) await DB.update('yearly_queue', plan.book.queueId, { current_page: endPage });
           app.closeModal();
           app.notify('Logged ✓', 'success');
           await app.refreshData();
@@ -402,6 +403,9 @@ PAGES.showDayDetail = (dateStr, app, weekOffset = 0) => {
         }
         app.closeModal();
         app.notify('Week logged ✓', 'success');
+        // Update current_page in yearly_queue to reflect how far we've read
+        const schedItem2 = app.schedule.find(s => s.bookId === bookId);
+        if (schedItem2) await DB.update('yearly_queue', schedItem2.queueId, { current_page: targetPage });
         await app.refreshData();
         PAGES.week(document.getElementById('main-content'), app, weekOffset);
       } catch(e) { app.notify('Failed: ' + e.message, 'error'); }
@@ -460,6 +464,12 @@ PAGES.showDayDetail = (dateStr, app, weekOffset = 0) => {
         }
         app.closeModal();
         app.notify('Saved ✓', 'success');
+        // Update current_page in yearly_queue for each book that was logged
+        for (let idx = 0; idx < dayPlans.length; idx++) {
+          const plan = dayPlans[idx];
+          const endPage = parseInt(document.querySelector(`.inp-end[data-idx="${idx}"]`)?.value) || null;
+          if (endPage) await DB.update('yearly_queue', plan.book.queueId, { current_page: endPage });
+        }
         await app.refreshData();
         PAGES.week(document.getElementById('main-content'), app, weekOffset);
       } catch(e) { app.notify('Failed: ' + e.message, 'error'); }
