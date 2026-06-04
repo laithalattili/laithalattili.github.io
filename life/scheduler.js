@@ -102,6 +102,32 @@ const SCHEDULER = {
     const currentPage = parseInt(queueItem.current_page) || startPage;
     const pagesLeft = Math.max(1, totalPages - Math.max(startPage, currentPage) + 1);
 
+    // If reading is already finished, skip reading phase and go straight to review
+    if (currentPage >= totalPages) {
+      const plan = [];
+      const readEnd = startDate;
+      const reviewStart = startDate;
+      let date = reviewStart;
+      let rPage = startPage;
+      let days = 0;
+      while (rPage <= totalPages && days < 200) {
+        let pp = this.getReviewPagesForDate(date, rev, calRules);
+        if (pp > 0) {
+          const from = rPage;
+          const to = Math.min(rPage + pp - 1, totalPages);
+          plan.push({date, fromPage:from, toPage:to, pages:to-from+1, type:'review'});
+          rPage = to + 1;
+        } else {
+          plan.push({date, fromPage:rPage, toPage:rPage, pages:0, type:'review-rest'});
+        }
+        date = this.addDays(date, 1);
+        days++;
+      }
+      const reviewDays = plan.filter(p => p.type==='review' && p.pages>0);
+      const reviewEnd = reviewDays.length ? reviewDays[reviewDays.length-1].date : startDate;
+      return {plan, readStart:startDate, readEnd, reviewStart, reviewEnd};
+    }
+
     const plan = [];
     let page = Math.max(startPage, Math.min(currentPage, totalPages));
     let date = startDate;

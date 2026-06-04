@@ -318,14 +318,15 @@ const APP = {
       const qItem = this.yearQueue.find(q => q.id === s.queueId);
       if (!qItem || !qItem.book) continue;
       const book = qItem.book;
-      const currentPage = parseInt(qItem.current_page) || parseInt(qItem.start_page) || 1;
+      const startPage = parseInt(qItem.start_page) || 1;
+      const currentPage = parseInt(qItem.current_page) || startPage;
       const totalPages = parseInt(book.pages) || 1;
       const readingFinished = currentPage >= totalPages;
 
-      // Check if review is fully logged
+      // Check if review is fully logged (total review pages logged >= pages in book)
       const reviewLogs = this.readingLog.filter(l => l.book_id === book.id && l.is_review);
       const reviewPagesLogged = reviewLogs.reduce((sum, l) => sum + (l.pages_read || 0), 0);
-      const reviewFinished = readingFinished && reviewPagesLogged >= totalPages;
+      const reviewFinished = readingFinished && reviewPagesLogged >= (totalPages - startPage + 1);
 
       let correctStatus;
       if (reviewFinished)                                                         correctStatus = 'completed';
