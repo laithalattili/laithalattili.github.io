@@ -8094,7 +8094,10 @@ function amOpen(){
   _amOpen=true;_amDismissed=null;_amLastCtxKey='';
   document.getElementById('am-panel').classList.add('open');
   amRender();if(_amInterval)clearInterval(_amInterval);
-  _amInterval=setInterval(amRender,1000);
+  _amInterval=setInterval(amRender,500); // 500ms catches missed ticks on mobile
+  // Force re-sync when tab becomes visible again (mobile browser throttling)
+  document.removeEventListener('visibilitychange',_amVisHandler);
+  document.addEventListener('visibilitychange',_amVisHandler);
 }
 function amClose(){
   _amOpen=false;
@@ -8108,6 +8111,7 @@ function amClose(){
   }
   document.getElementById('am-panel').classList.remove('open');
   if(_amInterval){clearInterval(_amInterval);_amInterval=null;}
+  document.removeEventListener('visibilitychange',_amVisHandler);
   _updateLiveBtn();
 }
 function amOpenNotes(){
@@ -8578,6 +8582,7 @@ function amDeleteBullet(label,week,idx,day,id){
 
 let _amLastCtxKey='';
 
+function _amVisHandler(){if(!document.hidden&&_amOpen){_amLastCtxKey='';amRender();}}
 function amRender(){
   const ctx=amGetCtx();_updateLiveBtn();_amAutoCheck();
   const body=document.getElementById('am-body');if(!body)return;
