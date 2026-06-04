@@ -834,6 +834,23 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 </style>
 </head>
 <body>
+<div id="err-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);color:#fff;font-size:12px;padding:20px;z-index:99999;overflow:auto;font-family:monospace;white-space:pre-wrap"></div>
+<script>
+window.onerror=function(msg,src,line,col,err){
+  var o=document.getElementById('err-overlay');
+  if(o){o.style.display='block';o.textContent='JS ERROR:
+'+msg+'
+Line:'+line+'
+'+(err&&err.stack?err.stack:'');}
+  return false;
+};
+window.addEventListener('unhandledrejection',function(e){
+  var o=document.getElementById('err-overlay');
+  if(o){o.style.display='block';o.textContent=(o.textContent||'')+'PROMISE REJECTION:
+'+(e.reason&&e.reason.stack?e.reason.stack:e.reason)+'
+';}
+});
+</script>
 
 <!-- PIN SCREEN -->
 <div id="sync-loader" style="display:none;position:fixed;inset:0;background:rgba(255,255,255,.95);z-index:9998;flex-direction:column;align-items:center;justify-content:center;gap:12px">
