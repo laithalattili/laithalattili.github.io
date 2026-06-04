@@ -8647,6 +8647,9 @@ function amRender(){
     const cdEl=document.getElementById('am-cd-val-el');
     if(cdEl){cdEl.textContent=str;cdEl.className='am-cd-val'+(ot?' overtime':'');}
     const nwEl=document.getElementById('am-now-val-el');if(nwEl)nwEl.textContent=nowStr;
+    // Update 'next commitment' countdown even when current slot is non-commitment
+    const fcEl=document.getElementById('am-free-cd-el');const fcNext=amGetNext();
+    if(fcEl&&fcNext){const tot=Math.round(fcNext.minUntil*60),ab=Math.abs(tot),hh=Math.floor(ab/3600),mm=Math.floor((ab%3600)/60),ss=ab%60;fcEl.textContent=String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');}
     const pb=document.getElementById('am-prog-bar-el');
     if(pb){
       pb.style.width=pct+'%';
