@@ -57,7 +57,7 @@ const DB = {
   },
 
   async deleteWhere(table, field, value) {
-    const res = await fetch(`${this.url}/rest/v1/${table}?${field}=eq.${value}`, {
+    const res = await fetch(`${this.url}/rest/v1/${table}?${field}=eq.${encodeURIComponent(value)}`, {
       method: 'DELETE', headers: this.headers()
     });
     if (!res.ok) throw new Error(await res.text());

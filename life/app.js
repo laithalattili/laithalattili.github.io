@@ -313,29 +313,30 @@ const APP = {
     const today = SCHEDULER.formatDate(new Date());
     const updates = new Map(); // book.id -> correct status
 
-    // Books with a schedule entry: derive status from progress first, then dates
+    // Books with a schedule entry: derive status from page progress first, then dates
     for (const s of this.schedule) {
       const qItem = this.yearQueue.find(q => q.id === s.queueId);
       if (!qItem || !qItem.book) continue;
       const book = qItem.book;
-      const startPage   = parseInt(qItem.start_page) || 1;
-      const currentPage = parseInt(qItem.current_page) || startPage;
-      const totalPages  = parseInt(book.pages) || 1;
-      const readingFinished = currentPage >= totalPages;
-
-      // Review is finished when review pages logged >= pages in the book range
-      const reviewLogs = this.readingLog.filter(l => l.book_id === book.id && l.is_review);
-      const reviewPagesLogged = reviewLogs.reduce((sum, l) => sum + (l.pages_read || 0), 0);
-      const bookPageCount = totalPages - startPage + 1;
-      const reviewFinished = readingFinished && reviewPagesLogged >= bookPageCount;
+      const totalPages = parseInt(book.pages) || 200;
+      const currentPage = parseInt(qItem.current_page) || 0;
+      const bookLogs = this.readingLog.filter(l => l.book_id === book.id && l.is_review);
+      const reviewPagesLogged = bookLogs.reduce((sum, l) => sum + (l.pages_read || 0), 0);
 
       let correctStatus;
-      if (reviewFinished)                                                         correctStatus = 'completed';
-      else if (readingFinished)                                                   correctStatus = 'review';
-      else if (s.reviewEnd < today)                                               correctStatus = 'completed';
-      else if (s.reviewStart <= today && s.reviewEnd >= today)                    correctStatus = 'review';
-      else if (s.readStart <= today && s.readEnd >= today)                        correctStatus = 'reading';
-      else                                                                        correctStatus = 'to-read';
+      if (currentPage >= totalPages && reviewPagesLogged >= totalPages) {
+        correctStatus = 'completed';
+      } else if (currentPage >= totalPages) {
+        correctStatus = 'review';
+      } else if (s.reviewEnd < today) {
+        correctStatus = 'completed';
+      } else if (s.reviewStart <= today && s.reviewEnd >= today) {
+        correctStatus = 'review';
+      } else if (s.readStart <= today && s.readEnd >= today) {
+        correctStatus = 'reading';
+      } else {
+        correctStatus = 'to-read';
+      }
       if (book.status !== correctStatus) updates.set(book.id, correctStatus);
     }
 

@@ -367,7 +367,9 @@ PAGES.showDayDetail = (dateStr, app, weekOffset = 0) => {
           const entry = { book_id: plan.book.bookId, date: dateStr, pages_planned: plan.pagesPlanned, pages_read: pages, is_review: plan.type === 'review', notes: '', current_page_after: endPage };
           if (plan.logId) await DB.update('reading_log', plan.logId, entry);
           else await DB.insert('reading_log', entry);
-          if (endPage) await DB.update('yearly_queue', plan.book.queueId, { current_page: endPage });
+          // Fix: update current_page on the queue item
+          const qItem = app.yearQueue.find(q => q.book_id === plan.book.bookId);
+          if (qItem) await DB.update('yearly_queue', qItem.id, { current_page: endPage });
           app.closeModal();
           app.notify('Logged ✓', 'success');
           await app.refreshData();
@@ -401,11 +403,11 @@ PAGES.showDayDetail = (dateStr, app, weekOffset = 0) => {
           }
           d = SCHEDULER.addDays(d, 1);
         }
+        // Fix: update current_page on the queue item
+        const qItem = app.yearQueue.find(q => q.book_id === bookId);
+        if (qItem) await DB.update('yearly_queue', qItem.id, { current_page: targetPage });
         app.closeModal();
         app.notify('Week logged ✓', 'success');
-        // Update current_page in yearly_queue to reflect how far we've read
-        const schedItem2 = app.schedule.find(s => s.bookId === bookId);
-        if (schedItem2) await DB.update('yearly_queue', schedItem2.queueId, { current_page: targetPage });
         await app.refreshData();
         PAGES.week(document.getElementById('main-content'), app, weekOffset);
       } catch(e) { app.notify('Failed: ' + e.message, 'error'); }
@@ -462,14 +464,17 @@ PAGES.showDayDetail = (dateStr, app, weekOffset = 0) => {
             else await DB.insert('reading_log', logEntry);
           }
         }
-        app.closeModal();
-        app.notify('Saved ✓', 'success');
-        // Update current_page in yearly_queue for each book that was logged
+        // Fix: update current_page on each book's queue item
         for (let idx = 0; idx < dayPlans.length; idx++) {
           const plan = dayPlans[idx];
-          const endPage = parseInt(document.querySelector(`.inp-end[data-idx="${idx}"]`)?.value) || null;
-          if (endPage) await DB.update('yearly_queue', plan.book.queueId, { current_page: endPage });
+          const endPageVal = parseInt(document.querySelector(`.inp-end[data-idx="${idx}"]`)?.value) || null;
+          if (endPageVal) {
+            const qItem = app.yearQueue.find(q => q.book_id === plan.book.bookId);
+            if (qItem) await DB.update('yearly_queue', qItem.id, { current_page: endPageVal });
+          }
         }
+        app.closeModal();
+        app.notify('Saved ✓', 'success');
         await app.refreshData();
         PAGES.week(document.getElementById('main-content'), app, weekOffset);
       } catch(e) { app.notify('Failed: ' + e.message, 'error'); }
