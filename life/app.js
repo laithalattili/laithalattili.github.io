@@ -313,13 +313,24 @@ const APP = {
     const today = SCHEDULER.formatDate(new Date());
     const updates = new Map(); // book.id -> correct status
 
-    // Books with a schedule entry: derive status from dates
+    // Books with a schedule entry: derive status from progress first, then dates
     for (const s of this.schedule) {
       const qItem = this.yearQueue.find(q => q.id === s.queueId);
       if (!qItem || !qItem.book) continue;
       const book = qItem.book;
+      const currentPage = parseInt(qItem.current_page) || parseInt(qItem.start_page) || 1;
+      const totalPages = parseInt(book.pages) || 1;
+      const readingFinished = currentPage >= totalPages;
+
+      // Check if review is fully logged
+      const reviewLogs = this.readingLog.filter(l => l.book_id === book.id && l.is_review);
+      const reviewPagesLogged = reviewLogs.reduce((sum, l) => sum + (l.pages_read || 0), 0);
+      const reviewFinished = readingFinished && reviewPagesLogged >= totalPages;
+
       let correctStatus;
-      if (s.reviewEnd < today)                                                    correctStatus = 'completed';
+      if (reviewFinished)                                                         correctStatus = 'completed';
+      else if (readingFinished)                                                   correctStatus = 'review';
+      else if (s.reviewEnd < today)                                               correctStatus = 'completed';
       else if (s.reviewStart <= today && s.reviewEnd >= today)                    correctStatus = 'review';
       else if (s.readStart <= today && s.readEnd >= today)                        correctStatus = 'reading';
       else                                                                        correctStatus = 'to-read';
