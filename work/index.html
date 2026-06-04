@@ -8887,7 +8887,7 @@ function amExportDocx(){
 }
 
 // ── Wire into clock tick ──────────────────────────────────────────
-setInterval(()=>{if(_amOpen)amRender();_updateLiveBtn();_amAutoCheck();},1000);
+setInterval(()=>{if(!_amOpen)_updateLiveBtn();_amAutoCheck();},1000);
 
 // ── Init ──────────────────────────────────────────────────────────
 function initActiveMode(){
