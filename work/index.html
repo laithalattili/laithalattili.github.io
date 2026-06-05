@@ -28734,7 +28734,7 @@ function _amStartLpRaf(){
         const elapsed=manualStart?Math.max(0,(Date.now()-manualStart)/60000):Math.max(0,fnm-t2m(getSlotTime(slotIdx)));
         const{segments}=pacingStateFromBullets(bullets,elapsed);
         bullets.forEach(function(b,i){
-          const el=document.getElementById('lp-timer-'+i);if(!el)return;
+          const el=document.getElementById('lp-timer-'+i);if(!el){if(i===0)console.log('RAF: lp-timer-0 NOT FOUND');return;}
           const seg=segments.find(function(s){return s._bIdx===i;});
           if(seg){
             const secRem=seg.dur-(elapsed-seg.absStart);
@@ -28795,6 +28795,7 @@ function amRender(){
   const ctxKey=`${dayName}_${slotIdx}_${liveLen}_${planLen}_${stateStr}_${lessonDoneStr}_${manualStart}_${isOverNow}_${lpHash}_${pointsHash}_${rosterState}_${tmtgHash}`;
 
   if(_amLastCtxKey!==ctxKey){
+    console.log('AM REBUILD',ctxKey.slice(0,60));
     _amLastCtxKey=ctxKey;
     if(titleEl)titleEl.textContent=label;
     if(subEl)subEl.textContent=`${st}–${et} · ${dayName}`;
