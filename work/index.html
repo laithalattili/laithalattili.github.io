@@ -28697,11 +28697,11 @@ function _amLessonHtml(ctx,nowStr){
       const timerColor=isCurSec?(secRem<0?(secRem<-2?'#ef4444':'#f97316'):'#22c55e'):isPast?'#333':'#444';
       const barPct=isCurSec?Math.min(100,Math.max(0,(1-(secRem/sec.dur))*100)):isPast?100:0;
       const bg=isCurSec?(isLate?'background:#1a0808;border-color:#ef444440':'background:#071a07;border-color:#22c55e40'):'background:#0d0d0d;border-color:#1a1a1a';
-      const textColor=isDone?'#333':isCurSec?(isLate?'#fca5a5':'#d0d0d0'):isPast?'#444':'#666';
+      const textColor=isDone?'#333':isCurSec?(isLate?'#fca5a5':'#ffffff'):isPast?'#888':'#777';
       return`<div class="lp-row${isCurSec?' lp-current':''}${isPast?' lp-past':''}" style="${bg}">
         <div class="lp-done-btn${isDone?' lp-done-active':''}" onclick="amLessonToggleDone('${label}',${offset},${slotIdx},'${dayName}','${sec.id}',${!isDone})">${isDone?'✓':''}</div>
         <div class="lp-body">
-          <div class="lp-name" style="color:${textColor};${isDone?'text-decoration:line-through;':''}">${isLate?'<span style="color:#ef4444;font-size:10px;margin-right:3px">⚠</span>':''}${_esc(sec.name)}</div>
+          <div class="lp-name" style="color:${textColor};${isCurSec?'font-size:15px;font-weight:700;':''}${isDone?'text-decoration:line-through;':''}">${isLate?'<span style="color:#ef4444;font-size:10px;margin-right:3px">⚠</span>':''}${_esc(sec.text||sec.name||'')}</div>
           ${isCurSec?`<div class="lp-bar-bg"><div class="lp-bar" style="width:${barPct}%;background:${isLate?'#ef4444':'#22c55e'}"></div></div>`:''}
         </div>
         <div class="lp-timer" style="color:${timerColor}">${timerStr}</div>
