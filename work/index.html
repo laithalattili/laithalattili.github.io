@@ -2251,7 +2251,7 @@ function ipPress(d){
 function ipDel(){if(ipEntry.length>0){ipEntry=ipEntry.slice(0,-1);updatePinDots('ip',ipEntry.length);}}
 
 // ── CLOCK ─────────────────────────────────────────────
-setInterval(function(){var els=document.querySelectorAll('[data-endms]');if(els.length)console.log('TIMER els:',els.length,els[0].getAttribute('data-endms'));els.forEach(function(el){var endMs=parseInt(el.getAttribute('data-endms'));if(!endMs)return;var rem=endMs-Date.now();var ot=rem<0;var ab=Math.abs(rem);var mm=Math.floor(ab/60000),ss=Math.floor((ab%60000)/1000);var str=(ot?'+':'')+String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');console.log('TIMER update:',str,'current:',el.textContent);el.textContent=str;el.style.color=ot?(rem<-120000?'#ef4444':'#f97316'):'#22c55e';});},500);
+setInterval(function(){document.querySelectorAll('[data-endms]').forEach(function(el){var endMs=parseInt(el.getAttribute('data-endms'));if(!endMs)return;var rem=endMs-Date.now();var ot=rem<0;var ab=Math.abs(rem);var mm=Math.floor(ab/60000),ss=Math.floor((ab%60000)/1000);var str=(ot?'+':'')+String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');el.textContent=str;el.style.color=ot?(rem<-120000?'#ef4444':'#f97316'):'#22c55e';});},500);
 let _wakeLock=null;
 async function _amRequestWakeLock(){
   if(!('wakeLock' in navigator)){console.log('Wake lock not supported');return;}
@@ -28798,7 +28798,9 @@ function amRender(){
   const rosterState=linkedCls?String(localStorage.getItem('am_roster_collapsed_'+linkedCls.id)||'0'):'';
   // Include tmtg notes hash so form edits trigger rebuild
   const tmtgHash=isTutorMtg?(()=>{try{const d=localStorage.getItem('tmtg_notes_'+(linkedCls?linkedCls.id:label.replace(/\s+/g,'_'))+'_'+today);return d?String(d.length):'0';}catch(e){return'0';}})():'';
-  const ctxKey=`${dayName}_${slotIdx}_${liveLen}_${planLen}_${stateStr}_${lessonDoneStr}_${manualStart}_${isOverNow}_${lpHash}_${pointsHash}_${rosterState}_${tmtgHash}`;
+  // For lesson slots, add current second so timer always rebuilds fresh
+  const lessonSecond=isLessonCtx?new Date().getSeconds():'';
+  const ctxKey=`${dayName}_${slotIdx}_${liveLen}_${planLen}_${stateStr}_${lessonDoneStr}_${manualStart}_${isOverNow}_${lpHash}_${pointsHash}_${rosterState}_${tmtgHash}_${lessonSecond}`;
 
   if(_amLastCtxKey!==ctxKey){
     _amLastCtxKey=ctxKey;
