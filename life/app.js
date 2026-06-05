@@ -209,6 +209,7 @@ const APP = {
           <button class="icon-btn" id="btn-lock" title="Lock app">⏻</button>
         </div>
       </header>
+      <div id="info-bar" style="display:none;"></div>
       <nav id="main-nav">
         <div class="nav-item" data-page="reading">Reading</div>
         <div class="nav-item" data-page="books">Books</div>
@@ -232,7 +233,39 @@ const APP = {
       if (page) this.navigate(page);
     });
 
+    this.initInfoBar();
     // bottom nav wired in index.html
+  },
+
+  async initInfoBar() {
+    const bar = document.getElementById('info-bar');
+    if (!bar) return;
+    const showBar = await DB.getSetting('show_info_bar');
+    if (showBar !== 'true') return;
+    const birthday = await DB.getSetting('birthday') || '1993-12-30';
+    bar.style.display = 'flex';
+    this.updateInfoBar(bar, birthday);
+    setInterval(() => this.updateInfoBar(bar, birthday), 1000);
+  },
+
+  updateInfoBar(bar, birthday) {
+    const now = new Date();
+    const jo = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Amman', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(now);
+    const cn = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(now);
+    const dateStr = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const bday = new Date(birthday);
+    const ageDiff = now - bday;
+    const ageDate = new Date(ageDiff);
+    const age = Math.abs(ageDate.getUTCFullYear() - 1970);
+    bar.innerHTML = `
+      <div class="info-bar-item"><span class="info-bar-label">JO</span><span class="info-bar-value">${jo}</span></div>
+      <div class="info-bar-sep">·</div>
+      <div class="info-bar-item"><span class="info-bar-label">CN</span><span class="info-bar-value">${cn}</span></div>
+      <div class="info-bar-sep">·</div>
+      <div class="info-bar-item info-bar-date">${dateStr}</div>
+      <div class="info-bar-sep">·</div>
+      <div class="info-bar-item"><span class="info-bar-label">Age</span><span class="info-bar-value">${age}</span></div>
+    `;
   },
 
   async loadData() {
@@ -383,7 +416,6 @@ const APP = {
       case 'courses':  PAGES.courses(main, this); break;
       case 'lists':    PAGES.listsPage(main, this); break;
       case 'settings': PAGES.settings(main, this); break;
-      // still reachable via books module tabs:
       case 'year':     PAGES.year(main, this); break;
       case 'library':  PAGES.library(main, this); break;
       case 'add-book': PAGES.addBook(main, this); break;
