@@ -2251,7 +2251,7 @@ function ipPress(d){
 function ipDel(){if(ipEntry.length>0){ipEntry=ipEntry.slice(0,-1);updatePinDots('ip',ipEntry.length);}}
 
 // ── CLOCK ─────────────────────────────────────────────
-setInterval(function(){document.querySelectorAll('[data-endms]').forEach(function(el){var endMs=parseInt(el.getAttribute('data-endms'));if(!endMs)return;var rem=endMs-Date.now();var ot=rem<0;var ab=Math.abs(rem);var mm=Math.floor(ab/60000),ss=Math.floor((ab%60000)/1000);var str=(ot?'+':'')+String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');if(el.textContent!==str){el.textContent=str;el.style.color=ot?(rem<-120000?'#ef4444':'#f97316'):'#22c55e';}});},500);
+setInterval(function(){var els=document.querySelectorAll('[data-endms]');if(els.length)console.log('TIMER els:',els.length,els[0].getAttribute('data-endms'));els.forEach(function(el){var endMs=parseInt(el.getAttribute('data-endms'));if(!endMs)return;var rem=endMs-Date.now();var ot=rem<0;var ab=Math.abs(rem);var mm=Math.floor(ab/60000),ss=Math.floor((ab%60000)/1000);var str=(ot?'+':'')+String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');console.log('TIMER update:',str,'current:',el.textContent);el.textContent=str;el.style.color=ot?(rem<-120000?'#ef4444':'#f97316'):'#22c55e';});},500);
 let _wakeLock=null;
 async function _amRequestWakeLock(){
   if(!('wakeLock' in navigator)){console.log('Wake lock not supported');return;}
