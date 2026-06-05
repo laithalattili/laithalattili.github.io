@@ -55,9 +55,9 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .sh-date-big{font-size:13px;color:#666;margin-top:3px;letter-spacing:.02em}
 .sh-colon{animation:sh-blink 1s step-start infinite}
 @keyframes sh-blink{0%,100%{opacity:1}50%{opacity:.15}}
-.sh-meta{display:flex;align-items:center;justify-content:space-between;padding:4px .75rem 5px;border-top:1px solid #161616}
+.sh-meta{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:4px .75rem 5px;border-top:1px solid #161616}
 .sh-title{font-size:10px;font-weight:600;color:#444;text-transform:uppercase;letter-spacing:.06em}
-.sh-actions{display:flex;gap:6px;align-items:center}
+.sh-actions{display:flex;gap:6px;align-items:center;justify-content:flex-end}
 #main-app{display:none}
 .app{padding:.75rem;max-width:440px;margin:0 auto;padding-bottom:80px}
 
@@ -28453,9 +28453,9 @@ function _amLessonHtml(ctx,nowStr){
         <span class="cl-text" style="color:${d2?'#444':'#fbbf24'};${d2?'text-decoration:line-through;':''}flex:1">${_esc(b.text)}</span>
         <span class="cl-live-badge">LIVE</span>
       </div>`;
-    }).join(''):`<div style="font-size:11px;color:#333;padding:4px 0 2px">Nothing added yet.</div>`}
+    }).join(''):''}
     <div class="am-live-add">
-      <input class="am-live-input" id="am-live-inp" placeholder="Add a note for this occurrence..." onkeydown="if(event.key==='Enter'){amAddLiveItem();event.preventDefault();}">
+      <input class="am-live-input" id="am-live-inp" placeholder="+ note" onkeydown="if(event.key==='Enter'){amAddLiveItem();event.preventDefault();}">
       <button class="am-live-submit" onclick="amAddLiveItem()">+</button>
     </div>
   </div>`;
@@ -28712,13 +28712,13 @@ function _amLessonHtml(ctx,nowStr){
   const live=snGetLive(offset,slotIdx,dayName);
   const liveItems=live.filter(b=>b.text.trim());
   const state=_getCheckState(offset,slotIdx,dayName);
-  html+=`<div class="am-cl-section" style="margin-top:6px"><div class="cl-section-sep" style="color:#f59f00;border-top:none;padding-top:0">⊙ This occurrence</div>${liveItems.length?liveItems.map(b=>{const d2=!!state[b.id];return`<div class="cl-item${d2?' done':''}" data-id="${b.id}"><div class="cl-check${d2?' checked':''}" onclick="amToggleCheck('${b.id}',true,${JSON.stringify(d2)})"></div><span style="font-size:10px;color:#f59f00;margin-right:5px">◆</span><span class="cl-text" style="color:${d2?'#444':'#fbbf24'};${d2?'text-decoration:line-through;':''}flex:1">${_esc(b.text)}</span><span class="cl-live-badge">LIVE</span></div>`;}).join(''):`<div style="font-size:11px;color:#333;padding:4px 0 2px">Nothing added yet.</div>`}<div class="am-live-add"><input class="am-live-input" id="am-live-inp" placeholder="Add a note for this occurrence..." onkeydown="if(event.key==='Enter'){amAddLiveItem();event.preventDefault();}" /><button class="am-live-submit" onclick="amAddLiveItem()">+</button></div></div>`;
+  html+=`<div class="am-cl-section" style="margin-top:6px"><div class="cl-section-sep" style="color:#f59f00;border-top:none;padding-top:0">⊙ This occurrence</div>${liveItems.length?liveItems.map(b=>{const d2=!!state[b.id];return`<div class="cl-item${d2?' done':''}" data-id="${b.id}"><div class="cl-check${d2?' checked':''}" onclick="amToggleCheck('${b.id}',true,${JSON.stringify(d2)})"></div><span style="font-size:10px;color:#f59f00;margin-right:5px">◆</span><span class="cl-text" style="color:${d2?'#444':'#fbbf24'};${d2?'text-decoration:line-through;':''}flex:1">${_esc(b.text)}</span><span class="cl-live-badge">LIVE</span></div>`;}).join(''):''}<div class="am-live-add"><input class="am-live-input" id="am-live-inp" placeholder="+ note" onkeydown="if(event.key==='Enter'){amAddLiveItem();event.preventDefault();}" /><button class="am-live-submit" onclick="amAddLiveItem()">+</button></div></div>`;
   if(linkedClass)html+=_amClassRosterHtml(linkedClass);
   html+=_amNextHtml(amGetNext());
   return html;
 }
 function _amAddSectionHtml(label){
-  return`<div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid #1a1a1a"><input type="text" id="lp-sec-name" placeholder="Section name" style="flex:1;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#ccc;font-size:12px;padding:5px 8px;font-family:inherit"><input type="number" id="lp-sec-dur" placeholder="min" min="1" max="90" style="width:52px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#ccc;font-size:12px;padding:5px 8px;text-align:center"><button onclick="amAddSection('${label}')" style="background:#1d4ed8;border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:600;padding:5px 12px;cursor:pointer">+</button></div>`;
+  return`<div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid #1a1a1a"><input type="text" id="lp-sec-name" placeholder="+ section" style="flex:1;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#ccc;font-size:12px;padding:5px 8px;font-family:inherit"><input type="number" id="lp-sec-dur" placeholder="min" min="1" max="90" style="width:52px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#ccc;font-size:12px;padding:5px 8px;text-align:center"><button onclick="amAddSection('${label}')" style="background:#1d4ed8;border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:600;padding:5px 12px;cursor:pointer">+</button></div>`;
 }
 function amDeleteBullet(label,week,idx,day,id){
   let plan=[];try{const d=localStorage.getItem('lp_'+label);plan=d?JSON.parse(d):[];}catch(e){}
@@ -28949,7 +28949,7 @@ function _amChecklistHtml(planned,live,state,offset,slotIdx,dayName){
   }
 
   html+=`<div class="am-live-add">
-    <input class="am-live-input" id="am-live-inp" placeholder="Add a note for this occurrence..." onkeydown="if(event.key==='Enter'){amAddLiveItem();event.preventDefault();}">
+    <input class="am-live-input" id="am-live-inp" placeholder="+ note" onkeydown="if(event.key==='Enter'){amAddLiveItem();event.preventDefault();}">
     <button class="am-live-submit" onclick="amAddLiveItem()">+</button>
   </div></div>`;
   return html;
@@ -28962,7 +28962,7 @@ function _amEmptyPlanHtml(label){
     <div class="cl-section-sep" style="color:#f59f00">⊙ This occurrence</div>
     <div style="font-size:11px;color:#333;padding:4px 0 2px">Nothing added yet for this occurrence.</div>
     <div class="am-live-add">
-      <input class="am-live-input" id="am-live-inp" placeholder="Add a note for this occurrence..." onkeydown="if(event.key==='Enter'){amAddLiveItem();event.preventDefault();}">
+      <input class="am-live-input" id="am-live-inp" placeholder="+ note" onkeydown="if(event.key==='Enter'){amAddLiveItem();event.preventDefault();}">
       <button class="am-live-submit" onclick="amAddLiveItem()">+</button>
     </div>
   </div>`;
