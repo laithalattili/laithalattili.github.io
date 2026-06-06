@@ -736,6 +736,7 @@ PAGES.filmsLog = async (container, app) => {
           const idx = logs.findIndex(l => l.id === btn.dataset.id);
           if (idx > -1) {
             const filmId = logs[idx].film_id;
+            const logDate = logs[idx].date;
             logs.splice(idx, 1);
             watchCount[filmId] = logs.filter(l => l.film_id === filmId).length;
             const yr = btn.closest('.year-log-entries')?.dataset.year;
@@ -743,6 +744,15 @@ PAGES.filmsLog = async (container, app) => {
             if (watchCount[filmId] === 0) {
               await DB.update('films', filmId, { status: 'to-watch', updated_at: new Date().toISOString() });
             }
+            // Reset any plan items for this film on this date back to not-done
+            try {
+              const planItems = await DB.query('film_plan', { filter: { film_id: filmId, done: true } });
+              for (const p of planItems) {
+                if (p.planned_date === logDate) {
+                  await DB.update('film_plan', p.id, { done: false });
+                }
+              }
+            } catch(e) { /* film_plan reset optional */ }
           }
           app.notify('Entry removed', 'success');
           renderLog();
@@ -808,104 +818,6 @@ PAGES.filmDetail = (filmId, app, films, watchLog) => {
 };
 
 // ── Films Log ─────────────────────────────────────────────────
-PAGES.filmsLog = async (container, app) => {
-  container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
-  let logs = [], films = [];
-  try {
-    logs = await DB.query('watch_log', { order: 'date.desc' });
-    films = await DB.query('films', { order: 'title.asc' });
-  } catch(e) { container.innerHTML = `<div style="color:var(--error)">${e.message}</div>`; return; }
-
-  const filmMap = {};
-  films.forEach(f => filmMap[f.id] = f);
-
-  // Count watches per film for re-watch badge
-  const watchCount = {};
-  logs.forEach(l => { watchCount[l.film_id] = (watchCount[l.film_id]||0) + 1; });
-
-  const byYear = {};
-  logs.forEach(l => {
-    const yr = l.date ? l.date.substring(0,4) : '—';
-    if (!byYear[yr]) byYear[yr] = [];
-    byYear[yr].push(l);
-  });
-  const years = Object.keys(byYear).sort().reverse();
-
-  const renderLog = () => {
-    container.innerHTML = `
-      <div style="display:flex;justify-content:flex-end;margin-bottom:0.75rem;">
-        <span style="font-family:var(--mono);font-size:0.65rem;color:var(--text3);">${logs.length} viewings</span>
-      </div>
-      ${years.length === 0 ? '<div class="empty"><div class="empty-text">No films logged yet</div></div>' : ''}
-      ${years.map(yr => `
-        <div style="font-family:var(--mono);font-size:0.62rem;color:var(--accent);letter-spacing:0.1em;text-transform:uppercase;margin:1rem 0 0.4rem;">
-          ${yr} · ${byYear[yr].length} viewing${byYear[yr].length!==1?'s':''}
-        </div>
-        ${byYear[yr].map(l => {
-          const f = filmMap[l.film_id] || {};
-          const count = watchCount[l.film_id] || 1;
-          return `
-            <div class="book-item log-entry" data-film-id="${l.film_id}" data-log-id="${l.id}" style="cursor:pointer;">
-              <div class="book-cover" style="background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:1.2rem;min-width:48px;width:48px;">🎬</div>
-              <div class="book-info">
-                <div class="book-title">${f.title||'Unknown film'}</div>
-                <div class="book-author">${f.director||''}${f.year?' · '+f.year:''}</div>
-              </div>
-              <div class="book-right" style="gap:0.3rem;">
-                <span style="font-family:var(--mono);font-size:0.65rem;color:var(--text3);">${l.date}</span>
-                ${l.session===2?'<span class="tag gray" style="font-size:0.55rem;">Pt.2</span>':''}
-                ${count>1?`<span style="font-family:var(--mono);font-size:0.6rem;color:var(--accent);">${count}×</span>`:''}
-                <button class="btn btn-secondary btn-sm btn-del-log" data-id="${l.id}" data-film-id="${l.film_id}" style="color:var(--error);font-size:0.65rem;">×</button>
-              </div>
-            </div>
-          `;
-        }).join('')}
-      `).join('')}
-    `;
-
-    // Click entry to open film detail
-    document.querySelectorAll('.log-entry').forEach(entry =>
-      entry.addEventListener('click', e => {
-        if (e.target.closest('button')) return;
-        const f = filmMap[entry.dataset.filmId];
-        if (f) PAGES.filmDetail(f.id, app, films, logs);
-      })
-    );
-
-    // Delete log entry
-    document.querySelectorAll('.btn-del-log').forEach(btn =>
-      btn.addEventListener('click', async e => {
-        e.stopPropagation();
-        if (!confirm('Remove this watch entry?')) return;
-        try {
-          await DB.delete('watch_log', btn.dataset.id);
-          // Update logs array
-          const idx = logs.findIndex(l => l.id === btn.dataset.id);
-          if (idx > -1) {
-            const filmId = logs[idx].film_id;
-            logs.splice(idx, 1);
-            // Recalculate watch count
-            watchCount[filmId] = logs.filter(l => l.film_id === filmId).length;
-            // If no more watches, reset film status to to-watch
-            if (watchCount[filmId] === 0) {
-              await DB.update('films', filmId, { status: 'to-watch', updated_at: new Date().toISOString() });
-            }
-          }
-          // Rebuild byYear
-          Object.keys(byYear).forEach(yr => {
-            byYear[yr] = byYear[yr].filter(l => l.id !== btn.dataset.id);
-          });
-          app.notify('Entry removed', 'success');
-          renderLog();
-        } catch(err) { app.notify('Error: '+err.message, 'error'); }
-      })
-    );
-  };
-
-  renderLog();
-};
-
-// ── Log Watch Modal ───────────────────────────────────────────
 PAGES.logWatchModal = (filmId, app, films, onDone) => {
   const f = films.find(x => x.id === filmId);
   if (!f) return;
@@ -952,79 +864,164 @@ PAGES.logWatchModal = (filmId, app, films, onDone) => {
   });
 };
 
-// ── Add Film Modal ────────────────────────────────────────────
+// ── Add Film Modal (with TMDB search) ────────────────────────
 PAGES.addFilmModal = (app, onDone) => {
-  app.showModal(`
-    <div class="modal-title">Add Film</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;">
-      <div class="form-group" style="margin-bottom:0;grid-column:1/-1;">
-        <label>Title *</label>
-        <input id="af-title" placeholder="Film title">
+  // TMDB API key - free to get at themoviedb.org
+  const TMDB_KEY = ''; // Set in Settings if blank
+
+  const renderForm = (prefill = {}) => {
+    app.showModal(`
+      <div class="modal-title">Add Film</div>
+
+      <!-- TMDB Search -->
+      <div style="background:var(--bg3);border-radius:var(--radius);padding:0.6rem;margin-bottom:0.75rem;">
+        <div style="font-family:var(--mono);font-size:0.58rem;color:var(--text3);text-transform:uppercase;margin-bottom:0.4rem;">Search online to auto-fill metadata</div>
+        <div style="display:flex;gap:0.4rem;">
+          <input id="tmdb-search" placeholder="Search TMDB..." style="flex:1;" value="${prefill.title||''}">
+          <button class="btn btn-secondary btn-sm" id="btn-tmdb-search">Search</button>
+        </div>
+        <div id="tmdb-results" style="margin-top:0.4rem;max-height:120px;overflow-y:auto;"></div>
       </div>
-      <div class="form-group" style="margin-bottom:0;grid-column:1/-1;">
-        <label>Director</label>
-        <input id="af-dir" placeholder="Director">
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;">
+        <div class="form-group" style="margin-bottom:0;grid-column:1/-1;">
+          <label>Title *</label>
+          <input id="af-title" placeholder="Film title" value="${prefill.title||''}">
+        </div>
+        <div class="form-group" style="margin-bottom:0;grid-column:1/-1;">
+          <label>Director</label>
+          <input id="af-dir" placeholder="Director" value="${prefill.director||''}">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label>Year</label>
+          <input id="af-year" type="number" placeholder="1979" value="${prefill.year||''}">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label>Duration (min)</label>
+          <input id="af-runtime" type="number" placeholder="120" value="${prefill.runtime_mins||''}">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label>Country</label>
+          <input id="af-country" placeholder="France" value="${prefill.country||''}">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label>Status</label>
+          <select id="af-status">
+            <option value="to-watch">To Watch</option>
+            <option value="watched">Watched</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label>Writer</label>
+          <input id="af-writer" placeholder="Writer" value="${prefill.writer||''}">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label>DP</label>
+          <input id="af-dp" placeholder="Cinematographer" value="${prefill.dp||''}">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label>PG Rating</label>
+          <input id="af-pg" placeholder="e.g. R, PG-13" value="${prefill.pg_rating||''}">
+        </div>
+        <div class="form-group" style="margin-bottom:0;grid-column:1/-1;display:flex;gap:1rem;">
+          <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;cursor:pointer;margin-bottom:0;">
+            <input type="checkbox" id="af-fav" style="width:auto;"> Favourite ★
+          </label>
+          <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;cursor:pointer;margin-bottom:0;">
+            <input type="checkbox" id="af-owned" style="width:auto;"> Owned (DVD)
+          </label>
+        </div>
       </div>
-      <div class="form-group" style="margin-bottom:0;">
-        <label>Year</label>
-        <input id="af-year" type="number" placeholder="1979">
+      <div style="display:flex;gap:0.5rem;margin-top:1rem;">
+        <button class="btn btn-primary" id="btn-save-film">Add</button>
+        <button class="btn btn-secondary" onclick="APP.closeModal()">Cancel</button>
       </div>
-      <div class="form-group" style="margin-bottom:0;">
-        <label>Duration (min)</label>
-        <input id="af-runtime" type="number" placeholder="120">
-      </div>
-      <div class="form-group" style="margin-bottom:0;">
-        <label>Country</label>
-        <input id="af-country" placeholder="France">
-      </div>
-      <div class="form-group" style="margin-bottom:0;">
-        <label>Status</label>
-        <select id="af-status">
-          <option value="to-watch">To Watch</option>
-          <option value="watched">Watched</option>
-          <option value="owned">Owned</option>
-        </select>
-      </div>
-      <div class="form-group" style="margin-bottom:0;">
-        <label>Writer</label>
-        <input id="af-writer" placeholder="Writer">
-      </div>
-      <div class="form-group" style="margin-bottom:0;">
-        <label>DP</label>
-        <input id="af-dp" placeholder="Cinematographer">
-      </div>
-      <div class="form-group" style="margin-bottom:0;grid-column:1/-1;display:flex;align-items:center;gap:0.5rem;">
-        <input type="checkbox" id="af-fav" style="width:auto;">
-        <label for="af-fav" style="margin-bottom:0;">Favourite ★</label>
-      </div>
-    </div>
-    <div style="display:flex;gap:0.5rem;margin-top:1rem;">
-      <button class="btn btn-primary" id="btn-save-film">Add</button>
-      <button class="btn btn-secondary" onclick="APP.closeModal()">Cancel</button>
-    </div>
-  `);
-  document.getElementById('btn-save-film').addEventListener('click', async () => {
-    const title = document.getElementById('af-title').value.trim();
-    if (!title) { app.notify('Title required','error'); return; }
-    try {
-      await DB.insert('films', {
-        title,
-        director: document.getElementById('af-dir').value.trim() || null,
-        year: parseInt(document.getElementById('af-year').value) || null,
-        runtime_mins: parseInt(document.getElementById('af-runtime').value) || null,
-        country: document.getElementById('af-country').value.trim() || null,
-        status: document.getElementById('af-status').value,
-        writer: document.getElementById('af-writer').value.trim() || null,
-        dp: document.getElementById('af-dp').value.trim() || null,
-        is_favorite: document.getElementById('af-fav').checked,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
-      app.closeModal();
-      app.notify('Film added','success');
-      if (onDone) onDone();
-    } catch(e) { app.notify('Error: '+e.message,'error'); }
-  });
+    `);
+
+    // TMDB search
+    const doSearch = async () => {
+      const q = document.getElementById('tmdb-search').value.trim();
+      if (!q) return;
+      const key = TMDB_KEY || await DB.getSetting('tmdb_api_key');
+      if (!key) {
+        document.getElementById('tmdb-results').innerHTML = '<div style="font-size:0.75rem;color:var(--error);">Add your TMDB API key in Settings first</div>';
+        return;
+      }
+      document.getElementById('tmdb-results').innerHTML = '<div style="font-size:0.75rem;color:var(--text3);">Searching...</div>';
+      try {
+        const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${key}&query=${encodeURIComponent(q)}&language=en-US`);
+        const data = await res.json();
+        const results = (data.results||[]).slice(0,5);
+        if (!results.length) { document.getElementById('tmdb-results').innerHTML = '<div style="font-size:0.75rem;color:var(--text3);">No results</div>'; return; }
+        document.getElementById('tmdb-results').innerHTML = results.map(r => `
+          <div class="tmdb-result" data-id="${r.id}" style="padding:0.35rem 0.5rem;cursor:pointer;font-size:0.82rem;border-radius:4px;display:flex;justify-content:space-between;align-items:center;">
+            <span>${r.title}${r.release_date?' ('+r.release_date.substring(0,4)+')':''}</span>
+            <span style="font-family:var(--mono);font-size:0.6rem;color:var(--text3);">Select →</span>
+          </div>
+        `).join('');
+        document.querySelectorAll('.tmdb-result').forEach(el =>
+          el.addEventListener('mouseenter', () => el.style.background = 'var(--bg4)'),
+          el.addEventListener('mouseleave', () => el.style.background = '')
+        );
+        document.querySelectorAll('.tmdb-result').forEach(el =>
+          el.addEventListener('click', async () => {
+            const tmdbId = el.dataset.id;
+            document.getElementById('tmdb-results').innerHTML = '<div style="font-size:0.75rem;color:var(--text3);">Loading details...</div>';
+            try {
+              const [movie, credits] = await Promise.all([
+                fetch(`https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${key}&language=en-US`).then(r=>r.json()),
+                fetch(`https://api.themoviedb.org/3/movie/${tmdbId}/credits?api_key=${key}`).then(r=>r.json())
+              ]);
+              const director = credits.crew?.find(c=>c.job==='Director')?.name || '';
+              const writers = credits.crew?.filter(c=>['Writer','Screenplay','Story'].includes(c.job)).map(c=>c.name).join(', ') || '';
+              const dp = credits.crew?.find(c=>c.job==='Director of Photography')?.name || '';
+              const country = movie.production_countries?.[0]?.name || '';
+              const year = movie.release_date ? parseInt(movie.release_date.substring(0,4)) : '';
+              document.getElementById('af-title').value  = movie.title || '';
+              document.getElementById('af-dir').value    = director;
+              document.getElementById('af-year').value   = year;
+              document.getElementById('af-runtime').value = movie.runtime || '';
+              document.getElementById('af-country').value = country;
+              document.getElementById('af-writer').value = writers;
+              document.getElementById('af-dp').value     = dp;
+              document.getElementById('af-pg').value     = movie.adult ? 'R' : '';
+              document.getElementById('tmdb-results').innerHTML = '<div style="font-size:0.75rem;color:var(--accent);">✓ Filled from TMDB</div>';
+            } catch(e) { document.getElementById('tmdb-results').innerHTML = '<div style="font-size:0.75rem;color:var(--error);">Failed to load details</div>'; }
+          })
+        );
+      } catch(e) { document.getElementById('tmdb-results').innerHTML = '<div style="font-size:0.75rem;color:var(--error);">Search failed</div>'; }
+    };
+
+    document.getElementById('btn-tmdb-search').addEventListener('click', doSearch);
+    document.getElementById('tmdb-search').addEventListener('keydown', e => { if (e.key==='Enter') doSearch(); });
+
+    document.getElementById('btn-save-film').addEventListener('click', async () => {
+      const title = document.getElementById('af-title').value.trim();
+      if (!title) { app.notify('Title required','error'); return; }
+      try {
+        await DB.insert('films', {
+          title,
+          director: document.getElementById('af-dir').value.trim() || null,
+          year: parseInt(document.getElementById('af-year').value) || null,
+          runtime_mins: parseInt(document.getElementById('af-runtime').value) || null,
+          country: document.getElementById('af-country').value.trim() || null,
+          status: document.getElementById('af-status').value,
+          writer: document.getElementById('af-writer').value.trim() || null,
+          dp: document.getElementById('af-dp').value.trim() || null,
+          pg_rating: document.getElementById('af-pg').value.trim() || null,
+          is_favorite: document.getElementById('af-fav').checked,
+          is_owned: document.getElementById('af-owned').checked,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+        app.closeModal();
+        app.notify('Film added','success');
+        if (onDone) onDone();
+      } catch(e) { app.notify('Error: '+e.message,'error'); }
+    });
+  };
+
+  renderForm();
 };
 
 // ── Edit Film Modal ───────────────────────────────────────────
