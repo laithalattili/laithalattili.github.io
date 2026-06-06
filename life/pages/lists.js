@@ -1,6 +1,5 @@
 // Lists Page — user-defined named lists for books, films, courses
-PAGES.listsPage = async (app, defaultType = 'films') => {
-  const container = document.getElementById('main-content');
+PAGES.listsPage = async (container, app, defaultType = 'films') => {
   container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading lists...</div>';
 
   let lists = [], items = [], films = [], books = [], courses = [];
@@ -8,7 +7,7 @@ PAGES.listsPage = async (app, defaultType = 'films') => {
     lists = await DB.query('user_lists', { order: 'name.asc' });
     items = await DB.query('list_items', { order: 'position.asc' });
     films = await DB.query('films', { order: 'title.asc' });
-    books = await DB.query('books', { order: 'title.asc' });
+    books = await DB.getBooks();
     courses = await DB.query('courses', { order: 'title.asc' });
   } catch(e) {
     container.innerHTML = `<div class="card" style="color:var(--error)">${e.message}</div>`;
