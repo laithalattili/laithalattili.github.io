@@ -945,7 +945,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
     </div>
     <div style="display:flex;align-items:center;gap:6px;width:100%">
       <span class="cat-chip" id="am-cat-chip" style="display:none"></span>
-      <button id="am-lock-btn" onclick="amToggleLock()" title="Lock screen" style="display:none;background:none;border:none;cursor:pointer;font-size:17px;padding:4px 6px;color:#444;line-height:1;border-radius:6px;-webkit-tap-highlight-color:transparent">🔒</button>
+      <button id="am-lock-btn" onclick="amToggleLock()" title="Freeze screen" style="display:none;background:none;border:none;cursor:pointer;font-size:17px;padding:4px 6px;color:#444;line-height:1;border-radius:6px;-webkit-tap-highlight-color:transparent">🛡</button>
       <button class="panel-hdr-btn" onclick="amExportDocx()" title="Export notes">⬇ Export</button>
       <button class="panel-hdr-btn" onclick="amOpenNotes()" title="Open plan for this slot">📋 Edit plan</button>
     </div>
@@ -2273,6 +2273,8 @@ async function amToggleWakeLock(){
   if(_wakeLock){await _wakeLock.release();_wakeLock=null;localStorage.setItem('am_wake_persist','0');}
   else{localStorage.setItem('am_wake_persist','1');await _amRequestWakeLock();}
   _amUpdateHeaderBtns();
+  var gw=document.getElementById('global-wake-btn');
+  if(gw){var awk=!!_wakeLock;gw.style.color=awk?'#f59f00':'#444';gw.title=awk?'Screen on — tap to release':'Keep screen on';}
 }
 function _amUpdateHeaderBtns(){
   var w=document.getElementById('am-extra-btns');if(!w)return;
@@ -28245,6 +28247,7 @@ function amOpen(){
   document.addEventListener('visibilitychange',_amVisHandler);
   _amUpdateHeaderBtns();
   if(localStorage.getItem('am_wake_persist')==='1')_amRequestWakeLock();
+  updateGlobalDefaultBtn();
 }
 function amClose(){
   _amOpen=false;
@@ -28259,9 +28262,10 @@ function amClose(){
   document.getElementById('am-panel').classList.remove('open');
   if(_amInterval){clearInterval(_amInterval);_amInterval=null;}
   _amLpRafRunning=false;
-  if(_amLocked){_amLocked=false;var ov=document.getElementById('am-lock-overlay');if(ov)ov.style.display='none';var lb=document.getElementById('am-lock-btn');if(lb){lb.textContent='🔒';lb.style.color='#444';}}
+  if(_amLocked){_amLocked=false;var ov=document.getElementById('am-lock-overlay');if(ov)ov.style.display='none';var lb=document.getElementById('am-lock-btn');if(lb){lb.textContent='🛡';lb.style.color='#444';}}
   document.removeEventListener('visibilitychange',_amVisHandler);
   _updateLiveBtn();
+  updateGlobalDefaultBtn();
 }
 function amOpenNotes(){
   const ctx=amGetCtx();if(!ctx)return;
@@ -28774,8 +28778,8 @@ function amToggleLock(){
   var btn=document.getElementById('am-lock-btn');
   if(overlay)overlay.style.display=_amLocked?'block':'none';
   if(btn){btn.style.color=_amLocked?'#f59f00':'#444';
-    btn.textContent=_amLocked?'🔐':'🔒';
-    btn.title=_amLocked?'Unlock':'Lock screen';}
+    btn.textContent=_amLocked?'🛡':'🛡';
+    btn.title=_amLocked?'Unfreeze screen':'Freeze screen';}
 }
 function amHandleLockTap(e){
   var overlay=document.getElementById('am-lock-overlay');
@@ -28845,7 +28849,7 @@ function amRender(){
     // Show/hide header buttons depending on slot type
     document.querySelectorAll('.panel-hdr-actions .panel-hdr-btn').forEach(b=>b.style.display=isTutorMtg?'none':'');
     var lockBtn=document.getElementById('am-lock-btn');
-    if(lockBtn)lockBtn.style.display=isLesson?'inline-block':'none';
+    if(lockBtn)lockBtn.style.display='inline-block';
     body.innerHTML=isTutorMtg?_amTutorMtgHtml(ctx,nowStr):isLesson?_amLessonHtml(ctx,nowStr):_amCommitHtml(ctx,nowStr,offset,slotIdx,dayName);
     const newInp=document.getElementById('am-live-inp');
     if(newInp&&prevVal){newInp.value=prevVal;}
