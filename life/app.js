@@ -252,6 +252,10 @@ const APP = {
     if (showBar === 'true') {
       localStorage.setItem('llm_show_info_bar', 'true');
       bar.style.display = 'flex';
+      document.body.classList.add('info-bar-visible');
+      // Calculate nav top = header(52) + info bar height
+      const barH = bar.offsetHeight || 52;
+      document.documentElement.style.setProperty('--nav-top', (52 + barH) + 'px');
       await this.updateInfoBarFull();
       if (!this._infoBarInterval) {
         this._infoBarInterval = setInterval(() => this.updateInfoBar(bar, this._infoBarBirthday), 1000);
@@ -259,6 +263,8 @@ const APP = {
     } else {
       localStorage.setItem('llm_show_info_bar', 'false');
       bar.style.display = 'none';
+      document.body.classList.remove('info-bar-visible');
+      document.documentElement.style.setProperty('--nav-top', '52px');
     }
   },
 
