@@ -3056,12 +3056,529 @@ async function switchWardrobeView(view) {
 }
 
 // ═══════════════════════════════════════════════════
-// GYM stubs
+// GYM — full implementation
 // ═══════════════════════════════════════════════════
-function renderGym() { /* stub */ }
-function openGymProgrammeEditor() { showToast('Programme editor coming soon'); }
-function toggleAudio() {}
+
+let G_PROGRAMME  = null;
+let G_EXERCISES  = [];
+let G_SESSIONS   = [];
+let G_SETS       = [];
+let _gymLoaded   = false;
+let _gymView     = 'today';
+let _editExId    = null;
+let _sessionExercises = [];
+
+const SEED_PROGRAMME = {
+  name: 'Push / Pull / Legs',
+  days: { tuesday: 'Push', thursday: 'Pull', friday: 'Legs' }
+};
+
+const SEED_EXERCISES = [
+  { session_type:'Push', name:'Bench Press (Barbell)',           icon:'🏋️', sets:3, reps:12, unit:'kg', position:0 },
+  { session_type:'Push', name:'Incline Bench Press (Dumbbell)',  icon:'💪', sets:3, reps:12, unit:'kg', position:1 },
+  { session_type:'Push', name:'Shoulder Press (Dumbbell)',       icon:'🔝', sets:3, reps:12, unit:'kg', position:2 },
+  { session_type:'Push', name:'Cable Fly Crossovers',            icon:'🦋', sets:3, reps:12, unit:'kg', position:3 },
+  { session_type:'Push', name:'Lateral Raise (Dumbbell)',        icon:'↔️', sets:3, reps:12, unit:'kg', position:4 },
+  { session_type:'Push', name:'Triceps Rope Pushdown',           icon:'⬇️', sets:3, reps:12, unit:'kg', position:5 },
+  { session_type:'Push', name:'Triceps Overhead Rope Extension', icon:'⬆️', sets:3, reps:12, unit:'kg', position:6 },
+  { session_type:'Pull', name:'Bent Over Row (Barbell)',         icon:'🚣', sets:3, reps:12, unit:'kg', position:0 },
+  { session_type:'Pull', name:'Lat Pulldown (Cable)',            icon:'⬇️', sets:3, reps:12, unit:'kg', position:1 },
+  { session_type:'Pull', name:'Seated Cable Row - V Grip',       icon:'🪝', sets:3, reps:12, unit:'kg', position:2 },
+  { session_type:'Pull', name:'Bicep Curl (Barbell)',            icon:'💪', sets:3, reps:12, unit:'kg', position:3 },
+  { session_type:'Pull', name:'Hammer Curl (Dumbbell)',          icon:'🔨', sets:3, reps:12, unit:'kg', position:4 },
+  { session_type:'Pull', name:'Face Pull',                       icon:'😤', sets:3, reps:12, unit:'kg', position:5 },
+  { session_type:'Legs', name:'Squat (Barbell)',                 icon:'🦵', sets:3, reps:12, unit:'kg', position:0 },
+  { session_type:'Legs', name:'Romanian Deadlift (Dumbbell)',    icon:'🏋️', sets:3, reps:12, unit:'kg', position:1 },
+  { session_type:'Legs', name:'Leg Extension (Machine)',         icon:'🦿', sets:3, reps:12, unit:'kg', position:2 },
+  { session_type:'Legs', name:'Seated Leg Curl (Machine)',       icon:'🦵', sets:3, reps:12, unit:'kg', position:3 },
+  { session_type:'Legs', name:'Seated Calf Raise',               icon:'👟', sets:3, reps:12, unit:'kg', position:4 },
+  { session_type:'Legs', name:'Cable Crunch',                    icon:'💥', sets:3, reps:12, unit:'kg', position:5 },
+  { session_type:'Legs', name:'Lying Leg Raise',                 icon:'🦵', sets:3, reps:12, unit:'kg', position:6 },
+];
+
+const REP_SCHEME = [12, 10, 8];
+
+async function loadGymData() {
+  try {
+    const [prog, exs, sess] = await Promise.all([
+      supa.from('omni_gym_programme').select('*').limit(1).single(),
+      supa.from('omni_gym_exercises').select('*').order('position'),
+      supa.from('omni_gym_sessions').select('*').order('date', {ascending:false}).limit(20),
+    ]);
+    if (prog.data)  G_PROGRAMME = prog.data;
+    if (exs.data)   G_EXERCISES = exs.data;
+    if (sess.data)  G_SESSIONS  = sess.data;
+    if (G_SESSIONS.length) {
+      const sessIds = G_SESSIONS.slice(0,5).map(s => s.id);
+      const { data: sets } = await supa.from('omni_gym_sets').select('*').in('session_id', sessIds);
+      if (sets) G_SETS = sets;
+    }
+    if (!G_PROGRAMME) await seedProgramme();
+    _gymLoaded = true;
+  } catch(e) { console.warn('Gym load error', e); _gymLoaded = true; }
+}
+
+async function seedProgramme() {
+  try {
+    const { data: prog } = await supa.from('omni_gym_programme')
+      .insert({ name: SEED_PROGRAMME.name, days: SEED_PROGRAMME.days }).select().single();
+    if (!prog) return;
+    G_PROGRAMME = prog;
+    const exRows = SEED_EXERCISES.map(e => ({ ...e, programme_id: prog.id }));
+    const { data: exs } = await supa.from('omni_gym_exercises').insert(exRows).select();
+    if (exs) G_EXERCISES = exs;
+  } catch(e) { console.warn('Seed error', e); }
+}
+
+function getTodaySessionType() {
+  if (!G_PROGRAMME) return null;
+  const days = G_PROGRAMME.days || {};
+  const dayName = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'][new Date().getDay()];
+  return days[dayName] || null;
+}
+
+function getNextSessionType() {
+  if (!G_PROGRAMME) return null;
+  const order = ['Push','Pull','Legs'];
+  const lastSess = G_SESSIONS[0];
+  if (!lastSess) return order[0];
+  const idx = order.indexOf(lastSess.session_type);
+  return order[(idx + 1) % order.length];
+}
+
+function getExercisesForType(type) {
+  return G_EXERCISES.filter(e => e.session_type === type).sort((a,b) => a.position - b.position);
+}
+
+function getLastSessionWeight(exerciseId) {
+  const lastSess = G_SESSIONS.find(s => G_SETS.some(st => st.session_id === s.id && st.exercise_id === exerciseId));
+  if (!lastSess) return null;
+  const sets = G_SETS.filter(s => s.session_id === lastSess.id && s.exercise_id === exerciseId && s.weight);
+  if (!sets.length) return null;
+  return Math.max(...sets.map(s => parseFloat(s.weight)));
+}
+
+function todayHasSession() { return G_SESSIONS.some(s => s.date === todayStr()); }
+
+async function switchGymView(view) {
+  _gymView = view;
+  document.querySelectorAll('.gs-btn').forEach(b => b.classList.toggle('active', b.dataset.gview === view));
+  ['today','history','programme','running'].forEach(v => {
+    const el = document.getElementById('gym-'+v+'-view');
+    if (el) el.style.display = v === view ? '' : 'none';
+  });
+  if (!_gymLoaded) await loadGymData();
+  if (view === 'today')     renderGymToday();
+  if (view === 'history')   renderGymHistory();
+  if (view === 'programme') renderGymProgramme();
+  if (view === 'running')   renderGymRunning();
+}
+
+async function renderGym() {
+  if (!_gymLoaded) await loadGymData();
+  renderGymToday();
+}
+
+function renderGymToday() {
+  const container = document.getElementById('gym-today-view');
+  if (!container) return;
+  const todayType = getTodaySessionType();
+  const alreadyDone = todayHasSession();
+
+  if (alreadyDone) {
+    const todaySess = G_SESSIONS.find(s => s.date === todayStr());
+    const todaySets = G_SETS.filter(s => s.session_id === todaySess?.id);
+    const exs = getExercisesForType(todaySess?.session_type || '');
+    container.innerHTML = `
+      <div style="padding:.75rem .75rem .35rem;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:15px;font-weight:700;color:var(--text)">${todaySess?.session_type} <span style="font-size:11px;font-weight:400;color:var(--text3)">done today</span></div>
+        </div>
+        <span class="pill pill-success">Done</span>
+      </div>
+      ${_renderSessionSummary(exs, todaySets)}
+      <div style="padding:.75rem"><button class="btn-secondary" onclick="undoTodaySession()">Undo session</button></div>`;
+    return;
+  }
+
+  if (!todayType) {
+    const next = getNextSessionType();
+    const nextDay = _getNextGymDay();
+    container.innerHTML = `<div style="padding:2rem 1.5rem;text-align:center">
+      <div style="font-size:36px;margin-bottom:12px">😴</div>
+      <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px">Rest day</div>
+      <div style="font-size:13px;color:var(--text3);margin-bottom:1.5rem">Next: <strong>${next}</strong>${nextDay?' on '+nextDay:''}</div>
+      <button class="btn-secondary" style="max-width:200px" onclick="openLogSession('${next}')">Log anyway</button>
+    </div>`;
+    return;
+  }
+
+  const exs = getExercisesForType(todayType);
+  container.innerHTML = `
+    <div style="padding:.75rem .75rem .35rem;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:15px;font-weight:700;color:var(--text)">${todayType}</div>
+        <div style="font-size:11px;color:var(--text3)">${exs.length} exercises &middot; ${REP_SCHEME.join('/')} reps</div>
+      </div>
+      <button onclick="openLogSession('${todayType}')" style="padding:9px 18px;background:var(--accent);color:#fff;border:none;border-radius:var(--r);font-size:13px;font-weight:700;font-family:var(--font)">Start</button>
+    </div>
+    <div style="padding:0 .75rem .5rem">
+      ${exs.map(ex => {
+        const last = getLastSessionWeight(ex.id);
+        return `<div style="display:flex;align-items:center;gap:10px;padding:.5rem .35rem;border-bottom:.5px solid var(--border)">
+          <span style="font-size:20px;width:28px;text-align:center;flex-shrink:0">${ex.icon||'💪'}</span>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:500;color:var(--text)">${ex.name}</div>
+            <div style="font-size:11px;color:var(--text3)">${ex.sets} sets &middot; ${REP_SCHEME.join('/')} reps${last?' &middot; last: '+last+'kg':''}</div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function _getNextGymDay() {
+  if (!G_PROGRAMME) return '';
+  const days = G_PROGRAMME.days || {};
+  const dayOrder = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  const todayIdx = new Date().getDay();
+  for (let i = 1; i <= 7; i++) {
+    const idx = (todayIdx + i) % 7;
+    if (days[dayOrder[idx]]) return dayOrder[idx].charAt(0).toUpperCase() + dayOrder[idx].slice(1);
+  }
+  return '';
+}
+
+function _renderSessionSummary(exs, sets) {
+  if (!exs.length) return '';
+  return `<div style="padding:0 .75rem .5rem">
+    ${exs.map(ex => {
+      const exSets = sets.filter(s => s.exercise_id === ex.id && s.weight);
+      const weights = exSets.map(s => s.weight+'kg').join(' / ');
+      return `<div style="display:flex;align-items:center;gap:10px;padding:.45rem .35rem;border-bottom:.5px solid var(--border)">
+        <span style="font-size:18px;width:24px;text-align:center;flex-shrink:0">${ex.icon||'💪'}</span>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:500;color:var(--text)">${ex.name}</div>
+          ${weights?`<div style="font-size:11px;color:var(--text3)">${weights}</div>`:''}
+        </div>
+        <span style="font-size:11px;color:var(--success)">✓</span>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function openLogSession(sessionType) {
+  const exs = getExercisesForType(sessionType);
+  document.getElementById('sess-modal-title').textContent = sessionType + ' Session';
+  document.getElementById('sess-notes').value = '';
+  _sessionExercises = exs.map(ex => {
+    const lastW = getLastSessionWeight(ex.id) || '';
+    return {
+      id: ex.id, name: ex.name, icon: ex.icon||'💪', sessionType,
+      sets: REP_SCHEME.map((reps, i) => ({ setNum:i+1, targetReps:reps, weight:lastW, completed:false }))
+    };
+  });
+  renderSessionExercises();
+  document.getElementById('session-modal').classList.add('open');
+}
+
+function renderSessionExercises() {
+  const container = document.getElementById('sess-exercises-list');
+  if (!container) return;
+  const unit = S.weightUnit || 'kg';
+  container.innerHTML = _sessionExercises.map((ex, ei) => `
+    <div style="margin-bottom:1rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+      <div style="display:flex;align-items:center;gap:8px;padding:.55rem .85rem;background:var(--bg2);border-bottom:1px solid var(--border)">
+        <span style="font-size:18px">${ex.icon}</span>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600;color:var(--text)">${ex.name}</div>
+          ${(()=>{const last=getLastSessionWeight(ex.id);return last?`<div style="font-size:10px;color:var(--text3)">Last: ${last}${unit} — beat it!</div>`:''})()}
+        </div>
+      </div>
+      ${ex.sets.map((set,si) => `
+        <div style="display:flex;align-items:center;gap:8px;padding:.45rem .85rem;border-bottom:.5px solid var(--border)">
+          <div style="width:22px;height:22px;border-radius:50%;background:${set.completed?'var(--success-bg)':'var(--bg3)'};border:1.5px solid ${set.completed?'var(--success)':'var(--border2)'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:${set.completed?'var(--success)':'var(--text3)'};flex-shrink:0;cursor:pointer"
+            onclick="toggleSetComplete(${ei},${si})">${set.completed?'✓':set.setNum}</div>
+          <div style="font-size:12px;color:var(--text3);flex-shrink:0;width:36px">${set.targetReps} rep</div>
+          <input type="number" value="${set.weight}" placeholder="0" min="0" step="0.5"
+            style="flex:1;font-size:14px;padding:5px 8px;border:1px solid var(--border2);border-radius:var(--rxs);background:var(--surface);color:var(--text);text-align:center"
+            onchange="updateSetWeight(${ei},${si},this.value)">
+          <span style="font-size:11px;color:var(--text4)">${unit}</span>
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+function toggleSetComplete(exIdx, setIdx) {
+  _sessionExercises[exIdx].sets[setIdx].completed = !_sessionExercises[exIdx].sets[setIdx].completed;
+  renderSessionExercises();
+}
+
+function updateSetWeight(exIdx, setIdx, val) {
+  _sessionExercises[exIdx].sets[setIdx].weight = val;
+  const sets = _sessionExercises[exIdx].sets;
+  for (let i = setIdx+1; i < sets.length; i++) { if (!sets[i].completed) sets[i].weight = val; }
+}
+
+function closeSessionModal() { document.getElementById('session-modal').classList.remove('open'); _sessionExercises = []; }
+
+async function saveSession() {
+  if (!_sessionExercises.length) return;
+  const sessionType = _sessionExercises[0].sessionType;
+  const notes = document.getElementById('sess-notes').value.trim();
+  const { data: sess, error } = await supa.from('omni_gym_sessions').insert({
+    date: todayStr(), session_type: sessionType, programme_id: G_PROGRAMME?.id||null, notes,
+  }).select().single();
+  if (error) { showToast('Error saving session'); return; }
+  G_SESSIONS.unshift(sess);
+  const setRows = [];
+  _sessionExercises.forEach(ex => {
+    ex.sets.forEach(set => setRows.push({
+      session_id: sess.id, exercise_id: ex.id, set_number: set.setNum,
+      reps: set.targetReps, weight: set.weight ? parseFloat(set.weight) : null, completed: set.completed,
+    }));
+  });
+  const { data: sets } = await supa.from('omni_gym_sets').insert(setRows).select();
+  if (sets) G_SETS.push(...sets);
+  closeSessionModal();
+  showToast(sessionType + ' session saved ✓');
+  renderGymToday();
+}
+
+async function undoTodaySession() {
+  const todaySess = G_SESSIONS.find(s => s.date === todayStr());
+  if (!todaySess) return;
+  await supa.from('omni_gym_sets').delete().eq('session_id', todaySess.id);
+  await supa.from('omni_gym_sessions').delete().eq('id', todaySess.id);
+  G_SESSIONS = G_SESSIONS.filter(s => s.id !== todaySess.id);
+  G_SETS = G_SETS.filter(s => s.session_id !== todaySess.id);
+  renderGymToday();
+  showToast('Session removed');
+}
+
+function renderGymHistory() {
+  const container = document.getElementById('gym-history-view');
+  if (!container) return;
+  if (!G_SESSIONS.length) {
+    container.innerHTML = `<div class="empty-state" style="padding:2rem">
+      <div class="empty-state-icon">📋</div>
+      <div class="empty-state-title">No sessions yet</div>
+      <div class="empty-state-sub">Log your first session in the Today tab.</div>
+    </div>`;
+    return;
+  }
+  container.innerHTML = G_SESSIONS.map(sess => {
+    const sets = G_SETS.filter(s => s.session_id === sess.id);
+    const exs = getExercisesForType(sess.session_type);
+    const totalSets = sets.filter(s => s.completed).length;
+    const d = new Date(sess.date);
+    const dateStr = d.getDate()+' '+MONTH_NAMES[d.getMonth()];
+    const dayStr = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+    return `<div style="margin:.5rem .75rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+      <div style="padding:.6rem 1rem;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--text)">${sess.session_type}</div>
+          <div style="font-size:11px;color:var(--text3)">${dayStr} ${dateStr}</div>
+        </div>
+        <span class="pill pill-success" style="font-size:10px">${totalSets} sets</span>
+      </div>
+      ${exs.slice(0,3).map(ex => {
+        const exSets = sets.filter(s => s.exercise_id === ex.id && s.weight);
+        const maxW = exSets.length ? Math.max(...exSets.map(s => parseFloat(s.weight)||0)) : null;
+        return `<div style="display:flex;align-items:center;gap:8px;padding:.4rem 1rem;border-bottom:.5px solid var(--border)">
+          <span style="font-size:16px">${ex.icon||'💪'}</span>
+          <span style="flex:1;font-size:12px;color:var(--text)">${ex.name}</span>
+          ${maxW?`<span style="font-size:11px;color:var(--text3);font-family:var(--mono)">${maxW}kg</span>`:''}
+        </div>`;
+      }).join('')}
+      ${exs.length>3?`<div style="padding:.3rem 1rem;font-size:11px;color:var(--text4)">+${exs.length-3} more</div>`:''}
+      ${sess.notes?`<div style="padding:.4rem 1rem;font-size:12px;color:var(--text3);font-style:italic">${sess.notes}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function renderGymProgramme() {
+  const container = document.getElementById('gym-programme-view');
+  if (!container) return;
+  const days = G_PROGRAMME?.days || {};
+  const dayOrder = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+  const dayLabels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const sessionTypes = [...new Set(Object.values(days).filter(Boolean))];
+  let html = `
+    <div style="padding:.75rem .75rem .35rem;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:14px;font-weight:700;color:var(--text)">${G_PROGRAMME?.name||'Programme'}</div>
+      <button onclick="openGymProgrammeEditor()" style="font-size:11px;color:var(--accent);font-weight:600;background:none;border:none;padding:0">Edit</button>
+    </div>
+    <div style="display:flex;gap:4px;padding:0 .75rem .75rem;flex-wrap:wrap">
+      ${dayOrder.map((d,i)=>{
+        const type=days[d];
+        return `<div style="flex:1;min-width:0;text-align:center;padding:.4rem .2rem;background:${type?'var(--accent)':'var(--bg3)'};color:${type?'#fff':'var(--text4)'};border-radius:var(--rsm)">
+          <div style="font-size:9px;font-weight:700">${dayLabels[i]}</div>
+          <div style="font-size:8px;margin-top:1px">${type||'Rest'}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  sessionTypes.forEach(type => {
+    const exs = getExercisesForType(type);
+    html += `<div style="padding:.35rem .75rem .2rem;font-size:10px;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.08em">${type}</div>
+    <div style="margin:0 .75rem .75rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+      ${exs.map(ex=>`
+        <div onclick="openEditExercise('${ex.id}')" style="display:flex;align-items:center;gap:10px;padding:.5rem .85rem;border-bottom:.5px solid var(--border);cursor:pointer">
+          <span style="font-size:18px;width:24px;text-align:center;flex-shrink:0">${ex.icon||'💪'}</span>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:500;color:var(--text)">${ex.name}</div>
+            <div style="font-size:11px;color:var(--text3)">${ex.sets} sets &middot; ${REP_SCHEME.join('/')} reps</div>
+          </div>
+          <span style="color:var(--text4);font-size:14px">›</span>
+        </div>`).join('')}
+      <div onclick="openAddExercise('${type}')" style="padding:.5rem .85rem;font-size:12px;color:var(--accent);font-weight:600;cursor:pointer;text-align:center">+ Add exercise</div>
+    </div>`;
+  });
+  container.innerHTML = html;
+}
+
+function openAddExercise(sessionType) {
+  _editExId = null;
+  document.getElementById('ex-modal-title').textContent = 'Add Exercise';
+  document.getElementById('ex-name').value = '';
+  document.getElementById('ex-icon').value = '💪';
+  document.getElementById('ex-sets').value = '3';
+  document.getElementById('ex-reps').value = '12';
+  document.getElementById('ex-delete-wrap').style.display = 'none';
+  const sel = document.getElementById('ex-session-type');
+  const types = [...new Set(Object.values(G_PROGRAMME?.days||{}).filter(Boolean))];
+  sel.innerHTML = types.map(t=>`<option value="${t}" ${t===sessionType?'selected':''}>${t}</option>`).join('');
+  document.getElementById('exercise-modal').classList.add('open');
+}
+
+function openEditExercise(exId) {
+  const ex = G_EXERCISES.find(e => e.id === exId);
+  if (!ex) return;
+  _editExId = exId;
+  document.getElementById('ex-modal-title').textContent = 'Edit Exercise';
+  document.getElementById('ex-name').value = ex.name;
+  document.getElementById('ex-icon').value = ex.icon||'💪';
+  document.getElementById('ex-sets').value = ex.sets;
+  document.getElementById('ex-reps').value = ex.reps;
+  document.getElementById('ex-delete-wrap').style.display = '';
+  const sel = document.getElementById('ex-session-type');
+  const types = [...new Set(Object.values(G_PROGRAMME?.days||{}).filter(Boolean))];
+  sel.innerHTML = types.map(t=>`<option value="${t}" ${t===ex.session_type?'selected':''}>${t}</option>`).join('');
+  document.getElementById('exercise-modal').classList.add('open');
+}
+
+function closeExerciseModal() { document.getElementById('exercise-modal').classList.remove('open'); _editExId = null; }
+
+async function saveExercise() {
+  const name = document.getElementById('ex-name').value.trim();
+  if (!name) { showToast('Enter a name'); return; }
+  const payload = {
+    name, icon: document.getElementById('ex-icon').value||'💪',
+    sets: parseInt(document.getElementById('ex-sets').value)||3,
+    reps: parseInt(document.getElementById('ex-reps').value)||10,
+    session_type: document.getElementById('ex-session-type').value,
+    unit: S.weightUnit||'kg', programme_id: G_PROGRAMME?.id,
+    position: _editExId ? G_EXERCISES.find(e=>e.id===_editExId)?.position||0 : G_EXERCISES.length,
+  };
+  if (_editExId) {
+    await supa.from('omni_gym_exercises').update(payload).eq('id', _editExId);
+    const idx = G_EXERCISES.findIndex(e=>e.id===_editExId);
+    if (idx>=0) G_EXERCISES[idx] = {...G_EXERCISES[idx],...payload};
+    showToast('Updated ✓');
+  } else {
+    const { data } = await supa.from('omni_gym_exercises').insert(payload).select().single();
+    if (data) G_EXERCISES.push(data);
+    showToast('Added ✓');
+  }
+  closeExerciseModal(); renderGymProgramme();
+}
+
+async function deleteExercise() {
+  if (!_editExId||!confirm('Delete this exercise?')) return;
+  await supa.from('omni_gym_exercises').delete().eq('id', _editExId);
+  G_EXERCISES = G_EXERCISES.filter(e=>e.id!==_editExId);
+  closeExerciseModal(); renderGymProgramme(); showToast('Deleted');
+}
+
+function openGymProgrammeEditor() {
+  document.getElementById('prog-name').value = G_PROGRAMME?.name||'';
+  const days = G_PROGRAMME?.days||{};
+  const dayOrder = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+  const grid = document.getElementById('prog-days-grid');
+  if (grid) grid.innerHTML = dayOrder.map(d=>{
+    const type = days[d]||'';
+    return `<div style="text-align:center">
+      <div style="font-size:9px;font-weight:700;color:var(--text4);margin-bottom:2px">${d.slice(0,2).toUpperCase()}</div>
+      <select data-day="${d}" style="font-size:10px;padding:3px 1px;border:1px solid var(--border);border-radius:var(--rxs);background:var(--surface);color:var(--text);width:100%">
+        <option value="">—</option>
+        ${['Push','Pull','Legs'].map(t=>`<option value="${t}" ${t===type?'selected':''}>${t}</option>`).join('')}
+      </select>
+    </div>`;
+  }).join('');
+  const stDiv = document.getElementById('prog-session-types');
+  if (stDiv) stDiv.innerHTML = ['Push','Pull','Legs'].map(t=>`<span class="pill pill-accent">${t}</span>`).join('');
+  document.getElementById('programme-modal').classList.add('open');
+}
+
+function closeProgrammeModal() { document.getElementById('programme-modal').classList.remove('open'); }
+function addSessionType() {
+  const inp = document.getElementById('prog-new-type');
+  const val = inp?.value.trim(); if(!val) return;
+  const stDiv = document.getElementById('prog-session-types');
+  if(stDiv) stDiv.innerHTML += `<span class="pill pill-accent">${val}</span>`;
+  if(inp) inp.value='';
+}
+
+async function saveProgramme() {
+  const name = document.getElementById('prog-name').value.trim()||'My Programme';
+  const days = {};
+  document.querySelectorAll('#prog-days-grid select').forEach(sel=>{ if(sel.value) days[sel.dataset.day]=sel.value; });
+  const payload = { name, days };
+  if (G_PROGRAMME?.id) {
+    await supa.from('omni_gym_programme').update(payload).eq('id', G_PROGRAMME.id);
+    G_PROGRAMME = {...G_PROGRAMME,...payload};
+  } else {
+    const { data } = await supa.from('omni_gym_programme').insert(payload).select().single();
+    if(data) G_PROGRAMME=data;
+  }
+  closeProgrammeModal(); renderGymProgramme(); renderGymToday(); showToast('Programme saved ✓');
+}
+
+function renderGymRunning() {
+  const container = document.getElementById('gym-running-view');
+  if (!container) return;
+  container.innerHTML = `<div style="padding:.75rem">
+    <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:.75rem">Log a Run</div>
+    <div class="inp-row"><label>Distance (km)</label><input type="number" id="run-dist" placeholder="5.0" step="0.1" min="0"></div>
+    <div class="inp-row"><label>Duration</label>
+      <div style="display:flex;gap:8px">
+        <input type="number" id="run-hrs" placeholder="0" min="0" max="24" style="flex:1">
+        <span style="align-self:center;color:var(--text3)">h</span>
+        <input type="number" id="run-mins" placeholder="30" min="0" max="59" style="flex:1">
+        <span style="align-self:center;color:var(--text3)">m</span>
+        <input type="number" id="run-secs" placeholder="0" min="0" max="59" style="flex:1">
+        <span style="align-self:center;color:var(--text3)">s</span>
+      </div>
+    </div>
+    <div class="inp-row"><label>Notes</label><textarea id="run-notes" rows="2" placeholder="Route, how it felt…"></textarea></div>
+    <button class="btn-primary" onclick="saveRun()">Save Run</button>
+  </div>`;
+}
+
+async function saveRun() {
+  const dist = parseFloat(document.getElementById('run-dist')?.value)||null;
+  const hrs=parseInt(document.getElementById('run-hrs')?.value)||0;
+  const mins=parseInt(document.getElementById('run-mins')?.value)||0;
+  const secs=parseInt(document.getElementById('run-secs')?.value)||0;
+  const dur=hrs*3600+mins*60+secs||null;
+  const notes=document.getElementById('run-notes')?.value.trim()||null;
+  const { error } = await supa.from('omni_running_log').insert({ date:todayStr(), distance_km:dist, duration_seconds:dur, notes });
+  if(error){ showToast('Error saving'); return; }
+  showToast('Run saved ✓'); renderGymRunning();
+}
+
+function toggleAudio() { showToast('Audio coming in a later build'); }
 function stopAudio() {}
+function linkAudioFolder() { showToast('Audio folder linking coming soon'); }
+function seekAudio() {}
 function setAudioSpeed(s) {
   document.querySelectorAll('.audio-speed-btn').forEach(b => b.classList.toggle('active', parseFloat(b.dataset.speed) === s));
 }
