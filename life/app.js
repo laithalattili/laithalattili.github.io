@@ -243,30 +243,52 @@ const APP = {
     const bar = document.getElementById('info-bar');
     if (!bar) return;
     const showBar = await DB.getSetting('show_info_bar');
-    if (showBar !== 'true') return;
-    const birthday = await DB.getSetting('birthday') || '1993-12-30';
+    if (showBar !== 'true') { bar.style.display = 'none'; return; }
     bar.style.display = 'flex';
+    await this.updateInfoBarFull();
+    setInterval(() => this.updateInfoBar(bar, this._infoBarBirthday), 1000);
+  },
+
+  async updateInfoBarFull() {
+    const bar = document.getElementById('info-bar');
+    if (!bar || bar.style.display === 'none') return;
+    const birthday = await DB.getSetting('birthday') || '1993-12-30';
+    const zonesRaw = await DB.getSetting('timezones') || JSON.stringify([
+      { label: 'JO', tz: 'Asia/Amman', primary: true },
+      { label: 'CN', tz: 'Asia/Shanghai', primary: false }
+    ]);
+    let zones = [];
+    try { zones = JSON.parse(zonesRaw); } catch(e) { zones = []; }
+    this._infoBarZones = zones;
+    this._infoBarBirthday = birthday;
     this.updateInfoBar(bar, birthday);
-    setInterval(() => this.updateInfoBar(bar, birthday), 1000);
   },
 
   updateInfoBar(bar, birthday) {
     const now = new Date();
-    const jo = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Amman', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(now);
-    const cn = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(now);
-    const dateStr = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-    const bday = new Date(birthday);
-    const ageDiff = now - bday;
-    const ageDate = new Date(ageDiff);
-    const age = Math.abs(ageDate.getUTCFullYear() - 1970);
+    const zones = this._infoBarZones || [
+      { label: 'JO', tz: 'Asia/Amman', primary: true },
+      { label: 'CN', tz: 'Asia/Shanghai', primary: false }
+    ];
+    const bday = new Date(birthday || '1993-12-30');
+    const age = Math.floor((now - bday) / (365.25 * 24 * 60 * 60 * 1000));
+    const dateStr = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+
+    const clockHTML = zones.map(z => {
+      const time = new Intl.DateTimeFormat('en-GB', {
+        timeZone: z.tz, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+      }).format(now);
+      return z.primary
+        ? `<div class="info-bar-clock primary"><span class="info-bar-label">${z.label}</span><span class="info-bar-time-primary">${time}</span></div>`
+        : `<div class="info-bar-clock secondary"><span class="info-bar-label">${z.label}</span><span class="info-bar-time-secondary">${time}</span></div>`;
+    }).join('<div class="info-bar-sep">·</div>');
+
     bar.innerHTML = `
-      <div class="info-bar-item"><span class="info-bar-label">JO</span><span class="info-bar-value">${jo}</span></div>
+      ${clockHTML}
       <div class="info-bar-sep">·</div>
-      <div class="info-bar-item"><span class="info-bar-label">CN</span><span class="info-bar-value">${cn}</span></div>
+      <div class="info-bar-clock secondary"><span class="info-bar-label">Date</span><span class="info-bar-time-secondary">${dateStr}</span></div>
       <div class="info-bar-sep">·</div>
-      <div class="info-bar-item info-bar-date">${dateStr}</div>
-      <div class="info-bar-sep">·</div>
-      <div class="info-bar-item"><span class="info-bar-label">Age</span><span class="info-bar-value">${age}</span></div>
+      <div class="info-bar-clock secondary"><span class="info-bar-label">Age</span><span class="info-bar-time-secondary">${age}</span></div>
     `;
   },
 
