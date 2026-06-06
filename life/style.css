@@ -159,7 +159,7 @@ header {
   display: flex; gap: 0;
   overflow-x: auto;
   position: sticky;
-  top: 52px;
+  top: var(--nav-top, 52px);
   z-index: 90;
 }
 /* Hide top nav on mobile — bottom nav takes over */
@@ -725,6 +725,11 @@ select option { background: var(--bg3); }
   top: 52px;
   z-index: 91;
 }
+/* When info bar is visible, nav sits below it */
+#info-bar[style*="flex"] ~ #main-nav,
+body.info-bar-visible #app nav {
+  top: 104px;
+}
 #info-bar::-webkit-scrollbar { display: none; }
 .info-bar-clock {
   display: flex;
@@ -771,7 +776,13 @@ select option { background: var(--bg3); }
   padding: 0 0.1rem;
 }
 @media (max-width: 600px) {
-  #info-bar { display: none !important; }
+  #info-bar {
+    padding: 0.25rem 0.75rem;
+    gap: 0.4rem;
+  }
+  .info-bar-time-primary { font-size: 0.8rem; }
+  .info-bar-time-secondary { font-size: 0.62rem; }
+  .info-bar-clock.primary { padding: 0.15rem 0.4rem; }
 }
 
 /* ── Module Tabs (Library · Plan · Log) ─────────────────── */
