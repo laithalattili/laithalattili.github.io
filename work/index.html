@@ -28589,9 +28589,9 @@ function _amLessonPlanHtml(label,bullets,done,effectiveElapsed,offset,slotIdx,da
         timerColor=secRem<0?(secRem<-2?'#ef4444':'#f97316'):'#22c55e';
         timerEndMs=Math.round(Date.now()+secRem*60000);
       } else if(isPastSeg){
-        timerStr=seg.dur+'m';timerColor='#333';
+        timerStr=(seg.dur||0)+'m';timerColor='#333';
       } else {
-        timerStr=seg.dur+'m';timerColor='#444';
+        timerStr=(seg.dur||0)+'m';timerColor='#444';
       }
     } else if(b.dur&&b.depth===1&&inSeg){
       // Timed sub-bullet
@@ -28607,7 +28607,7 @@ function _amLessonPlanHtml(label,bullets,done,effectiveElapsed,offset,slotIdx,da
             timerColor=subRem<0?'#ef4444':'#6ee7b7';
             timerEndMs=Math.round(Date.now()+subRem*60000);
           } else {
-            timerStr=sub.dur+'m';timerColor=isInPastSeg?'#333':'#444';
+            timerStr=(sub.dur||0)+'m';timerColor=isInPastSeg?'#333':'#444';
           }
           break;
         }
@@ -28765,20 +28765,21 @@ function _amLessonHtml(ctx,nowStr){
   if(!plan.length){
     html+=`<div class="am-cl-section"><div class="am-cl-hdr"><span class="am-cl-title">Lesson Plan</span></div><div style="text-align:center;padding:.5rem;color:#555;font-size:12px">No plan yet for <strong style="color:#888">${_esc(label)}</strong>.<br><span style="font-size:11px">Add sections below.</span></div>${_amAddSectionHtml(label)}</div>`;
   } else {
-    const totalPlanned=plan.reduce((a,s)=>a+s.dur,0);
+    const totalPlanned=plan.reduce((a,s)=>a+(s.dur||0),0);
     const{sectionIdx,secRem}=lessonPacingState(plan,elapsedMins);
     let cursor=0;
     const rows=plan.map((sec,i)=>{
-      const secStart=cursor;cursor+=sec.dur;
+      const secDur=sec.dur||0;
+      const secStart=cursor;cursor+=secDur;
       const isCurSec=i===sectionIdx;
       const isPast=i<sectionIdx;
       const isDone=!!done[sec.id];
       const isLate=isCurSec&&secRem<0&&!isDone;
       const totalSec=Math.round(Math.abs(secRem)*60);
       const mm=Math.floor(totalSec/60),ss=totalSec%60;
-      const timerStr=isCurSec?(secRem<0?'+':'')+String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0'):sec.dur+'m';
+      const timerStr=isCurSec?(secRem<0?'+':'')+String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0'):(secDur?secDur+'m':'-');
       const timerColor=isCurSec?(secRem<0?(secRem<-2?'#ef4444':'#f97316'):'#22c55e'):isPast?'#333':'#444';
-      const barPct=isCurSec?Math.min(100,Math.max(0,(1-(secRem/sec.dur))*100)):isPast?100:0;
+      const barPct=isCurSec&&secDur?Math.min(100,Math.max(0,(1-(secRem/secDur))*100)):isPast?100:0;
       const bg=isCurSec?(isLate?'background:#1a0808;border-color:#ef444440':'background:#071a07;border-color:#22c55e40'):'background:#0d0d0d;border-color:#1a1a1a';
       const textColor=isDone?'#333':isCurSec?(isLate?'#fca5a5':'#ffffff'):isPast?'#888':'#777';
       return`<div class="lp-row${isCurSec?' lp-current':''}${isPast?' lp-past':''}" style="${bg}">
@@ -29159,7 +29160,7 @@ function _doExport(title,sub,planned,live,state){
   function bulletPara(b,isLive){
     const done=!!state[b.id];
     const sym=b.depth===0?'\u2022':b.depth===1?'\u25e6':'\u25aa';
-    const durStr=b.dur&&b.depth===0?' ('+b.dur+'min)':'';
+    const durStr=b.dur?' ('+b.dur+'min)':'';
     return new Paragraph({indent:{left:depthIndent[Math.min(b.depth||0,2)]},spacing:{before:20,after:20},
       children:[
         new TextRun({text:sym+' '+(isLive?'[LIVE] ':'')+(b.text||''),size:18,font:'Arial',strike:done,
