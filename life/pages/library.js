@@ -5,140 +5,226 @@ PAGES.library = async (container, app, initialStatus = 'all', initialCategory = 
   const books = await DB.getBooks();
   const categories = [...new Set(books.flatMap(b => b.categories?.length ? b.categories : (b.category ? [b.category] : [])))].filter(Boolean).sort();
   const statuses = ['all', 'to-read', 'reading', 'completed', 'review'];
+  const years = [...new Set(books.map(b => b.publication_year).filter(Boolean))].sort().reverse();
 
-  let filtered = books;
-  let activeStatus = initialStatus;
-  let activeCategory = initialCategory;
-  let searchQuery = '';
+  let filters = {
+    search: '',
+    status: initialStatus,
+    category: initialCategory,
+    favorite: false,
+    owned: 'all',  // all / physical / digital
+    yearFrom: '',
+    yearTo: '',
+  };
+  let sortBy = 'title';
+  let sortDir = 'asc';
 
-  const render = () => {
-    let list = books;
-    if (activeStatus === 'favorites') list = list.filter(b => b.is_favorite);
-    else if (activeStatus !== 'all') list = list.filter(b => b.status === activeStatus);
-    if (activeCategory !== 'all') list = list.filter(b => (b.categories || []).includes(activeCategory) || b.category === activeCategory);
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter(b =>
-        b.title.toLowerCase().includes(q) ||
-        (b.author || '').toLowerCase().includes(q) ||
-        (b.category || '').toLowerCase().includes(q) ||
-        (b.tags || []).some(t => t.toLowerCase().includes(q))
-      );
-    }
-
-    document.getElementById('book-list').innerHTML = list.length
-      ? list.map(b => renderBookItem(b)).join('')
-      : '<div class="empty"><div class="empty-text">No books match your filters</div></div>';
-
-    document.getElementById('book-count').textContent = `${list.length} book${list.length !== 1 ? 's' : ''}`;
-
-    // Bind edit/delete/plan
-    document.querySelectorAll('.btn-edit-book').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        PAGES.editBook(btn.dataset.id, app, activeStatus, activeCategory);
-      });
-    });
-    document.querySelectorAll('.btn-add-to-plan').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        PAGES.addBookToPlanFromLibrary(btn.dataset.id, app);
-      });
-    });
+  const activeFilterCount = () => {
+    let n = 0;
+    if (filters.favorite) n++;
+    if (filters.status !== 'all') n++;
+    if (filters.category !== 'all') n++;
+    if (filters.owned !== 'all') n++;
+    if (filters.yearFrom || filters.yearTo) n++;
+    return n;
   };
 
-  container.innerHTML = `
-    <div class="page-title">Library</div>
-    <div class="page-subtitle" id="book-count">${books.length} books</div>
+  const applyFilters = () => {
+    let list = [...books];
+    if (filters.favorite) list = list.filter(b => b.is_favorite);
+    if (filters.status !== 'all') list = list.filter(b => b.status === filters.status);
+    if (filters.category !== 'all') list = list.filter(b => (b.categories||[]).includes(filters.category) || b.category === filters.category);
+    if (filters.owned === 'physical') list = list.filter(b => b.owned_physical);
+    if (filters.owned === 'digital') list = list.filter(b => b.owned_digital);
+    if (filters.yearFrom) list = list.filter(b => b.publication_year && b.publication_year >= parseInt(filters.yearFrom));
+    if (filters.yearTo) list = list.filter(b => b.publication_year && b.publication_year <= parseInt(filters.yearTo));
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
+      list = list.filter(b =>
+        (b.title||'').toLowerCase().includes(q) ||
+        (b.author||'').toLowerCase().includes(q) ||
+        (b.categories||[]).some(c => c.toLowerCase().includes(q)) ||
+        (b.category||'').toLowerCase().includes(q)
+      );
+    }
+    const keyMap = { title:'title', author:'author', year:'publication_year', pages:'pages' };
+    const key = keyMap[sortBy] || 'title';
+    list.sort((a,b) => {
+      const av = a[key]||( typeof a[key]==='number'?0:''), bv = b[key]||(typeof b[key]==='number'?0:'');
+      const cmp = typeof av==='string' ? av.localeCompare(bv) : av-bv;
+      return sortDir==='asc' ? cmp : -cmp;
+    });
+    return list;
+  };
 
-    <div class="search-bar">
-      <span class="search-icon">⌕</span>
-      <input type="text" id="lib-search" placeholder="Search titles, authors, categories...">
-    </div>
+  const sortLabelMap = { title:'Title', author:'Author', year:'Year', pages:'Pages' };
 
-    <div style="font-family: var(--mono); font-size: 0.6rem; color: var(--text3); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.4rem;">Status</div>
-    <div class="filter-pills" id="status-pills">
-      <button class="pill ${activeStatus === 'favorites' ? 'active' : ''}" data-status="favorites">★ Favourites (${books.filter(b => b.is_favorite).length})</button>
-      ${statuses.map(s => `
-        <button class="pill ${s === activeStatus ? 'active' : ''}" data-status="${s}">
-          ${s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
-          ${s !== 'all' ? `(${books.filter(b => b.status === s).length})` : `(${books.length})`}
-        </button>
-      `).join('')}
-    </div>
-
-    ${categories.length ? `
-      <div style="font-family: var(--mono); font-size: 0.6rem; color: var(--text3); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.4rem; margin-top: 0.25rem;">Category</div>
-      <div class="filter-pills" id="cat-pills">
-        <button class="pill active" data-cat="all">All</button>
-        ${categories.map(c => `<button class="pill" data-cat="${c}">${c}</button>`).join('')}
+  const renderShell = () => {
+    const afc = activeFilterCount();
+    container.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+        <span id="book-count" style="font-family:var(--mono);font-size:0.68rem;color:var(--text3);">${books.length} books</span>
+        <div style="display:flex;gap:0.4rem;align-items:center;">
+          <button class="btn btn-secondary btn-sm" id="btn-lib-filter">Filter${afc>0?` <span style="background:var(--accent);color:white;border-radius:99px;padding:0 4px;font-size:0.55rem;margin-left:2px;">${afc}</span>`:''}</button>
+          <button class="btn btn-secondary btn-sm" id="btn-lib-add">+ Add</button>
+        </div>
       </div>
-    ` : ''}
 
-    <div id="book-list">
-      ${books.map(b => renderBookItem(b)).join('')}
-    </div>
-  `;
+      <div class="search-bar">
+        <span class="search-icon">⌕</span>
+        <input type="text" id="lib-search" placeholder="Title, author, category..." value="${filters.search}">
+      </div>
 
-  document.getElementById('lib-search').addEventListener('input', e => {
-    searchQuery = e.target.value;
-    render();
-  });
+      <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.75rem;flex-wrap:wrap;">
+        <span style="font-family:var(--mono);font-size:0.58rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;">Sort</span>
+        ${Object.entries(sortLabelMap).map(([k,v]) => `
+          <button class="pill sort-pill ${sortBy===k?'active':''}" data-sort="${k}">${v}${sortBy===k?(sortDir==='asc'?' ↑':' ↓'):''}</button>
+        `).join('')}
+      </div>
 
-  document.getElementById('status-pills').addEventListener('click', e => {
-    if (!e.target.dataset.status) return;
-    activeStatus = e.target.dataset.status;
-    document.querySelectorAll('#status-pills .pill').forEach(p => p.classList.toggle('active', p.dataset.status === activeStatus));
-    render();
-  });
+      <!-- Filter panel -->
+      <div id="lib-filter-panel" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;margin-bottom:0.75rem;">
+        <div style="display:flex;flex-wrap:wrap;gap:1rem;">
 
-  document.getElementById('cat-pills')?.addEventListener('click', e => {
-    if (!e.target.dataset.cat) return;
-    activeCategory = e.target.dataset.cat;
-    document.querySelectorAll('#cat-pills .pill').forEach(p => p.classList.toggle('active', p.dataset.cat === activeCategory));
-    render();
-  });
+          <div>
+            <div style="font-family:var(--mono);font-size:0.58rem;color:var(--text3);text-transform:uppercase;margin-bottom:0.3rem;">Status</div>
+            ${['all','to-read','reading','completed','review'].map(s => `
+              <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;cursor:pointer;margin-bottom:0.2rem;">
+                <input type="radio" name="lib-status" value="${s}" ${filters.status===s?'checked':''} style="width:auto;">
+                ${s==='all'?'All':s.charAt(0).toUpperCase()+s.slice(1)}
+              </label>`).join('')}
+          </div>
 
-  document.querySelectorAll('.btn-edit-book').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      PAGES.editBook(btn.dataset.id, app, activeStatus, activeCategory);
+          <div>
+            <div style="font-family:var(--mono);font-size:0.58rem;color:var(--text3);text-transform:uppercase;margin-bottom:0.3rem;">Category</div>
+            <select id="lib-cat" style="font-size:0.78rem;padding:0.25rem;max-width:140px;">
+              <option value="all">All categories</option>
+              ${categories.map(c => `<option value="${c}" ${filters.category===c?'selected':''}>${c}</option>`).join('')}
+            </select>
+          </div>
+
+          <div>
+            <div style="font-family:var(--mono);font-size:0.58rem;color:var(--text3);text-transform:uppercase;margin-bottom:0.3rem;">Format</div>
+            ${[['all','All'],['physical','Physical'],['digital','Digital']].map(([v,l]) => `
+              <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;cursor:pointer;margin-bottom:0.2rem;">
+                <input type="radio" name="lib-owned" value="${v}" ${filters.owned===v?'checked':''} style="width:auto;">${l}
+              </label>`).join('')}
+          </div>
+
+          <div>
+            <div style="font-family:var(--mono);font-size:0.58rem;color:var(--text3);text-transform:uppercase;margin-bottom:0.3rem;">Year Published</div>
+            <div style="display:flex;align-items:center;gap:0.3rem;">
+              <input type="number" id="lib-year-from" placeholder="from" value="${filters.yearFrom}" style="width:60px;font-size:0.78rem;padding:0.25rem;text-align:center;">
+              <span style="color:var(--text3);">–</span>
+              <input type="number" id="lib-year-to" placeholder="to" value="${filters.yearTo}" style="width:60px;font-size:0.78rem;padding:0.25rem;text-align:center;">
+            </div>
+          </div>
+
+          <div>
+            <div style="font-family:var(--mono);font-size:0.58rem;color:var(--text3);text-transform:uppercase;margin-bottom:0.3rem;">Other</div>
+            <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;cursor:pointer;">
+              <input type="checkbox" id="lib-fav" ${filters.favorite?'checked':''} style="width:auto;">Favourites only
+            </label>
+          </div>
+
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:0.5rem;">
+          <button class="btn btn-secondary btn-sm" id="btn-lib-clear">Clear all</button>
+        </div>
+      </div>
+
+      <div id="book-list"></div>
+    `;
+    bindControls();
+    renderList();
+  };
+
+  const renderList = () => {
+    const list = applyFilters();
+    const countEl = document.getElementById('book-count');
+    if (countEl) countEl.textContent = `${list.length} book${list.length!==1?'s':''}`;
+    const listEl = document.getElementById('book-list');
+    if (!listEl) return;
+    listEl.innerHTML = list.length
+      ? list.map(b => renderBookItem(b)).join('')
+      : '<div class="empty"><div class="empty-text">No books match your filters</div></div>';
+    bindBookItems();
+  };
+
+  const bindBookItems = () => {
+    document.querySelectorAll('.btn-edit-book').forEach(btn =>
+      btn.addEventListener('click', e => { e.stopPropagation(); PAGES.editBook(btn.dataset.id, app, filters.status, filters.category); })
+    );
+    document.querySelectorAll('.btn-add-to-plan').forEach(btn =>
+      btn.addEventListener('click', e => { e.stopPropagation(); PAGES.addBookToPlanFromLibrary(btn.dataset.id, app); })
+    );
+    document.querySelectorAll('.book-title-link').forEach(el =>
+      el.addEventListener('click', () => PAGES._openBookNotes(el.dataset.id))
+    );
+  };
+
+  const bindControls = () => {
+    document.getElementById('lib-search').addEventListener('input', e => { filters.search = e.target.value; renderList(); });
+
+    document.querySelectorAll('.sort-pill').forEach(btn =>
+      btn.addEventListener('click', () => {
+        if (sortBy===btn.dataset.sort) sortDir = sortDir==='asc'?'desc':'asc';
+        else { sortBy=btn.dataset.sort; sortDir='asc'; }
+        renderShell();
+      })
+    );
+
+    document.getElementById('btn-lib-filter').addEventListener('click', () => {
+      const p = document.getElementById('lib-filter-panel');
+      p.style.display = p.style.display==='none'?'block':'none';
     });
-  });
 
-  document.querySelectorAll('.btn-add-to-plan').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      PAGES.addBookToPlanFromLibrary(btn.dataset.id, app);
+    document.querySelectorAll('[name="lib-status"]').forEach(r => r.addEventListener('change', () => { filters.status=r.value; renderList(); }));
+    document.getElementById('lib-cat').addEventListener('change', e => { filters.category=e.target.value; renderList(); });
+    document.querySelectorAll('[name="lib-owned"]').forEach(r => r.addEventListener('change', () => { filters.owned=r.value; renderList(); }));
+    document.getElementById('lib-year-from').addEventListener('input', e => { filters.yearFrom=e.target.value; renderList(); });
+    document.getElementById('lib-year-to').addEventListener('input', e => { filters.yearTo=e.target.value; renderList(); });
+    document.getElementById('lib-fav').addEventListener('change', e => { filters.favorite=e.target.checked; renderList(); });
+
+    document.getElementById('btn-lib-clear').addEventListener('click', () => {
+      filters = { search:'', status:'all', category:'all', favorite:false, owned:'all', yearFrom:'', yearTo:'' };
+      renderShell();
     });
-  });
 
+    document.getElementById('btn-lib-add').addEventListener('click', () =>
+      APP.navigate('add-book')
+    );
+  };
 
+  renderShell();
 };
 
 function renderBookItem(b) {
   const statusColors = { 'to-read': 'gray', reading: '', completed: 'green', review: '' };
   const cats = b.categories?.length ? b.categories : (b.category ? [b.category] : []);
-  const physicalBadge = b.owned_physical === true ? '<span class="tag gray" style="font-size:0.55rem;">📖 Physical</span>' : '';
-  const digitalBadge = b.owned_digital === true ? '<span class="tag gray" style="font-size:0.55rem;">💻 Digital</span>' : '';
+  const physicalBadge = b.owned_physical ? '<span style="font-family:var(--mono);font-size:0.52rem;color:var(--text3);border:1px solid var(--border);border-radius:3px;padding:0 3px;">📖</span>' : '';
+  const digitalBadge  = b.owned_digital  ? '<span style="font-family:var(--mono);font-size:0.52rem;color:var(--text3);border:1px solid var(--border);border-radius:3px;padding:0 3px;">💻</span>' : '';
+  const langBadge = b.original_language && b.original_language !== 'English'
+    ? `<span style="font-family:var(--mono);font-size:0.52rem;color:var(--text3);">${b.original_language}</span>` : '';
   return `
     <div class="book-item">
       <div class="book-cover" style="position:relative;cursor:pointer;" onclick="PAGES._openBookNotes('${b.id}')">
         ${b.cover_url ? `<img src="${b.cover_url}" alt="" loading="lazy">` : ''}
-        ${b.is_favorite ? '<div style="position:absolute;top:1px;right:1px;font-size:0.65rem;">★</div>' : ''}
+        ${b.is_favorite ? '<div style="position:absolute;top:1px;right:1px;font-size:0.65rem;color:var(--accent);">★</div>' : ''}
       </div>
       <div class="book-info">
-        <div class="book-title" style="cursor:pointer;" onclick="PAGES._openBookNotes('${b.id}')">${b.is_favorite ? '<span style="color:var(--accent);margin-right:0.25rem;">★</span>' : ''}${b.title}</div>
-        <div class="book-author">${b.author || ''}${b.publication_year ? ` · ${b.publication_year}` : ''}</div>
-        <div class="book-tags" style="margin-top: 0.3rem; gap: 0.25rem; flex-wrap: wrap;">
-          ${cats.map(c => `<span class="tag gray">${c}</span>`).join('')}
-          ${b.original_language && b.original_language !== 'English' ? `<span class="tag gray">${b.original_language}</span>` : ''}
-          ${physicalBadge}${digitalBadge}
+        <div class="book-title book-title-link" data-id="${b.id}" style="cursor:pointer;">
+          ${b.is_favorite ? '<span style="color:var(--accent);margin-right:0.25rem;">★</span>' : ''}${b.title}
+        </div>
+        <div class="book-author">${b.author||''}${b.publication_year?' · '+b.publication_year:''}</div>
+        <div style="display:flex;gap:0.25rem;flex-wrap:wrap;margin-top:0.3rem;align-items:center;">
+          ${cats.slice(0,2).map(c => `<span class="tag gray" style="font-size:0.55rem;">${c}</span>`).join('')}
+          ${langBadge}${physicalBadge}${digitalBadge}
         </div>
       </div>
       <div class="book-right">
-        <span class="tag ${statusColors[b.status] || ''}">${b.status}</span>
-        <div class="book-pages">${b.pages ? b.pages + 'p' : ''}</div>
+        <span class="tag ${statusColors[b.status]||''}">${b.status}</span>
+        <div class="book-pages">${b.pages?b.pages+'p':''}</div>
         <button class="btn btn-secondary btn-sm btn-edit-book" data-id="${b.id}">Edit</button>
         <button class="btn btn-secondary btn-sm btn-add-to-plan" data-id="${b.id}" data-status="${b.status}">+ Plan</button>
       </div>
