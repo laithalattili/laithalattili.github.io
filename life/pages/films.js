@@ -48,7 +48,7 @@ PAGES.filmsLibrary = async (container, app) => {
   const watchCounts = {};
   watchLog.forEach(l => { watchCounts[l.film_id] = (watchCounts[l.film_id] || 0) + 1; });
 
-  let filters = { search:'', status:'all', owned:'all', favorite:false, director:'all', decade:'all', country:'all', pg:'all' };
+  let filters = { search:'', status:'all', owned:'all', favorite:false, director:'all', decade:'all', country:'all', pg:'all', durMin:'', durMax:'', shelf:'' };
   let sortBy = 'title', sortDir = 'asc', durationUnit = 'mins';
 
   const decades  = [...new Set(films.map(f => f.year ? Math.floor(f.year/10)*10 : null).filter(Boolean))].sort();
@@ -72,6 +72,9 @@ PAGES.filmsLibrary = async (container, app) => {
     if (filters.decade !== 'all')    list = list.filter(f => f.year && Math.floor(f.year/10)*10 === parseInt(filters.decade));
     if (filters.country !== 'all')   list = list.filter(f => f.country === filters.country);
     if (filters.pg !== 'all')        list = list.filter(f => f.pg_rating === filters.pg);
+    if (filters.shelf) list = list.filter(f => (f.shelf||'').toLowerCase().includes(filters.shelf.toLowerCase()));
+    if (filters.durMin) list = list.filter(f => f.runtime_mins && f.runtime_mins >= parseInt(filters.durMin));
+    if (filters.durMax) list = list.filter(f => f.runtime_mins && f.runtime_mins <= parseInt(filters.durMax));
     if (filters.search) {
       const q = filters.search.toLowerCase();
       list = list.filter(f =>
@@ -93,8 +96,13 @@ PAGES.filmsLibrary = async (container, app) => {
     return list;
   };
 
-  const activeFilterCount = () => ['favorite','status','owned','director','decade','country','pg']
-    .filter(k => filters[k] && filters[k] !== 'all' && filters[k] !== false).length;
+  const activeFilterCount = () => {
+    let n = ['favorite','status','owned','director','decade','country','pg']
+      .filter(k => filters[k] && filters[k] !== 'all' && filters[k] !== false).length;
+    if (filters.durMin || filters.durMax) n++;
+    if (filters.shelf) n++;
+    return n;
+  };
 
   const sortLabelMap = { title:'Title', year:'Year', director:'Director', runtime:'Duration', country:'Country' };
 
@@ -162,6 +170,18 @@ PAGES.filmsLibrary = async (container, app) => {
             </select>
           </div>
           <div>
+            <div style="font-family:var(--mono);font-size:0.58rem;color:var(--text3);text-transform:uppercase;margin-bottom:0.3rem;">Duration (min)</div>
+            <div style="display:flex;align-items:center;gap:0.3rem;">
+              <input type="number" id="f-dur-min" placeholder="min" value="${filters.durMin}" style="width:52px;font-size:0.78rem;padding:0.25rem;text-align:center;">
+              <span style="color:var(--text3);font-size:0.75rem;">–</span>
+              <input type="number" id="f-dur-max" placeholder="max" value="${filters.durMax}" style="width:52px;font-size:0.78rem;padding:0.25rem;text-align:center;">
+            </div>
+          </div>
+          <div>
+            <div style="font-family:var(--mono);font-size:0.58rem;color:var(--text3);text-transform:uppercase;margin-bottom:0.3rem;">Shelf</div>
+            <input type="text" id="f-shelf" placeholder="e.g. A, B2" value="${filters.shelf}" style="width:70px;font-size:0.78rem;padding:0.25rem;">
+          </div>
+          <div>
             <div style="font-family:var(--mono);font-size:0.58rem;color:var(--text3);text-transform:uppercase;margin-bottom:0.3rem;">Other</div>
             <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;cursor:pointer;">
               <input type="checkbox" id="f-fav" ${filters.favorite?'checked':''} style="width:auto;">Favourites only
@@ -204,6 +224,7 @@ PAGES.filmsLibrary = async (container, app) => {
     const dur = f.runtime_mins ? `<span style="font-family:var(--mono);font-size:0.6rem;color:var(--text3);">${formatDur(f.runtime_mins)}</span>` : '';
     const rewatched = count > 1 ? `<span style="font-family:var(--mono);font-size:0.6rem;color:var(--accent);">${count}×</span>` : '';
     const ownedBadge = f.is_owned ? '<span style="font-family:var(--mono);font-size:0.52rem;color:var(--text3);border:1px solid var(--border);border-radius:3px;padding:0 3px;">DVD</span>' : '';
+    const shelfBadge = f.shelf ? `<span style="font-family:var(--mono);font-size:0.52rem;color:var(--accent);border:1px solid var(--accent);border-radius:3px;padding:0 3px;">📦 ${f.shelf}</span>` : '';
     const pg = f.pg_rating ? `<span style="font-family:var(--mono);font-size:0.55rem;color:var(--text3);">${f.pg_rating}</span>` : '';
     const statusColor = f.status==='watched'?'green':f.status==='to-watch'?'gray':'';
     return `
@@ -214,7 +235,7 @@ PAGES.filmsLibrary = async (container, app) => {
         <div class="book-info">
           <div class="book-title">${f.is_favorite?'<span style="color:var(--accent);margin-right:0.2rem;">★</span>':''}${f.title}</div>
           <div class="book-author">${f.director||''}${f.year?' · '+f.year:''}${f.country?' · '+f.country:''}</div>
-          <div style="display:flex;gap:0.3rem;align-items:center;flex-wrap:wrap;margin-top:0.2rem;">${dur}${pg}${ownedBadge}${rewatched}</div>
+          <div style="display:flex;gap:0.3rem;align-items:center;flex-wrap:wrap;margin-top:0.2rem;">${dur}${pg}${ownedBadge}${shelfBadge}${rewatched}</div>
         </div>
         <div class="book-right">
           <span class="tag ${statusColor}">${f.status}</span>
@@ -256,8 +277,11 @@ PAGES.filmsLibrary = async (container, app) => {
     document.getElementById('f-country').addEventListener('change', e => { filters.country=e.target.value; renderList(); });
     document.getElementById('f-pg').addEventListener('change', e => { filters.pg=e.target.value; renderList(); });
     document.getElementById('f-fav').addEventListener('change', e => { filters.favorite=e.target.checked; renderList(); });
+    document.getElementById('f-shelf').addEventListener('input', e => { filters.shelf = e.target.value; renderList(); });
+    document.getElementById('f-dur-min').addEventListener('input', e => { filters.durMin = e.target.value; renderList(); });
+    document.getElementById('f-dur-max').addEventListener('input', e => { filters.durMax = e.target.value; renderList(); });
     document.getElementById('btn-clear-filters').addEventListener('click', () => {
-      filters = { search:'', status:'all', owned:'all', favorite:false, director:'all', decade:'all', country:'all', pg:'all' };
+      filters = { search:'', status:'all', owned:'all', favorite:false, director:'all', decade:'all', country:'all', pg:'all', durMin:'', durMax:'', shelf:'' };
       renderShell();
     });
     document.getElementById('btn-dur-toggle').addEventListener('click', e => {
@@ -536,6 +560,60 @@ PAGES.filmsPlan = async (container, app) => {
 };
 
 
+
+// ── Film Detail ───────────────────────────────────────────────
+PAGES.filmDetail = (filmId, app, films, watchLog) => {
+  const f = films.find(x => x.id === filmId);
+  if (!f) return;
+  const logs = (watchLog||[]).filter(l => l.film_id === filmId).sort((a,b) => b.date.localeCompare(a.date));
+
+  const formatDur = (mins) => {
+    if (!mins) return '—';
+    const h = Math.floor(mins/60), m = mins%60;
+    return `${mins}min${h>0?' ('+h+'h'+(m>0?' '+m+'m':'')+')':''}`;
+  };
+
+  const row = (label, val) => val ? `
+    <div style="padding:0.4rem 0;border-bottom:1px solid var(--border);display:flex;gap:1rem;">
+      <span style="font-family:var(--mono);font-size:0.58rem;color:var(--text3);text-transform:uppercase;min-width:70px;padding-top:0.1rem;">${label}</span>
+      <span style="font-size:0.85rem;color:var(--text2);flex:1;">${val}</span>
+    </div>` : '';
+
+  app.showModal(`
+    <div class="modal-title">${f.title}</div>
+    <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+      ${f.status==='watched'?'<span class="tag green">watched</span>':'<span class="tag gray">to-watch</span>'}
+      ${f.is_owned?'<span class="tag">DVD owned</span>':''}
+      ${f.is_favorite?'<span style="color:var(--accent);">★ Favourite</span>':''}
+    </div>
+    <div style="margin-bottom:1rem;">
+      ${row('Director', f.director)}
+      ${row('Writer', f.writer)}
+      ${row('DP', f.dp)}
+      ${row('Year', f.year)}
+      ${row('Country', f.country)}
+      ${row('Duration', f.runtime_mins ? formatDur(f.runtime_mins) : null)}
+      ${row('PG Rating', f.pg_rating)}
+      ${row('Shelf', f.shelf)}
+    </div>
+    ${logs.length ? `
+      <div style="font-family:var(--mono);font-size:0.6rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.4rem;">
+        Watch History (${logs.length}×)
+      </div>
+      ${logs.map(l => `
+        <div style="display:flex;justify-content:space-between;font-size:0.82rem;padding:0.3rem 0;border-bottom:1px solid var(--border);">
+          <span>${l.date}</span>
+          ${l.session===2?'<span style="color:var(--text3);font-size:0.7rem;">Part 2</span>':''}
+          ${l.notes?`<span style="color:var(--text3);font-size:0.75rem;">${l.notes}</span>`:''}
+        </div>
+      `).join('')}
+    ` : '<div style="color:var(--text3);font-size:0.82rem;">Not yet watched</div>'}
+    <div style="display:flex;gap:0.5rem;margin-top:1rem;">
+      <button class="btn btn-secondary btn-sm" onclick="APP.closeModal()">Close</button>
+    </div>
+  `);
+};
+
 // ── Films Log ─────────────────────────────────────────────────
 PAGES.filmsLog = async (container, app) => {
   container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
@@ -548,6 +626,10 @@ PAGES.filmsLog = async (container, app) => {
   const filmMap = {};
   films.forEach(f => filmMap[f.id] = f);
 
+  // Count watches per film for re-watch badge
+  const watchCount = {};
+  logs.forEach(l => { watchCount[l.film_id] = (watchCount[l.film_id]||0) + 1; });
+
   const byYear = {};
   logs.forEach(l => {
     const yr = l.date ? l.date.substring(0,4) : '—';
@@ -556,33 +638,78 @@ PAGES.filmsLog = async (container, app) => {
   });
   const years = Object.keys(byYear).sort().reverse();
 
-  container.innerHTML = `
-    <div style="display:flex;justify-content:flex-end;margin-bottom:0.75rem;">
-      <span style="font-family:var(--mono);font-size:0.65rem;color:var(--text3);">${logs.length} viewings</span>
-    </div>
-    ${years.length === 0 ? '<div class="empty"><div class="empty-text">No films logged yet</div></div>' : ''}
-    ${years.map(yr => `
-      <div style="font-family:var(--mono);font-size:0.62rem;color:var(--accent);letter-spacing:0.1em;text-transform:uppercase;margin:1rem 0 0.4rem;">
-        ${yr} · ${byYear[yr].length} film${byYear[yr].length!==1?'s':''}
+  const renderLog = () => {
+    container.innerHTML = `
+      <div style="display:flex;justify-content:flex-end;margin-bottom:0.75rem;">
+        <span style="font-family:var(--mono);font-size:0.65rem;color:var(--text3);">${logs.length} viewings</span>
       </div>
-      ${byYear[yr].map(l => {
-        const f = filmMap[l.film_id] || {};
-        return `
-          <div class="book-item" style="cursor:default;">
-            <div class="book-cover" style="background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:1.2rem;min-width:48px;width:48px;">🎬</div>
-            <div class="book-info">
-              <div class="book-title">${f.title||'Unknown'}</div>
-              <div class="book-author">${f.director||''}${f.year?' · '+f.year:''}</div>
+      ${years.length === 0 ? '<div class="empty"><div class="empty-text">No films logged yet</div></div>' : ''}
+      ${years.map(yr => `
+        <div style="font-family:var(--mono);font-size:0.62rem;color:var(--accent);letter-spacing:0.1em;text-transform:uppercase;margin:1rem 0 0.4rem;">
+          ${yr} · ${byYear[yr].length} viewing${byYear[yr].length!==1?'s':''}
+        </div>
+        ${byYear[yr].map(l => {
+          const f = filmMap[l.film_id] || {};
+          const count = watchCount[l.film_id] || 1;
+          return `
+            <div class="book-item log-entry" data-film-id="${l.film_id}" data-log-id="${l.id}" style="cursor:pointer;">
+              <div class="book-cover" style="background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:1.2rem;min-width:48px;width:48px;">🎬</div>
+              <div class="book-info">
+                <div class="book-title">${f.title||'Unknown film'}</div>
+                <div class="book-author">${f.director||''}${f.year?' · '+f.year:''}</div>
+              </div>
+              <div class="book-right" style="gap:0.3rem;">
+                <span style="font-family:var(--mono);font-size:0.65rem;color:var(--text3);">${l.date}</span>
+                ${l.session===2?'<span class="tag gray" style="font-size:0.55rem;">Pt.2</span>':''}
+                ${count>1?`<span style="font-family:var(--mono);font-size:0.6rem;color:var(--accent);">${count}×</span>`:''}
+                <button class="btn btn-secondary btn-sm btn-del-log" data-id="${l.id}" data-film-id="${l.film_id}" style="color:var(--error);font-size:0.65rem;">×</button>
+              </div>
             </div>
-            <div class="book-right">
-              <span style="font-family:var(--mono);font-size:0.65rem;color:var(--text3);">${l.date}</span>
-              ${l.session===2?'<span class="tag gray" style="font-size:0.55rem;">Pt.2</span>':''}
-            </div>
-          </div>
-        `;
-      }).join('')}
-    `).join('')}
-  `;
+          `;
+        }).join('')}
+      `).join('')}
+    `;
+
+    // Click entry to open film detail
+    document.querySelectorAll('.log-entry').forEach(entry =>
+      entry.addEventListener('click', e => {
+        if (e.target.closest('button')) return;
+        const f = filmMap[entry.dataset.filmId];
+        if (f) PAGES.filmDetail(f.id, app, films, logs);
+      })
+    );
+
+    // Delete log entry
+    document.querySelectorAll('.btn-del-log').forEach(btn =>
+      btn.addEventListener('click', async e => {
+        e.stopPropagation();
+        if (!confirm('Remove this watch entry?')) return;
+        try {
+          await DB.delete('watch_log', btn.dataset.id);
+          // Update logs array
+          const idx = logs.findIndex(l => l.id === btn.dataset.id);
+          if (idx > -1) {
+            const filmId = logs[idx].film_id;
+            logs.splice(idx, 1);
+            // Recalculate watch count
+            watchCount[filmId] = logs.filter(l => l.film_id === filmId).length;
+            // If no more watches, reset film status to to-watch
+            if (watchCount[filmId] === 0) {
+              await DB.update('films', filmId, { status: 'to-watch', updated_at: new Date().toISOString() });
+            }
+          }
+          // Rebuild byYear
+          Object.keys(byYear).forEach(yr => {
+            byYear[yr] = byYear[yr].filter(l => l.id !== btn.dataset.id);
+          });
+          app.notify('Entry removed', 'success');
+          renderLog();
+        } catch(err) { app.notify('Error: '+err.message, 'error'); }
+      })
+    );
+  };
+
+  renderLog();
 };
 
 // ── Log Watch Modal ───────────────────────────────────────────
@@ -749,6 +876,10 @@ PAGES.editFilmModal = (filmId, app, films, onDone) => {
         <label>DP</label>
         <input id="ef-dp" value="${v(f.dp)}">
       </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>Shelf (optional)</label>
+        <input id="ef-shelf" placeholder="e.g. A, B2, 3" value="${v(f.shelf)}">
+      </div>
       <div class="form-group" style="margin-bottom:0;grid-column:1/-1;display:flex;gap:1rem;">
         <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;cursor:pointer;margin-bottom:0;">
           <input type="checkbox" id="ef-fav" style="width:auto;" ${f.is_favorite?'checked':''}> Favourite ★
@@ -779,6 +910,7 @@ PAGES.editFilmModal = (filmId, app, films, onDone) => {
         dp: document.getElementById('ef-dp').value.trim()||null,
         is_favorite: document.getElementById('ef-fav').checked,
         is_owned: document.getElementById('ef-owned').checked,
+        shelf: document.getElementById('ef-shelf').value.trim() || null,
         updated_at: new Date().toISOString()
       });
       app.closeModal(); app.notify('Updated','success');
