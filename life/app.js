@@ -206,6 +206,7 @@ const APP = {
         </div>
         <div class="header-right">
           <button class="icon-btn" id="btn-star" title="Set as default page">☆</button>
+          <button class="icon-btn" id="btn-settings" title="Settings">⚙</button>
           <button class="icon-btn" id="btn-lock" title="Lock app">⏻</button>
         </div>
       </header>
@@ -226,6 +227,7 @@ const APP = {
     `;
 
     document.getElementById('btn-lock').addEventListener('click', () => this.lock());
+    document.getElementById('btn-settings').addEventListener('click', () => this.navigate('settings'));
     document.getElementById('btn-star').addEventListener('click', () => this.setDefaultPage());
 
     document.getElementById('main-nav').addEventListener('click', (e) => {
@@ -466,4 +468,3 @@ const APP = {
     document.querySelectorAll('.modal-overlay').forEach(el => el.remove());
   }
 };
-
