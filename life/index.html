@@ -50,8 +50,8 @@
     .bnav-item.active { color: #c4622d; }
     .bnav-item .ni { font-size: 20px; line-height: 1; }
 
-    /* Show bottom nav only on small screens */
-    @media (max-width: 768px) {
+    /* Show bottom nav only on phones — 600px avoids most laptops */
+    @media (max-width: 600px) {
       #bottom-nav { display: flex !important; }
       body { padding-bottom: 68px; }
     }
