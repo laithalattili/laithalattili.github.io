@@ -54,22 +54,45 @@ PAGES.settings = async (container, app) => {
     <!-- Personal Settings -->
     <div class="card">
       <div class="card-meta" style="margin-bottom:1rem;">Personal & Display</div>
+
       <div class="form-group">
         <label>Birthday</label>
         <input type="date" id="pref-birthday" value="1993-12-30">
       </div>
+
       <div class="form-group">
         <label>OMDb API Key</label>
-        <input type="text" id="pref-omdb" placeholder="Get free key at omdbapi.com — enter email, key arrives instantly">
-        <div style="font-family:var(--mono);font-size:0.6rem;color:var(--text3);margin-top:0.25rem;">Used to search and auto-fill film metadata when adding films</div>
+        <input type="text" id="pref-omdb" placeholder="Get free key at omdbapi.com">
+        <div style="font-family:var(--mono);font-size:0.6rem;color:var(--text3);margin-top:0.2rem;">Used to search and auto-fill film metadata</div>
       </div>
-      <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;">
+
+      <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;">
         <input type="checkbox" id="pref-show-bar" style="width:auto;">
-        <label for="pref-show-bar" style="margin-bottom:0;">Show clocks & date bar (desktop)</label>
+        <label for="pref-show-bar" style="margin-bottom:0;">Show info bar on desktop (clocks, date, age)</label>
       </div>
-      <div style="font-family:var(--mono);font-size:0.65rem;color:var(--text3);margin-bottom:1rem;">
-        Shows Jordanian time, Chinese time, today's date, and your age in a bar above the nav.
+
+      <div style="font-family:var(--mono);font-size:0.6rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.5rem;margin-top:0.75rem;">Time Zones</div>
+      <div style="font-family:var(--mono);font-size:0.62rem;color:var(--text3);margin-bottom:0.5rem;">The primary zone shows larger. Drag to reorder.</div>
+
+      <div id="timezone-list" style="display:flex;flex-direction:column;gap:0.4rem;margin-bottom:0.5rem;"></div>
+
+      <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+        <select id="tz-preset" style="font-size:0.78rem;padding:0.25rem;flex:1;">
+          <option value="">Add timezone...</option>
+          <option value="Asia/Amman|JO">Jordan (Amman)</option>
+          <option value="Asia/Shanghai|CN">China (Shanghai)</option>
+          <option value="Europe/London|UK">United Kingdom</option>
+          <option value="America/New_York|NY">New York</option>
+          <option value="America/Los_Angeles|LA">Los Angeles</option>
+          <option value="Europe/Paris|FR">France (Paris)</option>
+          <option value="Asia/Dubai|UAE">UAE (Dubai)</option>
+          <option value="Asia/Tokyo|JP">Japan (Tokyo)</option>
+          <option value="America/Chicago|CH">Chicago</option>
+          <option value="Europe/Berlin|DE">Germany (Berlin)</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" id="btn-add-tz">Add</button>
       </div>
+
       <div style="display:flex;justify-content:flex-end;">
         <button class="btn btn-primary btn-sm" id="btn-save-personal">Save</button>
       </div>
@@ -158,18 +181,67 @@ PAGES.settings = async (container, app) => {
   // Load personal settings
   const savedBirthday = await DB.getSetting('birthday');
   const showBar = await DB.getSetting('show_info_bar');
-  const tmdbKey = await DB.getSetting('omdb_api_key');
+  const omdbKey = await DB.getSetting('omdb_api_key');
   if (savedBirthday) document.getElementById('pref-birthday').value = savedBirthday;
   if (showBar === 'true') document.getElementById('pref-show-bar').checked = true;
-  document.getElementById('pref-omdb').value = tmdbKey || 'c0c229d0';
+  document.getElementById('pref-omdb').value = omdbKey || 'c0c229d0';
+
+  // Timezone management
+  const defaultZones = [
+    { label: 'JO', tz: 'Asia/Amman', primary: true },
+    { label: 'CN', tz: 'Asia/Shanghai', primary: false }
+  ];
+  let zones = [...defaultZones];
+  const zonesRaw = await DB.getSetting('timezones');
+  if (zonesRaw) { try { zones = JSON.parse(zonesRaw); } catch(e) {} }
+
+  const renderTzList = () => {
+    document.getElementById('timezone-list').innerHTML = zones.map((z, i) => `
+      <div style="display:flex;align-items:center;gap:0.5rem;background:var(--bg3);border-radius:6px;padding:0.4rem 0.6rem;">
+        <span style="font-family:var(--mono);font-size:0.65rem;color:var(--text3);min-width:28px;">${z.label}</span>
+        <span style="font-size:0.8rem;color:var(--text2);flex:1;">${z.tz.replace('Asia/','').replace('Europe/','').replace('America/','')}</span>
+        <button class="btn btn-secondary btn-sm tz-primary" data-idx="${i}" style="font-size:0.6rem;${z.primary?'color:var(--accent);border-color:var(--accent);':''}">
+          ${z.primary ? '★ Primary' : 'Set primary'}
+        </button>
+        <button class="btn btn-secondary btn-sm tz-remove" data-idx="${i}" style="color:var(--error);font-size:0.65rem;">×</button>
+      </div>
+    `).join('') || '<div style="font-size:0.8rem;color:var(--text3);">No timezones added</div>';
+
+    document.querySelectorAll('.tz-primary').forEach(btn =>
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx);
+        zones.forEach((z,i) => z.primary = i === idx);
+        renderTzList();
+      })
+    );
+    document.querySelectorAll('.tz-remove').forEach(btn =>
+      btn.addEventListener('click', () => {
+        zones.splice(parseInt(btn.dataset.idx), 1);
+        renderTzList();
+      })
+    );
+  };
+  renderTzList();
+
+  document.getElementById('btn-add-tz').addEventListener('click', () => {
+    const val = document.getElementById('tz-preset').value;
+    if (!val) return;
+    const [tz, label] = val.split('|');
+    if (zones.find(z => z.tz === tz)) { app.notify('Already added', 'info'); return; }
+    zones.push({ label, tz, primary: zones.length === 0 });
+    document.getElementById('tz-preset').value = '';
+    renderTzList();
+  });
 
   // Save personal settings
   document.getElementById('btn-save-personal').addEventListener('click', async () => {
     const birthday = document.getElementById('pref-birthday').value;
     const showBarVal = document.getElementById('pref-show-bar').checked;
-    const tmdbKey = document.getElementById('pref-omdb').value.trim();
+    const omdbKeyVal = document.getElementById('pref-omdb').value.trim();
     await DB.setSetting('birthday', birthday);
     await DB.setSetting('show_info_bar', showBarVal ? 'true' : 'false');
+    await DB.setSetting('omdb_api_key', omdbKeyVal);
+    await DB.setSetting('timezones', JSON.stringify(zones));
     await DB.setSetting('omdb_api_key', tmdbKey);
     app.notify('Personal settings saved', 'success');
     // Reinit info bar
