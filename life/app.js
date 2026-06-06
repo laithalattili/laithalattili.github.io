@@ -242,11 +242,24 @@ const APP = {
   async initInfoBar() {
     const bar = document.getElementById('info-bar');
     if (!bar) return;
+    // Check localStorage first for instant display, then verify with Supabase
+    const localShow = localStorage.getItem('llm_show_info_bar');
+    if (localShow === 'true') {
+      bar.style.display = 'flex';
+      await this.updateInfoBarFull();
+    }
     const showBar = await DB.getSetting('show_info_bar');
-    if (showBar !== 'true') { bar.style.display = 'none'; return; }
-    bar.style.display = 'flex';
-    await this.updateInfoBarFull();
-    setInterval(() => this.updateInfoBar(bar, this._infoBarBirthday), 1000);
+    if (showBar === 'true') {
+      localStorage.setItem('llm_show_info_bar', 'true');
+      bar.style.display = 'flex';
+      await this.updateInfoBarFull();
+      if (!this._infoBarInterval) {
+        this._infoBarInterval = setInterval(() => this.updateInfoBar(bar, this._infoBarBirthday), 1000);
+      }
+    } else {
+      localStorage.setItem('llm_show_info_bar', 'false');
+      bar.style.display = 'none';
+    }
   },
 
   async updateInfoBarFull() {
