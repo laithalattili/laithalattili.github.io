@@ -1066,7 +1066,7 @@ PAGES.editFilmModal = (filmId, app, films, onDone) => {
     </div>
     <div style="display:flex;gap:0.5rem;margin-top:1rem;">
       <button class="btn btn-primary" id="btn-update-film">Save</button>
-      <button class="btn btn-secondary btn-sm" id="btn-unwatch-film" style="color:var(--text3);">Unwatch</button>
+      ${f.status==='watched'?'<button class="btn btn-secondary btn-sm" id="btn-unwatch-film" style="color:var(--text3);">Unwatch</button>':'<button class="btn btn-secondary btn-sm" id="btn-quick-log" style="color:var(--accent);">+ Log Watch</button>'}
       <button class="btn btn-secondary btn-sm" id="btn-delete-film" style="margin-left:auto;color:var(--error);">Delete</button>
       <button class="btn btn-secondary" onclick="APP.closeModal()">Cancel</button>
     </div>
@@ -1101,10 +1101,13 @@ PAGES.editFilmModal = (filmId, app, films, onDone) => {
     } catch(e) { app.notify('Error: '+e.message,'error'); }
   });
 
-  document.getElementById('btn-unwatch-film').addEventListener('click', async () => {
-    // Show watch history and let user delete entries
+  document.getElementById('btn-unwatch-film')?.addEventListener('click', async () => {
     app.closeModal();
     PAGES.unwatchFilm(filmId, f.title, app, onDone);
+  });
+  document.getElementById('btn-quick-log')?.addEventListener('click', async () => {
+    app.closeModal();
+    PAGES.logWatchModal(filmId, app, films, onDone);
   });
 };
 
