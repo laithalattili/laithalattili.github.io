@@ -292,9 +292,9 @@ PAGES.filmsLibrary = async (container, app) => {
     document.getElementById('btn-add-film').addEventListener('click', () =>
       PAGES.addFilmModal(app, () => PAGES.filmsLibrary(container, app))
     );
-    document.getElementById('btn-film-lists').addEventListener('click', () =>
-      PAGES.listsPage(container, app, 'films')
-    );
+    document.getElementById('btn-film-lists').addEventListener('click', () => {
+      APP.navigate('lists');
+    });
     document.getElementById('btn-by-director').addEventListener('click', () =>
       PAGES.directorBrowser(container, app, directors, (dir) => { filters.director=dir; renderShell(); })
     );
@@ -560,6 +560,199 @@ PAGES.filmsPlan = async (container, app) => {
 };
 
 
+
+// ── Film Detail ───────────────────────────────────────────────
+PAGES.filmDetail = (filmId, app, films, watchLog) => {
+  const f = films.find(x => x.id === filmId);
+  if (!f) return;
+  const logs = (watchLog||[]).filter(l => l.film_id === filmId).sort((a,b) => b.date.localeCompare(a.date));
+
+  const formatDur = (mins) => {
+    if (!mins) return '—';
+    const h = Math.floor(mins/60), m = mins%60;
+    return `${mins}min${h>0?' ('+h+'h'+(m>0?' '+m+'m':'')+')':''}`;
+  };
+
+  const row = (label, val) => val ? `
+    <div style="padding:0.4rem 0;border-bottom:1px solid var(--border);display:flex;gap:1rem;">
+      <span style="font-family:var(--mono);font-size:0.58rem;color:var(--text3);text-transform:uppercase;min-width:70px;padding-top:0.1rem;">${label}</span>
+      <span style="font-size:0.85rem;color:var(--text2);flex:1;">${val}</span>
+    </div>` : '';
+
+  app.showModal(`
+    <div class="modal-title">${f.title}</div>
+    <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+      ${f.status==='watched'?'<span class="tag green">watched</span>':'<span class="tag gray">to-watch</span>'}
+      ${f.is_owned?'<span class="tag">DVD owned</span>':''}
+      ${f.is_favorite?'<span style="color:var(--accent);">★ Favourite</span>':''}
+    </div>
+    <div style="margin-bottom:1rem;">
+      ${row('Director', f.director)}
+      ${row('Writer', f.writer)}
+      ${row('DP', f.dp)}
+      ${row('Year', f.year)}
+      ${row('Country', f.country)}
+      ${row('Duration', f.runtime_mins ? formatDur(f.runtime_mins) : null)}
+      ${row('PG Rating', f.pg_rating)}
+      ${row('Shelf', f.shelf)}
+    </div>
+    ${logs.length ? `
+      <div style="font-family:var(--mono);font-size:0.6rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.4rem;">
+        Watch History (${logs.length}×)
+      </div>
+      ${logs.map(l => `
+        <div style="display:flex;justify-content:space-between;font-size:0.82rem;padding:0.3rem 0;border-bottom:1px solid var(--border);">
+          <span>${l.date}</span>
+          ${l.session===2?'<span style="color:var(--text3);font-size:0.7rem;">Part 2</span>':''}
+          ${l.notes?`<span style="color:var(--text3);font-size:0.75rem;">${l.notes}</span>`:''}
+        </div>
+      `).join('')}
+    ` : '<div style="color:var(--text3);font-size:0.82rem;">Not yet watched</div>'}
+    <div style="display:flex;gap:0.5rem;margin-top:1rem;">
+      <button class="btn btn-secondary btn-sm" onclick="APP.closeModal()">Close</button>
+    </div>
+  `);
+};
+
+// ── Films Log ─────────────────────────────────────────────────
+PAGES.filmsLog = async (container, app) => {
+  container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+  let logs = [], films = [];
+  try {
+    logs = await DB.query('watch_log', { order: 'date.desc' });
+    films = await DB.query('films', { order: 'title.asc' });
+  } catch(e) { container.innerHTML = `<div style="color:var(--error)">${e.message}</div>`; return; }
+
+  const filmMap = {};
+  films.forEach(f => filmMap[f.id] = f);
+
+  const watchCount = {};
+  logs.forEach(l => { watchCount[l.film_id] = (watchCount[l.film_id]||0) + 1; });
+
+  const byYear = {};
+  logs.forEach(l => {
+    const yr = l.date ? l.date.substring(0,4) : '—';
+    if (!byYear[yr]) byYear[yr] = [];
+    byYear[yr].push(l);
+  });
+  const years = Object.keys(byYear).sort().reverse();
+
+  // Persist collapse state
+  const collapseKey = 'llm_films_log_collapse';
+  let collapseState = {};
+  try { collapseState = JSON.parse(localStorage.getItem(collapseKey)||'{}'); } catch(e) {}
+
+  const saveCollapse = () => localStorage.setItem(collapseKey, JSON.stringify(collapseState));
+
+  const allExpanded = () => years.every(yr => !collapseState[yr]);
+  const allCollapsed = () => years.every(yr => collapseState[yr]);
+
+  const renderLog = () => {
+    const allExp = allExpanded();
+    container.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+        <span style="font-family:var(--mono);font-size:0.65rem;color:var(--text3);">${logs.length} viewings · ${years.length} years</span>
+        <button class="btn btn-secondary btn-sm" id="btn-toggle-all" style="font-family:var(--mono);font-size:0.6rem;">
+          ${allExp ? 'Collapse all' : 'Expand all'}
+        </button>
+      </div>
+      ${years.length === 0 ? '<div class="empty"><div class="empty-text">No films logged yet</div></div>' : ''}
+      ${years.map(yr => {
+        const collapsed = !!collapseState[yr];
+        return `
+          <div style="margin-bottom:0.25rem;">
+            <div class="year-header-log" data-year="${yr}" style="display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0;cursor:pointer;border-bottom:1px solid var(--border);">
+              <span style="font-family:var(--mono);font-size:0.62rem;color:var(--accent);letter-spacing:0.1em;text-transform:uppercase;">
+                ${yr} · ${byYear[yr].length} viewing${byYear[yr].length!==1?'s':''}
+              </span>
+              <span style="font-family:var(--mono);font-size:0.6rem;color:var(--text3);">${collapsed?'▶':'▼'}</span>
+            </div>
+            <div class="year-log-entries" data-year="${yr}" style="display:${collapsed?'none':'block'};">
+              ${byYear[yr].map(l => {
+                const f = filmMap[l.film_id] || {};
+                const count = watchCount[l.film_id] || 1;
+                return `
+                  <div class="book-item log-entry" data-film-id="${l.film_id}" data-log-id="${l.id}" style="cursor:pointer;">
+                    <div class="book-cover" style="background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:1.2rem;min-width:48px;width:48px;">🎬</div>
+                    <div class="book-info">
+                      <div class="book-title">${f.title||'Unknown film'}</div>
+                      <div class="book-author">${f.director||''}${f.year?' · '+f.year:''}</div>
+                    </div>
+                    <div class="book-right" style="gap:0.3rem;">
+                      <span style="font-family:var(--mono);font-size:0.65rem;color:var(--text3);">${l.date}</span>
+                      ${l.session===2?'<span class="tag gray" style="font-size:0.55rem;">Pt.2</span>':''}
+                      ${count>1?`<span style="font-family:var(--mono);font-size:0.6rem;color:var(--accent);">${count}×</span>`:''}
+                      <button class="btn btn-secondary btn-sm btn-del-log" data-id="${l.id}" data-film-id="${l.film_id}" style="color:var(--error);font-size:0.65rem;">×</button>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }).join('')}
+    `;
+
+    // Toggle all
+    document.getElementById('btn-toggle-all')?.addEventListener('click', () => {
+      const shouldCollapse = allExpanded();
+      years.forEach(yr => { collapseState[yr] = shouldCollapse; });
+      saveCollapse();
+      renderLog();
+    });
+
+    // Toggle individual year
+    document.querySelectorAll('.year-header-log').forEach(header =>
+      header.addEventListener('click', () => {
+        const yr = header.dataset.year;
+        collapseState[yr] = !collapseState[yr];
+        saveCollapse();
+        const entries = container.querySelector(`.year-log-entries[data-year="${yr}"]`);
+        const arrow = header.querySelector('span:last-child');
+        if (entries) entries.style.display = collapseState[yr] ? 'none' : 'block';
+        if (arrow) arrow.textContent = collapseState[yr] ? '▶' : '▼';
+        // Update toggle-all button text
+        const btn = document.getElementById('btn-toggle-all');
+        if (btn) btn.textContent = allExpanded() ? 'Collapse all' : 'Expand all';
+      })
+    );
+
+    // Click entry to open film detail
+    document.querySelectorAll('.log-entry').forEach(entry =>
+      entry.addEventListener('click', e => {
+        if (e.target.closest('button')) return;
+        const f = filmMap[entry.dataset.filmId];
+        if (f) PAGES.filmDetail(f.id, app, films, logs);
+      })
+    );
+
+    // Delete log entry
+    document.querySelectorAll('.btn-del-log').forEach(btn =>
+      btn.addEventListener('click', async e => {
+        e.stopPropagation();
+        if (!confirm('Remove this watch entry?')) return;
+        try {
+          await DB.delete('watch_log', btn.dataset.id);
+          const idx = logs.findIndex(l => l.id === btn.dataset.id);
+          if (idx > -1) {
+            const filmId = logs[idx].film_id;
+            logs.splice(idx, 1);
+            watchCount[filmId] = logs.filter(l => l.film_id === filmId).length;
+            const yr = btn.closest('.year-log-entries')?.dataset.year;
+            if (yr && byYear[yr]) byYear[yr] = byYear[yr].filter(l => l.id !== btn.dataset.id);
+            if (watchCount[filmId] === 0) {
+              await DB.update('films', filmId, { status: 'to-watch', updated_at: new Date().toISOString() });
+            }
+          }
+          app.notify('Entry removed', 'success');
+          renderLog();
+        } catch(err) { app.notify('Error: '+err.message, 'error'); }
+      })
+    );
+  };
+
+  renderLog();
+};
 
 // ── Film Detail ───────────────────────────────────────────────
 PAGES.filmDetail = (filmId, app, films, watchLog) => {
