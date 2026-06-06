@@ -1942,14 +1942,19 @@ function renderPlannerDay() {
     }
   }
 
-  // Slots, skip sleep (tp=sleep)
-  const slots = WORK_SLOTS.map((s,i) => {
+  // Slots: skip sleep. On free days show everything; on busy days hide free/personal clutter.
+  const allSlots = WORK_SLOTS.map((s,i) => {
     const cell = s[dayName];
     if (!cell || cell.tp === 'sleep') return null;
     return { time: s.t, label: cell.l, tp: cell.tp, idx: i };
   }).filter(Boolean);
 
-  // Group consecutive same-label slots
+  const hasCommitments = allSlots.some(s => !['free','personal'].includes(s.tp));
+  const slots = hasCommitments
+    ? allSlots.filter(s => !['free','personal'].includes(s.tp))
+    : allSlots;
+
+  // Group consecutive same-label+type slots
   const grouped = [];
   for (const sl of slots) {
     const last = grouped[grouped.length-1];
@@ -1963,14 +1968,14 @@ function renderPlannerDay() {
 
   let html = '';
   let pastCollapsed = [];
-  let pastGroupStart = -1;
 
   for (let gi = 0; gi < grouped.length; gi++) {
     const sl = grouped[gi];
     const slotEndMins = t2m(sl.endTime || sl.time) || t2m(sl.time) + 45;
-    const isPast = isToday && slotEndMins < nowMins && sl.idx < curIdx;
-    const isCurrent = isToday && sl.idx === curIdx;
-    const isNext = isToday && !isCurrent && sl.idx > curIdx && grouped.slice(0, gi).every(g => g.idx < curIdx || g.idx === curIdx);
+    // Only collapse past on days that have real commitments
+    const isPast = isToday && hasCommitments && slotEndMins < nowMins && sl.idx < curIdx;
+    const isCurrent = isToday && hasCommitments && sl.idx === curIdx;
+    const isNext = isToday && hasCommitments && !isCurrent && sl.idx > curIdx && grouped.slice(0, gi).every(g => g.idx < curIdx || g.idx === curIdx);
 
     if (isPast) {
       pastCollapsed.push(sl);
@@ -3094,7 +3099,12 @@ function _applyStickyTops() {
 
 window.addEventListener('DOMContentLoaded', initApp);
 
-
+// Service worker registration
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
 </script>
 </body>
 </html>
