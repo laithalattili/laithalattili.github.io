@@ -616,7 +616,7 @@ input, textarea, select { font-family: var(--font); }
    ── TAB 2: PLANNER ────────────────────────────────
 ═══════════════════════════════════════════════════ */
 .planner-view-toggle {
-  position: sticky; z-index: 50;
+  position: sticky; top: 0; z-index: 50;
   background: var(--bg);
   padding: .4rem .75rem .35rem;
   border-bottom: 1px solid var(--border);
@@ -637,7 +637,7 @@ input, textarea, select { font-family: var(--font); }
    ── TAB 3: WARDROBE ───────────────────────────────
 ═══════════════════════════════════════════════════ */
 .wardrobe-subtabs {
-  position: sticky; z-index: 50;
+  position: sticky; top: 0; z-index: 50;
   background: var(--bg);
   display: flex; gap: 4px; padding: .4rem .75rem .35rem;
   border-bottom: 1px solid var(--border);
@@ -712,7 +712,7 @@ input, textarea, select { font-family: var(--font); }
    ── TAB 5: CHECKLISTS ─────────────────────────────
 ═══════════════════════════════════════════════════ */
 .checklist-subtabs {
-  position: sticky; z-index: 50; background: var(--bg);
+  position: sticky; top: 0; z-index: 50; background: var(--bg);
   display: flex; gap: 4px; padding: .4rem .75rem .35rem;
   border-bottom: 1px solid var(--border);
 }
@@ -955,7 +955,7 @@ input, textarea, select { font-family: var(--font); }
 
     <!-- ── TAB: PLANNER ─────────────────────────────────── -->
     <div class="tab-panel" id="tab-planner" data-tab="planner">
-      <div class="planner-view-toggle" id="planner-view-toggle">
+      <div class="planner-view-toggle" id="planner-view-toggle" style="top:0">
         <button class="pv-btn active" data-pview="day" onclick="switchPlannerView('day')">Day</button>
         <button class="pv-btn" data-pview="week" onclick="switchPlannerView('week')">Week</button>
         <button class="pv-btn" data-pview="month" onclick="switchPlannerView('month')">Month</button>
@@ -1003,7 +1003,7 @@ input, textarea, select { font-family: var(--font); }
 
     <!-- ── TAB: WARDROBE ─────────────────────────────────── -->
     <div class="tab-panel" id="tab-wardrobe" data-tab="wardrobe">
-      <div class="wardrobe-subtabs" style="top: var(--hdr-h);">
+      <div class="wardrobe-subtabs">
         <button class="ws-btn active" data-wview="today" onclick="switchWardrobeView('today')">Today</button>
         <button class="ws-btn" data-wview="items" onclick="switchWardrobeView('items')">Items</button>
         <button class="ws-btn" data-wview="combos" onclick="switchWardrobeView('combos')">Combos</button>
@@ -1228,7 +1228,7 @@ input, textarea, select { font-family: var(--font); }
 
     <!-- ── TAB: CHECKLISTS ───────────────────────────────── -->
     <div class="tab-panel" id="tab-checklists" data-tab="checklists">
-      <div class="checklist-subtabs" style="top: var(--hdr-h);">
+      <div class="checklist-subtabs">
         <button class="cl-btn active" data-clview="rhythms" onclick="switchCLView('rhythms')">Rhythms</button>
         <button class="cl-btn" data-clview="packing" onclick="switchCLView('packing')">Packing</button>
         <button class="cl-btn" data-clview="templates" onclick="switchCLView('templates')">Templates</button>
@@ -2584,7 +2584,7 @@ function renderCombosList() {
       <div onclick="openEditCombo('${combo.id}')" style="display:flex;align-items:center;gap:10px;padding:.65rem 1rem;border-bottom:.5px solid var(--border);cursor:pointer;background:${available?'var(--surface)':'var(--bg2)'}">
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:600;color:var(--text)">${seasonIcon} ${combo.name}</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:2px">${itemCount} item${itemCount!==1?'s':''} · ${combo.context||'formal'}${daysSince!==null?' · '+daysSince+'d ago':' · never worn'}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">${itemCount} item${itemCount!==1?'s':''} · ${combo.context||'formal'}${daysSince!==null?(daysSince===0?' · Today':' · '+daysSince+'d ago'):' · never worn'}</div>
         </div>
         ${available ? '<span class="pill pill-success" style="font-size:10px">Ready</span>' : '<span class="pill pill-warn" style="font-size:10px">Not ready</span>'}
         <span style="color:var(--text4);font-size:16px">›</span>
