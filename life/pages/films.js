@@ -115,7 +115,7 @@ PAGES.filmsLibrary = async (container, app) => {
           <button class="btn btn-secondary btn-sm" id="btn-dur-toggle">${durationUnit}</button>
           <button class="btn btn-secondary btn-sm" id="btn-filter-toggle">Filter${afc>0?` <span style="background:var(--accent);color:white;border-radius:99px;padding:0 4px;font-size:0.55rem;margin-left:2px;">${afc}</span>`:''}</button>
           <button class="btn btn-secondary btn-sm" id="btn-add-film">+ Add</button>
-          <button class="btn btn-secondary btn-sm" id="btn-film-lists">Lists</button>
+
         </div>
       </div>
 
@@ -292,9 +292,7 @@ PAGES.filmsLibrary = async (container, app) => {
     document.getElementById('btn-add-film').addEventListener('click', () =>
       PAGES.addFilmModal(app, () => PAGES.filmsLibrary(container, app))
     );
-    document.getElementById('btn-film-lists').addEventListener('click', () => {
-      APP.navigate('lists');
-    });
+
     document.getElementById('btn-by-director').addEventListener('click', () =>
       PAGES.directorBrowser(container, app, directors, (dir) => { filters.director=dir; renderShell(); })
     );
@@ -866,16 +864,13 @@ PAGES.logWatchModal = (filmId, app, films, onDone) => {
 
 // ── Add Film Modal (with TMDB search) ────────────────────────
 PAGES.addFilmModal = (app, onDone) => {
-  // TMDB API key - free to get at themoviedb.org
-  const TMDB_KEY = ''; // Set in Settings if blank
-
   const renderForm = (prefill = {}) => {
     app.showModal(`
       <div class="modal-title">Add Film</div>
 
       <!-- TMDB Search -->
       <div style="background:var(--bg3);border-radius:var(--radius);padding:0.6rem;margin-bottom:0.75rem;">
-        <div style="font-family:var(--mono);font-size:0.58rem;color:var(--text3);text-transform:uppercase;margin-bottom:0.4rem;">Search online to auto-fill metadata</div>
+        <div style="font-family:var(--mono);font-size:0.58rem;color:var(--text3);text-transform:uppercase;margin-bottom:0.4rem;">Search online to auto-fill metadata (OMDb)</div>
         <div style="display:flex;gap:0.4rem;">
           <input id="tmdb-search" placeholder="Search TMDB..." style="flex:1;" value="${prefill.title||''}">
           <button class="btn btn-secondary btn-sm" id="btn-tmdb-search">Search</button>
@@ -938,57 +933,47 @@ PAGES.addFilmModal = (app, onDone) => {
       </div>
     `);
 
-    // TMDB search
+    // OMDb search (free API - get key at omdbapi.com)
     const doSearch = async () => {
       const q = document.getElementById('tmdb-search').value.trim();
       if (!q) return;
-      const key = TMDB_KEY || await DB.getSetting('tmdb_api_key');
+      const storedKey = await DB.getSetting('omdb_api_key');
+      const key = storedKey || 'c0c229d0';
       if (!key) {
-        document.getElementById('tmdb-results').innerHTML = '<div style="font-size:0.75rem;color:var(--error);">Add your TMDB API key in Settings first</div>';
+        document.getElementById('tmdb-results').innerHTML = '<div style="font-size:0.75rem;color:var(--error);">Add your OMDb API key in Settings first</div>';
         return;
       }
       document.getElementById('tmdb-results').innerHTML = '<div style="font-size:0.75rem;color:var(--text3);">Searching...</div>';
       try {
-        const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${key}&query=${encodeURIComponent(q)}&language=en-US`);
+        const res = await fetch(`https://www.omdbapi.com/?apikey=${key}&s=${encodeURIComponent(q)}&type=movie`);
         const data = await res.json();
-        const results = (data.results||[]).slice(0,5);
-        if (!results.length) { document.getElementById('tmdb-results').innerHTML = '<div style="font-size:0.75rem;color:var(--text3);">No results</div>'; return; }
+        if (data.Response === 'False') { document.getElementById('tmdb-results').innerHTML = '<div style="font-size:0.75rem;color:var(--text3);">No results</div>'; return; }
+        const results = (data.Search||[]).slice(0,6);
         document.getElementById('tmdb-results').innerHTML = results.map(r => `
-          <div class="tmdb-result" data-id="${r.id}" style="padding:0.35rem 0.5rem;cursor:pointer;font-size:0.82rem;border-radius:4px;display:flex;justify-content:space-between;align-items:center;">
-            <span>${r.title}${r.release_date?' ('+r.release_date.substring(0,4)+')':''}</span>
+          <div class="omdb-result" data-id="${r.imdbID}" style="padding:0.35rem 0.5rem;cursor:pointer;font-size:0.82rem;border-radius:4px;display:flex;justify-content:space-between;align-items:center;">
+            <span>${r.Title} (${r.Year})</span>
             <span style="font-family:var(--mono);font-size:0.6rem;color:var(--text3);">Select →</span>
           </div>
         `).join('');
-        document.querySelectorAll('.tmdb-result').forEach(el =>
-          el.addEventListener('mouseenter', () => el.style.background = 'var(--bg4)'),
-          el.addEventListener('mouseleave', () => el.style.background = '')
-        );
-        document.querySelectorAll('.tmdb-result').forEach(el =>
+        document.querySelectorAll('.omdb-result').forEach(el => {
+          el.addEventListener('mouseenter', () => el.style.background = 'var(--bg4)');
+          el.addEventListener('mouseleave', () => el.style.background = '');
           el.addEventListener('click', async () => {
-            const tmdbId = el.dataset.id;
             document.getElementById('tmdb-results').innerHTML = '<div style="font-size:0.75rem;color:var(--text3);">Loading details...</div>';
             try {
-              const [movie, credits] = await Promise.all([
-                fetch(`https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${key}&language=en-US`).then(r=>r.json()),
-                fetch(`https://api.themoviedb.org/3/movie/${tmdbId}/credits?api_key=${key}`).then(r=>r.json())
-              ]);
-              const director = credits.crew?.find(c=>c.job==='Director')?.name || '';
-              const writers = credits.crew?.filter(c=>['Writer','Screenplay','Story'].includes(c.job)).map(c=>c.name).join(', ') || '';
-              const dp = credits.crew?.find(c=>c.job==='Director of Photography')?.name || '';
-              const country = movie.production_countries?.[0]?.name || '';
-              const year = movie.release_date ? parseInt(movie.release_date.substring(0,4)) : '';
-              document.getElementById('af-title').value  = movie.title || '';
-              document.getElementById('af-dir').value    = director;
-              document.getElementById('af-year').value   = year;
-              document.getElementById('af-runtime').value = movie.runtime || '';
-              document.getElementById('af-country').value = country;
-              document.getElementById('af-writer').value = writers;
-              document.getElementById('af-dp').value     = dp;
-              document.getElementById('af-pg').value     = movie.adult ? 'R' : '';
-              document.getElementById('tmdb-results').innerHTML = '<div style="font-size:0.75rem;color:var(--accent);">✓ Filled from TMDB</div>';
+              const res2 = await fetch(`https://www.omdbapi.com/?apikey=${key}&i=${el.dataset.id}&plot=short`);
+              const m = await res2.json();
+              document.getElementById('af-title').value   = m.Title || '';
+              document.getElementById('af-dir').value     = m.Director !== 'N/A' ? m.Director : '';
+              document.getElementById('af-year').value    = parseInt(m.Year) || '';
+              document.getElementById('af-runtime').value = m.Runtime ? parseInt(m.Runtime) : '';
+              document.getElementById('af-country').value = m.Country !== 'N/A' ? m.Country.split(',')[0].trim() : '';
+              document.getElementById('af-writer').value  = m.Writer !== 'N/A' ? m.Writer : '';
+              document.getElementById('af-pg').value      = m.Rated !== 'N/A' ? m.Rated : '';
+              document.getElementById('tmdb-results').innerHTML = '<div style="font-size:0.75rem;color:var(--accent);">✓ Filled from OMDb</div>';
             } catch(e) { document.getElementById('tmdb-results').innerHTML = '<div style="font-size:0.75rem;color:var(--error);">Failed to load details</div>'; }
-          })
-        );
+          });
+        });
       } catch(e) { document.getElementById('tmdb-results').innerHTML = '<div style="font-size:0.75rem;color:var(--error);">Search failed</div>'; }
     };
 
