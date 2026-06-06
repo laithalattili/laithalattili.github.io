@@ -28223,6 +28223,7 @@ function bulletIndent(i,dir,isLive){
   if(!arr[i])return;
   arr[i].depth=Math.max(0,Math.min(2,arr[i].depth+dir));
   notesRenderBody();
+  setTimeout(function(){var inp=document.querySelectorAll('.bullet-inp')[i];if(inp)inp.focus();},0);
 }
 function bulletDelete(i,isLive){
   const arr=isLive?_editLiveBullets:_editBullets;
