@@ -941,11 +941,11 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
         <div class="panel-hdr-sub" id="am-sub"></div>
       </div>
       <button id="am-star-btn" onclick="saveGlobalDefault()" title="Save as default" style="background:none;border:none;cursor:pointer;font-size:19px;padding:4px 6px;color:#444;line-height:1;border-radius:6px;-webkit-tap-highlight-color:transparent;flex-shrink:0">★</button>
+      <button id="am-lock-btn" onclick="amToggleLock()" title="Freeze screen" style="display:none;background:none;border:none;cursor:pointer;font-size:17px;padding:4px 6px;color:#444;line-height:1;border-radius:6px;-webkit-tap-highlight-color:transparent;position:relative;z-index:600;flex-shrink:0">🛡</button>
       <div id="am-extra-btns" style="display:flex;gap:4px;align-items:center;flex-shrink:0"></div>
     </div>
     <div style="display:flex;align-items:center;gap:6px;width:100%">
       <span class="cat-chip" id="am-cat-chip" style="display:none"></span>
-      <button id="am-lock-btn" onclick="amToggleLock()" title="Freeze screen" style="display:none;background:none;border:none;cursor:pointer;font-size:17px;padding:4px 6px;color:#444;line-height:1;border-radius:6px;-webkit-tap-highlight-color:transparent;position:relative;z-index:600">🛡</button>
       <button class="panel-hdr-btn" onclick="amExportDocx()" title="Export notes">⬇ Export</button>
       <button class="panel-hdr-btn" onclick="amOpenNotes()" title="Open plan for this slot">📋 Edit plan</button>
     </div>
