@@ -158,6 +158,9 @@ header {
   padding: 0 1.5rem;
   display: flex; gap: 0;
   overflow-x: auto;
+  position: sticky;
+  top: 52px;
+  z-index: 90;
 }
 /* Hide top nav on mobile — bottom nav takes over */
 @media (max-width: 768px) {
@@ -706,6 +709,69 @@ select option { background: var(--bg3); }
   padding: 0.1rem 0.4rem;
   margin-left: 0.3rem;
   font-weight: 500;
+}
+
+/* ── Info Bar (clocks, date, age) ───────────────────────── */
+#info-bar {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 0.4rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  position: sticky;
+  top: 52px;
+  z-index: 91;
+}
+#info-bar::-webkit-scrollbar { display: none; }
+.info-bar-clock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.05rem;
+  white-space: nowrap;
+}
+.info-bar-clock.primary {
+  background: var(--accent-dim);
+  border: 1px solid rgba(196,98,45,0.2);
+  border-radius: 6px;
+  padding: 0.25rem 0.6rem;
+}
+.info-bar-clock.secondary {
+  padding: 0.15rem 0.3rem;
+}
+.info-bar-label {
+  font-family: var(--mono);
+  font-size: 0.5rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text3);
+  line-height: 1;
+}
+.info-bar-time-primary {
+  font-family: var(--mono);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+  line-height: 1.2;
+}
+.info-bar-time-secondary {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text2);
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+.info-bar-sep {
+  color: var(--border2);
+  font-size: 0.8rem;
+  padding: 0 0.1rem;
+}
+@media (max-width: 768px) {
+  #info-bar { display: none !important; }
 }
 
 /* ── Module Tabs (Library · Plan · Log) ─────────────────── */
