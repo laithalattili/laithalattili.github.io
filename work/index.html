@@ -28783,7 +28783,7 @@ function _amLessonHtml(ctx,nowStr){
       const bg=isCurSec?(isLate?'background:#1a0808;border-color:#ef444440':'background:#071a07;border-color:#22c55e40'):'background:#0d0d0d;border-color:#1a1a1a';
       const textColor=isDone?'#333':isCurSec?(isLate?'#fca5a5':'#ffffff'):isPast?'#888':'#777';
       const depth=sec.depth||0;
-      const depthStyle=depth>0?`margin-left:${depth*16}px;border-left:2px solid #222;padding-left:8px;`:\'\'';
+      const depthStyle=depth>0?'margin-left:'+(depth*16)+'px;border-left:2px solid #222;padding-left:8px;':'';
       return`<div class="lp-row${isCurSec?' lp-current':''}${isPast?' lp-past':''}" style="${bg};${depthStyle}">
         <div class="lp-done-btn${isDone?' lp-done-active':''}" onclick="amLessonToggleDone('${label}',${offset},${slotIdx},'${dayName}','${sec.id}',${!isDone})">${isDone?'✓':''}</div>
         <div class="lp-body">
