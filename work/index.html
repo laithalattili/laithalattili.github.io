@@ -23960,7 +23960,7 @@ function renderTimetable(){
 
 
 // ── CALENDAR ─────────────────────────────────────────
-let calYear=2026,calMonth=4,calExpanded=false,calView='monthly',selectedCalDate=null;
+const _calNow=new Date();let calYear=_calNow.getFullYear(),calMonth=_calNow.getMonth(),calExpanded=false,calView='monthly',selectedCalDate=null;
 const CAL_EVENTS={};
 function addEv(d,t,type){if(!CAL_EVENTS[d])CAL_EVENTS[d]=[];CAL_EVENTS[d].push({text:t,type});}
 
@@ -24148,10 +24148,83 @@ function renderContinuous(){
   const cont=document.getElementById('cal-continuous');
   const dowHtml='<div class="cal-dow-row-month"><div class="cal-wnum" style="font-size:8px;color:#ced4da">W</div>'+
     ['Mo','Tu','We','Th','Fr','Sa','Su'].map((d,i)=>`<div class="cal-dow${i>=5?' weekend':''}">${d}</div>`).join('')+'</div>';
-  let html='',y=2026,m=4;
-  while(!(y===2027&&m>6)){html+=`<div class="cal-month-block"><div class="cal-month-sticky"><div class="cal-month-title" style="margin-bottom:3px">${months[m]} ${y}</div>${dowHtml}</div><div class="cal-grid" id="cg-${y}-${m}"></div></div>`;m++;if(m>11){m=0;y++;}}
-  cont.innerHTML=html;y=2026;m=4;
-  while(!(y===2027&&m>6)){renderCalGrid(y,m,document.getElementById('cg-'+y+'-'+m));m++;if(m>11){m=0;y++;}}
+  const _now=new Date(),_ny=_now.getFullYear(),_nm=_now.getMonth();
+  // Separate past months from current/future
+  // Structure: [Past] > [Year] > months, then current+future months flat
+  const pastOpen=localStorage.getItem('cal_past_open')!=='0';
+  let html='';
+
+  // Collect past months grouped by year
+  const pastByYear={};
+  let py=2026,pm=4;
+  while((py<_ny)||(py===_ny&&pm<_nm)){
+    if(!pastByYear[py])pastByYear[py]=[];
+    pastByYear[py].push(pm);
+    pm++;if(pm>11){pm=0;py++;}
+  }
+  const pastYears=Object.keys(pastByYear).map(Number);
+
+  if(pastYears.length){
+    html+='<div style="margin-bottom:8px;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden">';
+    html+='<div onclick="toggleCalPast()" style="padding:8px 12px;background:#f5f5f5;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:13px">';
+    html+='<span>Past</span><span style="font-size:10px;color:#888">'+(pastOpen?'&#9660;':'&#9654;')+'</span></div>';
+    if(pastOpen){
+      pastYears.forEach(function(yr){
+        const yearOpen=localStorage.getItem('cal_year_open_'+yr)!=='0';
+        html+='<div style="border-top:1px solid #e0e0e0">';
+        html+='<div onclick="toggleCalYear('+yr+')" style="padding:6px 16px;background:#fafafa;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:12px">';
+        html+='<span>'+yr+'</span><span style="font-size:10px;color:#aaa">'+(yearOpen?'&#9660;':'&#9654;')+'</span></div>';
+        if(yearOpen){
+          pastByYear[yr].forEach(function(mo){
+            html+='<div class="cal-month-block" style="padding:0 8px 8px">';
+            html+='<div class="cal-month-sticky"><div class="cal-month-title" style="margin-bottom:3px;font-size:12px;color:#888">'+months[mo]+' '+yr+'</div>'+dowHtml+'</div>';
+            html+='<div class="cal-grid" id="cg-'+yr+'-'+mo+'"></div>';
+            html+='</div>';
+          });
+        }
+        html+='</div>';
+      });
+    }
+    html+='</div>';
+  }
+
+  // Current and future months
+  let y=_ny,m=_nm;
+  const endY=2027,endM=6;
+  while(!(y===endY&&m>endM)){
+    html+='<div class="cal-month-block">';
+    html+='<div class="cal-month-sticky"><div class="cal-month-title" style="margin-bottom:3px">'+months[m]+' '+y+'</div>'+dowHtml+'</div>';
+    html+='<div class="cal-grid" id="cg-'+y+'-'+m+'"></div>';
+    html+='</div>';
+    m++;if(m>11){m=0;y++;}
+  }
+
+  cont.innerHTML=html;
+  // Render past grids if visible
+  if(pastOpen){
+    pastYears.forEach(function(yr){
+      const yearOpen=localStorage.getItem('cal_year_open_'+yr)!=='0';
+      if(yearOpen)pastByYear[yr].forEach(function(mo){
+        const g=document.getElementById('cg-'+yr+'-'+mo);if(g)renderCalGrid(yr,mo,g);
+      });
+    });
+  }
+  // Render current+future grids
+  y=_ny;m=_nm;
+  while(!(y===endY&&m>endM)){
+    const g=document.getElementById('cg-'+y+'-'+m);if(g)renderCalGrid(y,m,g);
+    m++;if(m>11){m=0;y++;}
+  }
+}
+function toggleCalPast(){
+  var cur=localStorage.getItem('cal_past_open');
+  localStorage.setItem('cal_past_open',cur==='0'?'1':'0');
+  renderContinuous();
+}
+function toggleCalYear(yr){
+  var cur=localStorage.getItem('cal_year_open_'+yr);
+  localStorage.setItem('cal_year_open_'+yr,cur==='0'?'1':'0');
+  renderContinuous();
 }
 function showCalEvs(ds,day,year,month,evt){
   if(evt&&evt.stopPropagation)evt.stopPropagation();
