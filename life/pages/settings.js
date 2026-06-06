@@ -240,6 +240,7 @@ PAGES.settings = async (container, app) => {
     const omdbKeyVal = document.getElementById('pref-omdb').value.trim();
     await DB.setSetting('birthday', birthday);
     await DB.setSetting('show_info_bar', showBarVal ? 'true' : 'false');
+    localStorage.setItem('llm_show_info_bar', showBarVal ? 'true' : 'false');
     await DB.setSetting('omdb_api_key', omdbKeyVal);
     await DB.setSetting('timezones', JSON.stringify(zones));
     await DB.setSetting('omdb_api_key', tmdbKey);
