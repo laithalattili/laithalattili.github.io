@@ -682,6 +682,51 @@ input, textarea, select { font-family: var(--font); }
 }
 .gym-set-dot.done { background: var(--success-bg); border-color: var(--success); }
 
+/* Gym subtabs */
+.gym-subtabs {
+  position: sticky; top: 0; z-index: 50;
+  background: var(--bg);
+  display: flex; gap: 4px; padding: .4rem .75rem .35rem;
+  border-bottom: 1px solid var(--border);
+}
+.gs-btn {
+  flex: 1; padding: 7px 4px; font-size: 11px; font-weight: 600;
+  border: 1px solid var(--border); border-radius: var(--rsm);
+  background: transparent; color: var(--text3); transition: all .15s;
+}
+.gs-btn.active { background: var(--text); color: #fff; border-color: var(--text); }
+
+/* Set logging row */
+.set-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: .35rem 0; border-bottom: .5px solid var(--border);
+}
+.set-row:last-child { border-bottom: none; }
+.set-num {
+  font-size: 10px; font-weight: 700; color: var(--text4);
+  width: 20px; text-align: center; flex-shrink: 0;
+}
+.set-weight-inp {
+  font-size: 14px; font-weight: 600; color: var(--text);
+  width: 64px; padding: 4px 6px; border: 1px solid var(--border2);
+  border-radius: var(--rxs); background: var(--surface); text-align: center;
+  font-family: var(--mono);
+}
+.set-reps-inp {
+  font-size: 13px; color: var(--text2);
+  width: 48px; padding: 4px 6px; border: 1px solid var(--border2);
+  border-radius: var(--rxs); background: var(--surface); text-align: center;
+}
+.set-tick {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--bg3); border: 1.5px solid var(--border2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; cursor: pointer; flex-shrink: 0;
+  transition: all .15s;
+}
+.set-tick.done { background: var(--success-bg); border-color: var(--success); }
+.set-unit { font-size: 10px; color: var(--text4); flex-shrink: 0; }
+
 /* Gym audio player */
 #gym-audio-player {
   position: sticky; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
@@ -1205,23 +1250,142 @@ input, textarea, select { font-family: var(--font); }
 
     <!-- ── TAB: GYM ──────────────────────────────────────── -->
     <div class="tab-panel" id="tab-gym" data-tab="gym">
-      <div id="gym-content">
-        <div class="empty-state" style="padding-top:3rem">
-          <div class="empty-state-icon">🏋️</div>
-          <div class="empty-state-title">No programme set up</div>
-          <div class="empty-state-sub">Set up your gym split in Settings to start logging sessions.</div>
-          <button class="btn-primary" style="margin-top:1.5rem;max-width:240px" onclick="openSettings('gym')">Set Up Programme</button>
-        </div>
+      <!-- Gym subtabs -->
+      <div class="gym-subtabs">
+        <button class="gs-btn active" data-gview="today" onclick="switchGymView('today')">Today</button>
+        <button class="gs-btn" data-gview="history" onclick="switchGymView('history')">History</button>
+        <button class="gs-btn" data-gview="programme" onclick="switchGymView('programme')">Programme</button>
+        <button class="gs-btn" data-gview="running" onclick="switchGymView('running')">Running</button>
       </div>
+      <div id="gym-today-view"><div class="empty-state" style="padding:3rem 1.5rem"><div class="loading-spinner" style="margin:0 auto"></div></div></div>
+      <div id="gym-history-view" style="display:none"></div>
+      <div id="gym-programme-view" style="display:none"></div>
+      <div id="gym-running-view" style="display:none"></div>
+
+      <!-- Sticky audio player -->
       <div id="gym-audio-player">
-        <div class="audio-title" id="audio-track-title">No track</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <div class="audio-title" id="audio-track-title">No track linked</div>
+          <button onclick="linkAudioFolder()" style="font-size:10px;color:var(--accent3);background:none;border:none;padding:0;font-weight:600">Link folder</button>
+        </div>
         <div class="audio-controls">
-          <button class="audio-btn" id="audio-play-btn" onclick="toggleAudio()">▶ Play</button>
-          <button class="audio-btn" onclick="stopAudio()">■ Stop</button>
+          <button class="audio-btn" id="audio-play-btn" onclick="toggleAudio()">▶</button>
+          <button class="audio-btn" onclick="stopAudio()">■</button>
+          <div style="flex:1;height:3px;background:rgba(255,255,255,.15);border-radius:2px;position:relative;cursor:pointer" id="audio-progress-bar" onclick="seekAudio(event)">
+            <div id="audio-progress-fill" style="height:100%;background:var(--accent3);border-radius:2px;width:0%"></div>
+          </div>
           <button class="audio-speed-btn active" data-speed="1" onclick="setAudioSpeed(1)">1×</button>
           <button class="audio-speed-btn" data-speed="1.2" onclick="setAudioSpeed(1.2)">1.2×</button>
           <button class="audio-speed-btn" data-speed="1.5" onclick="setAudioSpeed(1.5)">1.5×</button>
           <button class="audio-speed-btn" data-speed="2" onclick="setAudioSpeed(2)">2×</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROGRAMME EDITOR MODAL -->
+    <div class="modal-backdrop" id="programme-modal">
+      <div class="modal-box" style="max-height:90vh">
+        <div class="modal-title">Gym Programme</div>
+        <div class="inp-row">
+          <label>Programme Name</label>
+          <input type="text" id="prog-name" placeholder="e.g. PPL Split">
+        </div>
+        <div class="inp-row">
+          <label>Days</label>
+          <div id="prog-days-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:4px"></div>
+        </div>
+        <div style="margin-top:.75rem">
+          <div style="font-size:10px;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Session Types</div>
+          <div id="prog-session-types" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:.75rem"></div>
+          <input type="text" id="prog-new-type" placeholder="Add session type (e.g. Push, Pull, Legs)" style="font-size:13px;padding:8px 10px;border:1px solid var(--border2);border-radius:var(--rsm);background:var(--surface);color:var(--text);width:100%">
+          <button onclick="addSessionType()" class="btn-secondary" style="margin-top:6px;font-size:12px">+ Add Type</button>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" style="flex:1" onclick="closeProgrammeModal()">Cancel</button>
+          <button class="btn-primary" style="flex:2" onclick="saveProgramme()">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- EXERCISE EDITOR MODAL -->
+    <div class="modal-backdrop" id="exercise-modal">
+      <div class="modal-box">
+        <div class="modal-title" id="ex-modal-title">Add Exercise</div>
+        <div class="inp-row">
+          <label>Name</label>
+          <input type="text" id="ex-name" placeholder="e.g. Bench Press">
+        </div>
+        <div class="inp-row">
+          <label>Session Type</label>
+          <select id="ex-session-type"></select>
+        </div>
+        <div style="display:flex;gap:8px">
+          <div class="inp-row" style="flex:1">
+            <label>Sets</label>
+            <input type="number" id="ex-sets" value="3" min="1" max="20">
+          </div>
+          <div class="inp-row" style="flex:1">
+            <label>Reps</label>
+            <input type="number" id="ex-reps" value="10" min="1" max="100">
+          </div>
+        </div>
+        <div class="inp-row">
+          <label>Icon (emoji)</label>
+          <input type="text" id="ex-icon" placeholder="💪" maxlength="2" style="font-size:20px;text-align:center">
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" style="flex:1" onclick="closeExerciseModal()">Cancel</button>
+          <button class="btn-primary" style="flex:2" onclick="saveExercise()">Save</button>
+        </div>
+        <div id="ex-delete-wrap" style="display:none;margin-top:.75rem">
+          <button onclick="deleteExercise()" style="width:100%;padding:10px;background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger);border-radius:var(--r);font-size:13px;font-weight:600">Delete Exercise</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOG SESSION MODAL -->
+    <div class="modal-backdrop" id="session-modal">
+      <div class="modal-box" style="max-height:92vh">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+          <div class="modal-title" style="margin:0" id="sess-modal-title">Log Session</div>
+          <button onclick="closeSessionModal()" style="font-size:20px;color:var(--text3);background:none;border:none;padding:0">✕</button>
+        </div>
+        <div id="sess-exercises-list"></div>
+        <div class="inp-row" style="margin-top:.75rem">
+          <label>Notes (optional)</label>
+          <textarea id="sess-notes" rows="2" placeholder="How did it go?"></textarea>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-primary" onclick="saveSession()">Save Session</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RUNNING LOG MODAL -->
+    <div class="modal-backdrop" id="running-modal">
+      <div class="modal-box">
+        <div class="modal-title">Log Run</div>
+        <div class="inp-row">
+          <label>Date</label>
+          <input type="date" id="run-date">
+        </div>
+        <div style="display:flex;gap:8px">
+          <div class="inp-row" style="flex:1">
+            <label>Distance (km)</label>
+            <input type="number" id="run-dist" step="0.1" placeholder="5.0">
+          </div>
+          <div class="inp-row" style="flex:1">
+            <label>Duration (min)</label>
+            <input type="number" id="run-dur" placeholder="30">
+          </div>
+        </div>
+        <div class="inp-row">
+          <label>Notes</label>
+          <input type="text" id="run-notes" placeholder="Route, how it felt…">
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" style="flex:1" onclick="closeRunningModal()">Cancel</button>
+          <button class="btn-primary" style="flex:2" onclick="saveRun()">Save</button>
         </div>
       </div>
     </div>
@@ -1624,6 +1788,7 @@ async function handlePinComplete() {
 }
 
 function lockApp() {
+  try { localStorage.removeItem('omni_unlock_ts'); } catch(e) {}
   document.getElementById('main-app').classList.remove('visible');
   showPinScreen('unlock');
 }
@@ -3067,6 +3232,18 @@ async function dashUndoOutfit() {
 // ═══════════════════════════════════════════════════
 // APP INIT
 // ═══════════════════════════════════════════════════
+function _isWithinUnlockWindow() {
+  try {
+    const ts = parseInt(localStorage.getItem('omni_unlock_ts') || '0');
+    if (!ts) return false;
+    const lockDays = S.lockDays || 0;
+    // If lockDays is 0, treat as "lock on manual only" — stay unlocked across sessions
+    if (lockDays === 0) return true;
+    const elapsed = (Date.now() - ts) / (1000 * 60 * 60 * 24);
+    return elapsed < lockDays;
+  } catch(e) { return false; }
+}
+
 async function initApp() {
   await loadSettings();
 
@@ -3090,17 +3267,20 @@ async function initApp() {
   setInterval(updateClock, 1000);
 
   // Show PIN or app
+  // Check if we're within the inactivity window — skip PIN if so
+  document.getElementById('loading-overlay').classList.add('hidden');
   if (!hasPIN()) {
-    document.getElementById('loading-overlay').classList.add('hidden');
     showPinScreen('setup');
+  } else if (_isWithinUnlockWindow()) {
+    _doUnlock();
   } else {
-    document.getElementById('loading-overlay').classList.add('hidden');
     showPinScreen('unlock');
   }
 }
 
 
 function _doUnlock() {
+  try { localStorage.setItem('omni_unlock_ts', Date.now()); } catch(e) {}
   document.getElementById('pin-screen').classList.add('hidden');
   document.getElementById('main-app').classList.add('visible');
   _lastActivity = Date.now();
