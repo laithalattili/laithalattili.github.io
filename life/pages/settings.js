@@ -59,8 +59,8 @@ PAGES.settings = async (container, app) => {
         <input type="date" id="pref-birthday" value="1993-12-30">
       </div>
       <div class="form-group">
-        <label>TMDB API Key</label>
-        <input type="text" id="pref-tmdb" placeholder="Get free key at themoviedb.org/settings/api">
+        <label>OMDb API Key</label>
+        <input type="text" id="pref-omdb" placeholder="Get free key at omdbapi.com — enter email, key arrives instantly">
         <div style="font-family:var(--mono);font-size:0.6rem;color:var(--text3);margin-top:0.25rem;">Used to search and auto-fill film metadata when adding films</div>
       </div>
       <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;">
@@ -158,19 +158,19 @@ PAGES.settings = async (container, app) => {
   // Load personal settings
   const savedBirthday = await DB.getSetting('birthday');
   const showBar = await DB.getSetting('show_info_bar');
-  const tmdbKey = await DB.getSetting('tmdb_api_key');
+  const tmdbKey = await DB.getSetting('omdb_api_key');
   if (savedBirthday) document.getElementById('pref-birthday').value = savedBirthday;
   if (showBar === 'true') document.getElementById('pref-show-bar').checked = true;
-  if (tmdbKey) document.getElementById('pref-tmdb').value = tmdbKey;
+  document.getElementById('pref-omdb').value = tmdbKey || 'c0c229d0';
 
   // Save personal settings
   document.getElementById('btn-save-personal').addEventListener('click', async () => {
     const birthday = document.getElementById('pref-birthday').value;
     const showBarVal = document.getElementById('pref-show-bar').checked;
-    const tmdbKey = document.getElementById('pref-tmdb').value.trim();
+    const tmdbKey = document.getElementById('pref-omdb').value.trim();
     await DB.setSetting('birthday', birthday);
     await DB.setSetting('show_info_bar', showBarVal ? 'true' : 'false');
-    await DB.setSetting('tmdb_api_key', tmdbKey);
+    await DB.setSetting('omdb_api_key', tmdbKey);
     app.notify('Personal settings saved', 'success');
     // Reinit info bar
     if (typeof APP !== 'undefined') APP.initInfoBar();
