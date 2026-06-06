@@ -38,7 +38,7 @@ PAGES.filmsLibrary = async (container, app) => {
 
   let films = [], watchLog = [];
   try {
-    films = await DB.query('films', { order: 'title.asc' });
+    films    = await DB.query('films',     { order: 'title.asc' });
     watchLog = await DB.query('watch_log', { order: 'date.desc' });
   } catch(e) {
     container.innerHTML = `<div style="color:var(--error)">${e.message}</div>`;
@@ -48,66 +48,176 @@ PAGES.filmsLibrary = async (container, app) => {
   const watchCounts = {};
   watchLog.forEach(l => { watchCounts[l.film_id] = (watchCounts[l.film_id] || 0) + 1; });
 
-  const directors = [...new Set(films.map(f => f.director).filter(Boolean))].sort();
+  let filters = { search:'', status:'all', owned:'all', favorite:false, director:'all', decade:'all', country:'all', pg:'all' };
+  let sortBy = 'title', sortDir = 'asc', durationUnit = 'mins';
 
-  let activeStatus = 'all';
-  let activeDirector = 'all';
-  let searchQuery = '';
-  let durationUnit = 'mins';
+  const decades  = [...new Set(films.map(f => f.year ? Math.floor(f.year/10)*10 : null).filter(Boolean))].sort();
+  const countries = [...new Set(films.map(f => f.country).filter(Boolean))].sort();
+  const directors = [...new Set(films.map(f => f.director).filter(Boolean))].sort();
+  const pgRatings = [...new Set(films.map(f => f.pg_rating).filter(Boolean))].sort();
 
   const formatDur = (mins) => {
     if (!mins) return '';
-    if (durationUnit === 'hrs') {
-      const h = Math.floor(mins/60), m = mins%60;
-      return m > 0 ? `${h}h ${m}m` : `${h}h`;
-    }
+    if (durationUnit === 'hrs') { const h=Math.floor(mins/60),m=mins%60; return m?`${h}h ${m}m`:`${h}h`; }
     return `${mins}min`;
   };
 
-  const render = () => {
+  const applyFilters = () => {
     let list = [...films];
-    if (activeStatus === 'favorites') list = list.filter(f => f.is_favorite);
-    else if (activeStatus !== 'all') list = list.filter(f => f.status === activeStatus);
-    if (activeDirector !== 'all') list = list.filter(f => f.director === activeDirector);
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
+    if (filters.favorite)            list = list.filter(f => f.is_favorite);
+    if (filters.status !== 'all')    list = list.filter(f => f.status === filters.status);
+    if (filters.owned === 'owned')   list = list.filter(f => f.is_owned);
+    if (filters.owned === 'not-owned') list = list.filter(f => !f.is_owned);
+    if (filters.director !== 'all')  list = list.filter(f => f.director === filters.director);
+    if (filters.decade !== 'all')    list = list.filter(f => f.year && Math.floor(f.year/10)*10 === parseInt(filters.decade));
+    if (filters.country !== 'all')   list = list.filter(f => f.country === filters.country);
+    if (filters.pg !== 'all')        list = list.filter(f => f.pg_rating === filters.pg);
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
       list = list.filter(f =>
         (f.title||'').toLowerCase().includes(q) ||
         (f.director||'').toLowerCase().includes(q) ||
-        (f.country||'').toLowerCase().includes(q)
+        (f.writer||'').toLowerCase().includes(q) ||
+        (f.dp||'').toLowerCase().includes(q) ||
+        (f.country||'').toLowerCase().includes(q) ||
+        (f.year?.toString()||'').includes(q)
       );
     }
-    document.getElementById('film-count').textContent = `${list.length} film${list.length!==1?'s':''}`;
-    document.getElementById('film-list').innerHTML = list.length
+    const sortLabels = { title:'title', year:'year', director:'director', runtime:'runtime_mins', country:'country' };
+    const key = sortLabels[sortBy] || 'title';
+    list.sort((a,b) => {
+      const av = a[key]||( typeof a[key]==='number'?0:''), bv = b[key]||(typeof b[key]==='number'?0:'');
+      const cmp = typeof av==='string' ? av.localeCompare(bv) : av-bv;
+      return sortDir==='asc' ? cmp : -cmp;
+    });
+    return list;
+  };
+
+  const activeFilterCount = () => ['favorite','status','owned','director','decade','country','pg']
+    .filter(k => filters[k] && filters[k] !== 'all' && filters[k] !== false).length;
+
+  const sortLabelMap = { title:'Title', year:'Year', director:'Director', runtime:'Duration', country:'Country' };
+
+  const renderShell = () => {
+    const afc = activeFilterCount();
+    container.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+        <span id="film-count" style="font-family:var(--mono);font-size:0.68rem;color:var(--text3);">— films</span>
+        <div style="display:flex;gap:0.4rem;align-items:center;">
+          <button class="btn btn-secondary btn-sm" id="btn-dur-toggle">${durationUnit}</button>
+          <button class="btn btn-secondary btn-sm" id="btn-filter-toggle">Filter${afc>0?` <span style="background:var(--accent);color:white;border-radius:99px;padding:0 4px;font-size:0.55rem;margin-left:2px;">${afc}</span>`:''}</button>
+          <button class="btn btn-secondary btn-sm" id="btn-add-film">+ Add</button>
+          <button class="btn btn-secondary btn-sm" id="btn-film-lists">Lists</button>
+        </div>
+      </div>
+
+      <div class="search-bar">
+        <span class="search-icon">⌕</span>
+        <input type="text" id="film-search" placeholder="Title, director, writer, DP, country, year..." value="${filters.search}">
+      </div>
+
+      <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.75rem;flex-wrap:wrap;">
+        <span style="font-family:var(--mono);font-size:0.58rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;">Sort</span>
+        ${Object.entries(sortLabelMap).map(([k,v]) => `
+          <button class="pill sort-pill ${sortBy===k?'active':''}" data-sort="${k}">${v}${sortBy===k?(sortDir==='asc'?' ↑':' ↓'):''}</button>
+        `).join('')}
+      </div>
+
+      <div id="filter-panel" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;margin-bottom:0.75rem;">
+        <div style="display:flex;flex-wrap:wrap;gap:1rem;">
+          <div>
+            <div style="font-family:var(--mono);font-size:0.58rem;color:var(--text3);text-transform:uppercase;margin-bottom:0.3rem;">Status</div>
+            ${['all','watched','to-watch'].map(s => `
+              <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;cursor:pointer;margin-bottom:0.2rem;">
+                <input type="radio" name="f-status" value="${s}" ${filters.status===s?'checked':''} style="width:auto;">
+                ${s==='all'?'All':s.charAt(0).toUpperCase()+s.slice(1)}
+              </label>`).join('')}
+          </div>
+          <div>
+            <div style="font-family:var(--mono);font-size:0.58rem;color:var(--text3);text-transform:uppercase;margin-bottom:0.3rem;">Ownership</div>
+            ${[['all','All'],['owned','DVD owned'],['not-owned','Not owned']].map(([v,l]) => `
+              <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;cursor:pointer;margin-bottom:0.2rem;">
+                <input type="radio" name="f-owned" value="${v}" ${filters.owned===v?'checked':''} style="width:auto;">${l}
+              </label>`).join('')}
+          </div>
+          <div>
+            <div style="font-family:var(--mono);font-size:0.58rem;color:var(--text3);text-transform:uppercase;margin-bottom:0.3rem;">Decade</div>
+            <select id="f-decade" style="font-size:0.78rem;padding:0.25rem;">
+              <option value="all">All</option>
+              ${decades.map(d => `<option value="${d}" ${filters.decade==d?'selected':''}>${d}s</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <div style="font-family:var(--mono);font-size:0.58rem;color:var(--text3);text-transform:uppercase;margin-bottom:0.3rem;">Country</div>
+            <select id="f-country" style="font-size:0.78rem;padding:0.25rem;">
+              <option value="all">All</option>
+              ${countries.map(c => `<option value="${c}" ${filters.country===c?'selected':''}>${c}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <div style="font-family:var(--mono);font-size:0.58rem;color:var(--text3);text-transform:uppercase;margin-bottom:0.3rem;">PG Rating</div>
+            <select id="f-pg" style="font-size:0.78rem;padding:0.25rem;">
+              <option value="all">All</option>
+              ${pgRatings.map(p => `<option value="${p}" ${filters.pg===p?'selected':''}>${p}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <div style="font-family:var(--mono);font-size:0.58rem;color:var(--text3);text-transform:uppercase;margin-bottom:0.3rem;">Other</div>
+            <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;cursor:pointer;">
+              <input type="checkbox" id="f-fav" ${filters.favorite?'checked':''} style="width:auto;">Favourites only
+            </label>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:0.5rem;">
+          <button class="btn btn-secondary btn-sm" id="btn-clear-filters">Clear all</button>
+        </div>
+      </div>
+
+      <div style="margin-bottom:0.5rem;">
+        <button class="btn btn-secondary btn-sm" id="btn-by-director" style="font-family:var(--mono);font-size:0.62rem;">
+          By Director${filters.director!=='all'?' · '+filters.director:''}
+        </button>
+        ${filters.director!=='all'?`<button class="btn btn-secondary btn-sm" id="btn-clear-dir" style="font-size:0.6rem;margin-left:0.3rem;color:var(--error);">×</button>`:''}
+      </div>
+
+      <div id="film-list"></div>
+    `;
+    bindControls();
+    renderList();
+  };
+
+  const renderList = () => {
+    const list = applyFilters();
+    const afc = activeFilterCount();
+    const countEl = document.getElementById('film-count');
+    if (countEl) countEl.textContent = `${list.length} film${list.length!==1?'s':''}`;
+    const listEl = document.getElementById('film-list');
+    if (!listEl) return;
+    listEl.innerHTML = list.length
       ? list.map(f => renderFilmCard(f)).join('')
       : '<div class="empty"><div class="empty-text">No films match</div></div>';
-
-    document.querySelectorAll('.btn-log-watch').forEach(btn =>
-      btn.addEventListener('click', e => { e.stopPropagation(); PAGES.logWatchModal(btn.dataset.id, app, films, () => PAGES.filmsLibrary(container, app)); })
-    );
-    document.querySelectorAll('.btn-edit-film').forEach(btn =>
-      btn.addEventListener('click', e => { e.stopPropagation(); PAGES.editFilmModal(btn.dataset.id, app, films, () => PAGES.filmsLibrary(container, app)); })
-    );
+    bindFilmCards();
   };
 
   const renderFilmCard = (f) => {
-    const statusColors = { 'to-watch': 'gray', watched: 'green', owned: '' };
     const count = watchCounts[f.id] || 0;
-    const dur = f.runtime_mins ? `<span style="font-family:var(--mono);font-size:0.62rem;color:var(--text3);">${formatDur(f.runtime_mins)}</span>` : '';
+    const dur = f.runtime_mins ? `<span style="font-family:var(--mono);font-size:0.6rem;color:var(--text3);">${formatDur(f.runtime_mins)}</span>` : '';
     const rewatched = count > 1 ? `<span style="font-family:var(--mono);font-size:0.6rem;color:var(--accent);">${count}×</span>` : '';
+    const ownedBadge = f.is_owned ? '<span style="font-family:var(--mono);font-size:0.52rem;color:var(--text3);border:1px solid var(--border);border-radius:3px;padding:0 3px;">DVD</span>' : '';
+    const pg = f.pg_rating ? `<span style="font-family:var(--mono);font-size:0.55rem;color:var(--text3);">${f.pg_rating}</span>` : '';
+    const statusColor = f.status==='watched'?'green':f.status==='to-watch'?'gray':'';
     return `
-      <div class="book-item">
+      <div class="book-item film-card" data-id="${f.id}" style="cursor:pointer;">
         <div class="book-cover" style="background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:1.3rem;min-width:48px;width:48px;position:relative;">
-          🎬
-          ${f.is_favorite ? '<div style="position:absolute;top:1px;right:2px;font-size:0.6rem;color:var(--accent);">★</div>' : ''}
+          🎬${f.is_favorite?'<div style="position:absolute;top:1px;right:2px;font-size:0.6rem;color:var(--accent);">★</div>':''}
         </div>
         <div class="book-info">
           <div class="book-title">${f.is_favorite?'<span style="color:var(--accent);margin-right:0.2rem;">★</span>':''}${f.title}</div>
           <div class="book-author">${f.director||''}${f.year?' · '+f.year:''}${f.country?' · '+f.country:''}</div>
-          <div style="display:flex;gap:0.4rem;align-items:center;margin-top:0.2rem;">${dur}${rewatched}</div>
+          <div style="display:flex;gap:0.3rem;align-items:center;flex-wrap:wrap;margin-top:0.2rem;">${dur}${pg}${ownedBadge}${rewatched}</div>
         </div>
         <div class="book-right">
-          <span class="tag ${statusColors[f.status]||''}">${f.status}</span>
+          <span class="tag ${statusColor}">${f.status}</span>
           <button class="btn btn-secondary btn-sm btn-log-watch" data-id="${f.id}">Log</button>
           <button class="btn btn-secondary btn-sm btn-edit-film" data-id="${f.id}">Edit</button>
         </div>
@@ -115,66 +225,59 @@ PAGES.filmsLibrary = async (container, app) => {
     `;
   };
 
-  container.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
-      <div style="display:flex;gap:0.4rem;align-items:center;">
-        <span id="film-count" style="font-family:var(--mono);font-size:0.68rem;color:var(--text3);">${films.length} films</span>
-      </div>
-      <div style="display:flex;gap:0.4rem;">
-        <button class="btn btn-secondary btn-sm" id="btn-dur-toggle">${durationUnit==='mins'?'min':'hrs'}</button>
-        <button class="btn btn-secondary btn-sm" id="btn-add-film">+ Add</button>
-        <button class="btn btn-secondary btn-sm" id="btn-film-lists">Lists</button>
-      </div>
-    </div>
+  const bindFilmCards = () => {
+    document.querySelectorAll('.btn-log-watch').forEach(btn =>
+      btn.addEventListener('click', e => { e.stopPropagation(); PAGES.logWatchModal(btn.dataset.id, app, films, () => renderList()); })
+    );
+    document.querySelectorAll('.btn-edit-film').forEach(btn =>
+      btn.addEventListener('click', e => { e.stopPropagation(); PAGES.editFilmModal(btn.dataset.id, app, films, () => { films = films.map(f => f.id===btn.dataset.id?{...f}:f); renderList(); }); })
+    );
+    document.querySelectorAll('.film-card').forEach(card =>
+      card.addEventListener('click', e => { if (e.target.closest('button')) return; PAGES.filmDetail(card.dataset.id, app, films, watchLog); })
+    );
+  };
 
-    <div class="search-bar">
-      <span class="search-icon">⌕</span>
-      <input type="text" id="film-search" placeholder="Title, director, country...">
-    </div>
+  const bindControls = () => {
+    document.getElementById('film-search').addEventListener('input', e => { filters.search = e.target.value; renderList(); });
+    document.querySelectorAll('.sort-pill').forEach(btn =>
+      btn.addEventListener('click', () => {
+        if (sortBy===btn.dataset.sort) sortDir = sortDir==='asc'?'desc':'asc';
+        else { sortBy=btn.dataset.sort; sortDir='asc'; }
+        renderShell();
+      })
+    );
+    document.getElementById('btn-filter-toggle').addEventListener('click', () => {
+      const p = document.getElementById('filter-panel');
+      p.style.display = p.style.display==='none'?'block':'none';
+    });
+    document.querySelectorAll('[name="f-status"]').forEach(r => r.addEventListener('change', () => { filters.status=r.value; renderList(); }));
+    document.querySelectorAll('[name="f-owned"]').forEach(r => r.addEventListener('change', () => { filters.owned=r.value; renderList(); }));
+    document.getElementById('f-decade').addEventListener('change', e => { filters.decade=e.target.value; renderList(); });
+    document.getElementById('f-country').addEventListener('change', e => { filters.country=e.target.value; renderList(); });
+    document.getElementById('f-pg').addEventListener('change', e => { filters.pg=e.target.value; renderList(); });
+    document.getElementById('f-fav').addEventListener('change', e => { filters.favorite=e.target.checked; renderList(); });
+    document.getElementById('btn-clear-filters').addEventListener('click', () => {
+      filters = { search:'', status:'all', owned:'all', favorite:false, director:'all', decade:'all', country:'all', pg:'all' };
+      renderShell();
+    });
+    document.getElementById('btn-dur-toggle').addEventListener('click', e => {
+      durationUnit = durationUnit==='mins'?'hrs':'mins';
+      e.target.textContent = durationUnit;
+      renderList();
+    });
+    document.getElementById('btn-add-film').addEventListener('click', () =>
+      PAGES.addFilmModal(app, () => PAGES.filmsLibrary(container, app))
+    );
+    document.getElementById('btn-film-lists').addEventListener('click', () =>
+      PAGES.listsPage(container, app, 'films')
+    );
+    document.getElementById('btn-by-director').addEventListener('click', () =>
+      PAGES.directorBrowser(container, app, directors, (dir) => { filters.director=dir; renderShell(); })
+    );
+    document.getElementById('btn-clear-dir')?.addEventListener('click', () => { filters.director='all'; renderShell(); });
+  };
 
-    <div class="filter-pills" id="status-pills">
-      <button class="pill active" data-status="favorites">★ Favs (${films.filter(f=>f.is_favorite).length})</button>
-      ${['all','to-watch','watched','owned'].map(s => `
-        <button class="pill ${s==='all'?'active':''}" data-status="${s}">
-          ${s==='all'?'All':s.charAt(0).toUpperCase()+s.slice(1)} (${s==='all'?films.length:films.filter(f=>f.status===s).length})
-        </button>
-      `).join('')}
-    </div>
-
-    <div class="filter-pills" id="director-pills">
-      <button class="pill active" data-dir="all">All directors</button>
-      ${directors.slice(0,20).map(d => `<button class="pill" data-dir="${d}">${d}</button>`).join('')}
-    </div>
-
-    <div id="film-list"></div>
-  `;
-
-  render();
-
-  document.getElementById('film-search').addEventListener('input', e => { searchQuery = e.target.value; render(); });
-  document.getElementById('status-pills').addEventListener('click', e => {
-    if (!e.target.dataset.status) return;
-    activeStatus = e.target.dataset.status;
-    document.querySelectorAll('#status-pills .pill').forEach(p => p.classList.toggle('active', p.dataset.status === activeStatus));
-    render();
-  });
-  document.getElementById('director-pills').addEventListener('click', e => {
-    if (!e.target.dataset.dir) return;
-    activeDirector = e.target.dataset.dir;
-    document.querySelectorAll('#director-pills .pill').forEach(p => p.classList.toggle('active', p.dataset.dir === activeDirector));
-    render();
-  });
-  document.getElementById('btn-dur-toggle').addEventListener('click', e => {
-    durationUnit = durationUnit === 'mins' ? 'hrs' : 'mins';
-    e.target.textContent = durationUnit === 'mins' ? 'min' : 'hrs';
-    render();
-  });
-  document.getElementById('btn-add-film').addEventListener('click', () =>
-    PAGES.addFilmModal(app, () => PAGES.filmsLibrary(container, app))
-  );
-  document.getElementById('btn-film-lists').addEventListener('click', () =>
-    PAGES.listsPage(container, app, 'films')
-  );
+  renderShell();
 };
 
 // ── Films Plan Tab ────────────────────────────────────────────
@@ -646,13 +749,18 @@ PAGES.editFilmModal = (filmId, app, films, onDone) => {
         <label>DP</label>
         <input id="ef-dp" value="${v(f.dp)}">
       </div>
-      <div class="form-group" style="margin-bottom:0;grid-column:1/-1;display:flex;align-items:center;gap:0.5rem;">
-        <input type="checkbox" id="ef-fav" style="width:auto;" ${f.is_favorite?'checked':''}>
-        <label for="ef-fav" style="margin-bottom:0;">Favourite ★</label>
+      <div class="form-group" style="margin-bottom:0;grid-column:1/-1;display:flex;gap:1rem;">
+        <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;cursor:pointer;margin-bottom:0;">
+          <input type="checkbox" id="ef-fav" style="width:auto;" ${f.is_favorite?'checked':''}> Favourite ★
+        </label>
+        <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;cursor:pointer;margin-bottom:0;">
+          <input type="checkbox" id="ef-owned" style="width:auto;" ${f.is_owned?'checked':''}> Owned (DVD)
+        </label>
       </div>
     </div>
     <div style="display:flex;gap:0.5rem;margin-top:1rem;">
       <button class="btn btn-primary" id="btn-update-film">Save</button>
+      <button class="btn btn-secondary btn-sm" id="btn-unwatch-film" style="color:var(--text3);">Unwatch</button>
       <button class="btn btn-secondary btn-sm" id="btn-delete-film" style="margin-left:auto;color:var(--error);">Delete</button>
       <button class="btn btn-secondary" onclick="APP.closeModal()">Cancel</button>
     </div>
@@ -670,6 +778,7 @@ PAGES.editFilmModal = (filmId, app, films, onDone) => {
         writer: document.getElementById('ef-writer').value.trim()||null,
         dp: document.getElementById('ef-dp').value.trim()||null,
         is_favorite: document.getElementById('ef-fav').checked,
+        is_owned: document.getElementById('ef-owned').checked,
         updated_at: new Date().toISOString()
       });
       app.closeModal(); app.notify('Updated','success');
@@ -684,4 +793,98 @@ PAGES.editFilmModal = (filmId, app, films, onDone) => {
       if (onDone) onDone();
     } catch(e) { app.notify('Error: '+e.message,'error'); }
   });
+
+  document.getElementById('btn-unwatch-film').addEventListener('click', async () => {
+    // Show watch history and let user delete entries
+    app.closeModal();
+    PAGES.unwatchFilm(filmId, f.title, app, onDone);
+  });
+};
+
+// ── Unwatch Film ──────────────────────────────────────────────
+PAGES.unwatchFilm = async (filmId, filmTitle, app, onDone) => {
+  let logs = [];
+  try {
+    logs = await DB.query('watch_log', { filter: { film_id: filmId }, order: 'date.desc' });
+  } catch(e) { app.notify('Error: '+e.message,'error'); return; }
+
+  if (logs.length === 0) {
+    app.notify('No watch entries to remove','info');
+    return;
+  }
+
+  app.showModal(`
+    <div class="modal-title">Watch History</div>
+    <div style="font-size:0.88rem;color:var(--text2);margin-bottom:1rem;">${filmTitle}</div>
+    <div style="font-family:var(--mono);font-size:0.62rem;color:var(--text3);margin-bottom:0.5rem;">Tap × to remove an entry</div>
+    <div id="unwatch-list">
+      ${logs.map(l => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:0.85rem;">${l.date}${l.session===2?' · Part 2':''}</span>
+          <button class="btn btn-secondary btn-sm btn-del-watch" data-id="${l.id}" style="color:var(--error);">×</button>
+        </div>
+      `).join('')}
+    </div>
+    <button class="btn btn-secondary" style="margin-top:1rem;width:100%;" onclick="APP.closeModal()">Done</button>
+  `);
+
+  document.querySelectorAll('.btn-del-watch').forEach(btn =>
+    btn.addEventListener('click', async () => {
+      try {
+        await DB.delete('watch_log', btn.dataset.id);
+        // Remove from UI
+        btn.closest('div').remove();
+        // If no more logs, update film status back to to-watch
+        const remaining = document.querySelectorAll('.btn-del-watch').length;
+        if (remaining === 0) {
+          await DB.update('films', filmId, { status: 'to-watch', updated_at: new Date().toISOString() });
+          app.notify('All watches removed — status reset to to-watch','success');
+          app.closeModal();
+        } else {
+          app.notify('Entry removed','success');
+        }
+        if (onDone) onDone();
+      } catch(e) { app.notify('Error: '+e.message,'error'); }
+    })
+  );
+};
+
+// ── Director Browser ──────────────────────────────────────────
+PAGES.directorBrowser = (container, app, directors, onSelect) => {
+  app.showModal(`
+    <div class="modal-title">Browse by Director</div>
+    <div class="search-bar" style="margin-bottom:0.5rem;">
+      <span class="search-icon">⌕</span>
+      <input type="text" id="dir-search" placeholder="Search directors...">
+    </div>
+    <div id="dir-list" style="max-height:55vh;overflow-y:auto;">
+      ${renderDirList(directors)}
+    </div>
+  `);
+
+  function renderDirList(list) {
+    return list.map(d => `
+      <div class="book-item dir-item" data-dir="${d}" style="cursor:pointer;padding:0.5rem 0;">
+        <div class="book-info"><div style="font-size:0.88rem;">${d}</div></div>
+        <span style="font-family:var(--mono);font-size:0.6rem;color:var(--text3);">→</span>
+      </div>
+    `).join('') || '<div style="padding:1rem;text-align:center;color:var(--text3);">No directors found</div>';
+  }
+
+  document.getElementById('dir-search').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    const filtered = directors.filter(d => d.toLowerCase().includes(q));
+    document.getElementById('dir-list').innerHTML = renderDirList(filtered);
+    bindDirItems();
+  });
+
+  const bindDirItems = () => {
+    document.querySelectorAll('.dir-item').forEach(item =>
+      item.addEventListener('click', () => {
+        app.closeModal();
+        onSelect(item.dataset.dir);
+      })
+    );
+  };
+  bindDirItems();
 };
