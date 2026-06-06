@@ -1950,8 +1950,9 @@ function renderPlannerDay() {
   }).filter(Boolean);
 
   const hasCommitments = allSlots.some(s => !['free','personal'].includes(s.tp));
+  // On busy days only hide pure 'free' slots — keep personal (meals), go (commitments), lessons, duties
   const slots = hasCommitments
-    ? allSlots.filter(s => !['free','personal'].includes(s.tp))
+    ? allSlots.filter(s => s.tp !== 'free')
     : allSlots;
 
   // Group consecutive same-label+type slots
