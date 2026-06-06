@@ -29159,9 +29159,13 @@ function _doExport(title,sub,planned,live,state){
   function bulletPara(b,isLive){
     const done=!!state[b.id];
     const sym=b.depth===0?'\u2022':b.depth===1?'\u25e6':'\u25aa';
+    const durStr=b.dur&&b.depth===0?' ('+b.dur+'min)':'';
     return new Paragraph({indent:{left:depthIndent[Math.min(b.depth||0,2)]},spacing:{before:20,after:20},
-      children:[new TextRun({text:sym+' '+(isLive?'[LIVE] ':'')+(b.text||''),size:18,font:'Arial',strike:done,
-        color:isLive?'B45309':b.depth>0?'666666':'222222'})]});
+      children:[
+        new TextRun({text:sym+' '+(isLive?'[LIVE] ':'')+(b.text||''),size:18,font:'Arial',strike:done,
+          color:isLive?'B45309':b.depth>0?'666666':'222222'}),
+        durStr?new TextRun({text:durStr,size:16,font:'Arial',color:'0D9488',italics:true}):new TextRun('')
+      ]});
   }
   const planClean=(planned||[]).filter(b=>b.text&&b.text.trim());
   const liveClean=(live||[]).filter(b=>b.text&&b.text.trim());
