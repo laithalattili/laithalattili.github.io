@@ -946,10 +946,9 @@ input, textarea, select { font-family: var(--font); }
           <div class="dash-card-sub" id="dash-gym-sub"></div>
         </div>
         <!-- Outfit -->
-        <div class="dash-card span-2" id="dash-outfit">
+        <div class="dash-card span-2" id="dash-outfit" style="padding:.6rem .85rem">
           <div class="dash-card-label">👔 Outfit Today</div>
-          <div class="dash-card-main" id="dash-outfit-main">–</div>
-          <div style="margin-top:8px;display:flex;gap:8px" id="dash-outfit-actions"></div>
+          <div id="dash-outfit-inner"></div>
         </div>
       </div>
     </div>
@@ -1011,24 +1010,21 @@ input, textarea, select { font-family: var(--font); }
         <button class="ws-btn" data-wview="laundry" onclick="switchWardrobeView('laundry')">Laundry</button>
       </div>
 
-      <!-- TODAY view -->
+      <!-- TODAY view → repurposed as Laundry + Season quick-view -->
       <div id="wardrobe-today-view">
         <!-- Season banner -->
         <div id="w-season-bar" style="display:flex;align-items:center;justify-content:space-between;padding:.5rem 1rem;background:var(--bg2);border-bottom:1px solid var(--border)">
           <div style="display:flex;align-items:center;gap:8px">
             <span id="w-season-icon" style="font-size:18px">☀️</span>
             <span id="w-season-label" style="font-size:12px;font-weight:600;color:var(--text2)">Summer</span>
-            <span id="w-season-override-badge" style="display:none" class="pill pill-warn" style="font-size:10px">Override</span>
+            <span id="w-season-override-badge" style="display:none" class="pill pill-warn">Override</span>
           </div>
           <button onclick="openSeasonOverride()" style="font-size:11px;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:var(--rxs);padding:3px 9px">Change week</button>
         </div>
-
-        <div id="w-today-content" style="padding:.75rem">
-          <div class="empty-state">
-            <div class="empty-state-icon">👔</div>
-            <div class="empty-state-title">Loading…</div>
-          </div>
+        <div style="padding:.75rem .75rem .25rem">
+          <div style="font-size:10px;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Needs attention</div>
         </div>
+        <div id="w-today-content"></div>
       </div>
 
       <!-- ITEMS view -->
@@ -2334,67 +2330,35 @@ async function renderWardrobeToday() {
   updateSeasonBar();
   const container = document.getElementById('w-today-content');
   if (!container) return;
-
-  if (!_wardrobeLoaded) {
-    container.innerHTML = `<div class="empty-state"><div class="loading-spinner" style="margin:0 auto"></div></div>`;
-    await loadWardrobeData();
+  if (!_wardrobeLoaded) await loadWardrobeData();
+  // Show laundry items needing attention
+  const laundryItems = W_ITEMS.filter(i => W_LAUNDRY_CATS.includes(i.category) && (i.wash_needed || i.iron_needed));
+  if (!laundryItems.length) {
+    container.innerHTML = `<div class="empty-state" style="padding:2rem">
+      <div class="empty-state-icon">✨</div>
+      <div class="empty-state-title">All clean</div>
+      <div class="empty-state-sub">No shirts or trousers need attention. Outfit suggestion is on the Dashboard.</div>
+    </div>`;
+    return;
   }
-
-  // Check if outfit already confirmed today
-  const todayLog = W_LOG.find(l => l.date === todayStr());
-
-  if (todayLog) {
-    // Show confirmed outfit
-    const combo = W_COMBOS.find(c => c.id === todayLog.combination_id);
-    const items = (todayLog.items_snapshot || []);
-    container.innerHTML = `
-      <div style="text-align:center;padding:.75rem 0 .5rem">
-        <span class="pill pill-success">✓ Outfit confirmed</span>
+  container.innerHTML = laundryItems.map(item => `
+    <div style="display:flex;align-items:center;gap:10px;padding:.6rem 1rem;border-bottom:.5px solid var(--border);background:var(--surface)">
+      ${item.photo_url
+        ? `<img src="${item.photo_url}" style="width:40px;height:40px;object-fit:cover;border-radius:var(--rsm);flex-shrink:0;border:1px solid var(--border)">`
+        : `<div style="width:40px;height:40px;background:var(--bg3);border-radius:var(--rsm);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${_catIcon(item.category)}</div>`
+      }
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:500;color:var(--text)">${item.name}</div>
+        <div style="display:flex;gap:4px;margin-top:3px">
+          ${item.wash_needed ? '<span class="pill" style="background:#fff3e0;color:#e65100;font-size:10px">🧺 Needs wash</span>' : ''}
+          ${item.iron_needed ? '<span class="pill" style="background:#e8f5e9;color:#2e7d32;font-size:10px">♨️ Needs iron</span>' : ''}
+        </div>
       </div>
-      ${_renderOutfitCard(combo, items, true)}
-      <div style="padding:.75rem">
-        <button class="btn-secondary" onclick="undoOutfitConfirm()">↩ Undo</button>
-      </div>`;
-    return;
-  }
-
-  if (!W_COMBOS.length) {
-    container.innerHTML = `<div class="empty-state" style="padding:2rem">
-      <div class="empty-state-icon">👔</div>
-      <div class="empty-state-title">No combinations yet</div>
-      <div class="empty-state-sub">Add items then build combinations to get suggestions.</div>
-      <button class="btn-primary" style="margin-top:1rem;max-width:200px" onclick="switchWardrobeView('items')">Add Items</button>
-    </div>`;
-    return;
-  }
-
-  const suggestion = getOutfitSuggestion();
-
-  if (!suggestion) {
-    container.innerHTML = `<div class="empty-state" style="padding:2rem">
-      <div class="empty-state-icon">🧺</div>
-      <div class="empty-state-title">Nothing available</div>
-      <div class="empty-state-sub">All combinations have items that need washing, ironing, or are excluded.</div>
-      <button class="btn-primary" style="margin-top:1rem;max-width:200px" onclick="switchWardrobeView('laundry')">Check Laundry</button>
-    </div>`;
-    return;
-  }
-
-  const itemObjs = (suggestion.item_ids || []).map(id => W_ITEMS.find(i => i.id === id)).filter(Boolean);
-  const daysSince = W_LOG.find(l => l.combination_id === suggestion.id)
-    ? Math.round((new Date(todayStr()) - new Date(W_LOG.find(l => l.combination_id === suggestion.id).date)) / 86400000)
-    : null;
-
-  container.innerHTML = `
-    <div style="padding:.5rem 1rem .25rem;display:flex;align-items:center;justify-content:space-between">
-      <div style="font-size:10px;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.08em">Suggested outfit</div>
-      ${daysSince !== null ? `<span class="pill pill-neutral">${daysSince}d ago</span>` : '<span class="pill pill-success">Never worn</span>'}
-    </div>
-    ${_renderOutfitCard(suggestion, itemObjs, false)}
-    <div style="padding:.75rem;display:flex;gap:8px">
-      <button class="btn-primary" style="flex:2" onclick="confirmOutfit('${suggestion.id}')">✓ Wearing this</button>
-      <button class="btn-secondary" style="flex:1" onclick="skipSuggestion('${suggestion.id}')">Skip</button>
-    </div>`;
+      <div style="display:flex;flex-direction:column;gap:4px">
+        ${item.wash_needed  ? `<button onclick="markWashed('${item.id}')" style="font-size:10px;font-weight:600;padding:3px 8px;border:1px solid var(--success);background:var(--success-bg);color:var(--success);border-radius:var(--rxs)">✓ Washed</button>` : ''}
+        ${item.iron_needed  ? `<button onclick="markIroned('${item.id}')" style="font-size:10px;font-weight:600;padding:3px 8px;border:1px solid var(--info);background:var(--info-bg);color:var(--info);border-radius:var(--rxs)">✓ Ironed</button>` : ''}
+      </div>
+    </div>`).join('');
 }
 
 function _renderOutfitCard(combo, items, confirmed) {
@@ -3008,9 +2972,96 @@ function renderDashboard() {
   const gymEl = document.getElementById('dash-gym-main');
   if (gymEl) gymEl.innerHTML = '<span style="color:var(--text4);font-size:12px">No rhythms yet</span>';
 
-  // Outfit
-  const outfitEl = document.getElementById('dash-outfit-main');
-  if (outfitEl) outfitEl.innerHTML = '<span style="color:var(--text4);font-size:12px">Set up Wardrobe to get suggestions</span>';
+  // Outfit — load wardrobe data if needed then render inline
+  renderDashboardOutfit();
+}
+
+async function renderDashboardOutfit() {
+  const el = document.getElementById('dash-outfit-inner');
+  if (!el) return;
+
+  if (!_wardrobeLoaded) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text4)">Loading…</div>';
+    await loadWardrobeData();
+  }
+
+  if (!W_COMBOS.length) {
+    el.innerHTML = `<div style="font-size:12px;color:var(--text4)">Set up Wardrobe to get suggestions</div>
+      <button onclick="switchTab('wardrobe')" style="margin-top:6px;font-size:11px;color:var(--accent);background:none;border:none;padding:0;font-weight:600">Go to Wardrobe →</button>`;
+    return;
+  }
+
+  // Already confirmed today?
+  const todayLog = W_LOG.find(l => l.date === todayStr());
+  if (todayLog) {
+    const items = todayLog.items_snapshot || [];
+    el.innerHTML = _dashOutfitConfirmedHTML(items);
+    return;
+  }
+
+  // Suggestion
+  const suggestion = getOutfitSuggestion();
+  if (!suggestion) {
+    el.innerHTML = `<div style="font-size:12px;color:var(--text4)">Nothing available — check laundry</div>
+      <button onclick="switchTab('wardrobe');switchWardrobeView('laundry')" style="margin-top:6px;font-size:11px;color:var(--accent);background:none;border:none;padding:0;font-weight:600">Check Laundry →</button>`;
+    return;
+  }
+
+  const itemObjs = (suggestion.item_ids || []).map(id => W_ITEMS.find(i => i.id === id)).filter(Boolean);
+  el.innerHTML = _dashOutfitSuggestionHTML(suggestion, itemObjs);
+}
+
+function _dashOutfitPhotoStrip(items) {
+  // Horizontal scrollable strip of photos/icons
+  const photoItems = items.filter(i => i); // all items
+  if (!photoItems.length) return '';
+  return `<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin:6px 0;-webkit-overflow-scrolling:touch">
+    ${photoItems.map(item => item.photo_url
+      ? `<div style="flex-shrink:0;text-align:center">
+          <img src="${item.photo_url}" style="width:54px;height:54px;object-fit:cover;border-radius:var(--rsm);border:1px solid var(--border);display:block">
+          <div style="font-size:9px;color:var(--text4);margin-top:2px;width:54px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
+        </div>`
+      : `<div style="flex-shrink:0;text-align:center">
+          <div style="width:54px;height:54px;background:var(--bg3);border-radius:var(--rsm);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:24px">${_catIcon(item.category)}</div>
+          <div style="font-size:9px;color:var(--text4);margin-top:2px;width:54px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
+        </div>`
+    ).join('')}
+  </div>`;
+}
+
+function _dashOutfitSuggestionHTML(combo, items) {
+  return `<div style="font-size:13px;font-weight:600;color:var(--text)">${combo.name}</div>
+    ${_dashOutfitPhotoStrip(items)}
+    <div style="display:flex;gap:6px;margin-top:4px">
+      <button onclick="dashConfirmOutfit('${combo.id}')" style="flex:2;padding:8px;background:var(--accent);color:#fff;border:none;border-radius:var(--rsm);font-size:12px;font-weight:600;font-family:var(--font)">✓ Wearing this</button>
+      <button onclick="dashSkipOutfit('${combo.id}')" style="flex:1;padding:8px;background:var(--bg3);color:var(--text3);border:1px solid var(--border);border-radius:var(--rsm);font-size:12px;font-family:var(--font)">Skip</button>
+    </div>`;
+}
+
+function _dashOutfitConfirmedHTML(items) {
+  return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+      <span style="font-size:11px;color:var(--success);font-weight:600">✓ Confirmed</span>
+      <button onclick="dashUndoOutfit()" style="font-size:10px;color:var(--text4);background:none;border:none;padding:0">undo</button>
+    </div>
+    ${_dashOutfitPhotoStrip(items)}`;
+}
+
+async function dashConfirmOutfit(comboId) {
+  await confirmOutfit(comboId);   // reuse wardrobe logic
+  renderDashboardOutfit();
+}
+
+function dashSkipOutfit(comboId) {
+  _skippedCombos.push(comboId);
+  const origCombos = W_COMBOS;
+  W_COMBOS = W_COMBOS.filter(c => !_skippedCombos.includes(c.id));
+  renderDashboardOutfit();
+  W_COMBOS = origCombos;
+}
+
+async function dashUndoOutfit() {
+  await undoOutfitConfirm();
+  renderDashboardOutfit();
 }
 
 // ═══════════════════════════════════════════════════
