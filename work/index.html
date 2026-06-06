@@ -932,6 +932,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
 
 <!-- ACTIVE MODE PANEL -->
 <div id="am-panel">
+  <div id="am-lock-overlay" onclick="amHandleLockTap(event)" style="display:none;position:absolute;inset:0;z-index:500;cursor:not-allowed"></div>
   <div class="panel-hdr" style="flex-wrap:wrap;gap:6px 10px;padding:8px 12px 6px">
     <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
       <button class="panel-hdr-back" onclick="amClose()">✕</button>
@@ -23366,7 +23367,8 @@ function updateGlobalDefaultBtn(){
   try{
     const raw=localStorage.getItem('globalDefault');
     const match_state=(s)=>s.tab===_activeMainTab&&s.ttView===ttView
-      &&(s.tab!=='lists'||(s.listsTab===_activeListsTab&&s.classId===currentClassId));
+      &&(s.tab!=='lists'||(s.listsTab===_activeListsTab&&s.classId===currentClassId))
+      &&(!!s.liveOpen===_amOpen);
     // Header ★ (always visible)
     const hBtn=document.getElementById('global-default-btn');const amStarBtn=document.getElementById('am-star-btn');
     // Timetable toolbar ★
@@ -28257,7 +28259,7 @@ function amClose(){
   document.getElementById('am-panel').classList.remove('open');
   if(_amInterval){clearInterval(_amInterval);_amInterval=null;}
   _amLpRafRunning=false;
-  if(_amLocked){_amLocked=false;var ov=document.getElementById('am-lock-overlay');if(ov)ov.classList.remove('active');var lb=document.getElementById('am-lock-btn');if(lb){lb.textContent='🔒';lb.style.color='#444';}}
+  if(_amLocked){_amLocked=false;var ov=document.getElementById('am-lock-overlay');if(ov)ov.style.display='none';var lb=document.getElementById('am-lock-btn');if(lb){lb.textContent='🔒';lb.style.color='#444';}}
   document.removeEventListener('visibilitychange',_amVisHandler);
   _updateLiveBtn();
 }
@@ -28770,7 +28772,7 @@ function amToggleLock(){
   _amLocked=!_amLocked;
   var overlay=document.getElementById('am-lock-overlay');
   var btn=document.getElementById('am-lock-btn');
-  if(overlay)overlay.classList.toggle('active',_amLocked);
+  if(overlay)overlay.style.display=_amLocked?'block':'none';
   if(btn){btn.style.color=_amLocked?'#f59f00':'#444';
     btn.textContent=_amLocked?'🔐':'🔒';
     btn.title=_amLocked?'Unlock':'Lock screen';}
