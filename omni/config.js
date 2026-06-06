@@ -1,0 +1,2 @@
+const OMNI_SUPA_URL = 'https://mkvfggacecgltscdrfqv.supabase.co';
+const OMNI_SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rdmZnZ2FjZWNnbHRzY2RyZnF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5MjM3MDcsImV4cCI6MjA5NDQ5OTcwN30.ErSZCR9G1NlBiq5ScOL3pmhPzJd5aYk92BU1I7Rzsr4';
