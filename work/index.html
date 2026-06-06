@@ -944,6 +944,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
     </div>
     <div style="display:flex;align-items:center;gap:6px;width:100%">
       <span class="cat-chip" id="am-cat-chip" style="display:none"></span>
+      <button id="am-lock-btn" onclick="amToggleLock()" title="Lock screen" style="display:none;background:none;border:none;cursor:pointer;font-size:17px;padding:4px 6px;color:#444;line-height:1;border-radius:6px;-webkit-tap-highlight-color:transparent">🔒</button>
       <button class="panel-hdr-btn" onclick="amExportDocx()" title="Export notes">⬇ Export</button>
       <button class="panel-hdr-btn" onclick="amOpenNotes()" title="Open plan for this slot">📋 Edit plan</button>
     </div>
@@ -28256,6 +28257,7 @@ function amClose(){
   document.getElementById('am-panel').classList.remove('open');
   if(_amInterval){clearInterval(_amInterval);_amInterval=null;}
   _amLpRafRunning=false;
+  if(_amLocked){_amLocked=false;var ov=document.getElementById('am-lock-overlay');if(ov)ov.classList.remove('active');var lb=document.getElementById('am-lock-btn');if(lb){lb.textContent='🔒';lb.style.color='#444';}}
   document.removeEventListener('visibilitychange',_amVisHandler);
   _updateLiveBtn();
 }
@@ -28763,6 +28765,26 @@ function _amStartLpRaf(){
   }
   requestAnimationFrame(_rafTick);
 }
+let _amLocked=false;
+function amToggleLock(){
+  _amLocked=!_amLocked;
+  var overlay=document.getElementById('am-lock-overlay');
+  var btn=document.getElementById('am-lock-btn');
+  if(overlay)overlay.classList.toggle('active',_amLocked);
+  if(btn){btn.style.color=_amLocked?'#f59f00':'#444';
+    btn.textContent=_amLocked?'🔐':'🔒';
+    btn.title=_amLocked?'Unlock':'Lock screen';}
+}
+function amHandleLockTap(e){
+  var overlay=document.getElementById('am-lock-overlay');
+  if(!overlay)return;
+  overlay.style.display='none';
+  var el=document.elementFromPoint(e.clientX,e.clientY);
+  overlay.style.display='block';
+  if(el&&(el.classList.contains('cl-check')||el.classList.contains('lp-check')||el.closest&&(el.closest('.cl-check')||el.closest('.lp-check')))){
+    el.click();
+  }
+}
 function _amVisHandler(){if(!document.hidden&&_amOpen){_amLastCtxKey='';amRender();}}
 function amRender(){
   const ctx=amGetCtx();_updateLiveBtn();_amAutoCheck();
@@ -28820,6 +28842,8 @@ function amRender(){
     const isTutorMtg=cat.mode==='tutormtg'||tp==='tmtg';
     // Show/hide header buttons depending on slot type
     document.querySelectorAll('.panel-hdr-actions .panel-hdr-btn').forEach(b=>b.style.display=isTutorMtg?'none':'');
+    var lockBtn=document.getElementById('am-lock-btn');
+    if(lockBtn)lockBtn.style.display=isLesson?'inline-block':'none';
     body.innerHTML=isTutorMtg?_amTutorMtgHtml(ctx,nowStr):isLesson?_amLessonHtml(ctx,nowStr):_amCommitHtml(ctx,nowStr,offset,slotIdx,dayName);
     const newInp=document.getElementById('am-live-inp');
     if(newInp&&prevVal){newInp.value=prevVal;}
