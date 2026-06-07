@@ -174,20 +174,18 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
 .src-work{background:rgba(24,72,160,.04)}
 
 /* ── SLOT ROWS ── */
-.slot{margin:0 .6rem .25rem;border-radius:var(--r);border:1px solid var(--bd);background:var(--sur);overflow:hidden;transition:all .15s}
-.slot.free-slot{background:#f0faf0;border-color:#c8e6c9}
-.slot.now{background:#e8f5e9;border-color:#66bb6a;border-width:2px;box-shadow:0 1px 8px rgba(102,187,106,.18)}
-.slot.nxt{background:var(--sur);border-color:var(--bd2)}
-.slot-hdr{display:flex;align-items:center;gap:7px;padding:.38rem .7rem}
-.slot-time-range{font-family:var(--mono);font-size:10px;color:var(--tx3);flex-shrink:0;white-space:nowrap}
-.slot-time-range b{color:var(--tx2);font-weight:700}
+.slot{margin:0 .6rem .22rem;border-radius:var(--r);border:1px solid var(--bd);background:var(--sur);overflow:hidden;transition:border-color .15s}
+.slot.free-slot{background:#f4fbf4;border-color:#d0ebd0}
+.slot.now{border-color:var(--acc);border-width:2px;box-shadow:0 0 0 1px rgba(184,88,40,.1)}
+.slot.nxt{border-color:var(--bd2)}
+.slot-hdr{display:flex;align-items:center;gap:6px;padding:.38rem .7rem}
+.slot-tr{font-family:var(--mono);font-size:10px;color:var(--tx3);flex-shrink:0;white-space:nowrap;min-width:90px}
+.slot-tr b{color:var(--tx);font-weight:700}
 .slot-pip{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .slot-lbl{font-size:13px;font-weight:500;color:var(--tx);flex:1}
-.slot-lbl.now-lbl{font-weight:700;color:#2e7d32}
-.slot-lbl.free-lbl{color:#558b2f;font-weight:500}
-.slot-now-bar{height:2px;background:#66bb6a;margin:0 .7rem .35rem;border-radius:1px}
-.past-row{margin:0 .6rem .25rem;padding:.32rem .7rem;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r);display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--tx4);font-size:11px}
-.past-row:active{background:var(--bg3)}
+.slot-now-bar{height:2px;background:var(--acc);margin:0 .7rem .35rem;border-radius:1px}
+.past-sum{margin:0 .6rem .22rem;padding:.3rem .7rem;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r);display:flex;align-items:center;gap:6px;cursor:pointer}
+.past-sum:active{opacity:.7}
 .past-col{margin:0 .6rem .35rem;opacity:.32;cursor:pointer}
 .past-col:active{opacity:.5}
 .past-col-in{display:flex;align-items:center;gap:7px;padding:.32rem .7rem;background:var(--sur);border:1px solid var(--bd);border-radius:var(--r)}
@@ -1353,24 +1351,37 @@ function renderDay(){
   if(slotsCol){
     slotsHtml+=collapsedSummary;
   } else {
-    // Past collapsed
+    // Past: single summary row
     if(pastSlots.length){
-      const first=pastSlots[0].time;const last=pastSlots[pastSlots.length-1];const lastEnd=WSLOTS[last.idx+1]?.t||last.time;
-      const pastRows=pastSlots.map(sl=>{
-        const st=_slotTasks(allTasks,sl.time);const hasN=hasNotes(sl.idx,dateStr);
-        return`<div class="slot" style="opacity:.38"><div class="slot-hdr"><span class="slot-time">${sl.time}</span><span class="slot-pip" style="background:${catCol(sl.tp)}"></span><span class="slot-lbl">${sl.label}</span><button class="slot-notes-btn${hasN?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')">${hasN?'📝':'·'}</button></div>${st.length?`<div class="slot-tasks">${st.map(t=>`<div class="slot-task-row"><div class="slot-task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div></div>`).join('')}</div>`:''}</div>`;
-      }).join('');
+      const first=pastSlots[0].time;
+      const lastPast=pastSlots[pastSlots.length-1];
+      const lastEnd=WSLOTS[lastPast.idx+1]?.t||lastPast.time;
       const pastExp=localStorage.getItem('omni_past_exp_'+dateStr)==='1';
-      slotsHtml+=`<div class="past-col" id="past-col-block" style="${pastExp?'display:none':''}" onclick="localStorage.setItem('omni_past_exp_${dateStr}','1');this.style.display='none';document.getElementById('past-expanded').style.display=''"><div class="past-col-in"><span class="slot-time">${first}</span><span style="flex:1;font-size:11px;color:var(--tx3)">${pastSlots.length} past · tap to show</span><span class="slot-time">${lastEnd}</span></div></div><div id="past-expanded" style="${pastExp?'':'display:none'}">${pastRows}<div style="padding:.2rem .6rem;font-size:10px;color:var(--tx3);cursor:pointer;text-align:center" onclick="localStorage.setItem('omni_past_exp_${dateStr}','0');renderDay()">↑ Hide past</div></div>`;
+      slotsHtml+=`<div class="past-sum" id="past-sum-row" style="${pastExp?'display:none':''}" onclick="_togglePastExp('${dateStr}')">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--tx3);white-space:nowrap">${first}–${lastEnd}</span>
+        <span style="flex:1;font-size:11px;color:var(--tx3);margin-left:8px">${pastSlots.length} past slot${pastSlots.length>1?'s':''}</span>
+        <span style="font-size:10px;color:var(--acc);font-weight:600">expand ›</span>
+      </div>`;
+      slotsHtml+=`<div id="past-exp-rows" style="${pastExp?'':'display:none'}">`;
+      pastSlots.forEach(sl=>{
+        const isFreeP=['free','personal'].includes(sl.tp);
+        const endTP=WSLOTS[sl.idx+1]?.t||sl.time;
+        const stP=_slotTasks(allTasks,sl.time);const hasNP=hasNotes(sl.idx,dateStr);
+        slotsHtml+=`<div class="slot${isFreeP?' free-slot':''}" style="opacity:.42"><div class="slot-hdr"><span class="slot-tr">${sl.time} <b>–${endTP}</b></span><span class="slot-pip" style="background:${catCol(sl.tp)}"></span><span class="slot-lbl">${isFreeP?'':sl.label}</span><button class="slot-notes-btn${hasNP?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')">${hasNP?'📝':'·'}</button></div>${stP.length?`<div class="slot-tasks">${stP.map(t=>`<div class="slot-task-row"><div class="slot-task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div></div>`).join('')}</div>`:''}</div>`;
+      });
+      slotsHtml+=`<div onclick="_togglePastExp('${dateStr}')" style="padding:.12rem .7rem .28rem;font-size:10px;color:var(--tx4);cursor:pointer;text-align:right">↑ hide past</div></div>`;
     }
-    // Future slots
+    // Current and future slots
     futSlots.forEach((sl,fi)=>{
       const isFree=['free','personal'].includes(sl.tp);
-      const isCur=isToday&&sl.idx===curIdx; // highlight current slot on any day including free days
+      const isCur=isToday&&sl.idx===curIdx;
       const isNxt=isToday&&!isCur&&!isFree&&futSlots.slice(0,fi).every(s=>s.idx===curIdx||['free','personal'].includes(s.tp));
-      const st=_slotTasks(allTasks,sl.time);const hasN=hasNotes(sl.idx,dateStr);
-      const badge=isCur?'<span class="pill pill-acc" style="font-size:9px">Now</span>':isNxt?'<span class="pill pill-neu" style="font-size:9px">Next</span>':'';
-      slotsHtml+=`<div class="slot${isCur?' now':isNxt?' nxt':''}" style="${isFree&&!isCur?'opacity:.52;':''}position:relative;"><div class="slot-hdr"><span class="slot-time">${sl.time}</span><span class="slot-pip" style="background:${catCol(sl.tp)}"></span><span class="slot-lbl">${isFree&&!isCur?'':sl.label}</span>${badge}<button class="slot-notes-btn${hasN?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')">${hasN?'📝':'·'}</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:15px;color:var(--acc);background:none;border:none;padding:0 4px;margin-left:2px;opacity:.7;line-height:1" title="Add/assign task here">+</button></div>${isCur?'<div class="slot-now-bar"></div>':''}${st.length?`<div class="slot-tasks">${st.map(t=>`<div class="slot-task-row"><div class="slot-task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div>${t.src==='omni'?`<button onclick="openEditTask('${t.id}')" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0">✎</button>`:''}</div>`).join('')}</div>`:''}</div>`;
+      const endT=WSLOTS[sl.idx+1]?.t||sl.time;
+      const st=_slotTasks(allTasks,sl.time);
+      const hasN=hasNotes(sl.idx,dateStr);
+      const trHtml=`<span class="slot-tr">${sl.time} <b>–${endT}</b></span>`;
+      const badge=isCur?'<span style="font-size:9px;font-weight:700;color:var(--acc);margin-left:4px">Now</span>':isNxt?'<span style="font-size:9px;color:var(--tx3);margin-left:4px">Next</span>':'';
+      slotsHtml+=`<div class="slot${isCur?' now':isNxt?' nxt':''}${isFree?' free-slot':''}"><div class="slot-hdr">${trHtml}<span class="slot-pip" style="background:${catCol(sl.tp)}"></span><span class="slot-lbl">${isFree&&!isCur?'':sl.label}</span>${badge}<button class="slot-notes-btn${hasN?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')">${hasN?'📝':'·'}</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:14px;color:var(--acc);background:none;border:none;padding:0 3px;opacity:.7;line-height:1">+</button></div>${isCur?'<div class="slot-now-bar"></div>':''}${st.length?`<div class="slot-tasks">${st.map(t=>`<div class="slot-task-row"><div class="slot-task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div>${t.src==='omni'?`<button onclick="openEditTask('${t.id}')" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0">✎</button>`:''}</div>`).join('')}</div>`:''}</div>`;
     });
     if(!allSlots.length)slotsHtml+='<div class="empty"><div class="empty-i">🏖️</div><div class="empty-t">No slots today</div></div>';
   }
@@ -1465,21 +1476,32 @@ function renderDay(){
   el('day-tasks').innerHTML=th;
 }
 function toggleSlotsCol(){const c=localStorage.getItem('omni_slots_col')==='1';localStorage.setItem('omni_slots_col',c?'0':'1');renderDay();}
+function _togglePastExp(dateStr){
+  const k='omni_past_exp_'+dateStr;
+  const wasExp=localStorage.getItem(k)==='1';
+  localStorage.setItem(k,wasExp?'0':'1');
+  // Toggle DOM directly without full re-render for speed
+  const sumRow=document.getElementById('past-sum-row');
+  const expRows=document.getElementById('past-exp-rows');
+  if(sumRow)sumRow.style.display=wasExp?'':'none';
+  if(expRows)expRows.style.display=wasExp?'none':'';
+}
 function togglePastCollapse(){
+  // Collapse past and scroll to current
   const d=new Date();d.setDate(d.getDate()+_dayOff);
   const dateStr=d.toISOString().split('T')[0];
-  const k='omni_past_exp_'+dateStr;
-  const cur=localStorage.getItem(k)==='1';
-  localStorage.setItem(k,cur?'0':'1');
+  localStorage.setItem('omni_past_exp_'+dateStr,'0');
   renderDay();
-  // After collapsing, scroll current slot into view
-  if(localStorage.getItem(k)!=='1'){
-    setTimeout(()=>{
-      const nowEl=document.querySelector('#day-slots .slot.now');
-      if(nowEl)nowEl.scrollIntoView({behavior:'smooth',block:'start'});
-    },120);
-  }
+  setTimeout(()=>{
+    const nowEl=document.querySelector('#day-slots .slot.now');
+    if(nowEl){
+      const container=document.querySelector('#day-view');
+      if(container)container.scrollTop=nowEl.offsetTop-60;
+      else nowEl.scrollIntoView({behavior:'smooth',block:'start'});
+    }
+  },80);
 }
+function toggleCatCollapse(cid){const k='omni_cat_col_'+cid;localStorage.setItem(k,localStorage.getItem(k)==='1'?'0':'1');renderDay();}
 function toggleTasksCol(){const c=localStorage.getItem('omni_tasks_col')==='1';localStorage.setItem('omni_tasks_col',c?'0':'1');renderDay();}
 
 function _pastCollapse(slots){
@@ -2502,8 +2524,8 @@ async function init(){
 let _pickerTime='',_pickerDate='';
 function openSlotTaskPicker(time,dateStr){
   _pickerTime=time;_pickerDate=dateStr;
-  const off=Math.round((new Date(dateStr+'T12:00:00')-new Date())/86400000);
-  const allTasks=getTasksFor(off);
+  // Use _dayOff directly — more reliable than date arithmetic
+  const allTasks=getTasksFor(_dayOff);
   const assigned=allTasks.filter(t=>t._t?.taskTime===time);
   const unassigned=allTasks.filter(t=>!t._t?.taskTime&&t.src==='omni');
   let html=`<div style="padding:.4rem .8rem .25rem;font-size:12px;font-weight:700;color:var(--tx)">Tasks at ${time}</div>`;
