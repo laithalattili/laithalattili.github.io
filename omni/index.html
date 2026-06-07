@@ -1306,7 +1306,14 @@ function _bKey(e,i){
 function _esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 // ── TIMED TASKS ───────────────────────────────────────────────────────────────
-function _slotTasks(tasks,time){return tasks.filter(t=>t._t?.taskTime===time);}
+function _slotTasks(tasks,time){
+  const hints=JSON.parse(localStorage.getItem('omni_work_hints')||'{}');
+  return tasks.filter(t=>{
+    if(t._t?.taskTime===time)return true;
+    if(t.src==='work'&&hints[t.id]===time)return true;
+    return false;
+  });
+}
 function _unscheduled(tasks){return tasks;} // show all tasks below, timed ones show time badge
 function openAddTaskAtTime(slotTime){
   openAddTask();
@@ -1388,7 +1395,13 @@ function renderDay(){
           ? `<span class="slot-tr">${sl.time} <b>–${endT}</b></span>`
           : `<span class="slot-tr">${sl.time} –${endT}</span>`;
       const badge=isCur?'<span style="font-size:9px;font-weight:700;color:var(--acc);margin-left:4px">Now</span>':isNxt?'<span style="font-size:9px;color:var(--tx3);margin-left:4px">Next</span>':'';
-      slotsHtml+=`<div class="slot${isCur?' now':isNxt?' nxt':''}${isFree?' free-slot':''}"><div class="slot-hdr">${trHtml}<span class="slot-pip" style="background:${catCol(sl.tp)}"></span><span class="slot-lbl">${isFree&&!isCur?'':sl.label}</span>${badge}<button class="slot-notes-btn${hasN?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')">${hasN?'📝':'·'}</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:14px;color:var(--acc);background:none;border:none;padding:0 3px;opacity:.7;line-height:1">+</button></div>${isCur?'<div class="slot-now-bar"></div>':''}${st.length?`<div class="slot-tasks">${st.map(t=>`<div class="slot-task-row"><div class="slot-task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div>${t.src==='omni'?`<button onclick="openEditTask('${t.id}')" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0">✎</button>`:''}</div>`).join('')}</div>`:''}</div>`;
+      slotsHtml+=`<div class="slot${isCur?' now':isNxt?' nxt':''}${isFree?' free-slot':''}"><div class="slot-hdr">${trHtml}<span class="slot-pip" style="background:${catCol(sl.tp)}"></span><span class="slot-lbl">${isFree&&!isCur?'':sl.label}</span>${badge}<button class="slot-notes-btn${hasN?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')">${hasN?'📝':'·'}</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:14px;color:var(--acc);background:none;border:none;padding:0 3px;opacity:.7;line-height:1">+</button></div>${isCur?'<div class="slot-now-bar"></div>':''}${st.length?`<div class="slot-tasks">${st.map(t=>{
+    const isWork=t.src==='work';
+    const removeBtn=isWork
+      ? `<button onclick="removeWorkHint('${t.id}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px" title="Remove from slot">×</button>`
+      : `<button onclick="unassignTask('${t.id}','${dateStr}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px" title="Remove from slot">×</button>`;
+    return`<div class="slot-task-row"><div class="slot-task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div>${removeBtn}</div>`;
+  }).join('')}</div>`:''}</div>`;
     });
     if(!allSlots.length)slotsHtml+='<div class="empty"><div class="empty-i">🏖️</div><div class="empty-t">No slots today</div></div>';
   }
@@ -1396,8 +1409,12 @@ function renderDay(){
 
 
   // ── TASKS SECTION ──────────────────────────────────────────────────────────
-  let th=`<div style="display:flex;align-items:center;justify-content:space-between;padding:.55rem .6rem .15rem;margin-top:.2rem"><div class="sec-lbl" style="padding:0">Tasks (${pending} pending)</div><div style="display:flex;gap:8px;align-items:center"><button onclick="toggleTasksCol()" style="font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:2px 8px">${tasksCol?'Expand ↓':'Collapse ↑'}</button><button onclick="openAddTask()" style="font-size:11px;color:var(--acc);font-weight:700;background:none;border:none">+ New</button></div></div>`;
-  if(!tasksCol){
+  // Determine if ANY category is currently expanded
+  const allCatIds2=['other','personal',...WCATS.map(x=>x.id)];
+  const anyExpanded=allCatIds2.some(k=>localStorage.getItem('omni_cat_col_'+k)!=='1');
+  // Always show category headers — button controls content visibility
+  let th=`<div style="display:flex;align-items:center;justify-content:space-between;padding:.55rem .6rem .15rem;margin-top:.2rem"><div class="sec-lbl" style="padding:0">Tasks (${pending} pending)</div><div style="display:flex;gap:8px;align-items:center"><button onclick="toggleTasksCol()" style="font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:2px 8px">${anyExpanded?'Collapse ↑':'Expand ↓'}</button><button onclick="openAddTask()" style="font-size:11px;color:var(--acc);font-weight:700;background:none;border:none">+ New</button></div></div>`;
+  if(true){
     if(unsched.length){
       // Group by category for work tasks
       const catMap={};WCATS.forEach(c=>{catMap[c.id]=c;});
@@ -1469,36 +1486,7 @@ function renderDay(){
     } else {
       th+=`<div style="padding:.35rem .6rem;font-size:12px;color:var(--tx4);font-style:italic">No unscheduled tasks.</div>`;
     }
-  } else {
-    // Collapsed: show category summaries with done counts — click to expand individual category
-    const catMap3={};WCATS.forEach(c=>{catMap3[c.id]=c;});
-    const catGroups={};const uncatWork=[];const pers=[];
-    unsched.forEach(t=>{
-      if(t.src==='work'&&t._t?.cat&&catMap3[t._t.cat]){if(!catGroups[t._t.cat])catGroups[t._t.cat]=[];catGroups[t._t.cat].push(t);}
-      else if(t.src==='work')uncatWork.push(t);
-      else pers.push(t);
-    });
-    const allCatIds=[...WCATS.map(c=>c.id)];
-    allCatIds.forEach(cid=>{
-      const tasks=catGroups[cid];if(!tasks?.length)return;
-      const cat=catMap3[cid];
-      const done=tasks.filter(t=>t.done).length;const total=tasks.length;const allDone=done===total;
-      const catColKey='omni_cat_col_'+cid;const catExpanded=localStorage.getItem(catColKey)==='1';
-      th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid ${cat.color}44">
-        <div style="padding:.28rem .7rem;background:${allDone?cat.color+'22':cat.color+'12'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('${cid}')">
-          <span style="width:8px;height:8px;border-radius:50%;background:${cat.color};flex-shrink:0"></span>
-          <span style="font-size:10px;font-weight:700;color:${cat.color};flex:1;text-transform:uppercase;letter-spacing:.06em">${cat.name}</span>
-          <span style="font-size:10px;color:${allDone?'var(--ok)':'var(--tx3)'}">${allDone?'✓ All done':''+done+'/'+total+' done'}</span>
-          <span style="font-size:10px;color:var(--tx4)">${catExpanded?'▲':'▼'}</span>
-        </div>
-        ${catExpanded?`<div>${tasks.map(t=>{const u=t.tier===2&&t.urg;const ttime=t._t?.taskTime;return`<div class="task-row t${t.tier}${u?' urg':''}"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}${ttime?` <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">📌 ${ttime}</span>`:''}</div></div></div>`;}).join('')}</div>`:''}
-      </div>`;
-    });
-    if(uncatWork.length||pers.length){
-      const all=[...uncatWork,...pers];const done2=all.filter(t=>t.done).length;
-      th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid var(--bd)"><div style="padding:.28rem .7rem;background:var(--bg2);display:flex;align-items:center;gap:6px"><span style="font-size:10px;font-weight:700;color:var(--tx3);flex:1;text-transform:uppercase;letter-spacing:.06em">Other</span><span style="font-size:10px;color:var(--tx3)">${done2}/${all.length} done</span></div></div>`;
-    }
-  }
+  } // end if(true)
   el('day-tasks').innerHTML=th;
 }
 function toggleSlotsCol(){const c=localStorage.getItem('omni_slots_col')==='1';localStorage.setItem('omni_slots_col',c?'0':'1');renderDay();}
@@ -1528,12 +1516,13 @@ function togglePastCollapse(){
 }
 function toggleCatCollapse(cid){const k='omni_cat_col_'+cid;localStorage.setItem(k,localStorage.getItem(k)==='1'?'0':'1');renderDay();}
 function toggleTasksCol(){
-  const c=localStorage.getItem('omni_tasks_col')==='1';
-  const newState=c?'0':'1';
+  // Check if any category is currently expanded
+  const allCatKeys2=['other','personal',...WCATS.map(x=>x.id)];
+  const anyExp=allCatKeys2.some(k=>localStorage.getItem('omni_cat_col_'+k)!=='1');
+  // If any expanded → collapse all. If all collapsed → expand all.
+  const newState=anyExp?'1':'0';
+  allCatKeys2.forEach(k=>localStorage.setItem('omni_cat_col_'+k,newState));
   localStorage.setItem('omni_tasks_col',newState);
-  // Force ALL categories to same state
-  const allCatKeys=['other','personal',...WCATS.map(x=>x.id)];
-  allCatKeys.forEach(k=>localStorage.setItem('omni_cat_col_'+k,newState));
   renderDay();
 }
 
@@ -2597,6 +2586,9 @@ function unassignTask(taskId,dateStr){
   const t=OTASKS.find(x=>x.id===taskId);
   if(t){delete t.taskTime;saveOmniTasks();}
   closeSlotPicker();
+}
+function removeWorkHint(taskId){
+  try{const h=JSON.parse(localStorage.getItem('omni_work_hints')||'{}');delete h[taskId];localStorage.setItem('omni_work_hints',JSON.stringify(h));}catch(e){}
 }
 function assignWorkTaskToSlot(taskId,time){
   // Work tasks can't be modified in Supabase from here
