@@ -1005,6 +1005,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       <button class="tt-btn" id="tt-btn-today" onclick="setTTView('today',this)">Day</button>
       <button class="tt-btn" id="tt-btn-week" onclick="setTTView('week',this)">Plan</button>
     </div>
+    <button id="tt-now-btn" onclick="ttGoNow()" title="Back to current week/day" style="display:none;font-size:11px;font-weight:700;padding:3px 10px;border:1.5px solid #f59f00;border-radius:6px;background:#fff8e6;cursor:pointer;color:#f59f00">Now</button>
     <button class="tt-show-all-btn" id="tt-collapse-past-btn" onclick="toggleCollapsePastOpt()" title="Collapse past slots" style="font-size:13px;min-width:32px">⬆</button>
     <button class="tt-show-all-btn" id="tt-options-btn" onclick="toggleTTOptions()" title="View options">⚙</button>
     <button class="edit-mode-btn" id="edit-mode-btn" onclick="ttEditMode?lockEditMode():requestEditMode()">✏️ Edit</button>
@@ -22917,9 +22918,21 @@ function isWeekA(){
   const d=Math.round((new Date()-getWeekARef())/(7*864e5));
   return d%2===0;
 }
+function ttGoNow(){ttWeekOffset=0;tdDayOffset=0;renderTimetable();}
 function ttNavWeek(dir){
   if(ttEditMode)lockEditMode();
-  ttWeekOffset+=dir;renderTimetable();
+  if(ttView==='today'){
+    // In Day view: shift tdDayOffset by 7 so the displayed day follows the week
+    tdDayOffset+=dir*7;
+    // Also sync ttWeekOffset to keep the week bar in sync
+    var _t=new Date();_t.setDate(_t.getDate()+tdDayOffset);
+    var _cM=getWeekMondayFor(0);
+    var _tM=new Date(_t);_tM.setDate(_t.getDate()-((_t.getDay()+6)%7));
+    ttWeekOffset=Math.round((_tM-_cM)/(7*864e5));
+  } else {
+    ttWeekOffset+=dir;
+  }
+  renderTimetable();
 }
 function tdNavDay(dir){
   tdDayOffset+=dir;
@@ -23472,8 +23485,13 @@ function renderTodayView(){
   const wNum=getWeekNumber(offset);
 
   if(lblEl){
-    if(tdDayOffset===0&&isToday)lblEl.textContent='Today · '+dayLabels[dayName]+' '+dayLabel;
-    else lblEl.textContent=dayLabels[dayName]+' · '+dayLabel+' (W'+wNum+')';
+    if(tdDayOffset===0&&isToday){
+      lblEl.textContent='Today · '+dayLabels[dayName]+' '+dayLabel;
+      lblEl.style.color='#f59f00';
+    } else {
+      lblEl.textContent=dayLabels[dayName]+' · '+dayLabel+' (W'+wNum+')';
+      lblEl.style.color='';
+    }
   }
 
   const bgMap={lesson:'#1d4ed8',duty:'#7c3aed',go:'#d97706',free:'#dcfce7',personal:'#f1f3f5',mtg:'#5b21b6',abs:'#0e7490',zpl:'#0369a1',c1:'#be185d',c2:'#b45309',c3:'#065f46',sleep:'#e9ecef',tmtg:'#0d9488'};
@@ -23654,7 +23672,7 @@ function renderTodayView(){
     const _catMap={};_cats.forEach(ct=>{_catMap[ct.id]=ct;});
 
     function _taskRow(t){
-      const _done=localStorage.getItem(t.scope==='sticky'?'plan_done_'+t.id:'plan_done_'+t.id+'_w'+_wNum)==='1';
+      const _done=localStorage.getItem('plan_done_'+t.id+'_w'+_wNum)==='1';
       const _cat=_catMap[t.cat]||{color:'#868e96'};
       return`<div class="plan-task-row" style="background:#fff;border-radius:8px;margin-bottom:3px;border:1px solid #e9ecef">
         <div class="plan-task-cat-dot" style="background:${_cat.color}"></div>
@@ -23730,6 +23748,8 @@ function clearTodayNote(idx,day){
 
 // ── MAIN RENDER ───────────────────────────────────────
 function renderTimetable(){
+  var _nb=document.getElementById('tt-now-btn');
+  if(_nb)_nb.style.display=(ttWeekOffset!==0||tdDayOffset!==0)?'inline-block':'none';
   const offset=ttWeekOffset;
   const wA=getWeekIsA(offset);
   const activeDays=ttShowWeekend?DAYS:DAYS.slice(0,5);
@@ -24738,6 +24758,11 @@ function renderWeekTasksView(){
   const mon=getWeekMondayFor(ttWeekOffset);
   const fri=new Date(mon);fri.setDate(mon.getDate()+4);
   const fmtD=d=>d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  // Update plan nav label
+  const plbl=document.getElementById('tt-plan-label');
+  if(plbl){plbl.textContent='W'+wNum+(getWeekIsA(ttWeekOffset)?' A':' B')+' · '+fmtD(mon)+' – '+fmtD(fri);
+    plbl.style.color=ttWeekOffset===0?'#f59f00':'';}
+
   const viewMode=S._planViewMode||'day'; // 'day' or 'cat'
 
   // Migrate legacy AOR/House tasks from old key format into planData once
@@ -24770,7 +24795,7 @@ function renderWeekTasksView(){
   const todayStr=_todayDateStr();
 
   // Task done key: sticky uses task id, others use id+weekNum
-  function doneKey(t){return t.scope==='sticky'?'plan_done_'+t.id:'plan_done_'+t.id+'_w'+wNum;}
+  function doneKey(t){return 'plan_done_'+t.id+'_w'+wNum;}
   function isDone(t){return localStorage.getItem(doneKey(t))==='1';}
   function toggleDone(taskId){
     const t=tasks.find(x=>x.id===taskId);if(!t)return;
@@ -24912,7 +24937,7 @@ function planToggleDone(taskId){
   const tasks=S.planData||[];
   const t=tasks.find(x=>x.id===taskId);if(!t)return;
   const wNum=getWeekNumber(ttWeekOffset);
-  const k=t.scope==='sticky'?'plan_done_'+t.id:'plan_done_'+t.id+'_w'+wNum;
+  const k='plan_done_'+t.id+'_w'+wNum;
   const was=localStorage.getItem(k)==='1';
   localStorage.setItem(k,was?'0':'1');
   renderWeekTasksView();
