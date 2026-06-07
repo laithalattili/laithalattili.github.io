@@ -467,7 +467,7 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
           <button class="nav-anch here" id="day-anch" onclick="navDay(0)" title="Today">●</button>
           <button class="nav-arr" onclick="navDay(1)">›</button>
         </div>
-        <div style="display:flex;gap:5px;padding:.2rem .6rem .25rem;border-bottom:1px solid var(--bd);background:var(--bg)">
+        <div style="display:flex;gap:5px;padding:.2rem .6rem .25rem;border-bottom:1px solid var(--bd);background:var(--bg);position:sticky;top:37px;z-index:10">
           <button onclick="toggleSlotsCol()" id="slots-col-bar-btn" style="flex:1;font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:3px 8px">Timetable ↕</button>
           <button onclick="togglePastCollapse()" id="past-col-bar-btn" style="flex:1;font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:3px 8px">Past ↕</button>
           <button onclick="toggleTasksCol()" id="tasks-col-bar-btn" style="flex:1;font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:3px 8px">Tasks ↕</button>
@@ -1343,7 +1343,7 @@ function renderDay(){
   // When collapsed: show key commitment labels as a summary chip row
   const commitSlots=allSlots.filter(s=>!['free','personal'].includes(s.tp));
   const collapsedSummary=commitSlots.length
-    ? `<div style="display:flex;flex-wrap:wrap;gap:4px;padding:.25rem .6rem .35rem">${commitSlots.map(s=>`<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;background:${catCol(s.tp)}22;color:${catCol(s.tp)};border:1px solid ${catCol(s.tp)}44">${s.time} ${s.label}</span>`).join('')}</div>`
+    ? `<div style="display:flex;flex-wrap:wrap;gap:4px;padding:.25rem .6rem .35rem">${commitSlots.map(s=>`<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${catCol(s.tp)}22;color:${catCol(s.tp)};border:1px solid ${catCol(s.tp)}44"><b>${s.time}</b> ${s.label}</span>`).join('')}</div>`
     : `<div style="padding:.25rem .6rem;font-size:11px;color:var(--tx4);font-style:italic">Free day</div>`;
 
   let slotsHtml=`<div style="display:flex;align-items:center;justify-content:space-between;padding:.3rem .6rem .1rem"><div class="sec-lbl" style="padding:0">Timetable</div><button onclick="toggleSlotsCol()" style="font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:2px 8px">${slotsCol?'Expand ↓':'Collapse ↑'}</button></div>`;
@@ -1379,7 +1379,14 @@ function renderDay(){
       const endT=WSLOTS[sl.idx+1]?.t||sl.time;
       const st=_slotTasks(allTasks,sl.time);
       const hasN=hasNotes(sl.idx,dateStr);
-      const trHtml=`<span class="slot-tr">${sl.time} <b>–${endT}</b></span>`;
+      // Bold: end time of current slot, start time of next slot
+      const boldEnd=isCur;
+      const boldStart=isNxt;
+      const trHtml=boldStart
+        ? `<span class="slot-tr"><b>${sl.time}</b> –${endT}</span>`
+        : boldEnd
+          ? `<span class="slot-tr">${sl.time} <b>–${endT}</b></span>`
+          : `<span class="slot-tr">${sl.time} –${endT}</span>`;
       const badge=isCur?'<span style="font-size:9px;font-weight:700;color:var(--acc);margin-left:4px">Now</span>':isNxt?'<span style="font-size:9px;color:var(--tx3);margin-left:4px">Next</span>':'';
       slotsHtml+=`<div class="slot${isCur?' now':isNxt?' nxt':''}${isFree?' free-slot':''}"><div class="slot-hdr">${trHtml}<span class="slot-pip" style="background:${catCol(sl.tp)}"></span><span class="slot-lbl">${isFree&&!isCur?'':sl.label}</span>${badge}<button class="slot-notes-btn${hasN?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')">${hasN?'📝':'·'}</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:14px;color:var(--acc);background:none;border:none;padding:0 3px;opacity:.7;line-height:1">+</button></div>${isCur?'<div class="slot-now-bar"></div>':''}${st.length?`<div class="slot-tasks">${st.map(t=>`<div class="slot-task-row"><div class="slot-task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div>${t.src==='omni'?`<button onclick="openEditTask('${t.id}')" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0">✎</button>`:''}</div>`).join('')}</div>`:''}</div>`;
     });
@@ -1421,23 +1428,42 @@ function renderDay(){
         }
         th+=`</div>`;
       });
-      // Uncategorised work tasks
+      // Uncategorised work tasks — collapsible
       if(workUncat.length){
-        th+=`<div class="task-grp">`;
-        workUncat.forEach(t=>{
-          const u=t.tier===2&&t.urg;const m=t.tier===1?'Today':t.tier===2?(u?'⚠ Last day':'Window'):'Ongoing';
-          th+=`<div class="task-row t${t.tier}${u?' urg':''} src-work"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}</div><div class="task-meta">Work · ${m}</div></div></div>`;
-        });
+        const ucDone=workUncat.filter(t=>t.done).length;const ucTotal=workUncat.length;const ucAllDone=ucDone===ucTotal;
+        const ucKey='omni_cat_col_other';const ucCol=localStorage.getItem(ucKey)==='1';
+        th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid var(--bd)">
+          <div style="padding:.3rem .7rem;background:${ucAllDone?'var(--bg3)':'var(--bg2)'};border-bottom:${ucCol?'none':'1px solid var(--bd)'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('other')">
+            <span style="width:8px;height:8px;border-radius:50%;background:var(--tx4);flex-shrink:0"></span>
+            <span style="font-size:10px;font-weight:700;color:var(--tx3);flex:1;text-transform:uppercase;letter-spacing:.06em">Other</span>
+            <span style="font-size:10px;color:${ucAllDone?'var(--ok)':'var(--tx4)'}">${ucAllDone?'✓ All done':''+ucDone+'/'+ucTotal}</span>
+            <span style="font-size:9px;color:var(--tx4);margin-left:3px">${ucCol?'▶':'▼'}</span>
+          </div>`;
+        if(!ucCol){
+          workUncat.forEach(t=>{
+            const u=t.tier===2&&t.urg;const m=t.tier===1?'Today':t.tier===2?(u?'⚠ Last day':'Window'):'Ongoing';const ttime=t._t?.taskTime;
+            th+=`<div class="task-row t${t.tier}${u?' urg':''} src-work"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}${ttime?` <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">📌 ${ttime}</span>`:''}</div><div class="task-meta">Work · ${m}</div></div></div>`;
+          });
+        }
         th+=`</div>`;
       }
-      // Personal tasks
+      // Personal tasks — collapsible
       if(personal.length){
-        th+=`<div style="margin:.15rem .6rem 0;padding:.2rem .3rem 0;border-top:1px solid var(--bd)"><div class="sec-lbl" style="padding:.3rem 0 .15rem;font-size:8px">Personal</div></div><div class="task-grp">`;
-        personal.forEach(t=>{
-          const u=t.tier===2&&t.urg;const m=t.tier===1?'Today':t.tier===2?(u?'⚠ Last day':'Window'):'Sticky';
-          const ttime2=t._t?.taskTime;
-          th+=`<div class="task-row t${t.tier}${u?' urg':''}"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}${ttime2?` <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">📌 ${ttime2}</span>`:''}</div><div class="task-meta">${m}</div></div><button onclick="openEditTask('${t.id}')" style="font-size:12px;color:var(--tx4);background:none;border:none;padding:0 2px">✎</button></div>`;
-        });
+        const pDone=personal.filter(t=>t.done).length;const pTotal=personal.length;const pAllDone=pDone===pTotal;
+        const pKey='omni_cat_col_personal';const pCol=localStorage.getItem(pKey)==='1';
+        th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid #b8582844">
+          <div style="padding:.3rem .7rem;background:${pAllDone?'rgba(184,88,40,.15)':'rgba(184,88,40,.07)'};border-bottom:${pCol?'none':'1px solid rgba(184,88,40,.15)'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('personal')">
+            <span style="width:8px;height:8px;border-radius:50%;background:var(--acc);flex-shrink:0"></span>
+            <span style="font-size:10px;font-weight:700;color:var(--acc);flex:1;text-transform:uppercase;letter-spacing:.06em">Personal</span>
+            <span style="font-size:10px;color:${pAllDone?'var(--ok)':'var(--tx4)'}">${pAllDone?'✓ All done':''+pDone+'/'+pTotal}</span>
+            <span style="font-size:9px;color:var(--tx4);margin-left:3px">${pCol?'▶':'▼'}</span>
+          </div>`;
+        if(!pCol){
+          personal.forEach(t=>{
+            const u=t.tier===2&&t.urg;const m=t.tier===1?'Today':t.tier===2?(u?'⚠ Last day':'Window'):'Sticky';const ttime2=t._t?.taskTime;
+            th+=`<div class="task-row t${t.tier}${u?' urg':''}"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}${ttime2?` <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">📌 ${ttime2}</span>`:''}</div><div class="task-meta">${m}</div></div><div style="display:flex;gap:3px"><button onclick="openEditTask('${t.id}')" style="font-size:12px;color:var(--tx4);background:none;border:none;padding:0 2px">✎</button></div></div>`;
+          });
+        }
         th+=`</div>`;
       }
     } else {
@@ -1487,22 +1513,29 @@ function _togglePastExp(dateStr){
   if(expRows)expRows.style.display=wasExp?'none':'';
 }
 function togglePastCollapse(){
-  // Collapse past and scroll to current
   const d=new Date();d.setDate(d.getDate()+_dayOff);
   const dateStr=d.toISOString().split('T')[0];
+  // Collapse past slots
   localStorage.setItem('omni_past_exp_'+dateStr,'0');
-  renderDay();
-  setTimeout(()=>{
-    const nowEl=document.querySelector('#day-slots .slot.now');
-    if(nowEl){
-      const container=document.querySelector('#day-view');
-      if(container)container.scrollTop=nowEl.offsetTop-60;
-      else nowEl.scrollIntoView({behavior:'smooth',block:'start'});
-    }
-  },80);
+  // Hide expanded rows immediately, show summary row
+  const expRows=document.getElementById('past-exp-rows');
+  const sumRow=document.getElementById('past-sum-row');
+  if(expRows)expRows.style.display='none';
+  if(sumRow)sumRow.style.display='';
+  // Scroll #scr (the main scrollable container) to top so current slot is first
+  const scr=document.getElementById('scr');
+  if(scr)scr.scrollTop=0;
 }
 function toggleCatCollapse(cid){const k='omni_cat_col_'+cid;localStorage.setItem(k,localStorage.getItem(k)==='1'?'0':'1');renderDay();}
-function toggleTasksCol(){const c=localStorage.getItem('omni_tasks_col')==='1';localStorage.setItem('omni_tasks_col',c?'0':'1');renderDay();}
+function toggleTasksCol(){
+  const c=localStorage.getItem('omni_tasks_col')==='1';
+  const newState=c?'0':'1';
+  localStorage.setItem('omni_tasks_col',newState);
+  // Force ALL categories to same state
+  const allCatKeys=['other','personal',...WCATS.map(x=>x.id)];
+  allCatKeys.forEach(k=>localStorage.setItem('omni_cat_col_'+k,newState));
+  renderDay();
+}
 
 function _pastCollapse(slots){
   if(!slots.length)return'';
@@ -2528,30 +2561,27 @@ function openSlotTaskPicker(time,dateStr){
   const allTasks=getTasksFor(_dayOff);
   const assigned=allTasks.filter(t=>t._t?.taskTime===time);
   const unassigned=allTasks.filter(t=>!t._t?.taskTime&&t.src==='omni');
-  let html=`<div style="padding:.4rem .8rem .25rem;font-size:12px;font-weight:700;color:var(--tx)">Tasks at ${time}</div>`;
+  let html=`<div style="padding:.4rem .8rem .2rem;font-size:12px;font-weight:700;color:var(--tx)">Assign tasks to ${time}</div>`;
+  // Assigned to this slot
   if(assigned.length){
-    html+=`<div class="sec-lbl" style="padding:.25rem .8rem .1rem;font-size:9px">Assigned here</div>`;
+    html+=`<div class="sec-lbl" style="padding:.2rem .8rem .05rem;font-size:9px">AT THIS SLOT</div>`;
     assigned.forEach(t=>{
-      html+=`<div style="display:flex;align-items:center;gap:8px;padding:.4rem .8rem;border-bottom:.5px solid var(--bd)"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1;font-size:13px;color:var(--tx)">${t.text}</div><button onclick="unassignTask('${t.id}','${dateStr}')" style="font-size:10px;color:var(--er);background:none;border:none;padding:0;flex-shrink:0">×</button></div>`;
+      html+=`<div style="display:flex;align-items:center;gap:8px;padding:.38rem .8rem;border-bottom:.5px solid var(--bd);background:var(--sur2)"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1;font-size:13px;color:var(--tx)">${t.text}</div><button onclick="unassignTask('${t.id}','${dateStr}')" style="font-size:11px;color:var(--er);background:none;border:none;padding:0 2px;flex-shrink:0" title="Remove from slot">× untime</button></div>`;
     });
   }
-  // Show ALL personal tasks for the day as assignable
-  const allPersonal=allTasks.filter(t=>t.src==='omni'&&!t._t?.taskTime);
-  const alreadyAssignedElsewhere=allTasks.filter(t=>t.src==='omni'&&t._t?.taskTime&&t._t.taskTime!==time);
-  if(allPersonal.length){
-    html+=`<div class="sec-lbl" style="padding:.25rem .8rem .1rem;font-size:9px">Tap to assign to ${time}</div>`;
-    allPersonal.forEach(t=>{
-      html+=`<div style="display:flex;align-items:center;gap:8px;padding:.4rem .8rem;border-bottom:.5px solid var(--bd);cursor:pointer;active:background:var(--bg2)" onclick="assignTask('${t.id}','${time}','${dateStr}')"><span style="font-size:14px;color:var(--acc);flex-shrink:0">+</span><div style="flex:1;font-size:13px;color:var(--tx)">${t.text}</div></div>`;
+  // All other tasks for this day (not assigned to this slot)
+  const others=allTasks.filter(t=>!(t._t?.taskTime===time));
+  if(others.length){
+    html+=`<div class="sec-lbl" style="padding:.2rem .8rem .05rem;font-size:9px">TAP TO ASSIGN</div>`;
+    others.forEach(t=>{
+      const isElsewhere=t._t?.taskTime&&t._t.taskTime!==time;
+      const srcLabel=t.src==='work'?'Work':'Personal';
+      const ttLabel=isElsewhere?` 📌${t._t.taskTime}`:'';
+      html+=`<div style="display:flex;align-items:center;gap:8px;padding:.38rem .8rem;border-bottom:.5px solid var(--bd);cursor:pointer" onclick="${t.src==='omni'?`assignTask('${t.id}','${time}','${dateStr}')`:`assignWorkTaskToSlot('${t.id}','${time}')`}"><span style="font-size:14px;color:var(--acc);flex-shrink:0">→</span><div style="flex:1"><div style="font-size:13px;color:var(--tx)">${t.text}${ttLabel}</div><div style="font-size:10px;color:var(--tx4)">${srcLabel}</div></div></div>`;
     });
   }
-  if(alreadyAssignedElsewhere.length){
-    html+=`<div class="sec-lbl" style="padding:.25rem .8rem .1rem;font-size:9px">Assigned to other slots</div>`;
-    alreadyAssignedElsewhere.forEach(t=>{
-      html+=`<div style="display:flex;align-items:center;gap:8px;padding:.32rem .8rem;border-bottom:.5px solid var(--bd)"><span style="font-size:10px;color:var(--tx4);flex-shrink:0">📌${t._t.taskTime}</span><div style="flex:1;font-size:12px;color:var(--tx3)">${t.text}</div><button onclick="assignTask('${t.id}','${time}','${dateStr}')" style="font-size:10px;color:var(--acc);background:none;border:none;padding:0;cursor:pointer">Move here</button></div>`;
-    });
-  }
-  if(!allPersonal.length&&!alreadyAssignedElsewhere.length&&!assigned.length){
-    html+=`<div style="padding:.5rem .8rem;font-size:12px;color:var(--tx4);font-style:italic">No personal tasks for this day yet.</div>`;
+  if(!others.length&&!assigned.length){
+    html+=`<div style="padding:.5rem .8rem;font-size:12px;color:var(--tx4);font-style:italic">No tasks for this day yet.</div>`;
   }
   html+=`<div style="padding:.5rem .8rem"><button onclick="closeSlotPicker();openAddTaskAtTime('${time}')" style="width:100%;padding:9px;background:var(--acc);color:#fff;border:none;border-radius:var(--r);font-size:13px;font-weight:700;font-family:var(--font)">+ New personal task at ${time}</button></div>`;
   el('slot-picker-body').innerHTML=html;
@@ -2567,6 +2597,17 @@ function unassignTask(taskId,dateStr){
   const t=OTASKS.find(x=>x.id===taskId);
   if(t){delete t.taskTime;saveOmniTasks();}
   closeSlotPicker();
+}
+function assignWorkTaskToSlot(taskId,time){
+  // Work tasks can't be modified in Supabase from here
+  // Show a toast explaining, but store a local display hint
+  try{
+    const hints=JSON.parse(localStorage.getItem('omni_work_hints')||'{}');
+    hints[taskId]=time;
+    localStorage.setItem('omni_work_hints',JSON.stringify(hints));
+  }catch(e){}
+  closeSlotPicker();
+  showToast('Work task pinned to '+time+' (local only)');
 }
 
 window.addEventListener('DOMContentLoaded',init);
