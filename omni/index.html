@@ -1064,13 +1064,12 @@ function showToast(msg,dur=2200){
 // ═══════════════════════════════════════════════════
 // WORK APP DATA
 // ═══════════════════════════════════════════════════
-let WSLOTS=[];  // from app_settings key 'S'
-let WTASKS=[];  // from app_settings key 'settings' → .planData
+let WTASKS=[];  // from work_app_data key 'settings' → .planData
 let WCATS=[{id:'aor',name:'AOR',color:'#7c3aed'},{id:'prep',name:'Prep',color:'#1d4ed8'},{id:'house',name:'House',color:'#d97706'}];
 let OTASKS=[];  // personal tasks from omni_settings key 'tasks'
 let _workLoaded=false;
 
-const CAT_COL={lesson:'#1d4ed8',duty:'#7c3aed',go:'#d97706',free:'#166534',personal:'#6b7280',mtg:'#5b21b6',tmtg:'#0d9488'};
+const CAT_COL={lesson:'#1d4ed8',duty:'#7c3aed',go:'#d97706',free:'#166634',personal:'#6b7280',mtg:'#5b21b6',tmtg:'#0d9488'};
 function _catColor(catId){const c=WCATS.find(x=>x.id===catId);return c?c.color:'#8a7968';}
 function _catName(catId){const c=WCATS.find(x=>x.id===catId);return c?c.name:'';}
 function catCol(tp){return CAT_COL[tp]||'#8a7968';}
@@ -1110,10 +1109,11 @@ const WSLOTS_STATIC=[
   {t:'22:30',Mon:{l:'Free',tp:'free'},Tue:{l:'Free',tp:'free'},Wed:{l:'Free',tp:'free'},Thu:{l:'Free',tp:'free'},Fri:{l:'Free',tp:'free'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
   {t:'23:00',Mon:{l:'Sleep',tp:'sleep'},Tue:{l:'Sleep',tp:'sleep'},Wed:{l:'Sleep',tp:'sleep'},Thu:{l:'Sleep',tp:'sleep'},Fri:{l:'Sleep',tp:'sleep'},Sat:{l:'Sleep',tp:'sleep'},Sun:{l:'Sleep',tp:'sleep'}},
 ];
+// Assign immediately — do not wait for async load
+let WSLOTS=WSLOTS_STATIC;
 
 async function loadWorkData(){
-  // Timetable is hardcoded — always available immediately
-  WSLOTS=WSLOTS_STATIC;
+  // Timetable is hardcoded — WSLOTS already set above
   // Only fetch plan tasks from Supabase
   if(!_OK)return;
   try{
