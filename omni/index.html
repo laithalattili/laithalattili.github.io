@@ -1304,7 +1304,7 @@ function _esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replac
 
 // ── TIMED TASKS ───────────────────────────────────────────────────────────────
 function _slotTasks(tasks,time){return tasks.filter(t=>t._t?.taskTime===time);}
-function _unscheduled(tasks){return tasks.filter(t=>!t._t?.taskTime);}
+function _unscheduled(tasks){return tasks;} // show all tasks below, timed ones show time badge
 function openAddTaskAtTime(slotTime){
   openAddTask();
   el('tm-tier').value='1';
@@ -1361,9 +1361,8 @@ function renderDay(){
     // Future slots
     futSlots.forEach((sl,fi)=>{
       const isFree=['free','personal'].includes(sl.tp);
-      const isCur=isToday&&hasComm&&sl.idx===curIdx;
-      // Next = first non-current future commitment slot
-      const isNxt=isToday&&hasComm&&!isCur&&!isFree&&futSlots.slice(0,fi).every(s=>s.idx===curIdx||['free','personal'].includes(s.tp));
+      const isCur=isToday&&sl.idx===curIdx; // highlight current slot on any day including free days
+      const isNxt=isToday&&!isCur&&!isFree&&futSlots.slice(0,fi).every(s=>s.idx===curIdx||['free','personal'].includes(s.tp));
       const st=_slotTasks(allTasks,sl.time);const hasN=hasNotes(sl.idx,dateStr);
       const badge=isCur?'<span class="pill pill-acc" style="font-size:9px">Now</span>':isNxt?'<span class="pill pill-neu" style="font-size:9px">Next</span>':'';
       slotsHtml+=`<div class="slot${isCur?' now':isNxt?' nxt':''}" style="${isFree&&!isCur?'opacity:.52;':''}position:relative;"><div class="slot-hdr"><span class="slot-time">${sl.time}</span><span class="slot-pip" style="background:${catCol(sl.tp)}"></span><span class="slot-lbl">${isFree&&!isCur?'':sl.label}</span>${badge}<button class="slot-notes-btn${hasN?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')">${hasN?'📝':'·'}</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:15px;color:var(--acc);background:none;border:none;padding:0 4px;margin-left:2px;opacity:.7;line-height:1" title="Add/assign task here">+</button></div>${isCur?'<div class="slot-now-bar"></div>':''}${st.length?`<div class="slot-tasks">${st.map(t=>`<div class="slot-task-row"><div class="slot-task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div>${t.src==='omni'?`<button onclick="openEditTask('${t.id}')" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0">✎</button>`:''}</div>`).join('')}</div>`:''}</div>`;
@@ -1423,7 +1422,8 @@ function renderDay(){
         th+=`<div style="margin:.15rem .6rem 0;padding:.2rem .3rem 0;border-top:1px solid var(--bd)"><div class="sec-lbl" style="padding:.3rem 0 .15rem;font-size:8px">Personal</div></div><div class="task-grp">`;
         personal.forEach(t=>{
           const u=t.tier===2&&t.urg;const m=t.tier===1?'Today':t.tier===2?(u?'⚠ Last day':'Window'):'Sticky';
-          th+=`<div class="task-row t${t.tier}${u?' urg':''}"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}</div><div class="task-meta">${m}</div></div><button onclick="openEditTask('${t.id}')" style="font-size:12px;color:var(--tx4);background:none;border:none;padding:0 2px">✎</button></div>`;
+          const ttime2=t._t?.taskTime;
+          th+=`<div class="task-row t${t.tier}${u?' urg':''}"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}${ttime2?` <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">📌 ${ttime2}</span>`:''}</div><div class="task-meta">${m}</div></div><button onclick="openEditTask('${t.id}')" style="font-size:12px;color:var(--tx4);background:none;border:none;padding:0 2px">✎</button></div>`;
         });
         th+=`</div>`;
       }
@@ -1431,7 +1431,34 @@ function renderDay(){
       th+=`<div style="padding:.35rem .6rem;font-size:12px;color:var(--tx4);font-style:italic">No unscheduled tasks.</div>`;
     }
   } else {
-    th+=`<div style="padding:.35rem .6rem;font-size:12px;color:var(--tx4)">Tasks hidden.</div>`;
+    // Collapsed: show category summaries with done counts — click to expand individual category
+    const catMap3={};WCATS.forEach(c=>{catMap3[c.id]=c;});
+    const catGroups={};const uncatWork=[];const pers=[];
+    unsched.forEach(t=>{
+      if(t.src==='work'&&t._t?.cat&&catMap3[t._t.cat]){if(!catGroups[t._t.cat])catGroups[t._t.cat]=[];catGroups[t._t.cat].push(t);}
+      else if(t.src==='work')uncatWork.push(t);
+      else pers.push(t);
+    });
+    const allCatIds=[...WCATS.map(c=>c.id)];
+    allCatIds.forEach(cid=>{
+      const tasks=catGroups[cid];if(!tasks?.length)return;
+      const cat=catMap3[cid];
+      const done=tasks.filter(t=>t.done).length;const total=tasks.length;const allDone=done===total;
+      const catColKey='omni_cat_col_'+cid;const catExpanded=localStorage.getItem(catColKey)==='1';
+      th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid ${cat.color}44">
+        <div style="padding:.28rem .7rem;background:${allDone?cat.color+'22':cat.color+'12'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('${cid}')">
+          <span style="width:8px;height:8px;border-radius:50%;background:${cat.color};flex-shrink:0"></span>
+          <span style="font-size:10px;font-weight:700;color:${cat.color};flex:1;text-transform:uppercase;letter-spacing:.06em">${cat.name}</span>
+          <span style="font-size:10px;color:${allDone?'var(--ok)':'var(--tx3)'}">${allDone?'✓ All done':''+done+'/'+total+' done'}</span>
+          <span style="font-size:10px;color:var(--tx4)">${catExpanded?'▲':'▼'}</span>
+        </div>
+        ${catExpanded?`<div>${tasks.map(t=>{const u=t.tier===2&&t.urg;const ttime=t._t?.taskTime;return`<div class="task-row t${t.tier}${u?' urg':''}"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}${ttime?` <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">📌 ${ttime}</span>`:''}</div></div></div>`;}).join('')}</div>`:''}
+      </div>`;
+    });
+    if(uncatWork.length||pers.length){
+      const all=[...uncatWork,...pers];const done2=all.filter(t=>t.done).length;
+      th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid var(--bd)"><div style="padding:.28rem .7rem;background:var(--bg2);display:flex;align-items:center;gap:6px"><span style="font-size:10px;font-weight:700;color:var(--tx3);flex:1;text-transform:uppercase;letter-spacing:.06em">Other</span><span style="font-size:10px;color:var(--tx3)">${done2}/${all.length} done</span></div></div>`;
+    }
   }
   el('day-tasks').innerHTML=th;
 }
@@ -1487,13 +1514,12 @@ function renderWeek(){
     const undoneTasks=allDayTasks.filter(t=>!t.done);
     const doneTasks=allDayTasks.filter(t=>t.done);
     html+=`<div>
-      <div class="wd-hdr${isToday?' is-today':''}">
+      <div class="wd-hdr${isToday?' is-today':''}" onclick="wkToggleDay(${off})" style="cursor:pointer" title="Tap to collapse/expand day">
         <span class="wd-name${isToday?' td':''}">${full[di]}</span>
         <span class="wd-date${isToday?' td':''}">${d.getDate()} ${MN[d.getMonth()]}</span>
         ${isToday?'<span class="wd-today">TODAY</span>':''}
         <span style="flex:1"></span>
-        ${wSlots.length?`<button onclick="wkToggleSlots(${off})" style="font-size:8px;font-weight:700;color:var(--tx4);background:var(--bg3);border:1px solid var(--bd);border-radius:2px;padding:1px 5px;margin-right:3px">${wkSlotCol?'Slots':'–'}</button>`:''}
-        ${allDayTasks.length?`<button onclick="wkToggleTasks(${off})" style="font-size:8px;font-weight:700;color:var(--tx4);background:var(--bg3);border:1px solid var(--bd);border-radius:2px;padding:1px 5px">${wkTaskCol?'Tasks':'–'}</button>`:''}
+        <span style="font-size:9px;color:var(--tx4);margin-right:4px">${wkSlotCol&&wkTaskCol?'▶':'▼'}</span>
       </div>
       <div style="padding:.2rem 0">`;
     if(!wSlots.length&&!allDayTasks.length){
@@ -1536,6 +1562,15 @@ function wkTick(dk,cbEl,off){
   toggleDone(dk,cbEl);renderWeek();
 }
 function wkExpand(off){localStorage.setItem('omni_wkex_'+off,localStorage.getItem('omni_wkex_'+off)==='1'?'0':'1');renderWeek();}
+function wkToggleDay(off){
+  // If both collapsed, expand both; otherwise collapse both
+  const sc=localStorage.getItem('omni_wksc_'+off)==='1';
+  const tc=localStorage.getItem('omni_wktc_'+off)==='1';
+  const collapse=!(sc&&tc); // collapse if not already both collapsed
+  localStorage.setItem('omni_wksc_'+off,collapse?'1':'0');
+  localStorage.setItem('omni_wktc_'+off,collapse?'1':'0');
+  renderWeek();
+}
 function wkToggleSlots(off){localStorage.setItem('omni_wksc_'+off,localStorage.getItem('omni_wksc_'+off)==='1'?'0':'1');renderWeek();}
 function wkCollapseAll(type){
   const key=type==='slots'?'omni_wksc_':'omni_wktc_';
