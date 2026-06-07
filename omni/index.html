@@ -176,6 +176,8 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
 /* ── SLOT ROWS ── */
 .slot{margin:0 .6rem .22rem;border-radius:var(--r);border:1px solid var(--bd);background:var(--sur);overflow:hidden;transition:border-color .15s}
 .slot.free-slot{background:#f4fbf4;border-color:#d0ebd0}
+.slot.sleep-slot{background:#f0eee8;border-color:#ddd8cf;opacity:.6}
+.slot.sleep-slot .slot-tr{color:var(--tx4)}
 .slot.now{border-color:var(--acc);border-width:2px;box-shadow:0 0 0 1px rgba(184,88,40,.1)}
 .slot.nxt{border-color:var(--bd2)}
 .slot-hdr{display:flex;align-items:center;gap:6px;padding:.38rem .7rem}
@@ -471,6 +473,7 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
           <button onclick="toggleSlotsCol()" id="slots-col-bar-btn" style="flex:1;font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:3px 8px">Timetable ↕</button>
           <button onclick="togglePastCollapse()" id="past-col-bar-btn" style="flex:1;font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:3px 8px">Past ↕</button>
           <button onclick="toggleTasksCol()" id="tasks-col-bar-btn" style="flex:1;font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:3px 8px">Tasks ↕</button>
+          <button onclick="toggleNight()" id="night-btn" style="font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:3px 8px">🌙</button>
         </div>
         <div id="day-slots"></div>
         <div id="day-tasks"></div>
@@ -1334,7 +1337,15 @@ function renderDay(){
   if(el('day-lbl'))el('day-lbl').textContent=_dayOff===0?'Today':_dayOff===-1?'Yesterday':_dayOff===1?'Tomorrow':DN[d.getDay()];
   if(el('day-sub'))el('day-sub').textContent=`${d.getDate()} ${MN[d.getMonth()]} ${d.getFullYear()} · ${dayName}`;
   const now=new Date();const nowM=now.getHours()*60+now.getMinutes();
-  const allSlots=WSLOTS.map((s,i)=>{const c=s[dayName];if(!c||c.tp==='sleep')return null;return{time:s.t,label:c.l,tp:c.tp,idx:i};}).filter(Boolean);
+  const showNight=localStorage.getItem('omni_night')==='1';
+  const allSlots=WSLOTS.map((s,i)=>{
+    const c=s[dayName];if(!c)return null;
+    if(c.tp==='sleep'){
+      if(!showNight)return null;
+      return{time:s.t,label:'Sleep',tp:'sleep',idx:i};
+    }
+    return{time:s.t,label:c.l,tp:c.tp,idx:i};
+  }).filter(Boolean);
   const hasComm=allSlots.some(s=>!['free','personal'].includes(s.tp));
   let curIdx=-1;if(isToday)for(let i=0;i<WSLOTS.length;i++){if(nowM>=t2m(WSLOTS[i]?.t))curIdx=i;}
   const allTasks=getTasksFor(_dayOff);
@@ -1372,8 +1383,13 @@ function renderDay(){
       slotsHtml+=`<div id="past-exp-rows" style="${pastExp?'':'display:none'}">`;
       pastSlots.forEach(sl=>{
         const isFreeP=['free','personal'].includes(sl.tp);
+        const isSleepP=sl.tp==='sleep';
         const endTP=WSLOTS[sl.idx+1]?.t||sl.time;
         const stP=_slotTasks(allTasks,sl.time);const hasNP=hasNotes(sl.idx,dateStr);
+        if(isSleepP){
+          slotsHtml+=`<div class="slot sleep-slot" style="opacity:.35"><div class="slot-hdr"><span class="slot-tr">${sl.time} –${endTP}</span><span class="slot-pip" style="background:#a0968a"></span><span class="slot-lbl" style="color:var(--tx4);font-style:italic">Sleep</span></div></div>`;
+          return;
+        }
         slotsHtml+=`<div class="slot${isFreeP?' free-slot':''}" style="opacity:.42"><div class="slot-hdr"><span class="slot-tr">${sl.time} <b>–${endTP}</b></span><span class="slot-pip" style="background:${catCol(sl.tp)}"></span><span class="slot-lbl">${isFreeP?'':sl.label}</span><button class="slot-notes-btn${hasNP?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')">${hasNP?'📝':'·'}</button></div>${stP.length?`<div class="slot-tasks">${stP.map(t=>`<div class="slot-task-row"><div class="slot-task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div></div>`).join('')}</div>`:''}</div>`;
       });
       slotsHtml+=`<div onclick="_togglePastExp('${dateStr}')" style="padding:.12rem .7rem .28rem;font-size:10px;color:var(--tx4);cursor:pointer;text-align:right">↑ hide past</div></div>`;
@@ -1395,6 +1411,12 @@ function renderDay(){
           ? `<span class="slot-tr">${sl.time} <b>–${endT}</b></span>`
           : `<span class="slot-tr">${sl.time} –${endT}</span>`;
       const badge=isCur?'<span style="font-size:9px;font-weight:700;color:var(--acc);margin-left:4px">Now</span>':isNxt?'<span style="font-size:9px;color:var(--tx3);margin-left:4px">Next</span>':'';
+      const isSleep=sl.tp==='sleep';
+      if(isSleep){
+        // Sleep slot: minimal display, no actions
+        slotsHtml+=`<div class="slot sleep-slot${isCur?' now':''}"><div class="slot-hdr">${trHtml}<span class="slot-pip" style="background:#a0968a"></span><span class="slot-lbl" style="color:var(--tx4);font-style:italic">Sleep</span>${badge}</div>${isCur?'<div class="slot-now-bar"></div>':''}</div>`;
+        return;
+      }
       slotsHtml+=`<div class="slot${isCur?' now':isNxt?' nxt':''}${isFree?' free-slot':''}"><div class="slot-hdr">${trHtml}<span class="slot-pip" style="background:${catCol(sl.tp)}"></span><span class="slot-lbl">${isFree&&!isCur?'':sl.label}</span>${badge}<button class="slot-notes-btn${hasN?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')">${hasN?'📝':'·'}</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:14px;color:var(--acc);background:none;border:none;padding:0 3px;opacity:.7;line-height:1">+</button></div>${isCur?'<div class="slot-now-bar"></div>':''}${st.length?`<div class="slot-tasks">${st.map(t=>{
     const isWork=t.src==='work';
     const removeBtn=isWork
@@ -1406,6 +1428,9 @@ function renderDay(){
     if(!allSlots.length)slotsHtml+='<div class="empty"><div class="empty-i">🏖️</div><div class="empty-t">No slots today</div></div>';
   }
   el('day-slots').innerHTML=slotsHtml;
+  // Update night button state
+  const nb=document.getElementById('night-btn');
+  if(nb){const sn=localStorage.getItem('omni_night')==='1';nb.style.background=sn?'rgba(30,20,60,.12)':'';nb.style.borderColor=sn?'#9c8fc0':'var(--bd)';}
 
 
   // ── TASKS SECTION ──────────────────────────────────────────────────────────
@@ -1488,6 +1513,13 @@ function renderDay(){
     }
   } // end if(true)
   el('day-tasks').innerHTML=th;
+}
+function toggleNight(){
+  const cur=localStorage.getItem('omni_night')==='1';
+  localStorage.setItem('omni_night',cur?'0':'1');
+  const btn=document.getElementById('night-btn');
+  if(btn){btn.style.background=cur?'':'rgba(30,20,60,.12)';btn.style.borderColor=cur?'var(--bd)':'#9c8fc0';}
+  renderDay();
 }
 function toggleSlotsCol(){const c=localStorage.getItem('omni_slots_col')==='1';localStorage.setItem('omni_slots_col',c?'0':'1');renderDay();}
 function _togglePastExp(dateStr){
