@@ -375,6 +375,31 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
 .gl-sess-info{display:flex;align-items:center;justify-content:space-between;padding:.3rem .8rem;background:#0d0d0d;border-bottom:.5px solid #1a1a1a;flex-shrink:0}
 .gl-sess-type{font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.1em}
 .gl-sess-prog{font-size:10px;color:#333;font-family:var(--mono)}
+
+/* ── AUDIO PLAYER BAR ── */
+#audio-bar{
+  position:fixed;bottom:calc(var(--nav) + env(safe-area-inset-bottom));left:0;right:0;
+  z-index:190;background:#1a1208;border-top:1px solid rgba(255,255,255,.1);
+  display:none;flex-direction:column;gap:0;
+  padding:.32rem .75rem .3rem;
+}
+#audio-bar.on{display:flex}
+/* push scr content up when bar is visible */
+body.audio-on #scr{padding-bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 12px + env(safe-area-inset-bottom));}
+body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + env(safe-area-inset-bottom));}
+.ab-top{display:flex;align-items:center;gap:7px}
+.ab-title{flex:1;font-size:11px;font-weight:500;color:#d4c4a8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ab-meta{font-size:9px;color:#6a5a48;flex-shrink:0}
+.ab-prog-wrap{height:2px;background:rgba(255,255,255,.1);border-radius:1px;cursor:pointer;margin:.28rem 0}
+.ab-prog-fill{height:100%;background:var(--acc3);border-radius:1px;transition:width .5s linear}
+.ab-ctrls{display:flex;align-items:center;gap:6px}
+.ab-btn{padding:3px 8px;font-size:11px;font-weight:600;background:rgba(255,255,255,.08);color:#d4c4a8;border-radius:3px;border:1px solid rgba(255,255,255,.1);flex-shrink:0}
+.ab-btn:active{background:rgba(255,255,255,.18)}
+.ab-btn.play{background:var(--acc);color:#fff;border-color:var(--acc)}
+.ab-spd{font-family:var(--mono);font-size:9px;padding:2px 6px;color:#6a5a48;background:rgba(255,255,255,.04);border-radius:3px;border:1px solid rgba(255,255,255,.06);cursor:pointer}
+.ab-spd.on{color:#d4c4a8;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.15)}
+.ab-link{font-size:10px;color:var(--acc3);background:none;border:none;padding:0;font-weight:600;flex-shrink:0}
+
 </style>
 </head>
 <body>
@@ -546,6 +571,31 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
 
   </div><!-- /scr -->
 </div><!-- /app -->
+
+<!-- AUDIO PLAYER BAR -->
+<div id="audio-bar">
+  <div class="ab-top">
+    <div class="ab-title" id="ab-title">No track loaded</div>
+    <div class="ab-meta" id="ab-meta"></div>
+    <button class="ab-link" id="ab-link-btn" onclick="abLinkFolder()">Link folder</button>
+  </div>
+  <div class="ab-prog-wrap" id="ab-prog-wrap" onclick="abSeek(event)">
+    <div class="ab-prog-fill" id="ab-prog-fill" style="width:0%"></div>
+  </div>
+  <div class="ab-ctrls">
+    <button class="ab-btn" onclick="abSkipBack()" title="−30s">−30</button>
+    <button class="ab-btn play" id="ab-play-btn" onclick="abTogglePlay()">▶</button>
+    <button class="ab-btn" onclick="abSkipFwd()" title="+30s">+30</button>
+    <button class="ab-btn" onclick="abPrev()" title="Prev track">⏮</button>
+    <button class="ab-btn" onclick="abNext()" title="Next track">⏭</button>
+    <span style="flex:1"></span>
+    <button class="ab-spd on" data-s="1"   onclick="abSetSpeed(1)">1×</button>
+    <button class="ab-spd"    data-s="1.2" onclick="abSetSpeed(1.2)">1.2×</button>
+    <button class="ab-spd"    data-s="1.5" onclick="abSetSpeed(1.5)">1.5×</button>
+    <button class="ab-spd"    data-s="2"   onclick="abSetSpeed(2)">2×</button>
+    <button class="ab-btn" onclick="abClose()" title="Close player" style="margin-left:4px">✕</button>
+  </div>
+</div>
 
 <nav id="nav">
   <button class="ntab on" data-tab="dashboard" onclick="switchTab('dashboard')"><span class="ni">▦</span><span>Dashboard</span></button>
@@ -2706,6 +2756,201 @@ function _initPTR(){
 }
 window.addEventListener('DOMContentLoaded',_initPTR);
 // ═══════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SESSION C — AUDIO PLAYER
+// File System Access API + IndexedDB resume + sticky bar
+// ══════════════════════════════════════════════════════════════════════════════
+const AB_DB_NAME='omni_audio',AB_DB_VER=1,AB_STORE='positions';
+let _abDB=null,_abFiles=[],_abIdx=0,_abAudio=null,_abSpeed=1,_abSaveTimer=null;
+let _abDirHandle=null;
+
+// ── IndexedDB ────────────────────────────────────────────────────────────────
+function _abOpenDB(){
+  return new Promise((res,rej)=>{
+    const req=indexedDB.open(AB_DB_NAME,AB_DB_VER);
+    req.onupgradeneeded=e=>{e.target.result.createObjectStore(AB_STORE,{keyPath:'key'});};
+    req.onsuccess=e=>{_abDB=e.target.result;res(_abDB);};
+    req.onerror=e=>rej(e);
+  });
+}
+async function _abSavePos(key,pos){
+  if(!_abDB)await _abOpenDB();
+  return new Promise(res=>{
+    const tx=_abDB.transaction(AB_STORE,'readwrite');
+    tx.objectStore(AB_STORE).put({key,pos});
+    tx.oncomplete=res;
+  });
+}
+async function _abLoadPos(key){
+  if(!_abDB)await _abOpenDB();
+  return new Promise(res=>{
+    const tx=_abDB.transaction(AB_STORE,'readonly');
+    const req=tx.objectStore(AB_STORE).get(key);
+    req.onsuccess=e=>res(e.target.result?.pos||0);
+    req.onerror=()=>res(0);
+  });
+}
+
+// ── Folder linking (File System Access API) ──────────────────────────────────
+async function abLinkFolder(){
+  if(!window.showDirectoryPicker){showToast('File System API not supported in this browser');return;}
+  try{
+    _abDirHandle=await window.showDirectoryPicker({mode:'read'});
+    await _abLoadFiles();
+    // Persist directory handle in localStorage key for reminder
+    try{localStorage.setItem('omni_audio_dir',_abDirHandle.name);}catch(e){}
+  }catch(e){
+    if(e.name!=='AbortError')showToast('Could not open folder');
+  }
+}
+
+async function _abLoadFiles(){
+  if(!_abDirHandle)return;
+  _abFiles=[];
+  for await(const entry of _abDirHandle.values()){
+    if(entry.kind==='file'&&/\.(mp3|m4a|ogg|wav|aac|opus)$/i.test(entry.name)){
+      _abFiles.push(entry);
+    }
+  }
+  _abFiles.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+  if(_abFiles.length){
+    _abIdx=0;
+    await abLoadTrack(_abIdx);
+    abShowBar();
+    showToast(_abFiles.length+' tracks loaded');
+  } else {
+    showToast('No audio files found in folder');
+  }
+}
+
+// ── Load track ───────────────────────────────────────────────────────────────
+async function abLoadTrack(idx){
+  if(!_abFiles.length)return;
+  _abIdx=Math.max(0,Math.min(idx,_abFiles.length-1));
+  const entry=_abFiles[_abIdx];
+  // Stop current
+  if(_abAudio){
+    _abAudio.pause();
+    clearInterval(_abSaveTimer);
+    _abAudio=null;
+  }
+  try{
+    const file=await entry.getFile();
+    const url=URL.createObjectURL(file);
+    _abAudio=new Audio(url);
+    _abAudio.playbackRate=_abSpeed;
+    // Restore saved position
+    const saved=await _abLoadPos(entry.name);
+    if(saved>0&&saved<file.size)_abAudio.currentTime=saved;
+    // Events
+    _abAudio.addEventListener('loadedmetadata',()=>abRender());
+    _abAudio.addEventListener('timeupdate',()=>{abRender();});
+    _abAudio.addEventListener('ended',()=>{abNext();});
+    _abAudio.addEventListener('error',()=>{showToast('Error loading track');});
+    // Auto-save position every 5s
+    _abSaveTimer=setInterval(async()=>{
+      if(_abAudio&&!_abAudio.paused&&_abAudio.currentTime>0){
+        await _abSavePos(entry.name,_abAudio.currentTime);
+      }
+    },5000);
+    abRender();
+  }catch(e){showToast('Could not load track');}
+}
+
+// ── Controls ─────────────────────────────────────────────────────────────────
+function abTogglePlay(){
+  if(!_abAudio)return;
+  if(_abAudio.paused){_abAudio.play().catch(e=>{});}
+  else{_abAudio.pause();if(_abAudio.currentTime>0)_abSavePos(_abFiles[_abIdx]?.name,_abAudio.currentTime);}
+  abRender();
+}
+function abPrev(){if(_abIdx>0)abLoadTrack(_abIdx-1);}
+function abNext(){if(_abIdx<_abFiles.length-1)abLoadTrack(_abIdx+1).then(()=>{if(_abAudio)_abAudio.play().catch(()=>{});});}
+function abSkipBack(){if(_abAudio)_abAudio.currentTime=Math.max(0,_abAudio.currentTime-30);}
+function abSkipFwd(){if(_abAudio)_abAudio.currentTime=Math.min(_abAudio.duration||0,_abAudio.currentTime+30);}
+function abSetSpeed(s){
+  _abSpeed=s;
+  if(_abAudio)_abAudio.playbackRate=s;
+  document.querySelectorAll('.ab-spd').forEach(b=>b.classList.toggle('on',+b.dataset.s===s));
+}
+function abSeek(e){
+  if(!_abAudio||!_abAudio.duration)return;
+  const wrap=document.getElementById('ab-prog-wrap');if(!wrap)return;
+  const pct=(e.clientX-wrap.getBoundingClientRect().left)/wrap.offsetWidth;
+  _abAudio.currentTime=Math.max(0,Math.min(_abAudio.duration,pct*_abAudio.duration));
+}
+
+// ── Bar visibility ───────────────────────────────────────────────────────────
+function abShowBar(){
+  const bar=document.getElementById('audio-bar');if(!bar)return;
+  bar.classList.add('on');
+  document.body.classList.add('audio-on');
+  // Measure bar height for scroll padding
+  requestAnimationFrame(()=>{
+    document.documentElement.style.setProperty('--audio-bar-h',bar.offsetHeight+'px');
+  });
+  // Update link button
+  const lb=document.getElementById('ab-link-btn');
+  if(lb)lb.textContent=_abDirHandle?'Change':_abFiles.length?'Reload':'Link folder';
+}
+function abClose(){
+  if(_abAudio){_abAudio.pause();_abSavePos(_abFiles[_abIdx]?.name,_abAudio.currentTime);}
+  const bar=document.getElementById('audio-bar');if(bar)bar.classList.remove('on');
+  document.body.classList.remove('audio-on');
+  document.documentElement.style.removeProperty('--audio-bar-h');
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function abRender(){
+  const titleEl=document.getElementById('ab-title');
+  const metaEl=document.getElementById('ab-meta');
+  const progEl=document.getElementById('ab-prog-fill');
+  const playBtn=document.getElementById('ab-play-btn');
+  if(!titleEl)return;
+  if(!_abFiles.length){titleEl.textContent='No tracks loaded';return;}
+  const name=_abFiles[_abIdx]?.name||'';
+  titleEl.textContent=name.replace(/\.[^.]+$/,''); // strip extension
+  const dur=_abAudio?.duration||0;
+  const pos=_abAudio?.currentTime||0;
+  const pct=dur>0?(pos/dur*100):0;
+  if(progEl)progEl.style.width=pct.toFixed(1)+'%';
+  if(metaEl){
+    const fmt=s=>{const m=Math.floor(s/60),sec=Math.floor(s%60);return m+':'+(sec<10?'0':'')+sec;};
+    metaEl.textContent=dur>0?(fmt(pos)+' / '+fmt(dur)):(_abIdx+1+'/'+_abFiles.length);
+  }
+  if(playBtn){
+    const playing=_abAudio&&!_abAudio.paused;
+    playBtn.textContent=playing?'⏸':'▶';
+    playBtn.classList.toggle('play',true);
+  }
+  if(metaEl)metaEl.textContent+=('  '+(_abIdx+1)+'/'+_abFiles.length);
+}
+
+// ── Open bar from header ⚡ button ────────────────────────────────────────────
+
+function _hdrFlash(){
+  // If gym tab active → gym live mode; otherwise → audio player
+  if(_curTab==='gym'){openLive();}else{openAudioPlayer();}
+}
+
+async function openAudioPlayer(){
+  if(!_abFiles.length&&!_abDirHandle){
+    // First time — prompt for folder
+    await abLinkFolder();
+    return;
+  }
+  if(!_abFiles.length&&_abDirHandle){
+    await _abLoadFiles();
+    return;
+  }
+  abShowBar();
+  abRender();
+}
+
+// ── Init: open DB early ───────────────────────────────────────────────────────
+_abOpenDB().catch(e=>console.warn('Audio DB error',e));
+
 // BEEP (Web Audio — ignores silent mode)
 // ═══════════════════════════════════════════════════
 let _audioCtx=null;
