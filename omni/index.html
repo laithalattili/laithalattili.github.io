@@ -1073,11 +1073,11 @@ async function loadWorkData(){
   if(!_OK){console.warn('Supabase not available, _OK=false');return;}
   try{
     const[sa,sb]=await Promise.all([
-      supaFrom('app_settings').select('value').eq('key','S').single(),
-      supaFrom('app_settings').select('value').eq('key','settings').single()
+      supaFrom('work_app_data').select('value').eq('key','S').single(),
+      supaFrom('work_app_data').select('value').eq('key','settings').single()
     ]);
     if(sa.data?.value){const v=typeof sa.data.value==='string'?JSON.parse(sa.data.value):sa.data.value;WSLOTS=Array.isArray(v)?v:[];console.log('WSLOTS loaded:',WSLOTS.length,'slots');}
-    else{console.warn('No slot data in app_settings key S',sa);}
+    else{console.warn('No slot data in work_app_data key S',sa);}
     if(sb.data?.value){const v=typeof sb.data.value==='string'?JSON.parse(sb.data.value):sb.data.value;WTASKS=v.planData||[];console.log('WTASKS loaded:',WTASKS.length,'tasks');}
     _workLoaded=true;
   }catch(e){console.warn('Work data load error:',e);}
