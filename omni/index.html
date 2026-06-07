@@ -27,7 +27,7 @@
   --mono:'DM Mono',monospace;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+html,body{height:100%;overflow:hidden}
 body{font-family:var(--font);background:var(--bg);color:var(--tx);font-size:14px;line-height:1.4}
 button{font-family:var(--font);cursor:pointer;border:none;background:none;color:inherit}
 input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
@@ -83,7 +83,7 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
 .ni{font-size:19px;line-height:1}
 
 /* ── SCROLL ── */
-#scr{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:calc(var(--nav) + 12px + env(safe-area-inset-bottom))}
+#scr{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-y:auto;padding-bottom:calc(var(--nav) + 12px + env(safe-area-inset-bottom))}
 #app{display:none;height:100%;flex-direction:column}
 #app.on{display:flex}
 .tab{display:none}.tab.on{display:block}
@@ -179,6 +179,9 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
 .slot.sleep-slot{background:#f0eee8;border-color:#ddd8cf;opacity:.6}
 .slot.sleep-slot .slot-tr{color:var(--tx4)}
 .slot.now{border-color:var(--acc);border-width:2px;box-shadow:0 0 0 1px rgba(184,88,40,.1)}
+.slot.now .slot-tr{font-size:12px}
+.slot.now .slot-lbl{font-size:15px;font-weight:700;color:var(--tx)}
+.slot.now .slot-hdr{padding:.52rem .7rem}
 .slot.nxt{border-color:var(--bd2)}
 .slot-hdr{display:flex;align-items:center;gap:6px;padding:.38rem .7rem}
 .slot-tr{font-family:var(--mono);font-size:10px;color:var(--tx3);flex-shrink:0;white-space:nowrap;min-width:90px}
@@ -469,7 +472,7 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
           <button class="nav-anch here" id="day-anch" onclick="navDay(0)" title="Today">●</button>
           <button class="nav-arr" onclick="navDay(1)">›</button>
         </div>
-        <div id="day-ctrl-bar" style="display:flex;gap:5px;padding:.2rem .6rem .25rem;border-bottom:1px solid var(--bd);background:var(--bg);position:sticky;top:74px;z-index:9">
+        <div id="day-ctrl-bar" style="display:flex;gap:5px;padding:.2rem .6rem .25rem;border-bottom:1px solid var(--bd);background:var(--bg);position:sticky;top:80px;z-index:9">
           <button onclick="toggleSlotsCol()" id="slots-col-bar-btn" style="flex:1;font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:3px 8px">Timetable ↕</button>
           <button onclick="togglePastCollapse()" id="past-col-bar-btn" style="flex:1;font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:3px 8px">Past ↕</button>
           <button onclick="toggleTasksCol()" id="tasks-col-bar-btn" style="flex:1;font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:3px 8px">Tasks ↕</button>
@@ -1350,7 +1353,7 @@ function renderDay(){
   let curIdx=-1;if(isToday)for(let i=0;i<WSLOTS.length;i++){if(nowM>=t2m(WSLOTS[i]?.t))curIdx=i;}
   const allTasks=getTasksFor(_dayOff);
   const pastSlots=[],futSlots=[];
-  allSlots.forEach(sl=>{const endT=WSLOTS[sl.idx+1]?.t||sl.time;(isToday&&hasComm&&t2m(endT)<=nowM&&sl.idx<curIdx?pastSlots:futSlots).push(sl);});
+  allSlots.forEach(sl=>{const endT=WSLOTS[sl.idx+1]?.t||'00:00';(isToday&&hasComm&&t2m(endT)<=nowM&&sl.idx<curIdx?pastSlots:futSlots).push(sl);});
 
   const slotsCol=localStorage.getItem('omni_slots_col')==='1';
   const tasksCol=localStorage.getItem('omni_tasks_col')==='1';
@@ -1383,7 +1386,7 @@ function renderDay(){
       pastSlots.forEach(sl=>{
         const isFreeP=['free','personal'].includes(sl.tp);
         const isSleepP=sl.tp==='sleep';
-        const endTP=WSLOTS[sl.idx+1]?.t||sl.time;
+        const endTP=WSLOTS[sl.idx+1]?.t||'00:00';
         const stP=_slotTasks(allTasks,sl.time);const hasNP=hasNotes(sl.idx,dateStr);
         if(isSleepP){
           slotsHtml+=`<div class="slot sleep-slot" style="opacity:.35"><div class="slot-hdr"><span class="slot-tr">${sl.time} –${endTP}</span><span class="slot-pip" style="background:#a0968a"></span><span class="slot-lbl" style="color:var(--tx4);font-style:italic">Sleep</span></div></div>`;
@@ -1539,17 +1542,21 @@ function togglePastCollapse(){
   // Toggle: if currently expanded → collapse; if collapsed → expand
   const isExpanded=expRows&&expRows.style.display!=='none';
   if(isExpanded){
-    // Collapse past and scroll to top of day content
+    // Collapse past and scroll so current slot is visible
     localStorage.setItem('omni_past_exp_'+dateStr,'0');
     if(expRows)expRows.style.display='none';
     if(sumRow)sumRow.style.display='';
-    const scr=document.getElementById('scr');
-    const daySlots=document.getElementById('day-slots');
-    const bar=document.getElementById('day-ctrl-bar');
-    if(scr&&daySlots){
-      const barH=bar?bar.offsetHeight:30;
-      scr.scrollTop=daySlots.offsetTop-74-barH-4;
-    }
+    // Wait one frame then scroll current slot into view
+    requestAnimationFrame(()=>{
+      const nowEl=document.querySelector('#day-slots .slot.now');
+      const scr=document.getElementById('scr');
+      if(nowEl&&scr){
+        const bar=document.getElementById('day-ctrl-bar');
+        const barH=bar?bar.offsetHeight:30;
+        const stickyH=80+barH; // nav + ctrl bar
+        scr.scrollTop=nowEl.offsetTop-stickyH-6;
+      }
+    });
   } else {
     // Expand past
     localStorage.setItem('omni_past_exp_'+dateStr,'1');
