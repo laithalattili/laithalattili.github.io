@@ -467,7 +467,7 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
           <button class="nav-anch here" id="day-anch" onclick="navDay(0)" title="Today">●</button>
           <button class="nav-arr" onclick="navDay(1)">›</button>
         </div>
-        <div style="display:flex;gap:5px;padding:.2rem .6rem .25rem;border-bottom:1px solid var(--bd);background:var(--bg);position:sticky;top:37px;z-index:10">
+        <div id="day-ctrl-bar" style="display:flex;gap:5px;padding:.2rem .6rem .25rem;border-bottom:1px solid var(--bd);background:var(--bg);position:sticky;top:74px;z-index:9">
           <button onclick="toggleSlotsCol()" id="slots-col-bar-btn" style="flex:1;font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:3px 8px">Timetable ↕</button>
           <button onclick="togglePastCollapse()" id="past-col-bar-btn" style="flex:1;font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:3px 8px">Past ↕</button>
           <button onclick="toggleTasksCol()" id="tasks-col-bar-btn" style="flex:1;font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:3px 8px">Tasks ↕</button>
@@ -1503,16 +1503,26 @@ function _togglePastExp(dateStr){
 function togglePastCollapse(){
   const d=new Date();d.setDate(d.getDate()+_dayOff);
   const dateStr=d.toISOString().split('T')[0];
-  // Collapse past slots
+  // Always collapse (never expand) — this button's job is to hide past and go to now
   localStorage.setItem('omni_past_exp_'+dateStr,'0');
-  // Hide expanded rows immediately, show summary row
   const expRows=document.getElementById('past-exp-rows');
   const sumRow=document.getElementById('past-sum-row');
   if(expRows)expRows.style.display='none';
   if(sumRow)sumRow.style.display='';
-  // Scroll #scr (the main scrollable container) to top so current slot is first
+  // Scroll to top of day content — past row is now just one compact line
   const scr=document.getElementById('scr');
-  if(scr)scr.scrollTop=0;
+  if(scr){
+    // Find the offset of day-slots within scr
+    const daySlots=document.getElementById('day-slots');
+    if(daySlots){
+      const bar=document.getElementById('day-ctrl-bar');
+      const barH=bar?bar.offsetHeight:30;
+      const navH=74; // stabs + day-nav
+      scr.scrollTop=daySlots.offsetTop - navH - barH - 4;
+    } else {
+      scr.scrollTop=0;
+    }
+  }
 }
 function toggleCatCollapse(cid){const k='omni_cat_col_'+cid;localStorage.setItem(k,localStorage.getItem(k)==='1'?'0':'1');renderDay();}
 function toggleTasksCol(){
