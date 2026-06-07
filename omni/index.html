@@ -1299,93 +1299,67 @@ function renderDay(){
   const isToday=_dayOff===0;
   const lbl=_dayOff===0?'Today':_dayOff===-1?'Yesterday':_dayOff===1?'Tomorrow':DN[d.getDay()];
   const sub=`${d.getDate()} ${MN[d.getMonth()]} ${d.getFullYear()} · ${dayName}`;
-  const le=el('day-lbl');if(le)le.textContent=lbl;
-  const se=el('day-sub');if(se)se.textContent=sub;
-
+  if(el('day-lbl'))el('day-lbl').textContent=lbl;
+  if(el('day-sub'))el('day-sub').textContent=sub;
   const now=new Date();const nowM=now.getHours()*60+now.getMinutes();
+  // All non-sleep slots, NOT grouped so every time slot shows individually
   const allSlots=WSLOTS.map((s,i)=>{const c=s[dayName];if(!c||c.tp==='sleep')return null;return{time:s.t,label:c.l,tp:c.tp,idx:i};}).filter(Boolean);
   const hasComm=allSlots.some(s=>!['free','personal'].includes(s.tp));
-
-  // Group consecutive same label+type
-  const grouped=[];
-  for(const sl of allSlots){const last=grouped[grouped.length-1];if(last&&last.label===sl.label&&last.tp===sl.tp)last.endIdx=sl.idx;else grouped.push({...sl,endIdx:sl.idx});}
-
   let curIdx=-1;
   if(isToday)for(let i=0;i<WSLOTS.length;i++){if(nowM>=t2m(WSLOTS[i]?.t))curIdx=i;}
-
   const allTasks=getTasksFor(_dayOff);
-  let html='',pastBuf=[];
-
-  for(let gi=0;gi<grouped.length;gi++){
-    const sl=grouped[gi];
-    const endT=WSLOTS[sl.endIdx+1]?.t||sl.time;
-    const isFree=['free','personal'].includes(sl.tp);
-    const isPast=isToday&&hasComm&&t2m(endT)<=nowM&&sl.endIdx<curIdx;
-    const isCur=isToday&&hasComm&&sl.idx<=curIdx&&sl.endIdx>=curIdx;
-    const isNxt=isToday&&hasComm&&!isCur&&gi>0&&grouped.slice(0,gi).every(g=>g.endIdx<curIdx)&&sl.idx>curIdx;
-
-    if(isPast){pastBuf.push(sl);continue;}
-    if(pastBuf.length){html+=_pastCollapse(pastBuf);pastBuf=[];}
-
-    const slotTasks=_slotTasks(allTasks,sl.time);
-    const hasN=hasNotes(sl.idx,dateStr);
-    const badge=isCur?'<span class="pill pill-acc" style="font-size:9px">Now</span>':isNxt?'<span class="pill pill-neu" style="font-size:9px">Next</span>':'';
-    const freeStyle=isFree&&!isCur?'opacity:.5;':'';
-
-    html+=`<div class="slot${isCur?' now':isNxt?' nxt':''}" style="${freeStyle}">
-      <div class="slot-hdr">
-        <span class="slot-time">${sl.time}</span>
-        <span class="slot-pip" style="background:${catCol(sl.tp)}"></span>
-        <span class="slot-lbl">${sl.label}</span>
-        ${badge}
-        <button class="slot-notes-btn${hasN?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')" title="Notes">${hasN?'📝':'·'}</button>
-      </div>
-      ${isCur?'<div class="slot-now-bar"></div>':''}`;
-
-    if(slotTasks.length){
-      html+=`<div class="slot-tasks">`;
-      slotTasks.forEach(t=>{
-        html+=`<div class="slot-task-row">
-          <div class="slot-task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div>
-          <div class="slot-task-tx${t.done?' done':''}">${t.text}</div>
-          ${t.src==='omni'?`<button onclick="openEditTask('${t.id}')" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0">✎</button>`:''}
-        </div>`;
-      });
-      html+=`</div>`;
-    }
-    html+=`<button class="slot-add-btn" onclick="openAddTaskAtTime('${sl.time}')"><span style="color:var(--acc)">+</span> Add task here</button>`;
-    html+=`</div>`;
+  // Split past vs current+future
+  const pastSlots=[],futSlots=[];
+  allSlots.forEach(sl=>{
+    const endT=WSLOTS[sl.idx+1]?.t||sl.time;
+    (isToday&&hasComm&&t2m(endT)<=nowM&&sl.idx<curIdx?pastSlots:futSlots).push(sl);
+  });
+  let html='';
+  // Past: single collapsible row
+  if(pastSlots.length){
+    const first=pastSlots[0].time;const last=pastSlots[pastSlots.length-1];const lastEnd=WSLOTS[last.idx+1]?.t||last.time;
+    const pastRows=pastSlots.map(sl=>{
+      const st=_slotTasks(allTasks,sl.time);const hasN=hasNotes(sl.idx,dateStr);
+      return `<div class="slot" style="opacity:.38"><div class="slot-hdr"><span class="slot-time">${sl.time}</span><span class="slot-pip" style="background:${catCol(sl.tp)}"></span><span class="slot-lbl">${sl.label}</span><button class="slot-notes-btn${hasN?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')">${hasN?'📝':'·'}</button></div>${st.length?`<div class="slot-tasks">${st.map(t=>`<div class="slot-task-row"><div class="slot-task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div></div>`).join('')}</div>`:''}</div>`;
+    }).join('');
+    html+=`<div class="past-col" id="past-col-block" onclick="this.style.display='none';document.getElementById('past-expanded').style.display=''"><div class="past-col-in"><span class="slot-time">${first}</span><span style="flex:1;font-size:11px;color:var(--tx3)">${pastSlots.length} past · tap to expand</span><span class="slot-time">${lastEnd}</span></div></div><div id="past-expanded" style="display:none">${pastRows}</div>`;
   }
-  if(pastBuf.length)html+=_pastCollapse(pastBuf);
-  if(!grouped.length)html='<div class="empty"><div class="empty-i">🏖️</div><div class="empty-t">Free day</div></div>';
+  // Future/current slots
+  futSlots.forEach((sl,fi)=>{
+    const isFree=['free','personal'].includes(sl.tp);
+    const isCur=isToday&&hasComm&&sl.idx===curIdx;
+    const isNxt=isToday&&hasComm&&!isCur&&fi===0&&pastSlots.length>0&&futSlots[0]===sl;
+    const st=_slotTasks(allTasks,sl.time);const hasN=hasNotes(sl.idx,dateStr);
+    const badge=isCur?'<span class="pill pill-acc" style="font-size:9px">Now</span>':isNxt?'<span class="pill pill-neu" style="font-size:9px">Next</span>':'';
+    html+=`<div class="slot${isCur?' now':isNxt?' nxt':''}" style="${isFree&&!isCur?'opacity:.52;':''}"><div class="slot-hdr"><span class="slot-time">${sl.time}</span><span class="slot-pip" style="background:${catCol(sl.tp)}"></span><span class="slot-lbl">${sl.label}</span>${badge}<button class="slot-notes-btn${hasN?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')">${hasN?'📝':'·'}</button></div>${isCur?'<div class="slot-now-bar"></div>':''}${st.length?`<div class="slot-tasks">${st.map(t=>`<div class="slot-task-row"><div class="slot-task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div>${t.src==='omni'?`<button onclick="openEditTask('${t.id}')" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0">✎</button>`:''}</div>`).join('')}</div>`:''}<button class="slot-add-btn" onclick="openAddTaskAtTime('${sl.time}')"><span style="color:var(--acc)">+</span> Add task here</button></div>`;
+  });
+  if(!allSlots.length)html='<div class="empty"><div class="empty-i">🏖️</div><div class="empty-t">No slots today</div></div>';
   el('day-slots').innerHTML=html;
-
-  // Unscheduled tasks
+  // Unscheduled tasks with collapse memory
   const unsched=_unscheduled(allTasks);
-  let th=`<div style="display:flex;align-items:center;justify-content:space-between;padding:.55rem .6rem .15rem;margin-top:.2rem">
-    <div class="sec-lbl" style="padding:0">Unscheduled tasks</div>
-    <button onclick="openAddTask()" style="font-size:11px;color:var(--acc);font-weight:700;background:none;border:none">+ Add</button>
-  </div>`;
-  if(unsched.length){
-    [1,2,3].forEach(tier=>{
-      const ts=unsched.filter(t=>t.tier===tier);if(!ts.length)return;
-      th+=`<div class="task-grp">`;
-      ts.forEach(t=>{
-        const u=t.tier===2&&t.urg;
-        const m=t.tier===1?'Day-locked':t.tier===2?(u?'⚠ Last day':'Window'):t.src==='work'?'Sticky (work)':'Sticky';
-        th+=`<div class="task-row t${tier}${u?' urg':''}${t.src==='work'?' src-work':''}">
-          <div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div>
-          <div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}</div><div class="task-meta">${t.src==='work'?'Work · ':''}${m}</div></div>
-          ${t.src==='omni'?`<button onclick="openEditTask('${t.id}')" style="font-size:12px;color:var(--tx4);background:none;border:none;padding:0 2px">✎</button>`:''}
-        </div>`;
+  const collapsed=localStorage.getItem('omni_tasks_col')==='1';
+  const pending=unsched.filter(t=>!t.done).length;
+  let th=`<div style="display:flex;align-items:center;justify-content:space-between;padding:.55rem .6rem .15rem;margin-top:.2rem"><div class="sec-lbl" style="padding:0">Tasks (${pending} pending)</div><div style="display:flex;gap:8px;align-items:center"><button onclick="toggleTasksCol()" style="font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:2px 8px">${collapsed?'Expand ↓':'Collapse ↑'}</button><button onclick="openAddTask()" style="font-size:11px;color:var(--acc);font-weight:700;background:none;border:none">+ Add</button></div></div>`;
+  if(!collapsed){
+    if(unsched.length){
+      [1,2,3].forEach(tier=>{
+        const ts=unsched.filter(t=>t.tier===tier);if(!ts.length)return;
+        th+=`<div class="task-grp">`;
+        ts.forEach(t=>{
+          const u=t.tier===2&&t.urg;const m=t.tier===1?'Day-locked':t.tier===2?(u?'⚠ Last day':'Window'):t.src==='work'?'Sticky (work)':'Sticky';
+          th+=`<div class="task-row t${tier}${u?' urg':''}${t.src==='work'?' src-work':''}"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}</div><div class="task-meta">${t.src==='work'?'Work · ':''}${m}</div></div>${t.src==='omni'?`<button onclick="openEditTask('${t.id}')" style="font-size:12px;color:var(--tx4);background:none;border:none;padding:0 2px">✎</button>`:''}</div>`;
+        });
+        th+=`</div>`;
       });
-      th+=`</div>`;
-    });
+    } else {
+      th+=`<div style="padding:.35rem .6rem;font-size:12px;color:var(--tx4);font-style:italic">No unscheduled tasks.</div>`;
+    }
   } else {
-    th+=`<div style="padding:.35rem .6rem;font-size:12px;color:var(--tx4);font-style:italic">No unscheduled tasks.</div>`;
+    th+=`<div style="padding:.35rem .6rem;font-size:12px;color:var(--tx4)">Tasks hidden.</div>`;
   }
   el('day-tasks').innerHTML=th;
 }
+function toggleTasksCol(){const c=localStorage.getItem('omni_tasks_col')==='1';localStorage.setItem('omni_tasks_col',c?'0':'1');renderDay();}
 
 function _pastCollapse(slots){
   if(!slots.length)return'';
@@ -1439,17 +1413,23 @@ function renderWeek(){
         <span style="font-size:12px;font-weight:500;color:var(--tx);flex:1">${sl.label}</span>
       </div>`;
     });
-    tasks.slice(0,3).forEach(t=>{
-      const col=t.tier===1?'var(--acc)':t.tier===2&&t.urg?'var(--wa)':'var(--bd2)';
-      html+=`<div style="display:flex;align-items:center;gap:6px;padding:.25rem .6rem;border-bottom:.3px solid var(--bd)">
-        <span style="width:4px;height:4px;border-radius:50%;background:${col};flex-shrink:0"></span>
-        <span style="font-size:11px;color:var(--tx2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.text}</span>
-      </div>`;
+    const wkExp=localStorage.getItem('omni_wkex_'+off)==='1';
+    const visTasks=wkExp?tasks:tasks.slice(0,4);
+    visTasks.forEach(t=>{
+      const tc=t.tier===1?'var(--acc)':t.tier===2&&t.urg?'var(--wa)':'var(--bd2)';
+      html+=`<div style="display:flex;align-items:center;gap:6px;padding:.28rem .6rem;border-bottom:.3px solid var(--bd)"><div style="width:16px;height:16px;border-radius:3px;border:1.5px solid ${tc};flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;background:${t.done?'var(--ok-bg)':'transparent'}" onclick="wkTick('${t.dk}',this,${off})">${t.done?'<span style="color:var(--ok);font-size:9px">✓</span>':''}</div><span style="font-size:11px;color:${t.done?'var(--tx4)':'var(--tx2)'};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${t.done?'text-decoration:line-through':''}">${t.text}</span></div>`;
     });
-    if(tasks.length>3)html+=`<div style="padding:.2rem .6rem;font-size:10px;color:var(--tx4)">+${tasks.length-3} more tasks</div>`;
+    if(tasks.length>4){const rem=tasks.length-4;html+=`<div style="padding:.2rem .6rem;font-size:10px;color:var(--acc);font-weight:700;cursor:pointer" onclick="wkExpand(${off})">${wkExp?'Show less ↑':'+'+rem+' more'}</div>`;}
     html+=`</div></div>`;
   }
   el('week-days').innerHTML=html;
+}
+
+function wkTick(dk,el2,off){
+  toggleDone(dk,el2);renderWeek();
+}
+function wkExpand(off){
+  const k='omni_wkex_'+off;localStorage.setItem(k,localStorage.getItem(k)==='1'?'0':'1');renderWeek();
 }
 
 // ── MONTH VIEW ────────────────────────────────────
@@ -1475,7 +1455,9 @@ function renderMonth(){
       if(c<firstDow){html+=`<div class="mo-day other${isWe?' we-day':''}"><div class="mo-dn">${pday++}</div></div>`;}
       else if(day<=dim){
         const td=new Date(yr,mn,day);const isTd=td.toDateString()===today.toDateString();
-        html+=`<div class="mo-day${isTd?' today':''}${isWe?' we-day':''}"><div class="mo-dn">${day}</div><div class="mo-dots"></div></div>`;day++;
+        const tdOff=Math.round((td-today)/86400000);const tdT=getTasksFor(tdOff).filter(t=>!t.done).slice(0,3);
+        const dotHtml=tdT.map(t=>`<div class="mo-dot" style="background:${t.tier===1?'var(--acc)':t.tier===2&&t.urg?'var(--wa)':'var(--bd2)'}"></div>`).join('');
+        html+=`<div class="mo-day${isTd?' today':''}${isWe?' we-day':''}"><div class="mo-dn">${day}</div><div class="mo-dots">${dotHtml}</div></div>`;day++;
       }else{html+=`<div class="mo-day other${isWe?' we-day':''}"><div class="mo-dn">${day-dim}</div></div>`;day++;}
     }
     html+=`</div></div>`;
