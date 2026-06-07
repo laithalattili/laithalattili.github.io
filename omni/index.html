@@ -1375,10 +1375,9 @@ function renderDay(){
       const lastPast=pastSlots[pastSlots.length-1];
       const lastEnd=WSLOTS[lastPast.idx+1]?.t||lastPast.time;
       const pastExp=localStorage.getItem('omni_past_exp_'+dateStr)==='1';
-      slotsHtml+=`<div class="past-sum" id="past-sum-row" style="${pastExp?'display:none':''}" onclick="_togglePastExp('${dateStr}')">
+      slotsHtml+=`<div class="past-sum" id="past-sum-row" style="${pastExp?'display:none':''}">
         <span style="font-family:var(--mono);font-size:10px;color:var(--tx3);white-space:nowrap">${first}–${lastEnd}</span>
         <span style="flex:1;font-size:11px;color:var(--tx3);margin-left:8px">${pastSlots.length} past slot${pastSlots.length>1?'s':''}</span>
-        <span style="font-size:10px;color:var(--acc);font-weight:600">expand ›</span>
       </div>`;
       slotsHtml+=`<div id="past-exp-rows" style="${pastExp?'':'display:none'}">`;
       pastSlots.forEach(sl=>{
@@ -1392,7 +1391,7 @@ function renderDay(){
         }
         slotsHtml+=`<div class="slot${isFreeP?' free-slot':''}" style="opacity:.42"><div class="slot-hdr"><span class="slot-tr">${sl.time} <b>–${endTP}</b></span><span class="slot-pip" style="background:${catCol(sl.tp)}"></span><span class="slot-lbl">${isFreeP?'':sl.label}</span><button class="slot-notes-btn${hasNP?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')">${hasNP?'📝':'·'}</button></div>${stP.length?`<div class="slot-tasks">${stP.map(t=>`<div class="slot-task-row"><div class="slot-task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div></div>`).join('')}</div>`:''}</div>`;
       });
-      slotsHtml+=`<div onclick="_togglePastExp('${dateStr}')" style="padding:.12rem .7rem .28rem;font-size:10px;color:var(--tx4);cursor:pointer;text-align:right">↑ hide past</div></div>`;
+      slotsHtml+=`</div>`;
     }
     // Current and future slots
     futSlots.forEach((sl,fi)=>{
@@ -1535,25 +1534,27 @@ function _togglePastExp(dateStr){
 function togglePastCollapse(){
   const d=new Date();d.setDate(d.getDate()+_dayOff);
   const dateStr=d.toISOString().split('T')[0];
-  // Always collapse (never expand) — this button's job is to hide past and go to now
-  localStorage.setItem('omni_past_exp_'+dateStr,'0');
   const expRows=document.getElementById('past-exp-rows');
   const sumRow=document.getElementById('past-sum-row');
-  if(expRows)expRows.style.display='none';
-  if(sumRow)sumRow.style.display='';
-  // Scroll to top of day content — past row is now just one compact line
-  const scr=document.getElementById('scr');
-  if(scr){
-    // Find the offset of day-slots within scr
+  // Toggle: if currently expanded → collapse; if collapsed → expand
+  const isExpanded=expRows&&expRows.style.display!=='none';
+  if(isExpanded){
+    // Collapse past and scroll to top of day content
+    localStorage.setItem('omni_past_exp_'+dateStr,'0');
+    if(expRows)expRows.style.display='none';
+    if(sumRow)sumRow.style.display='';
+    const scr=document.getElementById('scr');
     const daySlots=document.getElementById('day-slots');
-    if(daySlots){
-      const bar=document.getElementById('day-ctrl-bar');
+    const bar=document.getElementById('day-ctrl-bar');
+    if(scr&&daySlots){
       const barH=bar?bar.offsetHeight:30;
-      const navH=74; // stabs + day-nav
-      scr.scrollTop=daySlots.offsetTop - navH - barH - 4;
-    } else {
-      scr.scrollTop=0;
+      scr.scrollTop=daySlots.offsetTop-74-barH-4;
     }
+  } else {
+    // Expand past
+    localStorage.setItem('omni_past_exp_'+dateStr,'1');
+    if(expRows)expRows.style.display='';
+    if(sumRow)sumRow.style.display='none';
   }
 }
 function toggleCatCollapse(cid){const k='omni_cat_col_'+cid;localStorage.setItem(k,localStorage.getItem(k)==='1'?'0':'1');renderDay();}
