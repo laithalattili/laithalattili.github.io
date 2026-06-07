@@ -2662,33 +2662,46 @@ window.addEventListener('DOMContentLoaded',init);
 function _initPTR(){
   const scr=document.getElementById('scr');
   if(!scr)return;
-  let startY=0,pulling=false,indicator=null;
-  const THRESHOLD=65;
+  let startY=0,currY=0,active=false,triggered=false;
+  const THRESHOLD=60;
+  const MAX_PULL=90;
+
+  // Create indicator element once
+  const ind=document.createElement('div');
+  ind.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2000;pointer-events:none;display:flex;align-items:center;justify-content:center;height:0;overflow:hidden;background:var(--bg);border-bottom:1px solid var(--bd);transition:height .15s ease;font-size:12px;color:var(--tx3);font-weight:500';
+  document.body.appendChild(ind);
+
   scr.addEventListener('touchstart',e=>{
-    if(scr.scrollTop<=0){startY=e.touches[0].clientY;pulling=false;}
-    else startY=0;
+    if(scr.scrollTop>0)return;
+    startY=e.touches[0].clientY;
+    active=true;triggered=false;
   },{passive:true});
+
   scr.addEventListener('touchmove',e=>{
-    if(!startY)return;
-    const dy=e.touches[0].clientY-startY;
-    if(dy>8&&scr.scrollTop<=0){
-      pulling=true;
-      if(!indicator){
-        indicator=document.createElement('div');
-        indicator.id='ptr-indicator';
-        indicator.style.cssText='position:fixed;top:64px;left:50%;transform:translateX(-50%);background:var(--sur);border:1px solid var(--bd);border-radius:20px;padding:5px 16px;font-size:11px;color:var(--tx3);z-index:2000;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.1)';
-        document.body.appendChild(indicator);
-      }
-      const pct=Math.min(1,dy/THRESHOLD);
-      indicator.textContent=pct>=1?'↑ Release to refresh':'↓ Pull to refresh';
-      indicator.style.opacity=String(Math.min(1,pct*2));
+    if(!active)return;
+    currY=e.touches[0].clientY;
+    const dy=currY-startY;
+    if(dy<=0){active=false;ind.style.height='0';return;}
+    // Rubberband: resistance increases as you pull further
+    const pull=Math.min(MAX_PULL,dy*0.45);
+    ind.style.height=pull+'px';
+    if(pull>=THRESHOLD*0.45){
+      ind.textContent=pull>=THRESHOLD*0.45&&pull<THRESHOLD*0.8?'Pull to refresh':'↑ Release to refresh';
+      triggered=pull>=THRESHOLD*0.45;
     }
   },{passive:true});
-  scr.addEventListener('touchend',e=>{
-    const dy=startY?e.changedTouches[0].clientY-startY:0;
-    if(indicator){indicator.style.opacity='0';setTimeout(()=>{indicator&&indicator.remove();indicator=null;},250);}
-    if(pulling&&dy>=THRESHOLD){setTimeout(()=>location.reload(),120);}
-    pulling=false;startY=0;
+
+  scr.addEventListener('touchend',()=>{
+    if(!active){return;}
+    active=false;
+    if(triggered){
+      ind.style.height='44px';
+      ind.textContent='Refreshing…';
+      setTimeout(()=>location.reload(),400);
+    } else {
+      ind.style.height='0';
+    }
+    startY=0;currY=0;
   },{passive:true});
 }
 window.addEventListener('DOMContentLoaded',_initPTR);
