@@ -174,15 +174,20 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
 .src-work{background:rgba(24,72,160,.04)}
 
 /* ── SLOT ROWS ── */
-.slot{margin:0 .6rem .35rem;border-radius:var(--r);border:1px solid var(--bd);background:var(--sur);overflow:hidden;transition:opacity .2s}
-.slot.past{opacity:.36}
-.slot.now{border-color:var(--acc);box-shadow:0 0 0 1px rgba(184,88,40,.18),0 2px 10px rgba(0,0,0,.06)}
-.slot.nxt{border-color:var(--bd2)}
-.slot-hdr{display:flex;align-items:center;gap:7px;padding:.42rem .7rem}
-.slot-time{font-family:var(--mono);font-size:10px;color:var(--tx3);flex-shrink:0;width:34px}
+.slot{margin:0 .6rem .25rem;border-radius:var(--r);border:1px solid var(--bd);background:var(--sur);overflow:hidden;transition:all .15s}
+.slot.free-slot{background:#f0faf0;border-color:#c8e6c9}
+.slot.now{background:#e8f5e9;border-color:#66bb6a;border-width:2px;box-shadow:0 1px 8px rgba(102,187,106,.18)}
+.slot.nxt{background:var(--sur);border-color:var(--bd2)}
+.slot-hdr{display:flex;align-items:center;gap:7px;padding:.38rem .7rem}
+.slot-time-range{font-family:var(--mono);font-size:10px;color:var(--tx3);flex-shrink:0;white-space:nowrap}
+.slot-time-range b{color:var(--tx2);font-weight:700}
 .slot-pip{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .slot-lbl{font-size:13px;font-weight:500;color:var(--tx);flex:1}
-.slot-now-bar{height:2px;background:var(--acc);margin:0 .7rem .42rem;border-radius:1px}
+.slot-lbl.now-lbl{font-weight:700;color:#2e7d32}
+.slot-lbl.free-lbl{color:#558b2f;font-weight:500}
+.slot-now-bar{height:2px;background:#66bb6a;margin:0 .7rem .35rem;border-radius:1px}
+.past-row{margin:0 .6rem .25rem;padding:.32rem .7rem;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r);display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--tx4);font-size:11px}
+.past-row:active{background:var(--bg3)}
 .past-col{margin:0 .6rem .35rem;opacity:.32;cursor:pointer}
 .past-col:active{opacity:.5}
 .past-col-in{display:flex;align-items:center;gap:7px;padding:.32rem .7rem;background:var(--sur);border:1px solid var(--bd);border-radius:var(--r)}
@@ -1370,13 +1375,7 @@ function renderDay(){
     if(!allSlots.length)slotsHtml+='<div class="empty"><div class="empty-i">🏖️</div><div class="empty-t">No slots today</div></div>';
   }
   el('day-slots').innerHTML=slotsHtml;
-  // On today, scroll current slot into view after render
-  if(isToday&&curIdx>=0){
-    requestAnimationFrame(()=>{
-      const nowEl=document.querySelector('#day-slots .slot.now');
-      if(nowEl)nowEl.scrollIntoView({behavior:'smooth',block:'start'});
-    });
-  }
+
 
   // ── TASKS SECTION ──────────────────────────────────────────────────────────
   let th=`<div style="display:flex;align-items:center;justify-content:space-between;padding:.55rem .6rem .15rem;margin-top:.2rem"><div class="sec-lbl" style="padding:0">Tasks (${pending} pending)</div><div style="display:flex;gap:8px;align-items:center"><button onclick="toggleTasksCol()" style="font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:2px 8px">${tasksCol?'Expand ↓':'Collapse ↑'}</button><button onclick="openAddTask()" style="font-size:11px;color:var(--acc);font-weight:700;background:none;border:none">+ New</button></div></div>`;
@@ -1389,23 +1388,26 @@ function renderDay(){
         if(t.src==='work'){if(t._t?.cat&&catMap[t._t.cat]){if(!workByCat[t._t.cat])workByCat[t._t.cat]=[];workByCat[t._t.cat].push(t);}else workUncat.push(t);}
         else personal.push(t);
       });
-      // Render work tasks grouped by category
+      // Render work tasks grouped by category — collapsible headers
       const catOrder=[...WCATS.map(c=>c.id)];
       catOrder.forEach(cid=>{
-        const tasks=workByCat[cid];if(!tasks?.length)return;
+        const cts=workByCat[cid];if(!cts?.length)return;
         const cat=catMap[cid];
-        th+=`<div style="margin:0 .6rem .35rem;border-radius:var(--r);overflow:hidden;border:1px solid ${cat.color}44">
-          <div style="padding:.25rem .7rem;background:${cat.color}18;border-bottom:1px solid ${cat.color}33;display:flex;align-items:center;gap:6px">
+        const catDone=cts.filter(t=>t.done).length;const catTotal=cts.length;const allCatDone=catDone===catTotal;
+        const catColKey='omni_cat_col_'+cid;const catCol2=localStorage.getItem(catColKey)==='1';
+        th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid ${cat.color}44">
+          <div style="padding:.3rem .7rem;background:${allCatDone?cat.color+'22':cat.color+'12'};border-bottom:${catCol2?'none':'1px solid '+cat.color+'22'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('${cid}')">
             <span style="width:8px;height:8px;border-radius:50%;background:${cat.color};flex-shrink:0"></span>
-            <span style="font-size:10px;font-weight:700;color:${cat.color};text-transform:uppercase;letter-spacing:.06em">${cat.name}</span>
+            <span style="font-size:10px;font-weight:700;color:${cat.color};flex:1;text-transform:uppercase;letter-spacing:.06em">${cat.name}</span>
+            <span style="font-size:10px;color:${allCatDone?'var(--ok)':'var(--tx4)'}">${allCatDone?'✓ All done':''+catDone+'/'+catTotal}</span>
+            <span style="font-size:9px;color:var(--tx4);margin-left:3px">${catCol2?'▶':'▼'}</span>
           </div>`;
-        tasks.forEach(t=>{
-          const u=t.tier===2&&t.urg;
-          th+=`<div class="task-row t${t.tier}${u?' urg':''}">
-            <div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div>
-            <div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}</div><div class="task-meta">${u?'⚠ Last day':t.tier===1?'Today':t.tier===2?'This week':'Ongoing'}</div></div>
-          </div>`;
-        });
+        if(!catCol2){
+          cts.forEach(t=>{
+            const u=t.tier===2&&t.urg;const ttime=t._t?.taskTime;
+            th+=`<div class="task-row t${t.tier}${u?' urg':''}"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}${ttime?` <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">📌 ${ttime}</span>`:''}</div><div class="task-meta">${u?'⚠ Last day':t.tier===1?'Today':t.tier===2?'This week':'Ongoing'}</div></div></div>`;
+          });
+        }
         th+=`</div>`;
       });
       // Uncategorised work tasks
@@ -1423,7 +1425,7 @@ function renderDay(){
         personal.forEach(t=>{
           const u=t.tier===2&&t.urg;const m=t.tier===1?'Today':t.tier===2?(u?'⚠ Last day':'Window'):'Sticky';
           const ttime2=t._t?.taskTime;
-          th+=`<div class="task-row t${t.tier}${u?' urg':''}"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}${ttime2?` <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">📌 ${ttime2}</span>`:''}</div><div class="task-meta">${m}</div></div><button onclick="openEditTask('${t.id}')" style="font-size:12px;color:var(--tx4);background:none;border:none;padding:0 2px">✎</button></div>`;
+          th+=`<div class="task-row t${t.tier}${u?' urg':''}"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}${ttime2?` <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">📌 ${ttime2}</span>`:''}</div><div class="task-meta">${m}</div></div><button onclick="openEditTask('${t.id}')" style="font-size:12px;color:var(--tx4);background:none;border:none;padding:0 2px">✎</button></div>`;
         });
         th+=`</div>`;
       }
@@ -1470,6 +1472,13 @@ function togglePastCollapse(){
   const cur=localStorage.getItem(k)==='1';
   localStorage.setItem(k,cur?'0':'1');
   renderDay();
+  // After collapsing, scroll current slot into view
+  if(localStorage.getItem(k)!=='1'){
+    setTimeout(()=>{
+      const nowEl=document.querySelector('#day-slots .slot.now');
+      if(nowEl)nowEl.scrollIntoView({behavior:'smooth',block:'start'});
+    },120);
+  }
 }
 function toggleTasksCol(){const c=localStorage.getItem('omni_tasks_col')==='1';localStorage.setItem('omni_tasks_col',c?'0':'1');renderDay();}
 
@@ -2504,11 +2513,23 @@ function openSlotTaskPicker(time,dateStr){
       html+=`<div style="display:flex;align-items:center;gap:8px;padding:.4rem .8rem;border-bottom:.5px solid var(--bd)"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1;font-size:13px;color:var(--tx)">${t.text}</div><button onclick="unassignTask('${t.id}','${dateStr}')" style="font-size:10px;color:var(--er);background:none;border:none;padding:0;flex-shrink:0">×</button></div>`;
     });
   }
-  if(unassigned.length){
-    html+=`<div class="sec-lbl" style="padding:.25rem .8rem .1rem;font-size:9px">Assign to this slot</div>`;
-    unassigned.forEach(t=>{
-      html+=`<div style="display:flex;align-items:center;gap:8px;padding:.4rem .8rem;border-bottom:.5px solid var(--bd);cursor:pointer" onclick="assignTask('${t.id}','${time}','${dateStr}')"><span style="font-size:14px;color:var(--acc);flex-shrink:0">→</span><div style="flex:1;font-size:13px;color:var(--tx)">${t.text}</div></div>`;
+  // Show ALL personal tasks for the day as assignable
+  const allPersonal=allTasks.filter(t=>t.src==='omni'&&!t._t?.taskTime);
+  const alreadyAssignedElsewhere=allTasks.filter(t=>t.src==='omni'&&t._t?.taskTime&&t._t.taskTime!==time);
+  if(allPersonal.length){
+    html+=`<div class="sec-lbl" style="padding:.25rem .8rem .1rem;font-size:9px">Tap to assign to ${time}</div>`;
+    allPersonal.forEach(t=>{
+      html+=`<div style="display:flex;align-items:center;gap:8px;padding:.4rem .8rem;border-bottom:.5px solid var(--bd);cursor:pointer;active:background:var(--bg2)" onclick="assignTask('${t.id}','${time}','${dateStr}')"><span style="font-size:14px;color:var(--acc);flex-shrink:0">+</span><div style="flex:1;font-size:13px;color:var(--tx)">${t.text}</div></div>`;
     });
+  }
+  if(alreadyAssignedElsewhere.length){
+    html+=`<div class="sec-lbl" style="padding:.25rem .8rem .1rem;font-size:9px">Assigned to other slots</div>`;
+    alreadyAssignedElsewhere.forEach(t=>{
+      html+=`<div style="display:flex;align-items:center;gap:8px;padding:.32rem .8rem;border-bottom:.5px solid var(--bd)"><span style="font-size:10px;color:var(--tx4);flex-shrink:0">📌${t._t.taskTime}</span><div style="flex:1;font-size:12px;color:var(--tx3)">${t.text}</div><button onclick="assignTask('${t.id}','${time}','${dateStr}')" style="font-size:10px;color:var(--acc);background:none;border:none;padding:0;cursor:pointer">Move here</button></div>`;
+    });
+  }
+  if(!allPersonal.length&&!alreadyAssignedElsewhere.length&&!assigned.length){
+    html+=`<div style="padding:.5rem .8rem;font-size:12px;color:var(--tx4);font-style:italic">No personal tasks for this day yet.</div>`;
   }
   html+=`<div style="padding:.5rem .8rem"><button onclick="closeSlotPicker();openAddTaskAtTime('${time}')" style="width:100%;padding:9px;background:var(--acc);color:#fff;border:none;border-radius:var(--r);font-size:13px;font-weight:700;font-family:var(--font)">+ New personal task at ${time}</button></div>`;
   el('slot-picker-body').innerHTML=html;
