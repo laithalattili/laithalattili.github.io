@@ -1331,7 +1331,7 @@ function renderDay(){
     const isNxt=isToday&&hasComm&&!isCur&&fi===0&&pastSlots.length>0&&futSlots[0]===sl;
     const st=_slotTasks(allTasks,sl.time);const hasN=hasNotes(sl.idx,dateStr);
     const badge=isCur?'<span class="pill pill-acc" style="font-size:9px">Now</span>':isNxt?'<span class="pill pill-neu" style="font-size:9px">Next</span>':'';
-    html+=`<div class="slot${isCur?' now':isNxt?' nxt':''}" style="${isFree&&!isCur?'opacity:.52;':''}"><div class="slot-hdr"><span class="slot-time">${sl.time}</span><span class="slot-pip" style="background:${catCol(sl.tp)}"></span><span class="slot-lbl">${sl.label}</span>${badge}<button class="slot-notes-btn${hasN?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')">${hasN?'📝':'·'}</button></div>${isCur?'<div class="slot-now-bar"></div>':''}${st.length?`<div class="slot-tasks">${st.map(t=>`<div class="slot-task-row"><div class="slot-task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div>${t.src==='omni'?`<button onclick="openEditTask('${t.id}')" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0">✎</button>`:''}</div>`).join('')}</div>`:''}<button class="slot-add-btn" onclick="openAddTaskAtTime('${sl.time}')"><span style="color:var(--acc)">+</span> Add task here</button></div>`;
+    html+=`<div class="slot${isCur?' now':isNxt?' nxt':''}" style="${isFree&&!isCur?'opacity:.52;':''}position:relative;"><div class="slot-hdr"><span class="slot-time">${sl.time}</span><span class="slot-pip" style="background:${catCol(sl.tp)}"></span><span class="slot-lbl">${sl.label}</span>${badge}<button class="slot-notes-btn${hasN?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')">${hasN?'📝':'·'}</button></div>${isCur?'<div class="slot-now-bar"></div>':''}${st.length?`<div class="slot-tasks">${st.map(t=>`<div class="slot-task-row"><div class="slot-task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div>${t.src==='omni'?`<button onclick="openEditTask('${t.id}')" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0">✎</button>`:''}</div>`).join('')}</div>`:''}<button class="slot-add-btn" onclick="openAddTaskAtTime('${sl.time}')"><span style="color:var(--acc)">+</span> Add task here</button></div>`;
   });
   if(!allSlots.length)html='<div class="empty"><div class="empty-i">🏖️</div><div class="empty-t">No slots today</div></div>';
   el('day-slots').innerHTML=html;
@@ -1339,6 +1339,10 @@ function renderDay(){
   const unsched=_unscheduled(allTasks);
   const collapsed=localStorage.getItem('omni_tasks_col')==='1';
   const pending=unsched.filter(t=>!t.done).length;
+  const slotsCol=localStorage.getItem('omni_slots_col')==='1';
+  // Slots collapse button - inject at top of day-slots
+  const slotToggleHtml=`<div style="display:flex;align-items:center;justify-content:space-between;padding:.3rem .6rem .2rem"><div class="sec-lbl" style="padding:0">Timetable</div><button onclick="toggleSlotsCol()" style="font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:2px 8px">${slotsCol?'Expand ↓':'Collapse ↑'}</button></div>`;
+  el('day-slots').innerHTML=slotToggleHtml+(slotsCol?'<div style="padding:.3rem .6rem;font-size:12px;color:var(--tx4);font-style:italic">Timetable hidden.</div>':el('day-slots').innerHTML);
   let th=`<div style="display:flex;align-items:center;justify-content:space-between;padding:.55rem .6rem .15rem;margin-top:.2rem"><div class="sec-lbl" style="padding:0">Tasks (${pending} pending)</div><div style="display:flex;gap:8px;align-items:center"><button onclick="toggleTasksCol()" style="font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:2px 8px">${collapsed?'Expand ↓':'Collapse ↑'}</button><button onclick="openAddTask()" style="font-size:11px;color:var(--acc);font-weight:700;background:none;border:none">+ Add</button></div></div>`;
   if(!collapsed){
     if(unsched.length){
@@ -1395,24 +1399,39 @@ function renderWeek(){
     const wSlots=getSlotsForDay(dayShort).filter(s=>!['free','personal'].includes(s.tp));
     const tasks=getTasksFor(off).filter(t=>!t.done);
 
+    const wkSlotCol=localStorage.getItem('omni_wksc_'+off)==='1';
+    const wkTaskCol=localStorage.getItem('omni_wktc_'+off)==='1';
+    const wkTaskExp=localStorage.getItem('omni_wkex_'+off)==='1';
+    const allDayTasks=getTasksFor(off);
+    const undoneTasks=allDayTasks.filter(t=>!t.done);
+    const doneTasks=allDayTasks.filter(t=>t.done);
     html+=`<div>
       <div class="wd-hdr${isToday?' is-today':''}">
         <span class="wd-name${isToday?' td':''}">${full[di]}</span>
         <span class="wd-date${isToday?' td':''}">${d.getDate()} ${MN[d.getMonth()]}</span>
         ${isToday?'<span class="wd-today">TODAY</span>':''}
+        <span style="flex:1"></span>
+        ${wSlots.length?`<button onclick="wkToggleSlots(${off})" style="font-size:8px;font-weight:700;color:var(--tx4);background:var(--bg3);border:1px solid var(--bd);border-radius:2px;padding:1px 5px;margin-right:3px">${wkSlotCol?'Slots':'–'}</button>`:''}
+        ${allDayTasks.length?`<button onclick="wkToggleTasks(${off})" style="font-size:8px;font-weight:700;color:var(--tx4);background:var(--bg3);border:1px solid var(--bd);border-radius:2px;padding:1px 5px">${wkTaskCol?'Tasks':'–'}</button>`:''}
       </div>
       <div style="padding:.2rem 0">`;
-
-    if(!wSlots.length&&!tasks.length){
+    if(!wSlots.length&&!allDayTasks.length){
       html+=`<div style="padding:.32rem .6rem;font-size:11px;color:var(--tx4);font-style:italic">Free</div>`;
     }
-    wSlots.forEach(sl=>{
-      html+=`<div style="display:flex;align-items:center;gap:7px;padding:.28rem .6rem;border-bottom:.3px solid var(--bd)">
-        <span style="font-family:var(--mono);font-size:10px;color:var(--tx3);width:34px;flex-shrink:0">${sl.time}</span>
-        <span style="width:6px;height:6px;border-radius:50%;background:${catCol(sl.tp)};flex-shrink:0"></span>
-        <span style="font-size:12px;font-weight:500;color:var(--tx);flex:1">${sl.label}</span>
-      </div>`;
-    });
+    if(!wkSlotCol){
+      wSlots.forEach(sl=>{
+        html+=`<div style="display:flex;align-items:center;gap:7px;padding:.28rem .6rem;border-bottom:.3px solid var(--bd)"><span style="font-family:var(--mono);font-size:10px;color:var(--tx3);width:34px;flex-shrink:0">${sl.time}</span><span style="width:6px;height:6px;border-radius:50%;background:${catCol(sl.tp)};flex-shrink:0"></span><span style="font-size:12px;font-weight:500;color:var(--tx);flex:1">${sl.label}</span></div>`;
+      });
+    }
+    if(!wkTaskCol){
+      const visTasks=wkTaskExp?undoneTasks:undoneTasks.slice(0,4);
+      visTasks.forEach(t=>{
+        const tc=t.tier===1?'var(--acc)':t.tier===2&&t.urg?'var(--wa)':'var(--bd2)';
+        html+=`<div style="display:flex;align-items:center;gap:6px;padding:.28rem .6rem;border-bottom:.3px solid var(--bd)"><div style="width:16px;height:16px;border-radius:3px;border:1.5px solid ${tc};flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;background:${t.done?'var(--ok-bg)':'transparent'}" onclick="wkTick('${t.dk}',this,${off})">${t.done?'<span style="color:var(--ok);font-size:9px">✓</span>':''}</div><span style="font-size:11px;color:${t.done?'var(--tx4)':'var(--tx2)'};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${t.done?'text-decoration:line-through':''}">${t.text}</span></div>`;
+      });
+      if(undoneTasks.length>4){const rem=undoneTasks.length-4;html+=`<div style="padding:.2rem .6rem;font-size:10px;color:var(--acc);font-weight:700;cursor:pointer" onclick="wkExpand(${off})">${wkTaskExp?'Show less ↑':'+'+rem+' more'}</div>`;}
+      if(doneTasks.length)html+=`<div style="padding:.18rem .6rem;font-size:10px;color:var(--tx4)">✓ ${doneTasks.length} done</div>`;
+    }
     const wkExp=localStorage.getItem('omni_wkex_'+off)==='1';
     const visTasks=wkExp?tasks:tasks.slice(0,4);
     visTasks.forEach(t=>{
@@ -1425,12 +1444,12 @@ function renderWeek(){
   el('week-days').innerHTML=html;
 }
 
-function wkTick(dk,el2,off){
-  toggleDone(dk,el2);renderWeek();
+function wkTick(dk,cbEl,off){
+  toggleDone(dk,cbEl);renderWeek();
 }
-function wkExpand(off){
-  const k='omni_wkex_'+off;localStorage.setItem(k,localStorage.getItem(k)==='1'?'0':'1');renderWeek();
-}
+function wkExpand(off){localStorage.setItem('omni_wkex_'+off,localStorage.getItem('omni_wkex_'+off)==='1'?'0':'1');renderWeek();}
+function wkToggleSlots(off){localStorage.setItem('omni_wksc_'+off,localStorage.getItem('omni_wksc_'+off)==='1'?'0':'1');renderWeek();}
+function wkToggleTasks(off){localStorage.setItem('omni_wktc_'+off,localStorage.getItem('omni_wktc_'+off)==='1'?'0':'1');renderWeek();}
 
 // ── MONTH VIEW ────────────────────────────────────
 function renderMonth(){
@@ -2287,7 +2306,16 @@ function renderDash(){
   // Tasks preview
   const tasks=getTasksFor(0).filter(t=>!t.done);
   const tm=el('dc-tasks-m');
-  if(tm){if(!tasks.length)tm.innerHTML='<span style="color:var(--tx4)">All clear ✓</span>';else{const t1=tasks.filter(t=>t.tier===1).length;const t2=tasks.filter(t=>t.tier===2).length;const t3=tasks.filter(t=>t.tier===3).length;tm.innerHTML=`${t1?`<div style="color:var(--acc);font-size:11px;font-weight:700">${t1} day-locked</div>`:''}${t2?`<div style="font-size:11px">${t2} window</div>`:''}${t3?`<div style="color:var(--tx4);font-size:11px">${t3} sticky</div>`:''}`}}
+  if(tm){
+    const dayLocked=tasks.filter(t=>t.tier===1&&!t.done);
+    const urgWindow=tasks.filter(t=>t.tier===2&&t.urg&&!t.done);
+    const window2=tasks.filter(t=>t.tier===2&&!t.urg&&!t.done);
+    if(!dayLocked.length&&!urgWindow.length&&!window2.length){
+      tm.innerHTML='<span style="color:var(--ok);font-weight:700">All clear ✓</span>';
+    } else {
+      tm.innerHTML=`${dayLocked.length?`<div style="color:var(--acc);font-size:11px;font-weight:700">🔴 ${dayLocked.length} due today</div>`:''}${urgWindow.length?`<div style="color:var(--wa);font-size:11px;font-weight:700">⚠️ ${urgWindow.length} last day</div>`:''}${window2.length?`<div style="font-size:11px;color:var(--tx2)">${window2.length} in window</div>`:''}`;
+    }
+  }
   // Finance stub
   const fm=el('dc-fin-m');if(fm)fm.innerHTML='<span style="color:var(--tx4)">–</span>';
   // Reading stub
@@ -2330,6 +2358,175 @@ async function init(){
 }
 
 window.addEventListener('DOMContentLoaded',init);
+
+// ═══════════════════════════════════════════════════
+// BEEP (Web Audio — ignores silent mode)
+// ═══════════════════════════════════════════════════
+let _audioCtx=null;
+function _getACtx(){if(!_audioCtx)_audioCtx=new(window.AudioContext||window.webkitAudioContext)();return _audioCtx;}
+function beep(freq=880,dur=80,vol=0.4){try{const ctx=_getACtx();const o=ctx.createOscillator();const g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.type='sine';o.frequency.value=freq;g.gain.setValueAtTime(vol,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+dur/1000);o.start(ctx.currentTime);o.stop(ctx.currentTime+dur/1000);}catch(e){}}
+function beepRest(){beep(660,80,.35);setTimeout(()=>beep(770,80,.35),150);setTimeout(()=>beep(880,120,.45),300);}
+function beepSetDone(){beep(550,60,.25);}
+
+// ═══════════════════════════════════════════════════
+// LIVE MODE (general — slots/morning)
+// ═══════════════════════════════════════════════════
+let _liveOpen=false,_liveInterval=null,_liveCdLong=false,_liveCtx=null;
+let _liveWake=null,_liveFrozen=false;
+
+function _getLiveCtx(){
+  const now=new Date();const nowM=now.getHours()*60+now.getMinutes()+now.getSeconds()/60;
+  const dayName=DS[now.getDay()];const dateStr=now.toISOString().split('T')[0];
+  if(!WSLOTS.length){const mTM=(24*60-nowM);return{type:'free',label:'Free',tp:'free',st:'',et:'00:00',rem:mTM/60,pct:(nowM/(24*60))*100,next:null,dateStr,idx:-1,dayName,isMorning:now.getHours()<12};}
+  let curIdx=-1;for(let i=0;i<WSLOTS.length;i++){if(nowM>=t2m(WSLOTS[i]?.t))curIdx=i;}
+  let cur=null,curStart=nowM,curEnd=nowM+60;
+  if(curIdx>=0){const c=WSLOTS[curIdx]?.[dayName];if(c&&c.tp!=='sleep'){curStart=t2m(WSLOTS[curIdx].t);curEnd=WSLOTS[curIdx+1]?t2m(WSLOTS[curIdx+1].t):curStart+60;cur={label:c.l,tp:c.tp,idx:curIdx,st:WSLOTS[curIdx].t,et:WSLOTS[curIdx+1]?.t||''};}}
+  let next=null;for(let i=curIdx+1;i<WSLOTS.length;i++){const c=WSLOTS[i]?.[dayName];if(c&&!['free','personal','sleep'].includes(c.tp)){next={label:c.l,tp:c.tp,st:WSLOTS[i].t,minUntil:(t2m(WSLOTS[i].t)-nowM)};break;}}
+  const rem=curEnd>curStart?(curEnd-nowM)/60:1;
+  const pct=curStart<curEnd?Math.min(100,Math.max(0,(nowM-curStart)/(curEnd-curStart)*100)):0;
+  return{type:cur?'slot':'free',label:cur?cur.label:'Free',tp:cur?.tp||'free',st:cur?.st||'',et:cur?.et||'',rem,pct,next,dateStr,idx:cur?cur.idx:-1,dayName,isMorning:!cur||['personal','free'].includes(cur?.tp)};
+}
+function _fmtCd(remMins){
+  const tot=Math.round(remMins*60);const ot=tot<0;const ab=Math.abs(tot);
+  if(_liveCdLong){const tm=Math.floor(ab/60);const s=ab%60;return{str:(ot?'+':'')+String(tm).padStart(2,'0')+':'+String(s).padStart(2,'0'),ot};}
+  const h=Math.floor(ab/3600),m=Math.floor((ab%3600)/60),s=ab%60;
+  return{str:(ot?'+':'')+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0'),ot};
+}
+function openLive(){
+  if(_curTab==='gym'&&_todayType()&&!_hasSessToday()){openGymLivePicker(_todayType());return;}
+  _liveOpen=true;el('live-overlay').classList.add('on');el('btn-live').classList.add('active');
+  _liveRender();if(_liveInterval)clearInterval(_liveInterval);_liveInterval=setInterval(_liveTick,500);
+}
+function closeLive(){
+  _liveOpen=false;el('live-overlay').classList.remove('on');el('btn-live').classList.remove('active');
+  if(_liveInterval){clearInterval(_liveInterval);_liveInterval=null;}
+  if(_liveFrozen)toggleFreeze();if(_liveWake){try{_liveWake.release();}catch(e){}_liveWake=null;}
+}
+function toggleLiveCdFmt(){_liveCdLong=!_liveCdLong;_liveTick();}
+async function toggleLiveWake(){const b=el('live-wake-btn');if(_liveWake){try{await _liveWake.release();}catch(e){}_liveWake=null;b.classList.remove('lit');}else{try{_liveWake=await navigator.wakeLock.request('screen');b.classList.add('lit');_liveWake.addEventListener('release',()=>{_liveWake=null;b.classList.remove('lit');});}catch(e){showToast('Wake lock unavailable');}}}
+function toggleFreeze(){
+  _liveFrozen=!_liveFrozen;const ov=el('freeze-ov');
+  const hdr=document.querySelector('#live-overlay .live-hdr');const hdrH=hdr?hdr.getBoundingClientRect().bottom:80;
+  if(ov){ov.style.top=hdrH+'px';ov.classList.toggle('on',_liveFrozen);}
+  const btn=el('live-freeze-btn');if(btn){btn.classList.toggle('freeze-on',_liveFrozen);btn.textContent='🧊';btn.title=_liveFrozen?'Tap to unfreeze':'Freeze screen';}
+}
+function _liveRender(){
+  const ctx=_getLiveCtx();_liveCtx=ctx;
+  el('live-title').textContent=ctx.label;
+  el('live-subtitle').textContent=ctx.st?(ctx.st+(ctx.et?' – '+ctx.et:'')):(ctx.et?'until '+ctx.et:'');
+  el('live-prog-st').textContent=ctx.st||'';el('live-prog-et').textContent=ctx.et||'';
+  const dateStr=ctx.dateStr;let body='';
+  // Morning outfit
+  if(ctx.isMorning&&_wLoaded&&WCOMBOS.length){
+    const ds=todayStr();const todayLog=WLOG.find(l=>l.date===ds);
+    const sugg=todayLog?WCOMBOS.find(c=>c.id===todayLog.combination_id):getOutfitSuggestion(ds,[],DS[new Date().getDay()]);
+    if(sugg){const items=(sugg.item_ids||[]).map(id=>WITEMS.find(i=>i.id===id)).filter(Boolean);
+      body+=`<div class="live-outfit-strip"><div class="live-outfit-lbl">${todayLog?'✓ Outfit confirmed':'Suggested'} — ${sugg.name}</div><div style="display:flex;gap:5px;overflow-x:auto;padding:2px 0">${items.map(i=>i.photo_url?`<img src="${i.photo_url}" style="width:48px;height:48px;object-fit:cover;border-radius:5px;flex-shrink:0;border:1px solid #222">`:`<div style="width:48px;height:48px;background:#1a1a1a;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px">${W_ICO[i.category]||'👔'}</div>`).join('')}</div>${!todayLog?`<div style="display:flex;gap:6px;margin-top:6px"><button onclick="dashConfirm('${sugg.id}');_liveRender()" style="flex:2;padding:6px;background:var(--acc);color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:700;font-family:var(--font)">✓ Wearing this</button><button onclick="dashSkip('${sugg.id}');_liveRender()" style="flex:1;padding:6px;background:#1a1a1a;color:#666;border:1px solid #222;border-radius:5px;font-size:11px;font-family:var(--font)">Skip</button></div>`:''}</div>`;
+    }
+  }
+  // Slot notes
+  if(ctx.idx>=0){
+    const notes=getNotes(ctx.idx,dateStr).filter(b=>b.text.trim());
+    body+=`<div class="live-notes-card"><div class="live-notes-lbl">Notes</div>${notes.map((b,i)=>{const ind=b.depth*14;const mk=b.depth===0?'●':b.depth===1?'○':'▸';return`<div class="live-bullet" style="padding-left:${ind}px"><span class="live-bullet-m">${mk}</span><textarea class="live-bullet-inp" rows="1" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px';_liveNoteSave(${ctx.idx},'${dateStr}')" onblur="_liveNoteSave(${ctx.idx},'${dateStr}')">${b.text}</textarea></div>`;}).join('')}<button onclick="addLiveNote(${ctx.idx},'${dateStr}')" style="font-size:11px;color:#555;background:none;border:none;padding:.3rem 0 0;cursor:pointer">+ note</button></div>`;
+  }
+  // Slot tasks
+  if(ctx.idx>=0){const tasks=getTasksFor(0).filter(t=>!t.done&&t._t?.taskTime===ctx.st);if(tasks.length){body+=`<div class="live-notes-card"><div class="live-notes-lbl">Tasks this slot</div>${tasks.map(t=>`<div style="display:flex;align-items:center;gap:8px;padding:.25rem 0;border-bottom:.5px solid #1a1a1a"><div style="width:16px;height:16px;border-radius:3px;border:1.5px solid #333;display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="toggleDone('${t.dk}',this)"></div><span style="font-size:13px;color:#ccc;flex:1">${t.text}</span></div>`).join('')}</div>`;}}
+  // Next commitment
+  if(ctx.next){const tot=Math.round(ctx.next.minUntil*60);const ab=Math.abs(tot);const hh=Math.floor(ab/3600),mm=Math.floor((ab%3600)/60),ss=ab%60;const str=String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');body+=`<div class="live-next-card"><div class="live-next-lbl">Up next · in ${str}</div><div class="live-next-row"><div class="live-next-dot" style="background:${catCol(ctx.next.tp)}"></div><span class="live-next-name">${ctx.next.label}</span><span class="live-next-time">${ctx.next.st}</span></div></div>`;}
+  el('live-body').innerHTML=body;
+  el('live-body').querySelectorAll('textarea').forEach(ta=>{ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';});
+}
+function _liveTick(){
+  if(!_liveOpen)return;
+  const ctx=_getLiveCtx();const now=new Date();
+  const nowStr=_p(now.getHours())+':'+_p(now.getMinutes())+':'+_p(now.getSeconds());
+  const{str,ot}=_fmtCd(ctx.rem);
+  const cdEl=el('live-cd-val');if(cdEl){cdEl.textContent=str;cdEl.className='live-cd-val'+(ot?' ot':'');}
+  const lbl=el('live-cd-lbl');if(lbl)lbl.textContent=ot?'Overtime':'Remaining';
+  const nt=el('live-now-t');if(nt)nt.textContent=nowStr;
+  const ne=el('live-now-end');if(ne)ne.textContent=ctx.et?'→ '+ctx.et:'';
+  const pf=el('live-prog-fill');if(pf){pf.style.width=ctx.pct+'%';pf.className='live-prog-fill '+(ctx.pct<50?'ahead':ctx.pct<80?'':'behind');}
+  if(_liveCtx?.st!==ctx.st){_liveRender();}else{_liveCtx=ctx;}
+}
+function _liveNoteSave(idx,ds){const bs=[];el('live-body').querySelectorAll('.live-bullet').forEach(row=>{const ta=row.querySelector('textarea');const ind=parseInt(row.style.paddingLeft)||0;bs.push({text:ta?ta.value:'',depth:Math.round(ind/14)});});saveNotes(idx,ds,bs);}
+function addLiveNote(idx,ds){const bs=getNotes(idx,ds);bs.push({text:'',depth:0});saveNotes(idx,ds,bs);_liveRender();setTimeout(()=>{const tas=el('live-body').querySelectorAll('.live-bullet-inp');if(tas.length){const last=tas[tas.length-1];last.focus();last.style.height='auto';last.style.height=last.scrollHeight+'px';}},50);}
+
+// ═══════════════════════════════════════════════════
+// GYM LIVE MODE
+// ═══════════════════════════════════════════════════
+let _gymLiveOpen=false,_gymLiveSessType='',_gymLiveDurMins=90,_gymLiveStartMs=0;
+let _gymLiveExs=[],_gymLiveRestType=null,_gymLiveRestEndMs=0,_gymLiveRestBeepDone=false,_gymLiveInterval=null;
+const GYM_SET_REST_MS=45000,GYM_EX_REST_MS=90000;
+
+function openGymLivePicker(type){
+  const t=type||_todayType()||_nextType();
+  const dur=prompt('Session duration (minutes):','90');
+  if(!dur)return;
+  _gymLiveDurMins=Math.max(10,parseInt(dur)||90);
+  openGymLive(t);
+}
+function openGymLive(type){
+  _gymLiveSessType=type;const exs=_exForType(type);
+  _gymLiveExs=exs.map(ex=>({id:ex.id,name:ex.name,type,sets:REPSCHEME.map((r,i)=>({num:i+1,reps:r,weight:_lastW(ex.id)||'',done:false}))}));
+  _gymLiveRestType=null;_gymLiveRestEndMs=0;_gymLiveRestBeepDone=false;_gymLiveStartMs=Date.now();
+  _gymLiveOpen=true;el('live-overlay').classList.add('on');el('btn-live').classList.add('active');
+  _gymLiveRender();if(_gymLiveInterval)clearInterval(_gymLiveInterval);_gymLiveInterval=setInterval(_gymLiveTick,500);
+}
+function closeGymLive(){
+  _gymLiveOpen=false;el('live-overlay').classList.remove('on');el('btn-live').classList.remove('active');
+  if(_gymLiveInterval){clearInterval(_gymLiveInterval);_gymLiveInterval=null;}
+  if(_liveFrozen)toggleFreeze();if(_liveWake){try{_liveWake.release();}catch(e){}_liveWake=null;}
+}
+function _gymLiveRender(){
+  const elapsed=(Date.now()-_gymLiveStartMs)/60000;const rem=_gymLiveDurMins-elapsed;
+  const{str,ot}=_fmtCd(rem);
+  const cdEl=el('live-cd-val');if(cdEl){cdEl.textContent=str;cdEl.className='live-cd-val'+(ot?' ot':'');}
+  const lbl=el('live-cd-lbl');if(lbl)lbl.textContent=ot?'Overtime':'Remaining';
+  el('live-title').textContent=_gymLiveSessType+' Session';
+  el('live-subtitle').textContent='Fixed · '+_gymLiveDurMins+' min';
+  el('live-prog-st').textContent='';el('live-prog-et').textContent='';
+  const pct=Math.min(100,Math.max(0,(elapsed/_gymLiveDurMins)*100));
+  const pf=el('live-prog-fill');if(pf){pf.style.width=pct+'%';pf.className='live-prog-fill '+(pct<50?'ahead':pct<90?'':'behind');}
+  const now=new Date();const nt=el('live-now-t');if(nt)nt.textContent=_p(now.getHours())+':'+_p(now.getMinutes())+':'+_p(now.getSeconds());
+  const endT=new Date(_gymLiveStartMs+_gymLiveDurMins*60000);const ne=el('live-now-end');if(ne)ne.textContent='→ '+_p(endT.getHours())+':'+_p(endT.getMinutes());
+  const activeExIdx=_gymLiveExs.findIndex(ex=>ex.sets.some(s=>!s.done));
+  let body=`<div class="gl-sess-info"><span class="gl-sess-type">${_gymLiveSessType}</span><span class="gl-sess-prog">${_gymLiveExs.filter(ex=>ex.sets.every(s=>s.done)).length}/${_gymLiveExs.length} exercises</span></div>`;
+  _gymLiveExs.forEach((ex,ei)=>{
+    const allDone=ex.sets.every(s=>s.done);const isActive=ei===activeExIdx;
+    body+=`<div class="gl-ex-block${isActive?' active':''}${allDone?' done-ex':''}" id="glex-${ei}"><div class="gl-ex-hdr">${gymIcon(ex.name)}<div class="gl-ex-name${allDone?' done-name':''}">${ex.name}</div>${allDone?'<span style="color:var(--ok);font-size:14px">✓</span>':''}</div>`;
+    if(isActive||allDone){ex.sets.forEach((set,si)=>{body+=`<div class="gl-set-row"><div class="gl-set-dot${set.done?' done':''}" onclick="glTickSet(${ei},${si})">${set.done?'✓':set.num}</div><span class="gl-set-reps">${set.reps} rep</span><input type="number" class="gl-set-w" value="${set.weight}" placeholder="0" step="0.5" onchange="glSetW(${ei},${si},this.value)" onclick="this.select()"><span class="gl-set-unit">${unit()}</span></div>`;});}
+    else{body+=`<div style="padding:.28rem .8rem;font-size:11px;color:#333">${ex.sets.length} sets</div>`;}
+    if(isActive&&_gymLiveRestType){const restLeft=Math.max(0,(_gymLiveRestEndMs-Date.now())/1000);const total=_gymLiveRestType==='set'?GYM_SET_REST_MS/1000:GYM_EX_REST_MS/1000;const pct2=Math.max(0,Math.min(100,(1-restLeft/total)*100));const done2=restLeft<=0;const cls=done2?'done-rest':_gymLiveRestType==='set'?'set-rest':'ex-rest';const fillCls=done2?'':_gymLiveRestType==='set'?'set-fill':'ex-fill';const m2=Math.floor(restLeft/60),s2=Math.round(restLeft%60);const tStr=done2?'Go!':`${m2>0?m2+'m ':''}${String(s2).padStart(2,'0')}s`;body+=`<div class="gl-rest"><span class="gl-rest-lbl">${_gymLiveRestType==='set'?'Set rest':'Exercise rest'}</span><span class="gl-rest-val ${cls}" id="gl-rest-val">${tStr}</span><div class="gl-rest-bg"><div class="gl-rest-fill ${fillCls}" id="gl-rest-fill" style="width:${pct2}%"></div></div><button class="gl-rest-skip" onclick="glSkipRest()">Skip ›</button></div>`;}
+    body+=`</div>`;
+  });
+  if(activeExIdx===-1){body+=`<div style="margin:.5rem .8rem;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:10px;padding:1.25rem;text-align:center"><div style="font-size:28px;margin-bottom:8px">💪</div><div style="font-size:15px;font-weight:700;color:#e0e0e0;margin-bottom:4px">Session complete!</div><div style="font-size:12px;color:#555;margin-bottom:1rem">${_gymLiveExs.length} exercises · ${Math.round(elapsed)} min</div><button onclick="glSaveAndClose()" style="padding:10px 24px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:var(--font)">Save & Exit</button></div>`;}
+  else{body+=`<div style="margin:.5rem .8rem"><div style="display:flex;gap:8px"><button onclick="glSaveAndClose()" style="flex:1;padding:9px;background:#1a1a1a;color:#666;border:1px solid #2a2a2a;border-radius:8px;font-size:12px;font-family:var(--font)">Save & Exit</button><button onclick="closeGymLive()" style="flex:1;padding:9px;background:transparent;color:#444;border:1px solid #1a1a1a;border-radius:8px;font-size:12px;font-family:var(--font)">Exit without saving</button></div></div>`;}
+  el('live-body').innerHTML=body;
+}
+function _gymLiveTick(){
+  if(!_gymLiveOpen)return;
+  const elapsed=(Date.now()-_gymLiveStartMs)/60000;const rem=_gymLiveDurMins-elapsed;
+  const{str,ot}=_fmtCd(rem);
+  const cdEl=el('live-cd-val');if(cdEl){cdEl.textContent=str;cdEl.className='live-cd-val'+(ot?' ot':'');}
+  const lbl=el('live-cd-lbl');if(lbl)lbl.textContent=ot?'Overtime':'Remaining';
+  const now=new Date();const nt=el('live-now-t');if(nt)nt.textContent=_p(now.getHours())+':'+_p(now.getMinutes())+':'+_p(now.getSeconds());
+  const pct=Math.min(100,Math.max(0,(elapsed/_gymLiveDurMins)*100));const pf=el('live-prog-fill');if(pf)pf.style.width=pct+'%';
+  if(_gymLiveRestType){const restLeft=Math.max(0,(_gymLiveRestEndMs-Date.now())/1000);const total=_gymLiveRestType==='set'?GYM_SET_REST_MS/1000:GYM_EX_REST_MS/1000;const pct2=Math.max(0,Math.min(100,(1-restLeft/total)*100));const done2=restLeft<=0;if(done2&&!_gymLiveRestBeepDone){_gymLiveRestBeepDone=true;beepRest();}const rvEl=el('gl-rest-val');if(rvEl){const m2=Math.floor(restLeft/60),s2=Math.round(restLeft%60);rvEl.textContent=done2?'Go!':`${m2>0?m2+'m ':''}${String(s2).padStart(2,'0')}s`;rvEl.className='gl-rest-val '+(done2?'done-rest':_gymLiveRestType==='set'?'set-rest':'ex-rest');}const rfEl=el('gl-rest-fill');if(rfEl)rfEl.style.width=pct2+'%';}
+}
+function glTickSet(ei,si){
+  const ex=_gymLiveExs[ei];const set=ex.sets[si];set.done=!set.done;beepSetDone();
+  if(set.done){const allDone=ex.sets.every(s=>s.done);const isLast=_gymLiveExs.slice(ei+1).every(e=>e.sets.every(s=>s.done));if(allDone&&!isLast){_gymLiveRestType='ex';_gymLiveRestEndMs=Date.now()+GYM_EX_REST_MS;_gymLiveRestBeepDone=false;}else if(!allDone){_gymLiveRestType='set';_gymLiveRestEndMs=Date.now()+GYM_SET_REST_MS;_gymLiveRestBeepDone=false;}else{_gymLiveRestType=null;}}else{_gymLiveRestType=null;}
+  _gymLiveRender();
+}
+function glSetW(ei,si,v){_gymLiveExs[ei].sets[si].weight=v;const sets=_gymLiveExs[ei].sets;for(let i=si+1;i<sets.length;i++){if(!sets[i].done)sets[i].weight=v;}}
+function glSkipRest(){_gymLiveRestType=null;_gymLiveRestBeepDone=true;_gymLiveRender();}
+async function glSaveAndClose(){
+  const type=_gymLiveSessType;
+  const{data:sess,error}=await supaFrom('omni_gym_sessions').insert({date:todayStr(),session_type:type,programme_id:GPROG?.id||null,notes:''}).select().single();
+  if(!error&&sess){GSESS.unshift(sess);const rows=[];_gymLiveExs.forEach(ex=>ex.sets.forEach(s=>rows.push({session_id:sess.id,exercise_id:ex.id,set_number:s.num,reps:s.reps,weight:s.weight?+s.weight:null,completed:s.done})));const{data:sets}=await supaFrom('omni_gym_sets').insert(rows).select();if(sets)GSETS.push(...sets);}
+  closeGymLive();showToast(type+' saved ✓');if(_curTab==='gym')renderGymToday();
+}
+
 </script>
 </body>
 
