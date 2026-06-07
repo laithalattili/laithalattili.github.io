@@ -1069,18 +1069,51 @@ const CAT_COL={lesson:'#1d4ed8',duty:'#7c3aed',go:'#d97706',free:'#166534',perso
 function catCol(tp){return CAT_COL[tp]||'#8a7968';}
 function t2m(t){const[h,m]=(t||'0:0').split(':').map(Number);return h*60+m;}
 
+// Timetable is hardcoded (not in Supabase) — matches work app SLOTS exactly
+const WSLOTS_STATIC=[
+  {t:'00:00',Mon:{l:'Sleep',tp:'sleep'},Tue:{l:'Sleep',tp:'sleep'},Wed:{l:'Sleep',tp:'sleep'},Thu:{l:'Sleep',tp:'sleep'},Fri:{l:'Sleep',tp:'sleep'},Sat:{l:'Sleep',tp:'sleep'},Sun:{l:'Sleep',tp:'sleep'}},
+  {t:'01:00',Mon:{l:'Sleep',tp:'sleep'},Tue:{l:'Sleep',tp:'sleep'},Wed:{l:'Sleep',tp:'sleep'},Thu:{l:'Sleep',tp:'sleep'},Fri:{l:'Sleep',tp:'sleep'},Sat:{l:'Sleep',tp:'sleep'},Sun:{l:'Sleep',tp:'sleep'}},
+  {t:'02:00',Mon:{l:'Sleep',tp:'sleep'},Tue:{l:'Sleep',tp:'sleep'},Wed:{l:'Sleep',tp:'sleep'},Thu:{l:'Sleep',tp:'sleep'},Fri:{l:'Sleep',tp:'sleep'},Sat:{l:'Sleep',tp:'sleep'},Sun:{l:'Sleep',tp:'sleep'}},
+  {t:'03:00',Mon:{l:'Sleep',tp:'sleep'},Tue:{l:'Sleep',tp:'sleep'},Wed:{l:'Sleep',tp:'sleep'},Thu:{l:'Sleep',tp:'sleep'},Fri:{l:'Sleep',tp:'sleep'},Sat:{l:'Sleep',tp:'sleep'},Sun:{l:'Sleep',tp:'sleep'}},
+  {t:'04:00',Mon:{l:'Sleep',tp:'sleep'},Tue:{l:'Sleep',tp:'sleep'},Wed:{l:'Sleep',tp:'sleep'},Thu:{l:'Sleep',tp:'sleep'},Fri:{l:'Sleep',tp:'sleep'},Sat:{l:'Sleep',tp:'sleep'},Sun:{l:'Sleep',tp:'sleep'}},
+  {t:'05:00',Mon:{l:'Sleep',tp:'sleep'},Tue:{l:'Sleep',tp:'sleep'},Wed:{l:'Sleep',tp:'sleep'},Thu:{l:'Sleep',tp:'sleep'},Fri:{l:'Sleep',tp:'sleep'},Sat:{l:'Sleep',tp:'sleep'},Sun:{l:'Sleep',tp:'sleep'}},
+  {t:'06:00',Mon:{l:'Sleep',tp:'sleep'},Tue:{l:'Sleep',tp:'sleep'},Wed:{l:'Sleep',tp:'sleep'},Thu:{l:'Sleep',tp:'sleep'},Fri:{l:'Sleep',tp:'sleep'},Sat:{l:'Sleep',tp:'sleep'},Sun:{l:'Sleep',tp:'sleep'}},
+  {t:'07:00',Mon:{l:'Wake Up',tp:'personal'},Tue:{l:'Wake Up Duty',tp:'duty'},Wed:{l:'Wake Up Duty',tp:'duty'},Thu:{l:'Wake Up Duty',tp:'duty'},Fri:{l:'Wake Up',tp:'personal'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'07:30',Mon:{l:'Breakfast',tp:'personal'},Tue:{l:'Breakfast',tp:'personal'},Wed:{l:'Breakfast',tp:'personal'},Thu:{l:'Breakfast',tp:'personal'},Fri:{l:'Bfast Duty',tp:'duty'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'08:00',Mon:{l:'Tutor Time',tp:'go'},Tue:{l:'Tutor Time',tp:'go'},Wed:{l:'Tutor Time',tp:'go'},Thu:{l:'Tutor Time',tp:'go'},Fri:{l:'Tutor Time',tp:'go'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'08:20',Mon:{l:'Free',tp:'free'},Tue:{l:'Assembly',tp:'go'},Wed:{l:'Free',tp:'free'},Thu:{l:'9OptA',tp:'lesson'},Fri:{l:'Free',tp:'free'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'09:05',Mon:{l:'Free',tp:'free'},Tue:{l:'Free',tp:'free'},Wed:{l:'Free',tp:'free'},Thu:{l:'9OptA',tp:'lesson'},Fri:{l:'Free',tp:'free'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'09:50',Mon:{l:'Free',tp:'free'},Tue:{l:'Free',tp:'free'},Wed:{l:'8B2',tp:'lesson'},Thu:{l:'Free',tp:'free'},Fri:{l:'Free',tp:'free'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'10:35',Mon:{l:'EDT Training',tp:'go'},Tue:{l:'Break',tp:'personal'},Wed:{l:'Det. Duty',tp:'duty'},Thu:{l:'Break',tp:'personal'},Fri:{l:'US Briefing',tp:'go'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'11:00',Mon:{l:'Free',tp:'free'},Tue:{l:'7A2',tp:'lesson'},Wed:{l:'Free',tp:'free'},Thu:{l:'Free',tp:'free'},Fri:{l:'Free',tp:'free'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'11:45',Mon:{l:'Free',tp:'free'},Tue:{l:'7A2',tp:'lesson'},Wed:{l:'8B2',tp:'lesson'},Thu:{l:'HSM Walks',tp:'duty'},Fri:{l:'7B',tp:'lesson'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'12:30',Mon:{l:'Lunch',tp:'personal'},Tue:{l:'Lunch',tp:'personal'},Wed:{l:'HSMs Mtg',tp:'go'},Thu:{l:'Lunch',tp:'personal'},Fri:{l:'Lunch',tp:'personal'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'13:30',Mon:{l:'Free',tp:'free'},Tue:{l:'Free',tp:'free'},Wed:{l:'Free',tp:'free'},Thu:{l:'Free',tp:'free'},Fri:{l:'7B',tp:'lesson'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'14:15',Mon:{l:'Free',tp:'free'},Tue:{l:'Free',tp:'free'},Wed:{l:'Mtg: Kris',tp:'go'},Thu:{l:'Free',tp:'free'},Fri:{l:'Free',tp:'free'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'15:00',Mon:{l:'Free',tp:'free'},Tue:{l:'Free',tp:'free'},Wed:{l:'Free',tp:'free'},Thu:{l:'Free',tp:'free'},Fri:{l:'Free',tp:'free'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'15:15',Mon:{l:'Free',tp:'free'},Tue:{l:'Free',tp:'free'},Wed:{l:'Free',tp:'free'},Thu:{l:'Break',tp:'personal'},Fri:{l:'Free',tp:'free'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'15:30',Mon:{l:'Free',tp:'free'},Tue:{l:'Free',tp:'free'},Wed:{l:'Free',tp:'free'},Thu:{l:'8A1',tp:'lesson'},Fri:{l:'Free',tp:'free'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'16:15',Mon:{l:'Free',tp:'free'},Tue:{l:'Free',tp:'free'},Wed:{l:'Free',tp:'free'},Thu:{l:'8A1',tp:'lesson'},Fri:{l:'9OptA',tp:'lesson'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'17:00',Mon:{l:'Free',tp:'free'},Tue:{l:'EDT Mtg',tp:'go'},Wed:{l:'Free',tp:'free'},Thu:{l:'ECA',tp:'go'},Fri:{l:'House Act.',tp:'go'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'18:00',Mon:{l:'Dinner',tp:'personal'},Tue:{l:'Dinner',tp:'personal'},Wed:{l:'Dinner',tp:'personal'},Thu:{l:'Dinner',tp:'personal'},Fri:{l:'Dinner',tp:'personal'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'18:45',Mon:{l:'House Mtg',tp:'duty'},Tue:{l:'Free',tp:'free'},Wed:{l:'House Mtg',tp:'duty'},Thu:{l:'Free',tp:'free'},Fri:{l:'House Mtg',tp:'duty'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'19:15',Mon:{l:'Free',tp:'free'},Tue:{l:'Canteen Duty',tp:'duty'},Wed:{l:'Gym#2 OUT',tp:'go'},Thu:{l:'Canteen Duty',tp:'duty'},Fri:{l:'Canteen Duty',tp:'duty'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'20:30',Mon:{l:'Free Time Duty',tp:'duty'},Tue:{l:'Gym#1 Duty',tp:'duty'},Wed:{l:'Free',tp:'free'},Thu:{l:'Gym#2 Duty',tp:'duty'},Fri:{l:'Gym#3 OUT',tp:'go'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'21:30',Mon:{l:'Sleep Duty',tp:'duty'},Tue:{l:'Free',tp:'free'},Wed:{l:'Free',tp:'free'},Thu:{l:'Free',tp:'free'},Fri:{l:'Free',tp:'free'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'22:30',Mon:{l:'Free',tp:'free'},Tue:{l:'Free',tp:'free'},Wed:{l:'Free',tp:'free'},Thu:{l:'Free',tp:'free'},Fri:{l:'Free',tp:'free'},Sat:{l:'Free',tp:'free'},Sun:{l:'Free',tp:'free'}},
+  {t:'23:00',Mon:{l:'Sleep',tp:'sleep'},Tue:{l:'Sleep',tp:'sleep'},Wed:{l:'Sleep',tp:'sleep'},Thu:{l:'Sleep',tp:'sleep'},Fri:{l:'Sleep',tp:'sleep'},Sat:{l:'Sleep',tp:'sleep'},Sun:{l:'Sleep',tp:'sleep'}},
+];
+
 async function loadWorkData(){
-  if(!_OK){console.warn('Supabase not available, _OK=false');return;}
+  // Timetable is hardcoded — always available immediately
+  WSLOTS=WSLOTS_STATIC;
+  // Only fetch plan tasks from Supabase
+  if(!_OK)return;
   try{
-    const[sa,sb]=await Promise.all([
-      supaFrom('work_app_data').select('value').eq('key','S').single(),
-      supaFrom('work_app_data').select('value').eq('key','settings').single()
-    ]);
-    if(sa.data?.value){const v=typeof sa.data.value==='string'?JSON.parse(sa.data.value):sa.data.value;WSLOTS=Array.isArray(v)?v:[];console.log('WSLOTS loaded:',WSLOTS.length,'slots');}
-    else{console.warn('No slot data in work_app_data key S',sa);}
-    if(sb.data?.value){const v=typeof sb.data.value==='string'?JSON.parse(sb.data.value):sb.data.value;WTASKS=v.planData||[];console.log('WTASKS loaded:',WTASKS.length,'tasks');}
+    const{data}=await supaFrom('work_app_data').select('value').eq('key','settings').single();
+    if(data?.value){const v=typeof data.value==='string'?JSON.parse(data.value):data.value;WTASKS=v.planData||[];console.log('WTASKS loaded:',WTASKS.length,'tasks');}
     _workLoaded=true;
-  }catch(e){console.warn('Work data load error:',e);}
+  }catch(e){console.warn('Work tasks load error:',e);}
 }
 
 async function loadOmniTasks(){
@@ -1107,8 +1140,9 @@ function getTasksFor(dayOffset){
   const d=new Date();d.setDate(d.getDate()+dayOffset);
   const dayName=DS[d.getDay()];
   const dateStr=d.toISOString().split('T')[0];
-  const wNum=isoWeek(d);
-  const isSun=d.getDay()===0; // last day of ISO week
+  const wNum=isoWeek(d);         // week number of TARGET day
+  const todayWNum=isoWeek(new Date()); // week number of TODAY (actual current week)
+  const isSun=d.getDay()===0; // last day of ISO week (Sunday = end of ISO week)
   const res=[];
 
   function dkWork(t){return t.scope==='sticky'?'plan_done_'+t.id:'plan_done_'+t.id+'_w'+wNum;}
@@ -1120,14 +1154,15 @@ function getTasksFor(dayOffset){
     let tier=0,show=false,urg=false;
     if(t.scope==='sticky'){tier=3;show=true;}
     else if(t.scope==='week'){
-      tier=2;show=isoWeek(d)===wNum;
+      // week tasks: show only if target day is in the SAME week as when task was created
+      tier=2;show=wNum===(t.weekNum||todayWNum);
       if(show&&!isDone(dkWork(t))&&isSun)urg=true; // last day, not done
     }
-    else if(t.scope==='week-day'){tier=1;show=isoWeek(d)===wNum&&t.day===dayName;}
+    else if(t.scope==='week-day'){tier=1;show=wNum===(t.weekNum||todayWNum)&&t.day===dayName;}
     else if(t.scope==='day'){
       tier=1;
       if(t.date){const dd=new Date(t.date+'T00:00:00');show=dd.toDateString()===d.toDateString();}
-      else show=t.day===dayName&&isoWeek(d)===wNum;
+      else show=t.day===dayName&&wNum===(t.weekNum||todayWNum);
     }
     else if(t.scope==='recurring'){
       tier=1;const rd=t.recurDay||t.day;
@@ -2008,7 +2043,7 @@ async function switchGV(v){
 
 function _exForType(type){return GEX.filter(e=>e.session_type===type).sort((a,b)=>a.position-b.position);}
 function _lastW(exId){const s=GSETS.filter(x=>x.exercise_id===exId&&x.weight);return s.length?Math.max(...s.map(x=>+x.weight)):null;}
-function _todayType(){if(!GPROG)return null;const days=GPROG.days||{};const d=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'][new Date().getDay()];return days[d]||null;}
+function _todayType(){if(!GPROG)return null;const days=GPROG.days||{};const dk=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'][new Date().getDay()];const t=days[dk]||null;return t;}
 function _hasSessToday(){return GSESS.some(s=>s.date===todayStr());}
 function _nextType(){const order=['Push','Pull','Legs'];const last=GSESS[0];if(!last)return order[0];return order[(order.indexOf(last.session_type)+1)%order.length];}
 const unit=()=>S.weightUnit||'kg';
