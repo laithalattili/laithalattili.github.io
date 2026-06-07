@@ -540,6 +540,15 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
   <button class="ntab" data-tab="gym" onclick="switchTab('gym')"><span class="ni">🏋️</span><span>Gym</span></button>
   <button class="ntab" data-tab="checklists" onclick="switchTab('checklists')"><span class="ni">✅</span><span>Checklists</span></button>
 </nav>
+<!-- SLOT TASK PICKER SHEET -->
+<div class="sh-wrap" id="slot-picker-sh">
+  <div class="sh-bd" onclick="closeSlotPicker()"></div>
+  <div class="sh">
+    <div class="sh-drag"></div>
+    <div class="sh-body" id="slot-picker-body" style="padding:0"></div>
+  </div>
+</div>
+
 <div id="toast"></div>
 <!-- FREEZE OVERLAY -->
 <div id="freeze-ov"></div>
@@ -1337,13 +1346,15 @@ function renderDay(){
         const st=_slotTasks(allTasks,sl.time);const hasN=hasNotes(sl.idx,dateStr);
         return`<div class="slot" style="opacity:.38"><div class="slot-hdr"><span class="slot-time">${sl.time}</span><span class="slot-pip" style="background:${catCol(sl.tp)}"></span><span class="slot-lbl">${sl.label}</span><button class="slot-notes-btn${hasN?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')">${hasN?'📝':'·'}</button></div>${st.length?`<div class="slot-tasks">${st.map(t=>`<div class="slot-task-row"><div class="slot-task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div></div>`).join('')}</div>`:''}</div>`;
       }).join('');
-      slotsHtml+=`<div class="past-col" id="past-col-block" onclick="this.style.display='none';document.getElementById('past-expanded').style.display=''"><div class="past-col-in"><span class="slot-time">${first}</span><span style="flex:1;font-size:11px;color:var(--tx3)">${pastSlots.length} past · tap to expand</span><span class="slot-time">${lastEnd}</span></div></div><div id="past-expanded" style="display:none">${pastRows}</div>`;
+      const pastExp=localStorage.getItem('omni_past_exp_'+dateStr)==='1';
+      slotsHtml+=`<div class="past-col" id="past-col-block" style="${pastExp?'display:none':''}" onclick="localStorage.setItem('omni_past_exp_${dateStr}','1');this.style.display='none';document.getElementById('past-expanded').style.display=''"><div class="past-col-in"><span class="slot-time">${first}</span><span style="flex:1;font-size:11px;color:var(--tx3)">${pastSlots.length} past · tap to show</span><span class="slot-time">${lastEnd}</span></div></div><div id="past-expanded" style="${pastExp?'':'display:none'}">${pastRows}<div style="padding:.2rem .6rem;font-size:10px;color:var(--tx3);cursor:pointer;text-align:center" onclick="localStorage.setItem('omni_past_exp_${dateStr}','0');renderDay()">↑ Hide past</div></div>`;
     }
     // Future slots
     futSlots.forEach((sl,fi)=>{
       const isFree=['free','personal'].includes(sl.tp);
       const isCur=isToday&&hasComm&&sl.idx===curIdx;
-      const isNxt=isToday&&hasComm&&!isCur&&fi===0&&pastSlots.length>0;
+      // Next = first non-current future commitment slot
+      const isNxt=isToday&&hasComm&&!isCur&&!isFree&&futSlots.slice(0,fi).every(s=>s.idx===curIdx||['free','personal'].includes(s.tp));
       const st=_slotTasks(allTasks,sl.time);const hasN=hasNotes(sl.idx,dateStr);
       const badge=isCur?'<span class="pill pill-acc" style="font-size:9px">Now</span>':isNxt?'<span class="pill pill-neu" style="font-size:9px">Next</span>':'';
       slotsHtml+=`<div class="slot${isCur?' now':isNxt?' nxt':''}" style="${isFree&&!isCur?'opacity:.52;':''}position:relative;"><div class="slot-hdr"><span class="slot-time">${sl.time}</span><span class="slot-pip" style="background:${catCol(sl.tp)}"></span><span class="slot-lbl">${sl.label}</span>${badge}<button class="slot-notes-btn${hasN?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')">${hasN?'📝':'·'}</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:15px;color:var(--acc);background:none;border:none;padding:0 4px;margin-left:2px;opacity:.7;line-height:1" title="Add/assign task here">+</button></div>${isCur?'<div class="slot-now-bar"></div>':''}${st.length?`<div class="slot-tasks">${st.map(t=>`<div class="slot-task-row"><div class="slot-task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div>${t.src==='omni'?`<button onclick="openEditTask('${t.id}')" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0">✎</button>`:''}</div>`).join('')}</div>`:''}</div>`;
@@ -1470,21 +1481,28 @@ function renderWeek(){
       });
     }
     if(!wkTaskCol){
-      const visTasks=wkTaskExp?undoneTasks:undoneTasks.slice(0,4);
-      visTasks.forEach(t=>{
-        const tc=t.tier===1?'var(--acc)':t.tier===2&&t.urg?'var(--wa)':'var(--bd2)';
-        html+=`<div style="display:flex;align-items:center;gap:6px;padding:.28rem .6rem;border-bottom:.3px solid var(--bd)"><div style="width:16px;height:16px;border-radius:3px;border:1.5px solid ${tc};flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;background:${t.done?'var(--ok-bg)':'transparent'}" onclick="wkTick('${t.dk}',this,${off})">${t.done?'<span style="color:var(--ok);font-size:9px">✓</span>':''}</div><span style="font-size:11px;color:${t.done?'var(--tx4)':'var(--tx2)'};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${t.done?'text-decoration:line-through':''}">${t.text}</span></div>`;
+      const catMap2={};WCATS.forEach(c=>{catMap2[c.id]=c;});
+      // Group by category
+      const wkByCat={};const wkUncat=[];const wkPersonal=[];
+      undoneTasks.forEach(t=>{
+        if(t.src==='work'){if(t._t?.cat&&catMap2[t._t.cat]){if(!wkByCat[t._t.cat])wkByCat[t._t.cat]=[];wkByCat[t._t.cat].push(t);}else wkUncat.push(t);}
+        else wkPersonal.push(t);
       });
-      if(undoneTasks.length>4){const rem=undoneTasks.length-4;html+=`<div style="padding:.2rem .6rem;font-size:10px;color:var(--acc);font-weight:700;cursor:pointer" onclick="wkExpand(${off})">${wkTaskExp?'Show less ↑':'+'+rem+' more'}</div>`;}
+      // Render with category colour bars
+      WCATS.forEach(cat=>{
+        const cts=wkByCat[cat.id];if(!cts?.length)return;
+        cts.forEach(t=>{
+          const tc=t.tier===1?cat.color:t.tier===2&&t.urg?'var(--wa)':cat.color+'99';
+          html+=`<div style="display:flex;align-items:center;gap:6px;padding:.28rem .6rem;border-bottom:.3px solid var(--bd);border-left:3px solid ${cat.color}55"><div style="width:14px;height:14px;border-radius:2px;border:1.5px solid ${tc};flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;background:${t.done?'var(--ok-bg)':'transparent'}" onclick="wkTick('${t.dk}',this,${off})">${t.done?'<span style="color:var(--ok);font-size:8px">✓</span>':''}</div><span style="font-size:11px;color:${t.done?'var(--tx4)':'var(--tx2)'};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${t.done?'text-decoration:line-through':''}">${t.text}</span></div>`;
+        });
+      });
+      wkUncat.concat(wkPersonal).forEach(t=>{
+        const tc=t.tier===1?'var(--acc)':t.tier===2&&t.urg?'var(--wa)':'var(--bd2)';
+        html+=`<div style="display:flex;align-items:center;gap:6px;padding:.28rem .6rem;border-bottom:.3px solid var(--bd)"><div style="width:14px;height:14px;border-radius:2px;border:1.5px solid ${tc};flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;background:${t.done?'var(--ok-bg)':'transparent'}" onclick="wkTick('${t.dk}',this,${off})">${t.done?'<span style="color:var(--ok);font-size:8px">✓</span>':''}</div><span style="font-size:11px;color:${t.done?'var(--tx4)':'var(--tx2)'};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${t.done?'text-decoration:line-through':''}">${t.text}</span></div>`;
+      });
+      if(undoneTasks.length>5){const rem=undoneTasks.length-5;html+=`<div style="padding:.18rem .6rem;font-size:10px;color:var(--acc);font-weight:700;cursor:pointer" onclick="wkExpand(${off})">${wkTaskExp?'Show less ↑':'+'+rem+' more'}</div>`;}
       if(doneTasks.length)html+=`<div style="padding:.18rem .6rem;font-size:10px;color:var(--tx4)">✓ ${doneTasks.length} done</div>`;
     }
-    const wkExp=localStorage.getItem('omni_wkex_'+off)==='1';
-    const visTasks=wkExp?tasks:tasks.slice(0,4);
-    visTasks.forEach(t=>{
-      const tc=t.tier===1?'var(--acc)':t.tier===2&&t.urg?'var(--wa)':'var(--bd2)';
-      html+=`<div style="display:flex;align-items:center;gap:6px;padding:.28rem .6rem;border-bottom:.3px solid var(--bd)"><div style="width:16px;height:16px;border-radius:3px;border:1.5px solid ${tc};flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;background:${t.done?'var(--ok-bg)':'transparent'}" onclick="wkTick('${t.dk}',this,${off})">${t.done?'<span style="color:var(--ok);font-size:9px">✓</span>':''}</div><span style="font-size:11px;color:${t.done?'var(--tx4)':'var(--tx2)'};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${t.done?'text-decoration:line-through':''}">${t.text}</span></div>`;
-    });
-    if(tasks.length>4){const rem=tasks.length-4;html+=`<div style="padding:.2rem .6rem;font-size:10px;color:var(--acc);font-weight:700;cursor:pointer" onclick="wkExpand(${off})">${wkExp?'Show less ↑':'+'+rem+' more'}</div>`;}
     html+=`</div></div>`;
   }
   el('week-days').innerHTML=html;
@@ -2417,45 +2435,27 @@ let _pickerTime='',_pickerDate='';
 function openSlotTaskPicker(time,dateStr){
   _pickerTime=time;_pickerDate=dateStr;
   const off=Math.round((new Date(dateStr+'T12:00:00')-new Date())/86400000);
-  const allTasks=getTasksFor(Math.round(off));
-  const alreadyAssigned=allTasks.filter(t=>t._t?.taskTime===time);
-  const unassigned=allTasks.filter(t=>!t._t?.taskTime);
-
-  const listHtml=`
-    ${alreadyAssigned.length?`<div class="sec-lbl" style="padding:.4rem .6rem .1rem;font-size:9px">Already at ${time}</div>`:''}
-    ${alreadyAssigned.map(t=>`<div style="display:flex;align-items:center;gap:8px;padding:.4rem .8rem;border-bottom:.5px solid var(--bd);background:var(--sur2)">
-      <div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);closeSlotPicker()">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div>
-      <div style="flex:1"><div style="font-size:13px;color:var(--tx)">${t.text}</div><div style="font-size:10px;color:var(--ok)">✓ Assigned to ${time}</div></div>
-      <button onclick="unassignTask('${t.id}','${dateStr}')" style="font-size:10px;color:var(--er);background:none;border:none;padding:0">Remove</button>
-    </div>`).join('')}
-    ${unassigned.length?`<div class="sec-lbl" style="padding:.4rem .6rem .1rem;font-size:9px">Assign to ${time}</div>`:''}
-    ${unassigned.map(t=>`<div style="display:flex;align-items:center;gap:8px;padding:.4rem .8rem;border-bottom:.5px solid var(--bd);cursor:pointer;background:var(--sur)" onclick="assignTask('${t.id}','${time}','${dateStr}')">
-      <span style="font-size:16px;color:var(--acc)">+</span>
-      <div style="flex:1"><div style="font-size:13px;color:var(--tx)">${t.text}</div><div style="font-size:10px;color:var(--tx4)">${t.src==='work'?'Work task':'Personal'}</div></div>
-    </div>`).join('')}
-    <div style="padding:.5rem .8rem;border-top:1px solid var(--bd)">
-      <button onclick="closeSlotPicker();openAddTaskAtTime('${time}')" style="width:100%;padding:9px;background:var(--acc);color:#fff;border:none;border-radius:var(--r);font-size:13px;font-weight:700;font-family:var(--font)">+ Create new task at ${time}</button>
-    </div>`;
-
-  // Reuse the notes sheet as a generic bottom sheet
-  el('notes-sh-title').textContent='Tasks at '+time;
-  el('bullet-editor').innerHTML='';
-  document.querySelector('#notes-sh .sh-body').innerHTML=listHtml;
-  document.querySelector('#notes-sh .sh-body').style.padding='0';
-  // Hide the add bullet button
-  const addBulletBtn=document.querySelector('#notes-sh .sh-body + button');if(addBulletBtn)addBulletBtn.style.display='none';
-  // Override close to use closeSlotPicker
-  document.querySelector('#notes-sh .sh-bd').onclick=closeSlotPicker;
-  el('notes-sh').classList.add('on');
+  const allTasks=getTasksFor(off);
+  const assigned=allTasks.filter(t=>t._t?.taskTime===time);
+  const unassigned=allTasks.filter(t=>!t._t?.taskTime&&t.src==='omni');
+  let html=`<div style="padding:.4rem .8rem .25rem;font-size:12px;font-weight:700;color:var(--tx)">Tasks at ${time}</div>`;
+  if(assigned.length){
+    html+=`<div class="sec-lbl" style="padding:.25rem .8rem .1rem;font-size:9px">Assigned here</div>`;
+    assigned.forEach(t=>{
+      html+=`<div style="display:flex;align-items:center;gap:8px;padding:.4rem .8rem;border-bottom:.5px solid var(--bd)"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1;font-size:13px;color:var(--tx)">${t.text}</div><button onclick="unassignTask('${t.id}','${dateStr}')" style="font-size:10px;color:var(--er);background:none;border:none;padding:0;flex-shrink:0">×</button></div>`;
+    });
+  }
+  if(unassigned.length){
+    html+=`<div class="sec-lbl" style="padding:.25rem .8rem .1rem;font-size:9px">Assign to this slot</div>`;
+    unassigned.forEach(t=>{
+      html+=`<div style="display:flex;align-items:center;gap:8px;padding:.4rem .8rem;border-bottom:.5px solid var(--bd);cursor:pointer" onclick="assignTask('${t.id}','${time}','${dateStr}')"><span style="font-size:14px;color:var(--acc);flex-shrink:0">→</span><div style="flex:1;font-size:13px;color:var(--tx)">${t.text}</div></div>`;
+    });
+  }
+  html+=`<div style="padding:.5rem .8rem"><button onclick="closeSlotPicker();openAddTaskAtTime('${time}')" style="width:100%;padding:9px;background:var(--acc);color:#fff;border:none;border-radius:var(--r);font-size:13px;font-weight:700;font-family:var(--font)">+ New personal task at ${time}</button></div>`;
+  el('slot-picker-body').innerHTML=html;
+  el('slot-picker-sh').classList.add('on');
 }
-function closeSlotPicker(){
-  el('notes-sh').classList.remove('on');
-  // Restore notes sheet to normal state
-  document.querySelector('#notes-sh .sh-body').innerHTML='<div class="bullet-editor" id="bullet-editor"></div><button class="btn-s" style="margin-top:.65rem;font-size:12px" onclick="addBullet(0)">+ Add bullet</button>';
-  document.querySelector('#notes-sh .sh-body').style.padding='';
-  document.querySelector('#notes-sh .sh-bd').onclick=closeNotes;
-  renderDay();
-}
+function closeSlotPicker(){el('slot-picker-sh').classList.remove('on');renderDay();}
 function assignTask(taskId,time,dateStr){
   const t=OTASKS.find(x=>x.id===taskId);
   if(t){t.taskTime=time;saveOmniTasks();}
