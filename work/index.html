@@ -28135,8 +28135,12 @@ function snHasContent(idx,day,week){
   return false;
 }
 
-function _syncLpPlans(){var obj={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.startsWith('lp_')){try{var v=localStorage.getItem(k);if(v)obj[k]=JSON.parse(v);}catch(e){}}}console.log('_syncLpPlans: saving keys=',Object.keys(obj),'supaReady=',_supaReady);try{localStorage.setItem('lessonPlans',JSON.stringify(obj));}catch(e){}supaSave('lessonPlans',JSON.stringify(obj));}
-function _loadLpPlans(){try{var d=localStorage.getItem('lessonPlans');console.log('_loadLpPlans: lessonPlans key=',d?'EXISTS('+d.length+'chars)':'MISSING');if(!d)return;var obj=JSON.parse(d);var keys=Object.keys(obj).filter(function(k){return k.startsWith('lp_');});console.log('_loadLpPlans: distributing keys=',keys);keys.forEach(function(k){localStorage.setItem(k,JSON.stringify(obj[k]));});}catch(e){console.error('_loadLpPlans error:',e);}}
+function _syncLpPlans(){// Individual lp_ keys sync automatically via patched localStorage.setItem
+// Nothing extra needed
+}
+function _loadLpPlans(){// lp_ keys are synced individually via patched localStorage.setItem
+// supaLoad already restored them — nothing to do here
+}
 function snSaveLive(week,idx,day,bullets){
   const k=_instanceKey(week,idx,day);
   if(!_slotOutlines[k])_slotOutlines[k]={recur:'once',planned:[],live:[],checkState:{}};
