@@ -629,9 +629,9 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
     <div class="ab-prog-fill" id="ab-prog-fill" style="width:0%"></div>
   </div>
   <div class="ab-ctrls">
-    <button class="ab-btn" onclick="abSkipBack()" title="−30s">−30</button>
+    <button class="ab-btn" id="ab-skip-back-btn" onclick="abSkipBack()" title="Skip back">−5s</button>
     <button class="ab-btn play" id="ab-play-btn" onclick="abTogglePlay()">▶</button>
-    <button class="ab-btn" onclick="abSkipFwd()" title="+30s">+30</button>
+    <button class="ab-btn" id="ab-skip-fwd-btn" onclick="abSkipFwd()" title="Skip forward">+5s</button>
     <button class="ab-btn" onclick="abPrev()" title="Prev track">⏮</button>
     <button class="ab-btn" onclick="abNext()" title="Next track">⏭</button>
     <span style="flex:1"></span>
@@ -1341,7 +1341,7 @@ function getTasksFor(dayOffset){
     res.push({id:t.id,text:t.text,tier,urg,done:isDone(dk),src:'omni',dk,_t:t});
   }
 
-  if(dayOffset===0&&typeof _todayType==='function'){const gymType=_todayType();const gymDone=typeof _hasSessToday==='function'&&_hasSessToday();if(gymType){res.push({id:'__gym__',text:gymType+' Session',tier:1,urg:false,done:gymDone,src:'gym',dk:'omni_gym_day_'+dateStr,_t:{scope:'day'},gymDone});}}
+  if(dayOffset===0&&typeof _todayType==='function'){const gymType=_todayType();const gymDone=typeof _hasSessToday==='function'&&_hasSessToday();if(gymType){const gymSlotTime=localStorage.getItem('omni_gym_slot_time')||'';res.push({id:'__gym__',text:'Gym: '+gymType+' Session',tier:1,urg:false,done:gymDone,src:'gym',dk:'omni_gym_day_'+dateStr,_t:{scope:'day',taskTime:gymSlotTime||undefined},gymDone});}}
   res.sort((a,b)=>a.tier!==b.tier?a.tier-b.tier:a.urg&&!b.urg?-1:!a.urg&&b.urg?1:0);
   return res;
 }
@@ -1432,9 +1432,11 @@ function _esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replac
 // ── TIMED TASKS ───────────────────────────────────────────────────────────────
 function _slotTasks(tasks,time){
   const hints=JSON.parse(localStorage.getItem('omni_work_hints')||'{}');
+  const gymSlot=localStorage.getItem('omni_gym_slot_time')||'';
   return tasks.filter(t=>{
     if(t._t?.taskTime===time)return true;
     if(t.src==='work'&&hints[t.id]===time)return true;
+    if(t.src==='gym'&&gymSlot===time)return true;
     return false;
   });
 }
@@ -2691,7 +2693,7 @@ function openSlotTaskPicker(time,dateStr){
         g.tasks.forEach(t=>{
           const isElsewhere=t._t?.taskTime&&t._t.taskTime!==time;
           const ttLabel=isElsewhere?' 📌'+t._t.taskTime:'';
-          const fn=t.src==='omni'?"assignTask('"+t.id+"','"+time+"','"+dateStr+"')":"assignWorkTaskToSlot('"+t.id+"','"+time+"')";
+          const fn=t.src==='omni'?"assignTask('"+t.id+"','"+time+"','"+dateStr+"')":t.src==='gym'?"assignGymToSlot('"+time+"')": "assignWorkTaskToSlot('"+t.id+"','"+time+"')";
           html+=`<div style="display:flex;align-items:center;gap:8px;padding:.33rem .8rem .33rem 1.5rem;border-top:.5px solid var(--bd);cursor:pointer" onclick="${fn}"><span style="color:var(--acc)">→</span><span style="font-size:13px;color:var(--tx);flex:1">${t.text}${ttLabel}</span></div>`;
         });
       }
@@ -2718,6 +2720,13 @@ function unassignTask(taskId,dateStr){
 }
 function removeWorkHint(taskId){
   try{const h=JSON.parse(localStorage.getItem('omni_work_hints')||'{}');delete h[taskId];localStorage.setItem('omni_work_hints',JSON.stringify(h));}catch(e){}
+}
+function assignGymToSlot(time){
+  // Store gym slot time in localStorage
+  localStorage.setItem('omni_gym_slot_time',time);
+  closeSlotPicker();
+  showToast('Gym session pinned to '+time);
+  renderDay();
 }
 function assignWorkTaskToSlot(taskId,time){
   // Work tasks can't be modified in Supabase from here
@@ -3403,6 +3412,13 @@ function _labRender(){
   if(playBtn){playBtn.textContent=playing?'⏸':'▶';playBtn.style.background=playing?'#7c3aed':'var(--acc)';}
   const spd=typeof _abSpeed!=='undefined'?_abSpeed:1;
   if(spdEl){spdEl.innerHTML=[1,1.2,1.5,2].map(s=>`<button onclick="abSetSpeed(${s});_labRender()" style="font-size:10px;padding:3px 10px;border-radius:12px;background:${spd===s?'rgba(255,255,255,.18)':'rgba(255,255,255,.05)'};color:${spd===s?'#e0d0c0':'#666'};border:1px solid ${spd===s?'rgba(255,255,255,.2)':'rgba(255,255,255,.06)'};font-weight:${spd===s?'700':'400'}">${s}×</button>`).join('');}
+  // Update skip button labels dynamically
+  const skipVal=parseInt(localStorage.getItem('omni_audio_skip')||'5');
+  const skipLabel=skipVal+'s';
+  bar.querySelectorAll('button').forEach(b=>{
+    if(b.textContent==='−30'||b.textContent.match(/^−\d+$/))b.textContent='−'+skipLabel;
+    if(b.textContent==='+30'||b.textContent.match(/^\+\d+$/))b.textContent='+'+skipLabel;
+  });
 }
 
 function _gymLiveRender(){
