@@ -1341,7 +1341,7 @@ function getTasksFor(dayOffset){
     res.push({id:t.id,text:t.text,tier,urg,done:isDone(dk),src:'omni',dk,_t:t});
   }
 
-  if(dayOffset===0&&typeof _todayType==='function'){const gymType=_todayType();const gymDone=typeof _hasSessToday==='function'&&_hasSessToday();if(gymType){const gymSlotTime=localStorage.getItem('omni_gym_slot_time')||'';res.push({id:'__gym__',text:'Gym: '+gymType+' Session',tier:1,urg:false,done:gymDone,src:'gym',dk:'omni_gym_day_'+dateStr,_t:{scope:'day',taskTime:gymSlotTime||undefined},gymDone});}}
+  if(dayOffset===0&&typeof _todayType==='function'&&typeof GPROG!=='undefined'&&GPROG){const gymType=_todayType();const gymDone=typeof _hasSessToday==='function'&&_hasSessToday();if(gymType){const gymSlotTime=localStorage.getItem('omni_gym_slot_time')||'';res.push({id:'__gym__',text:'Gym: '+gymType+' Session',tier:1,urg:false,done:gymDone,src:'gym',dk:'omni_gym_day_'+dateStr,_t:{scope:'day',taskTime:gymSlotTime||undefined},gymDone});}}
   res.sort((a,b)=>a.tier!==b.tier?a.tier-b.tier:a.urg&&!b.urg?-1:!a.urg&&b.urg?1:0);
   return res;
 }
@@ -1540,11 +1540,15 @@ function renderDay(){
         return;
       }
       slotsHtml+=`<div class="slot${isCur?' now':isNxt?' nxt':''}${isFree?' free-slot':''}"><div class="slot-hdr">${trHtml}<span class="slot-pip" style="background:${catCol(sl.tp)}"></span><span class="slot-lbl">${isFree&&!isCur?'':sl.label}</span>${badge}<button class="slot-notes-btn${hasN?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')">${hasN?'📝':'·'}</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:14px;color:var(--acc);background:none;border:none;padding:0 3px;opacity:.7;line-height:1">+</button></div>${isCur?'<div class="slot-now-bar"></div>':''}${st.length?`<div class="slot-tasks">${st.map(t=>{
-    const isWork=t.src==='work';
+    const isWork=t.src==='work';const isGym2=t.src==='gym';
     const removeBtn=isWork
       ? `<button onclick="removeWorkHint('${t.id}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px" title="Remove from slot">×</button>`
-      : `<button onclick="unassignTask('${t.id}','${dateStr}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px" title="Remove from slot">×</button>`;
-    return`<div class="slot-task-row"><div class="slot-task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div>${removeBtn}</div>`;
+      : isGym2
+        ? `<button onclick="localStorage.removeItem('omni_gym_slot_time');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px" title="Remove from slot">×</button>`
+        : `<button onclick="unassignTask('${t.id}','${dateStr}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px" title="Remove from slot">×</button>`;
+    const slotCbClick=isGym2?`switchTab('gym')`:`toggleDone('${t.dk}',this);setTimeout(renderDay,50)`;
+    const slotCbInner=isGym2?(t.gymDone?'<span style="color:var(--ok);font-size:10px">✓</span>':'🏋️'):(t.done?'<span style="color:var(--ok);font-size:10px">✓</span>':'');
+    return`<div class="slot-task-row"><div class="slot-task-cb${(t.done||t.gymDone)?' on':''}" onclick="${slotCbClick}">${slotCbInner}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div>${removeBtn}</div>`;
   }).join('')}</div>`:''}</div>`;
     });
     if(!allSlots.length)slotsHtml+='<div class="empty"><div class="empty-i">🏖️</div><div class="empty-t">No slots today</div></div>';
@@ -2323,6 +2327,8 @@ async function loadGym(){
     if(p.data)GPROG=p.data;if(e.data)GEX=e.data;if(s.data)GSESS=s.data;
     if(GSESS.length){const ids=GSESS.slice(0,5).map(x=>x.id);const{data:sets}=await supaFrom('omni_gym_sets').select('*').in('session_id',ids);if(sets)GSETS=sets;}
     if(!GPROG)await _seedGym();
+    // Re-render planner if open, so gym task appears
+    if(typeof _curTab!=='undefined'&&_curTab==='planner')renderDay();
   }catch(e){console.warn('Gym load',e);}
   _gLoaded=true;
 }
