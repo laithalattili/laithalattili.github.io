@@ -2336,8 +2336,6 @@ async function loadGym(){
     if(p.data)GPROG=p.data;if(e.data)GEX=e.data;if(s.data)GSESS=s.data;
     if(GSESS.length){const ids=GSESS.slice(0,5).map(x=>x.id);const{data:sets}=await supaFrom('omni_gym_sets').select('*').in('session_id',ids);if(sets)GSETS=sets;}
     if(!GPROG)await _seedGym();
-    // Re-render planner if open, so gym task appears
-    if(typeof _curTab!=='undefined'&&_curTab==='planner')renderDay();
   }catch(e){console.warn('Gym load',e);}
   _gLoaded=true;
 }
@@ -2658,8 +2656,11 @@ function renderDash(){
 function _afterUnlock(){
   const saved=localStorage.getItem('omni_lt')||localStorage.getItem('omni_dp')||'dashboard';
   switchTab(saved);
-  // If planner was the saved tab, re-render day after a tick to ensure WSLOTS is set
-  if(saved==='planner')setTimeout(()=>renderDay(),100);
+  // Re-render day after data loads — 100ms for work tasks, 2s fallback for gym
+  if(saved==='planner'){
+    setTimeout(()=>renderDay(),100);
+    setTimeout(()=>{if(_curTab==='planner')renderDay();},2000);
+  }
   setInterval(_checkAutoLock,60000);
   _checkWeeklyLock();
 }
@@ -2669,6 +2670,10 @@ async function init(){
   setInterval(updateClock,1000);updateClock();
   // Load work data + tasks
   await Promise.all([loadWorkData(),loadOmniTasks()]);
+  // Load gym data in background so gym task shows in day view without opening gym tab
+  loadGym().then(()=>{
+    renderDay(); // always re-render — cheap if not on planner, needed for gym task
+  }).catch(()=>{});
   // Realtime: auto-reload work tasks when Work app saves changes
   if(_OK){
     try{
