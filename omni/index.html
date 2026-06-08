@@ -691,6 +691,25 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
     <div class="live-prog-bg"><div class="live-prog-fill" id="live-prog-fill" style="width:0%"></div></div>
   </div>
   <div class="live-body" id="live-body"></div>
+  <!-- Sticky audio footer inside live overlay -->
+  <div id="live-audio-bar" style="flex-shrink:0;background:#0a0804;border-top:1px solid #1e1a14;padding:.55rem .9rem .6rem;display:none">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:.38rem">
+      <span style="font-size:13px">🎧</span>
+      <span id="lab-title" style="flex:1;font-size:11px;color:#6a5a48;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">No audio loaded</span>
+      <button onclick="abLinkFolder()" style="font-size:10px;color:var(--acc3);background:none;border:none;padding:0;font-weight:600;flex-shrink:0">Folder</button>
+    </div>
+    <div style="height:3px;background:rgba(255,255,255,.1);border-radius:2px;margin-bottom:.5rem;cursor:pointer" id="lab-prog-wrap" onclick="abSeekLive(event,this)">
+      <div id="lab-prog-fill" style="height:100%;width:0%;background:var(--acc3);border-radius:2px;transition:width .5s linear"></div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px">
+      <button onclick="abPrev()" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.06);color:#888;border:1px solid rgba(255,255,255,.1);font-size:14px;display:flex;align-items:center;justify-content:center">⏮</button>
+      <button onclick="abSkipBack()" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.08);color:#b09070;border:1px solid rgba(255,255,255,.12);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center">−30</button>
+      <button id="lab-play-btn" onclick="abTogglePlay();_labRender()" style="width:54px;height:54px;border-radius:50%;background:var(--acc);color:#fff;border:none;font-size:22px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(184,88,40,.4)">▶</button>
+      <button onclick="abSkipFwd()" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.08);color:#b09070;border:1px solid rgba(255,255,255,.12);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center">+30</button>
+      <button onclick="abNext()" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.06);color:#888;border:1px solid rgba(255,255,255,.1);font-size:14px;display:flex;align-items:center;justify-content:center">⏭</button>
+    </div>
+    <div style="display:flex;justify-content:center;gap:6px;margin-top:.45rem" id="lab-spd-btns"></div>
+  </div>
 </div>
 
 <!-- SLOT NOTES SHEET -->
@@ -1457,7 +1476,7 @@ function renderDay(){
 
   // ── SLOTS SECTION ──────────────────────────────────────────────────────────
   // When collapsed: show key commitment labels as a summary chip row
-  const commitSlots=allSlots.filter(s=>!['free','personal'].includes(s.tp));
+  const commitSlots=allSlots.filter(s=>!['free','personal','sleep'].includes(s.tp));
   const collapsedSummary=commitSlots.length
     ? `<div style="display:flex;flex-wrap:wrap;gap:4px;padding:.25rem .6rem .35rem">${commitSlots.map(s=>`<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${catCol(s.tp)}22;color:${catCol(s.tp)};border:1px solid ${catCol(s.tp)}44"><b>${s.time}</b> ${s.label}</span>`).join('')}</div>`
     : `<div style="padding:.25rem .6rem;font-size:11px;color:var(--tx4);font-style:italic">Free day</div>`;
@@ -3356,10 +3375,12 @@ function openGymLive(type){
   _gymLiveExs=exs.map(ex=>({id:ex.id,name:ex.name,type,sets:REPSCHEME.map((r,i)=>({num:i+1,reps:r,weight:_lastW(ex.id)||'',done:false}))}));
   _gymLiveRestType=null;_gymLiveRestEndMs=0;_gymLiveRestBeepDone=false;_gymLiveStartMs=Date.now();_gymLiveExpandedEx=-1;
   _gymLiveOpen=true;el('live-overlay').classList.add('on');el('btn-live').classList.add('active');
+  _labRender();
   _gymLiveRender();if(_gymLiveInterval)clearInterval(_gymLiveInterval);_gymLiveInterval=setInterval(_gymLiveTick,500);
 }
 function closeGymLive(){
   _gymLiveOpen=false;el('live-overlay').classList.remove('on');el('btn-live').classList.remove('active');
+  const _lb=document.getElementById('live-audio-bar');if(_lb)_lb.style.display='none';
   if(_gymLiveInterval){clearInterval(_gymLiveInterval);_gymLiveInterval=null;}
   if(_liveFrozen)toggleFreeze();if(_liveWake){try{_liveWake.release();}catch(e){}_liveWake=null;}
 }
@@ -3367,6 +3388,27 @@ function glToggleEx(ei){
   _gymLiveExpandedEx=(_gymLiveExpandedEx===ei)?-1:ei;
   _gymLiveRender();
 }
+
+function _labRender(){
+  const bar=document.getElementById('live-audio-bar');
+  if(!bar)return;
+  const hasFiles=typeof _abFiles!=='undefined'&&_abFiles.length>0;
+  bar.style.display='';  // always show in gym live
+  const titleEl=document.getElementById('lab-title');
+  const progEl=document.getElementById('lab-prog-fill');
+  const playBtn=document.getElementById('lab-play-btn');
+  const spdEl=document.getElementById('lab-spd-btns');
+  const name=hasFiles?(_abFiles[_abIdx]?.name||'').replace(/\.[^.]+$/,''):'No audio loaded';
+  if(titleEl)titleEl.textContent=name;
+  const dur=typeof _abAudio!=='undefined'&&_abAudio?.duration||0;
+  const pos=typeof _abAudio!=='undefined'&&_abAudio?.currentTime||0;
+  if(progEl)progEl.style.width=(dur>0?((pos/dur)*100).toFixed(1):0)+'%';
+  const playing=typeof _abAudio!=='undefined'&&_abAudio&&!_abAudio.paused;
+  if(playBtn){playBtn.textContent=playing?'⏸':'▶';playBtn.style.background=playing?'#7c3aed':'var(--acc)';}
+  const spd=typeof _abSpeed!=='undefined'?_abSpeed:1;
+  if(spdEl){spdEl.innerHTML=[1,1.2,1.5,2].map(s=>`<button onclick="abSetSpeed(${s});_labRender()" style="font-size:10px;padding:3px 10px;border-radius:12px;background:${spd===s?'rgba(255,255,255,.18)':'rgba(255,255,255,.05)'};color:${spd===s?'#e0d0c0':'#666'};border:1px solid ${spd===s?'rgba(255,255,255,.2)':'rgba(255,255,255,.06)'};font-weight:${spd===s?'700':'400'}">${s}×</button>`).join('');}
+}
+
 function _gymLiveRender(){
   const elapsed=(Date.now()-_gymLiveStartMs)/60000;const rem=_gymLiveDurMins-elapsed;
   const{str,ot}=_fmtCd(rem);
@@ -3390,13 +3432,8 @@ function _gymLiveRender(){
     if(isExpanded&&_gymLiveRestType){const restLeft=Math.max(0,(_gymLiveRestEndMs-Date.now())/1000);const total=_gymLiveRestType==="set"?GYM_SET_REST_MS/1000:GYM_EX_REST_MS/1000;const pct2=Math.max(0,Math.min(100,(1-restLeft/total)*100));const done2=restLeft<=0;const cls=done2?"done-rest":_gymLiveRestType==="set"?"set-rest":"ex-rest";const fillCls=done2?"":_gymLiveRestType==="set"?"set-fill":"ex-fill";const m2=Math.floor(restLeft/60),s2=Math.round(restLeft%60);const tStr=done2?"Go!":`${m2>0?m2+"m ":""}${String(s2).padStart(2,"0")}s`;body+=`<div class="gl-rest"><span class="gl-rest-lbl">${_gymLiveRestType==="set"?"Set rest":"Exercise rest"}</span><span class="gl-rest-val ${cls}" id="gl-rest-val">${tStr}</span><div class="gl-rest-bg"><div class="gl-rest-fill ${fillCls}" id="gl-rest-fill" style="width:${pct2}%"></div></div><button class="gl-rest-skip" onclick="glSkipRest()">Skip ›</button></div>`;}
     body+=`</div>`;
   });
-  const abPlaying=typeof _abAudio!=="undefined"&&_abAudio&&!_abAudio.paused;
-  const abTrackName=typeof _abFiles!=="undefined"&&_abFiles.length?(_abFiles[_abIdx]?.name||"").replace(/\.[^.]+$/,""):"No audio loaded";
-  const abDur=typeof _abAudio!=="undefined"&&_abAudio?.duration||0;const abPos=typeof _abAudio!=="undefined"&&_abAudio?.currentTime||0;
-  const abPct=abDur>0?((abPos/abDur)*100).toFixed(1):0;
-  const abSpd=typeof _abSpeed!=="undefined"?_abSpeed:1;
-  const _spdBtns=[1,1.2,1.5,2].map(s=>'<button onclick="abSetSpeed('+s+');_gymLiveRender()"'+' style="font-size:9px;padding:2px 5px;background:'+( abSpd===s?"rgba(255,255,255,.14)":"rgba(255,255,255,.04)" )+';color:'+( abSpd===s?"#d4c4a8":"#555" )+';border-radius:2px;border:1px solid rgba(255,255,255,.07)">'+s+'×</button>').join("");
-  body+=`<div style="margin:.5rem .8rem;background:#0d0b08;border:1px solid #1e1a14;border-radius:10px;padding:.65rem .85rem"><div style="display:flex;align-items:center;gap:7px;margin-bottom:.32rem"><span style="font-size:13px">🎧</span><span style="flex:1;font-size:10px;color:#6a5a48;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${abTrackName}</span><button onclick="abLinkFolder()" style="font-size:9px;color:var(--acc3);background:none;border:none;padding:0;font-weight:600">Folder</button></div><div style="height:2px;background:rgba(255,255,255,.08);border-radius:1px;margin-bottom:.38rem;cursor:pointer" onclick="abSeekLive(event,this)"><div style="height:100%;width:${abPct}%;background:var(--acc3);border-radius:1px"></div></div><div style="display:flex;align-items:center;gap:5px"><button onclick="abSkipBack()" style="padding:2px 7px;font-size:10px;font-weight:600;background:rgba(255,255,255,.06);color:#a08060;border-radius:3px;border:1px solid rgba(255,255,255,.08)">−30</button><button onclick="abTogglePlay();_gymLiveRender()" style="padding:2px 10px;font-size:11px;font-weight:700;background:${abPlaying?"var(--acc)":"rgba(255,255,255,.08)"};color:${abPlaying?"#fff":"#a08060"};border-radius:3px;border:1px solid rgba(255,255,255,.12)">${abPlaying?"⏸":"▶"}</button><button onclick="abSkipFwd()" style="padding:2px 7px;font-size:10px;font-weight:600;background:rgba(255,255,255,.06);color:#a08060;border-radius:3px;border:1px solid rgba(255,255,255,.08)">+30</button><button onclick="abPrev()" style="padding:2px 7px;font-size:10px;background:rgba(255,255,255,.04);color:#555;border-radius:3px;border:1px solid rgba(255,255,255,.06)">⏮</button><button onclick="abNext()" style="padding:2px 7px;font-size:10px;background:rgba(255,255,255,.04);color:#555;border-radius:3px;border:1px solid rgba(255,255,255,.06)">⏭</button><span style="flex:1"></span>${_spdBtns}</div></div>`;
+  // Audio: rendered in sticky #live-audio-bar footer, not inline
+  _labRender();
   if(firstIncompleteIdx===-1){body+=`<div style="margin:.5rem .8rem;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:10px;padding:1.25rem;text-align:center"><div style="font-size:28px;margin-bottom:8px">💪</div><div style="font-size:15px;font-weight:700;color:#e0e0e0;margin-bottom:4px">Session complete!</div><div style="font-size:12px;color:#555;margin-bottom:1rem">${_gymLiveExs.length} exercises · ${Math.round(elapsed)} min</div><button onclick="glSaveAndClose()" style="padding:10px 24px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:var(--font)">Save & Exit</button></div>`;}
   else{body+=`<div style="margin:.5rem .8rem"><div style="display:flex;gap:8px"><button onclick="glSaveAndClose()" style="flex:1;padding:9px;background:#1a1a1a;color:#666;border:1px solid #2a2a2a;border-radius:8px;font-size:12px;font-family:var(--font)">Save & Exit</button><button onclick="closeGymLive()" style="flex:1;padding:9px;background:transparent;color:#444;border:1px solid #1a1a1a;border-radius:8px;font-size:12px;font-family:var(--font)">Exit without saving</button></div></div>`;}
   el('live-body').innerHTML=body;
