@@ -3170,8 +3170,8 @@ function abTogglePlay(){
 }
 function abPrev(){if(_abIdx>0)abLoadTrack(_abIdx-1);}
 function abNext(){if(_abIdx<_abFiles.length-1)abLoadTrack(_abIdx+1).then(()=>{if(_abAudio)_abAudio.play().catch(()=>{});});}
-function abSkipBack(){if(_abAudio)_abAudio.currentTime=Math.max(0,_abAudio.currentTime-30);}
-function abSkipFwd(){if(_abAudio)_abAudio.currentTime=Math.min(_abAudio.duration||0,_abAudio.currentTime+30);}
+function abSkipBack(){const d=parseInt(localStorage.getItem('omni_audio_skip')||'5');if(_abAudio)_abAudio.currentTime=Math.max(0,_abAudio.currentTime-d);}
+function abSkipFwd(){const d=parseInt(localStorage.getItem('omni_audio_skip')||'5');if(_abAudio)_abAudio.currentTime=Math.min(_abAudio.duration||0,_abAudio.currentTime+d);}
 function abSetSpeed(s){
   _abSpeed=s;
   if(_abAudio)_abAudio.playbackRate=s;
@@ -3243,7 +3243,8 @@ function _hdrFlash(){
     if(t)openGymLivePicker(t);
     else showToast('No gym session scheduled today');
   }else{
-    openAudioPlayer();
+    // Open general live overlay (audio bar is inside it, folder linked from there)
+    openLive();
   }
 }
 
@@ -3281,20 +3282,51 @@ let _liveWake=null,_liveFrozen=false;
 function _getLiveCtx(){
   const now=new Date();const nowM=now.getHours()*60+now.getMinutes()+now.getSeconds()/60;
   const dayName=DS[now.getDay()];const dateStr=now.toISOString().split('T')[0];
-  if(!WSLOTS.length){const mTM=(24*60-nowM);return{type:'free',label:'Free',tp:'free',st:'',et:'00:00',rem:mTM/60,pct:(nowM/(24*60))*100,next:null,dateStr,idx:-1,dayName,isMorning:now.getHours()<12};}
+  if(!WSLOTS.length){return{type:'free',label:'Free',tp:'free',st:'',et:'',rem:60,pct:0,next:null,cdLabel:'Free',dateStr,idx:-1,dayName,isMorning:now.getHours()<12};}
   let curIdx=-1;for(let i=0;i<WSLOTS.length;i++){if(nowM>=t2m(WSLOTS[i]?.t))curIdx=i;}
   let cur=null,curStart=nowM,curEnd=nowM+60;
-  if(curIdx>=0){const c=WSLOTS[curIdx]?.[dayName];if(c&&c.tp!=='sleep'){curStart=t2m(WSLOTS[curIdx].t);curEnd=WSLOTS[curIdx+1]?t2m(WSLOTS[curIdx+1].t):curStart+60;cur={label:c.l,tp:c.tp,idx:curIdx,st:WSLOTS[curIdx].t,et:WSLOTS[curIdx+1]?.t||''};}}
-  let next=null;for(let i=curIdx+1;i<WSLOTS.length;i++){const c=WSLOTS[i]?.[dayName];if(c&&!['free','personal','sleep'].includes(c.tp)){next={label:c.l,tp:c.tp,st:WSLOTS[i].t,minUntil:(t2m(WSLOTS[i].t)-nowM)};break;}}
-  const rem=curEnd>curStart?(curEnd-nowM)/60:1;
-  const pct=curStart<curEnd?Math.min(100,Math.max(0,(nowM-curStart)/(curEnd-curStart)*100)):0;
-  return{type:cur?'slot':'free',label:cur?cur.label:'Free',tp:cur?.tp||'free',st:cur?.st||'',et:cur?.et||'',rem,pct,next,dateStr,idx:cur?cur.idx:-1,dayName,isMorning:!cur||['personal','free'].includes(cur?.tp)};
+  if(curIdx>=0){
+    const c=WSLOTS[curIdx]?.[dayName];
+    if(c&&!['free','personal','sleep'].includes(c.tp)){
+      curStart=t2m(WSLOTS[curIdx].t);
+      curEnd=WSLOTS[curIdx+1]?t2m(WSLOTS[curIdx+1].t):curStart+60;
+      cur={label:c.l,tp:c.tp,idx:curIdx,st:WSLOTS[curIdx].t,et:WSLOTS[curIdx+1]?.t||'00:00'};
+    }
+  }
+  // Next real commitment (skip free/personal/sleep)
+  let next=null;
+  for(let i=curIdx+1;i<WSLOTS.length;i++){
+    const c=WSLOTS[i]?.[dayName];
+    if(c&&!['free','personal','sleep'].includes(c.tp)){
+      next={label:c.l,tp:c.tp,st:WSLOTS[i].t,secUntil:Math.round((t2m(WSLOTS[i].t)-nowM)*60)};
+      break;
+    }
+  }
+  let rem,cdLabel,pct=0;
+  if(cur){
+    // In a commitment: countdown = remaining time in this slot
+    rem=(curEnd-nowM)/60;
+    cdLabel='Remaining — '+cur.label;
+    pct=Math.min(100,Math.max(0,(nowM-curStart)/(curEnd-curStart)*100));
+  }else{
+    // In free/empty: countdown = time until next commitment
+    rem=next?next.secUntil/60:60;
+    cdLabel=next?'Until '+next.label:'No commitments left';
+  }
+  return{type:cur?'slot':'free',label:cur?cur.label:'Free',tp:cur?.tp||'free',st:cur?.st||'',et:cur?.et||'',rem,pct,next,cdLabel,dateStr,idx:cur?cur.idx:-1,dayName,isMorning:!cur||['personal','free'].includes(cur?.tp)};
 }
 function _fmtCd(remMins){
   const tot=Math.round(remMins*60);const ot=tot<0;const ab=Math.abs(tot);
-  if(_liveCdLong){const tm=Math.floor(ab/60);const s=ab%60;return{str:(ot?'+':'')+String(tm).padStart(2,'0')+':'+String(s).padStart(2,'0'),ot};}
-  const h=Math.floor(ab/3600),m=Math.floor((ab%3600)/60),s=ab%60;
-  return{str:(ot?'+':'')+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0'),ot};
+  const pre=ot?'+':'';
+  if(_liveCdLong){
+    // Long: HH:MM:SS
+    const h=Math.floor(ab/3600),m=Math.floor((ab%3600)/60),s=ab%60;
+    return{str:pre+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0'),ot};
+  }else{
+    // Short default: MM:SS (up to 99:59, then auto-expand)
+    const totalMin=Math.floor(ab/60);const s=ab%60;
+    return{str:pre+String(totalMin).padStart(2,'0')+':'+String(s).padStart(2,'0'),ot};
+  }
 }
 function openLive(){
   if(_curTab==='gym'&&_todayType()&&!_hasSessToday()){openGymLivePicker(_todayType());return;}
@@ -3346,7 +3378,7 @@ function _liveTick(){
   const nowStr=_p(now.getHours())+':'+_p(now.getMinutes())+':'+_p(now.getSeconds());
   const{str,ot}=_fmtCd(ctx.rem);
   const cdEl=el('live-cd-val');if(cdEl){cdEl.textContent=str;cdEl.className='live-cd-val'+(ot?' ot':'');}
-  const lbl=el('live-cd-lbl');if(lbl)lbl.textContent=ot?'Overtime':'Remaining';
+  const lbl=el('live-cd-lbl');if(lbl)lbl.textContent=ctx.cdLabel||(ot?'Overtime':'Remaining');
   const nt=el('live-now-t');if(nt)nt.textContent=nowStr;
   const ne=el('live-now-end');if(ne)ne.textContent=ctx.et?'→ '+ctx.et:'';
   const pf=el('live-prog-fill');if(pf){pf.style.width=ctx.pct+'%';pf.className='live-prog-fill '+(ctx.pct<50?'ahead':ctx.pct<80?'':'behind');}
@@ -3364,13 +3396,23 @@ let _gymLiveExpandedEx=-1; // -1 = auto (first incomplete)
 const GYM_SET_REST_MS=45000,GYM_EX_REST_MS=90000;
 
 function openGymLivePicker(type){
-  const t=type||_todayType()||_nextType();
-  const dur=prompt('Session duration (minutes):','90');
-  if(!dur)return;
-  _gymLiveDurMins=Math.max(10,parseInt(dur)||90);
-  openGymLive(t);
+  // Check if today has a gym slot in timetable — use its duration
+  const now=new Date();const nowM=now.getHours()*60+now.getMinutes();const dayName=DS[now.getDay()];
+  let slotDurMins=null;
+  for(let i=0;i<WSLOTS.length;i++){
+    const c=WSLOTS[i]?.[dayName];
+    if(c&&(c.tp==='gym'||c.tp==='sports'||(c.l||'').toLowerCase().includes('gym'))){
+      const endT=WSLOTS[i+1]?.t;
+      if(endT){slotDurMins=t2m(endT)-t2m(WSLOTS[i].t);}
+      break;
+    }
+  }
+  if(slotDurMins&&slotDurMins>10){openGymLive(slotDurMins,type);return;}
+  const t=parseInt(prompt('Session duration (minutes)','90'))||90;
+  if(!t||t<5)return;
+  openGymLive(t,type);
 }
-function openGymLive(type){
+function openGymLive(durMins,type){
   _gymLiveSessType=type;const exs=_exForType(type);
   _gymLiveExs=exs.map(ex=>({id:ex.id,name:ex.name,type,sets:REPSCHEME.map((r,i)=>({num:i+1,reps:r,weight:_lastW(ex.id)||'',done:false}))}));
   _gymLiveRestType=null;_gymLiveRestEndMs=0;_gymLiveRestBeepDone=false;_gymLiveStartMs=Date.now();_gymLiveExpandedEx=-1;
