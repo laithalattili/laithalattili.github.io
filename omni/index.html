@@ -461,6 +461,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
       <div id="tz-clocks" style="display:flex;align-items:center;gap:0;flex:1;overflow:hidden"></div>
       <div class="hdr-age" id="hdr-age"></div>
     </div>
+    <div style="display:flex;justify-content:center;padding:.18rem .6rem .28rem;border-top:1px solid rgba(255,255,255,.05)"><button id="btn-live-main" onclick="_hdrFlash()" style="display:flex;align-items:center;justify-content:center;gap:6px;padding:.28rem 1.6rem;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:20px;color:rgba(255,255,255,.75);font-size:13px;font-weight:600;letter-spacing:.04em"><span style="font-size:15px;line-height:1">⚡</span><span>Live</span></button></div>
   </header>
   <div id="scr">
 
@@ -777,6 +778,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
           </select>
         </div>
       </div>
+      <div class="ss"><div class="ss-title">Audio Player</div><div class="sr"><span class="sr-lbl">Skip distance (seconds)</span><input type="number" id="s-audio-skip" class="si" min="1" max="120" style="width:60px;text-align:center" onchange="localStorage.setItem('omni_audio_skip',this.value);showToast('Skip: '+this.value+'s')"></div></div>
     </div>
   </div>
 </div>
@@ -1026,6 +1028,7 @@ async function saveSetting(k,v){
   try{await supaFrom('omni_settings').upsert({key:k,value:JSON.stringify(v),updated_at:new Date().toISOString()},{onConflict:'key'});}catch(e){console.warn('saveSetting remote fail',k,e);}
 }
 function _refreshSUI(){
+  const _ski=document.getElementById('s-audio-skip');if(_ski)_ski.value=localStorage.getItem('omni_audio_skip')||'5';
   const b=el('s-bday');if(b)b.value=S.birthday||'';
   const ot=el('s-outfit-time');if(ot)ot.value=S.outfitTime||'07:40';
   const ld=el('s-lock-days');if(ld)ld.value=S.lockDays||0;
@@ -1338,6 +1341,7 @@ function getTasksFor(dayOffset){
     res.push({id:t.id,text:t.text,tier,urg,done:isDone(dk),src:'omni',dk,_t:t});
   }
 
+  if(dayOffset===0&&typeof _todayType==='function'){const gymType=_todayType();const gymDone=typeof _hasSessToday==='function'&&_hasSessToday();if(gymType){res.push({id:'__gym__',text:gymType+' Session',tier:1,urg:false,done:gymDone,src:'gym',dk:'omni_gym_day_'+dateStr,_t:{scope:'day'},gymDone});}}
   res.sort((a,b)=>a.tier!==b.tier?a.tier-b.tier:a.urg&&!b.urg?-1:!a.urg&&b.urg?1:0);
   return res;
 }
@@ -1566,73 +1570,12 @@ function renderDay(){
   let th=`<div style="display:flex;align-items:center;justify-content:space-between;padding:.55rem .6rem .15rem;margin-top:.2rem"><div class="sec-lbl" style="padding:0">Tasks (${pending} pending)</div><div style="display:flex;gap:8px;align-items:center"><button onclick="toggleTasksCol()" style="font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:2px 8px">${anyExpanded?'Collapse ↑':'Expand ↓'}</button><button onclick="openAddTask()" style="font-size:11px;color:var(--acc);font-weight:700;background:none;border:none">+ New</button></div></div>`;
   if(true){
     if(unsched.length){
-      // Group by category for work tasks
-      const catMap={};WCATS.forEach(c=>{catMap[c.id]=c;});
+      const catMap2={};WCATS.forEach(c=>{catMap2[c.id]=c;});
       const workByCat={};const workUncat=[];const personal=[];
-      unsched.forEach(t=>{
-        if(t.src==='work'){if(t._t?.cat&&catMap[t._t.cat]){if(!workByCat[t._t.cat])workByCat[t._t.cat]=[];workByCat[t._t.cat].push(t);}else workUncat.push(t);}
-        else personal.push(t);
-      });
-      // Render work tasks grouped by category — collapsible headers
-      const catOrder=[...WCATS.map(c=>c.id)];
-      catOrder.forEach(cid=>{
-        const cts=workByCat[cid];if(!cts?.length)return;
-        const cat=catMap[cid];
-        const catDone=cts.filter(t=>t.done).length;const catTotal=cts.length;const allCatDone=catDone===catTotal;
-        const catColKey='omni_cat_col_'+cid;const catCol2=localStorage.getItem(catColKey)==='1';
-        th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid ${cat.color}44">
-          <div style="padding:.3rem .7rem;background:${allCatDone?cat.color+'22':cat.color+'12'};border-bottom:${catCol2?'none':'1px solid '+cat.color+'22'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('${cid}')">
-            <span style="width:8px;height:8px;border-radius:50%;background:${cat.color};flex-shrink:0"></span>
-            <span style="font-size:10px;font-weight:700;color:${cat.color};flex:1;text-transform:uppercase;letter-spacing:.06em">${cat.name}</span>
-            <span style="font-size:10px;color:${allCatDone?'var(--ok)':'var(--tx4)'}">${allCatDone?'✓ All done':''+catDone+'/'+catTotal}</span>
-            <span style="font-size:9px;color:var(--tx4);margin-left:3px">${catCol2?'▶':'▼'}</span>
-          </div>`;
-        if(!catCol2){
-          cts.forEach(t=>{
-            const u=t.tier===2&&t.urg;const ttime=t._t?.taskTime;
-            th+=`<div class="task-row t${t.tier}${u?' urg':''}"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}${ttime?` <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">📌 ${ttime}</span>`:''}</div><div class="task-meta">${u?'⚠ Last day':t.tier===1?'Today':t.tier===2?'This week':'Ongoing'}</div></div></div>`;
-          });
-        }
-        th+=`</div>`;
-      });
-      // Uncategorised work tasks — collapsible
-      if(workUncat.length){
-        const ucDone=workUncat.filter(t=>t.done).length;const ucTotal=workUncat.length;const ucAllDone=ucDone===ucTotal;
-        const ucKey='omni_cat_col_other';const ucCol=localStorage.getItem(ucKey)==='1';
-        th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid var(--bd)">
-          <div style="padding:.3rem .7rem;background:${ucAllDone?'var(--bg3)':'var(--bg2)'};border-bottom:${ucCol?'none':'1px solid var(--bd)'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('other')">
-            <span style="width:8px;height:8px;border-radius:50%;background:var(--tx4);flex-shrink:0"></span>
-            <span style="font-size:10px;font-weight:700;color:var(--tx3);flex:1;text-transform:uppercase;letter-spacing:.06em">Other</span>
-            <span style="font-size:10px;color:${ucAllDone?'var(--ok)':'var(--tx4)'}">${ucAllDone?'✓ All done':''+ucDone+'/'+ucTotal}</span>
-            <span style="font-size:9px;color:var(--tx4);margin-left:3px">${ucCol?'▶':'▼'}</span>
-          </div>`;
-        if(!ucCol){
-          workUncat.forEach(t=>{
-            const u=t.tier===2&&t.urg;const m=t.tier===1?'Today':t.tier===2?(u?'⚠ Last day':'Window'):'Ongoing';const ttime=t._t?.taskTime;
-            th+=`<div class="task-row t${t.tier}${u?' urg':''} src-work"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}${ttime?` <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">📌 ${ttime}</span>`:''}</div><div class="task-meta">Work · ${m}</div></div></div>`;
-          });
-        }
-        th+=`</div>`;
-      }
-      // Personal tasks — collapsible
-      if(personal.length){
-        const pDone=personal.filter(t=>t.done).length;const pTotal=personal.length;const pAllDone=pDone===pTotal;
-        const pKey='omni_cat_col_personal';const pCol=localStorage.getItem(pKey)==='1';
-        th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid #b8582844">
-          <div style="padding:.3rem .7rem;background:${pAllDone?'rgba(184,88,40,.15)':'rgba(184,88,40,.07)'};border-bottom:${pCol?'none':'1px solid rgba(184,88,40,.15)'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('personal')">
-            <span style="width:8px;height:8px;border-radius:50%;background:var(--acc);flex-shrink:0"></span>
-            <span style="font-size:10px;font-weight:700;color:var(--acc);flex:1;text-transform:uppercase;letter-spacing:.06em">Personal</span>
-            <span style="font-size:10px;color:${pAllDone?'var(--ok)':'var(--tx4)'}">${pAllDone?'✓ All done':''+pDone+'/'+pTotal}</span>
-            <span style="font-size:9px;color:var(--tx4);margin-left:3px">${pCol?'▶':'▼'}</span>
-          </div>`;
-        if(!pCol){
-          personal.forEach(t=>{
-            const u=t.tier===2&&t.urg;const m=t.tier===1?'Today':t.tier===2?(u?'⚠ Last day':'Window'):'Sticky';const ttime2=t._t?.taskTime;
-            th+=`<div class="task-row t${t.tier}${u?' urg':''}"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}${ttime2?` <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">📌 ${ttime2}</span>`:''}</div><div class="task-meta">${m}</div></div><div style="display:flex;gap:3px"><button onclick="openEditTask('${t.id}')" style="font-size:12px;color:var(--tx4);background:none;border:none;padding:0 2px">✎</button></div></div>`;
-          });
-        }
-        th+=`</div>`;
-      }
+      unsched.forEach(t=>{if(t.src==='gym'||t.src==='omni'){personal.push(t);}else if(t.src==='work'){const cid=t._t?.cat||t._t?.category||'';if(cid&&catMap2[cid]){if(!workByCat[cid])workByCat[cid]=[];workByCat[cid].push(t);}else workUncat.push(t);}});
+      if(personal.length){const pDone=personal.filter(t=>t.done).length;const pTotal=personal.length;const pAllDone=pDone===pTotal;const pKey='omni_cat_col_personal';const pCol=localStorage.getItem(pKey)==='1';th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid #b8582844"><div style="padding:.3rem .7rem;background:${pAllDone?'rgba(184,88,40,.15)':'rgba(184,88,40,.07)'};border-bottom:${pCol?'none':'1px solid rgba(184,88,40,.15)'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('personal')"><span style="width:8px;height:8px;border-radius:50%;background:var(--acc);flex-shrink:0"></span><span style="font-size:10px;font-weight:700;color:var(--acc);flex:1;text-transform:uppercase;letter-spacing:.06em">Personal</span><span style="font-size:10px;color:${pAllDone?'var(--ok)':'var(--tx4)'}">${pAllDone?'✓ All done':''+pDone+'/'+pTotal}</span><span style="font-size:9px;color:var(--tx4);margin-left:3px">${pCol?'▶':'▼'}</span></div>`;if(!pCol){personal.forEach(t=>{const isGym=t.src==='gym';const u=t.tier===2&&t.urg;const m=isGym?(t.gymDone?'Logged ✓':'Tap gym tab'):t.tier===1?'Today':t.tier===2?(u?'⚠ Last day':'Window'):'Sticky';const ttime2=t._t?.taskTime;const cbFn=isGym?"switchTab('gym')":"toggleDone('"+t.dk+"',this);setTimeout(renderDay,50)";const icon=t.done?'✓':isGym?'🏋️':'';const iconSize=isGym&&!t.done?15:11;const editBtn=isGym?'':'<button onclick="openEditTask(\'' +t.id+'\')" style="font-size:12px;color:var(--tx4);background:none;border:none;padding:0 2px">✎</button>';th+=`<div class="task-row t${t.tier}${u?' urg':''}"><div class="task-cb${t.done?' on':''}" onclick="${cbFn}">${(t.done||isGym)?'<span style="font-size:'+iconSize+'px">'+icon+'</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}"> ${t.text}${ttime2?' <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">📌 '+ttime2+'</span>':''}</div><div class="task-meta">${m}</div></div>${editBtn}</div>`;});}th+=`</div>`;}
+      WCATS.forEach(cat=>{const cts=workByCat[cat.id];if(!cts?.length)return;const catDone=cts.filter(t=>t.done).length;const catTotal=cts.length;const allCatDone=catDone===catTotal;const catColKey='omni_cat_col_'+cat.id;const catCol2=localStorage.getItem(catColKey)==='1';th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid ${cat.color}44"><div style="padding:.3rem .7rem;background:${allCatDone?cat.color+'22':cat.color+'12'};border-bottom:${catCol2?'none':'1px solid '+cat.color+'22'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('${cat.id}')"><span style="width:8px;height:8px;border-radius:50%;background:${cat.color};flex-shrink:0"></span><span style="font-size:10px;font-weight:700;color:${cat.color};flex:1;text-transform:uppercase;letter-spacing:.06em">${cat.name}</span><span style="font-size:10px;color:${allCatDone?'var(--ok)':'var(--tx4)'}">${allCatDone?'✓ All done':''+catDone+'/'+catTotal}</span><span style="font-size:9px;color:var(--tx4);margin-left:3px">${catCol2?'▶':'▼'}</span></div>`;if(!catCol2){cts.forEach(t=>{const u=t.tier===2&&t.urg;const ttime=t._t?.taskTime;th+=`<div class="task-row t${t.tier}${u?' urg':''}"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}${ttime?' <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">📌 '+ttime+'</span>':''}</div><div class="task-meta">${u?'⚠ Last day':t.tier===1?'Today':t.tier===2?'This week':'Ongoing'}</div></div></div>`;});}th+=`</div>`;});
+      if(workUncat.length){const ucDone=workUncat.filter(t=>t.done).length;const ucTotal=workUncat.length;const ucAllDone=ucDone===ucTotal;const ucKey='omni_cat_col_other';const ucCol=localStorage.getItem(ucKey)==='1';th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid var(--bd)"><div style="padding:.3rem .7rem;background:${ucAllDone?'var(--bg3)':'var(--bg2)'};border-bottom:${ucCol?'none':'1px solid var(--bd)'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('other')"><span style="width:8px;height:8px;border-radius:50%;background:var(--tx4);flex-shrink:0"></span><span style="font-size:10px;font-weight:700;color:var(--tx3);flex:1;text-transform:uppercase;letter-spacing:.06em">Other</span><span style="font-size:10px;color:${ucAllDone?'var(--ok)':'var(--tx4)'}">${ucAllDone?'✓ All done':''+ucDone+'/'+ucTotal}</span><span style="font-size:9px;color:var(--tx4);margin-left:3px">${ucCol?'▶':'▼'}</span></div>`;if(!ucCol){workUncat.forEach(t=>{const u=t.tier===2&&t.urg;const ttime=t._t?.taskTime;th+=`<div class="task-row t${t.tier}${u?' urg':''} src-work"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}${ttime?' <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">📌 '+ttime+'</span>':''}</div><div class="task-meta">Work · ${u?'⚠ Last day':t.tier===1?'Today':t.tier===2?'Window':'Ongoing'}</div></div></div>`;});}th+=`</div>`;}
     } else {
       th+=`<div style="padding:.35rem .6rem;font-size:12px;color:var(--tx4);font-style:italic">No unscheduled tasks.</div>`;
     }
@@ -2737,11 +2680,22 @@ function openSlotTaskPicker(time,dateStr){
   const others=allTasks.filter(t=>!(t._t?.taskTime===time));
   if(others.length){
     html+=`<div class="sec-lbl" style="padding:.2rem .8rem .05rem;font-size:9px">TAP TO ASSIGN</div>`;
-    others.forEach(t=>{
-      const isElsewhere=t._t?.taskTime&&t._t.taskTime!==time;
-      const srcLabel=t.src==='work'?'Work':'Personal';
-      const ttLabel=isElsewhere?` 📌${t._t.taskTime}`:'';
-      html+=`<div style="display:flex;align-items:center;gap:8px;padding:.38rem .8rem;border-bottom:.5px solid var(--bd);cursor:pointer" onclick="${t.src==='omni'?`assignTask('${t.id}','${time}','${dateStr}')`:`assignWorkTaskToSlot('${t.id}','${time}')`}"><span style="font-size:14px;color:var(--acc);flex-shrink:0">→</span><div style="flex:1"><div style="font-size:13px;color:var(--tx)">${t.text}${ttLabel}</div><div style="font-size:10px;color:var(--tx4)">${srcLabel}</div></div></div>`;
+    const pGrp=others.filter(t=>t.src==='omni'||t.src==='gym');
+    const wGrps=WCATS.map(c=>({id:c.id,name:c.name,color:c.color,tasks:others.filter(t=>t.src==='work'&&(t._t?.cat===c.id||t._t?.category===c.id))})).filter(g=>g.tasks.length);
+    const wOth=others.filter(t=>t.src==='work'&&!WCATS.some(c=>c.id===t._t?.cat||c.id===t._t?.category));
+    const grps=[{key:'pg',label:'Personal',color:'var(--acc)',tasks:pGrp},...wGrps.map(g=>({key:'wg_'+g.id,label:g.name,color:g.color,tasks:g.tasks})),...(wOth.length?[{key:'wo',label:'Other Work',color:'var(--tx4)',tasks:wOth}]:[])].filter(g=>g.tasks.length);
+    grps.forEach(g=>{
+      const ck='omni_pk_'+g.key;const col=localStorage.getItem(ck)==='1';
+      html+=`<div style="border-bottom:.5px solid var(--bd)"><div style="display:flex;align-items:center;gap:7px;padding:.32rem .8rem;cursor:pointer;background:var(--bg2)" onclick="var k='omni_pk_${g.key}';localStorage.setItem(k,localStorage.getItem(k)==='1'?'0':'1');openSlotTaskPicker('${time}','${dateStr}')"><span style="width:7px;height:7px;border-radius:50%;background:${g.color};flex-shrink:0"></span><span style="font-size:11px;font-weight:700;color:var(--tx2);flex:1">${g.label}</span><span style="font-size:10px;color:var(--tx4)">${g.tasks.length}</span><span style="font-size:10px;color:var(--tx4);margin-left:4px">${col?'▶':'▼'}</span></div>`;
+      if(!col){
+        g.tasks.forEach(t=>{
+          const isElsewhere=t._t?.taskTime&&t._t.taskTime!==time;
+          const ttLabel=isElsewhere?' 📌'+t._t.taskTime:'';
+          const fn=t.src==='omni'?"assignTask('"+t.id+"','"+time+"','"+dateStr+"')":"assignWorkTaskToSlot('"+t.id+"','"+time+"')";
+          html+=`<div style="display:flex;align-items:center;gap:8px;padding:.33rem .8rem .33rem 1.5rem;border-top:.5px solid var(--bd);cursor:pointer" onclick="${fn}"><span style="color:var(--acc)">→</span><span style="font-size:13px;color:var(--tx);flex:1">${t.text}${ttLabel}</span></div>`;
+        });
+      }
+      html+=`</div>`;
     });
   }
   if(!others.length&&!assigned.length){
