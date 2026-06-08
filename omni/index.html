@@ -400,6 +400,22 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
 .ab-spd.on{color:#d4c4a8;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.15)}
 .ab-link{font-size:10px;color:var(--acc3);background:none;border:none;padding:0;font-weight:600;flex-shrink:0}
 
+
+/* ── HABITS ── */
+.habit-section{margin:.35rem .6rem .1rem}
+.habit-sec-lbl{font-size:9px;font-weight:700;color:var(--tx4);text-transform:uppercase;letter-spacing:.1em;padding:.5rem .6rem .15rem;display:flex;align-items:center;justify-content:space-between}
+.habit-row{display:flex;align-items:center;gap:10px;padding:.42rem .7rem;background:var(--sur);border:1px solid var(--bd);border-radius:var(--r);margin-bottom:.22rem}
+.habit-row.done{background:var(--ok-bg);border-color:#c8e6c9}
+.habit-row.skipped{opacity:.45}
+.habit-icon{font-size:18px;flex-shrink:0;width:24px;text-align:center}
+.habit-body{flex:1;min-width:0}
+.habit-name{font-size:13px;font-weight:500;color:var(--tx)}
+.habit-sub{font-size:10px;color:var(--tx4);margin-top:1px}
+.habit-tick{width:24px;height:24px;border-radius:50%;border:2px solid var(--bd2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .12s}
+.habit-tick.on{background:var(--ok-bg);border-color:var(--ok)}
+.habit-tick:active{transform:scale(.88)}
+.guitar-cfg-sh{font-size:12px;color:var(--acc);background:none;border:none;padding:0;font-weight:600;flex-shrink:0}
+
 </style>
 </head>
 <body>
@@ -504,6 +520,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
           <button onclick="toggleNight()" id="night-btn" style="font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:3px 8px">🌙</button>
         </div>
         <div id="day-slots"></div>
+        <div id="day-habits"></div>
         <div id="day-tasks"></div>
         <div style="height:.5rem"></div>
       </div>
@@ -570,6 +587,34 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
     </div>
 
   </div><!-- /scr -->
+
+<!-- GUITAR CONFIG MODAL -->
+<div class="md-wrap" id="guitar-cfg-modal" style="position:fixed;inset:0;z-index:600;display:none;align-items:center;justify-content:center;padding:1rem;background:rgba(0,0,0,.45)">
+  <div class="md" style="background:var(--sur);border-radius:14px;width:100%;max-width:380px;padding:1.1rem;max-height:82vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.18)">
+    <div style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:.9rem">🎸 Guitar Practice</div>
+    <div class="inp" style="display:flex;flex-direction:column;gap:4px;margin-bottom:.65rem">
+      <label style="font-size:9px;font-weight:700;color:var(--tx4);text-transform:uppercase;letter-spacing:.08em">Sessions per week</label>
+      <input type="number" id="gtr-freq" min="1" max="7" value="3" style="padding:9px 10px;border:1px solid var(--bd2);border-radius:5px;background:var(--sur);color:var(--tx);font-size:14px">
+    </div>
+    <div class="inp" style="display:flex;flex-direction:column;gap:4px;margin-bottom:.65rem">
+      <label style="font-size:9px;font-weight:700;color:var(--tx4);text-transform:uppercase;letter-spacing:.08em">Preferred days</label>
+      <div id="gtr-days" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:2px"></div>
+    </div>
+    <div class="inp" style="display:flex;flex-direction:column;gap:4px;margin-bottom:.65rem">
+      <label style="font-size:9px;font-weight:700;color:var(--tx4);text-transform:uppercase;letter-spacing:.08em">Preferred time</label>
+      <input type="time" id="gtr-time" value="21:00" style="padding:9px 10px;border:1px solid var(--bd2);border-radius:5px;background:var(--sur);color:var(--tx);font-size:14px">
+    </div>
+    <div class="inp" style="display:flex;flex-direction:column;gap:4px;margin-bottom:.85rem">
+      <label style="font-size:9px;font-weight:700;color:var(--tx4);text-transform:uppercase;letter-spacing:.08em">Session duration (minutes)</label>
+      <input type="number" id="gtr-dur" min="5" max="120" value="20" style="padding:9px 10px;border:1px solid var(--bd2);border-radius:5px;background:var(--sur);color:var(--tx);font-size:14px">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="closeGuitarCfg()" style="flex:1;padding:10px;background:var(--sur);color:var(--tx2);border:1px solid var(--bd2);border-radius:8px;font-size:13px;font-weight:500">Cancel</button>
+      <button onclick="saveGuitarCfg()" style="flex:2;padding:11px;background:var(--acc);color:#fff;border-radius:8px;font-size:13px;font-weight:700;border:none">Save</button>
+    </div>
+  </div>
+</div>
+
 </div><!-- /app -->
 
 <!-- AUDIO PLAYER BAR -->
@@ -1486,6 +1531,13 @@ function renderDay(){
   // Scroll to current slot on today
   if(isToday&&curIdx>=0)requestAnimationFrame(()=>requestAnimationFrame(_scrollToNow));
 
+
+  // ── HABITS SECTION ───────────────────────────────────────────────────────────
+  if(isToday||_dayOff===0){
+    renderHabits(dateStr,dayName).catch(e=>console.warn('Habits',e));
+  } else {
+    const habEl=document.getElementById('day-habits');if(habEl)habEl.innerHTML='';
+  }
 
   // ── TASKS SECTION ──────────────────────────────────────────────────────────
   // Determine if ANY category is currently expanded
@@ -2708,6 +2760,238 @@ function assignWorkTaskToSlot(taskId,time){
 
 window.addEventListener('DOMContentLoaded',init);
 
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HABITS — Day view section
+// ══════════════════════════════════════════════════════════════════════════════
+let HAB_DATA={};   // loaded schedule_feed data for today
+let HAB_LOADED=false;
+
+// ── Tables used ───────────────────────────────────────────────────────────────
+// omni_schedule_feed  (LM writes film/course/book rows)
+// omni_habit_log      (we create: {date, type, meta})
+// Guitar config in omni_settings key 'guitar_cfg'
+
+// ── Load habits data for a given date ────────────────────────────────────────
+async function loadHabitsFor(dateStr){
+  HAB_DATA={gym:null,book:null,film:null,course:null};
+  if(!_ok)return;
+  try{
+    // Schedule feed for date (from Life Manager)
+    const{data:feed}=await supa.from('omni_schedule_feed')
+      .select('*').eq('date',dateStr);
+    if(feed){
+      feed.forEach(row=>{
+        if(row.type==='book'||row.type==='reading')HAB_DATA.book=row;
+        if(row.type==='film')HAB_DATA.film=row;
+        if(row.type==='course')HAB_DATA.course=row;
+      });
+    }
+    // Gym: check if session exists
+    const{data:gym}=await supa.from('omni_gym_sessions')
+      .select('id,session_type').eq('date',dateStr).limit(1);
+    if(gym?.length)HAB_DATA.gym=gym[0];
+  }catch(e){console.warn('Habits load',e);}
+}
+
+// ── Habit log helpers ─────────────────────────────────────────────────────────
+function _habKey(type,dateStr){return'omni_hab_'+type+'_'+dateStr;}
+function _habDone(type,dateStr){return localStorage.getItem(_habKey(type,dateStr))==='1';}
+function _habSetDone(type,dateStr,val){localStorage.setItem(_habKey(type,dateStr),val?'1':'0');}
+
+async function _logHabit(type,dateStr,meta={}){
+  if(!_ok)return;
+  try{
+    await supa.from('omni_habit_log').upsert(
+      {date:dateStr,type,meta:JSON.stringify(meta),logged_at:new Date().toISOString()},
+      {onConflict:'date,type'}
+    );
+  }catch(e){}
+}
+
+// ── Render habits ─────────────────────────────────────────────────────────────
+async function renderHabits(dateStr,dayName){
+  const el=document.getElementById('day-habits');
+  if(!el)return;
+  const gtrCfg=_getGuitarCfg();
+  const isGtrDay=gtrCfg.days.includes(dayName)||gtrCfg.days.length===0;
+
+  // Load data
+  await loadHabitsFor(dateStr);
+
+  let h=`<div class="habit-sec-lbl"><span>Today's Habits</span><span id="hab-edit-lnk"></span></div>`;
+
+  // ── GYM ───────────────────────────────────────────────────────────────────
+  const gymDone=!!HAB_DATA.gym;
+  h+=`<div class="habit-row${gymDone?' done':''}">
+    <span class="habit-icon">🏋️</span>
+    <div class="habit-body">
+      <div class="habit-name">Gym${gymDone?' — '+HAB_DATA.gym.session_type:''}</div>
+      <div class="habit-sub">${gymDone?'Session logged ✓':'No session today'}</div>
+    </div>
+    <div class="habit-tick${gymDone?' on':''}" style="pointer-events:none">${gymDone?'✓':''}</div>
+  </div>`;
+
+  // ── BOOK ──────────────────────────────────────────────────────────────────
+  const bookDone=_habDone('book',dateStr);
+  const bookData=HAB_DATA.book;
+  const bookTitle=bookData?.title||'Reading';
+  const bookMeta=bookData?.meta?JSON.parse(bookData.meta):{};
+  const pages=bookMeta.pages_planned||bookMeta.pages||null;
+  h+=`<div class="habit-row${bookDone?' done':''}" id="hab-book">
+    <span class="habit-icon">📖</span>
+    <div class="habit-body">
+      <div class="habit-name">${bookTitle}</div>
+      <div class="habit-sub">${pages?'Today: '+pages+' pages':'Daily reading'}${bookDone?' ✓':''}</div>
+    </div>
+    <div class="habit-tick${bookDone?' on':''}" onclick="_tickHabit('book','${dateStr}',${JSON.stringify(JSON.stringify(bookMeta))})">${bookDone?'✓':''}</div>
+  </div>`;
+
+  // ── FILM ──────────────────────────────────────────────────────────────────
+  const filmDone=_habDone('film',dateStr);
+  const filmData=HAB_DATA.film;
+  if(filmData){
+    const filmMeta=filmData.meta?JSON.parse(filmData.meta):{};
+    h+=`<div class="habit-row${filmDone?' done':''}" id="hab-film">
+      <span class="habit-icon">🎬</span>
+      <div class="habit-body">
+        <div class="habit-name">${filmData.title}</div>
+        <div class="habit-sub">${filmMeta.year||''} ${filmMeta.director?'· '+filmMeta.director:''}${filmDone?' — Watched ✓':''}</div>
+      </div>
+      <div class="habit-tick${filmDone?' on':''}" onclick="_tickHabit('film','${dateStr}',${JSON.stringify(JSON.stringify(filmMeta))})">${filmDone?'✓':''}</div>
+    </div>`;
+  }
+
+  // ── COURSE ────────────────────────────────────────────────────────────────
+  const courseDone=_habDone('course',dateStr);
+  const courseData=HAB_DATA.course;
+  if(courseData){
+    const courseMeta=courseData.meta?JSON.parse(courseData.meta):{};
+    h+=`<div class="habit-row${courseDone?' done':''}" id="hab-course">
+      <span class="habit-icon">🎓</span>
+      <div class="habit-body">
+        <div class="habit-name">${courseData.title}</div>
+        <div class="habit-sub">${courseMeta.episode||courseMeta.session?'Session '+(courseMeta.episode||courseMeta.session):'Daily session'}${courseDone?' ✓':''}</div>
+      </div>
+      <div class="habit-tick${courseDone?' on':''}" onclick="_tickHabit('course','${dateStr}',${JSON.stringify(JSON.stringify(courseMeta))})">${courseDone?'✓':''}</div>
+    </div>`;
+  }
+
+  // ── GUITAR ────────────────────────────────────────────────────────────────
+  if(isGtrDay&&gtrCfg.freq>0){
+    const gtrDone=_habDone('guitar',dateStr);
+    const timeStr=gtrCfg.time?` · ${gtrCfg.time}`:'';
+    const durStr=gtrCfg.dur?` · ${gtrCfg.dur}min`:'';
+    h+=`<div class="habit-row${gtrDone?' done':''}" id="hab-guitar">
+      <span class="habit-icon">🎸</span>
+      <div class="habit-body">
+        <div class="habit-name">Guitar Practice</div>
+        <div class="habit-sub">${gtrCfg.dur}min${timeStr}${gtrDone?' — Done ✓':''}</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        ${gtrDone?'':`<button onclick="openGuitarTimer()" style="font-size:10px;color:var(--acc);background:rgba(184,88,40,.08);border:1px solid rgba(184,88,40,.2);border-radius:3px;padding:2px 7px;font-weight:600">▶ Timer</button>`}
+        <div class="habit-tick${gtrDone?' on':''}" onclick="_tickHabit('guitar','${dateStr}',{})">${gtrDone?'✓':''}</div>
+      </div>
+    </div>`;
+  }
+
+  h+=`<div style="display:flex;justify-content:flex-end;padding:.15rem .6rem .3rem">
+    <button onclick="openGuitarCfg()" style="font-size:10px;color:var(--tx4);background:none;border:none;padding:0">⚙ Guitar config</button>
+  </div>`;
+
+  el.innerHTML=h;
+}
+
+async function _tickHabit(type,dateStr,metaJson){
+  const was=_habDone(type,dateStr);
+  _habSetDone(type,dateStr,!was);
+  if(!was)await _logHabit(type,dateStr,typeof metaJson==='string'?JSON.parse(metaJson):{});
+  // Re-render just habits section
+  const d=new Date();d.setDate(d.getDate()+_dayOff);
+  const dayName=DS[d.getDay()];
+  await renderHabits(dateStr,dayName);
+}
+
+// ── Guitar config ─────────────────────────────────────────────────────────────
+function _getGuitarCfg(){
+  try{return JSON.parse(localStorage.getItem('omni_guitar_cfg')||'{"freq":3,"days":[],"time":"21:00","dur":20}');}
+  catch(e){return{freq:3,days:[],time:'21:00',dur:20};}
+}
+function openGuitarCfg(){
+  const cfg=_getGuitarCfg();
+  document.getElementById('gtr-freq').value=cfg.freq||3;
+  document.getElementById('gtr-time').value=cfg.time||'21:00';
+  document.getElementById('gtr-dur').value=cfg.dur||20;
+  const daysDiv=document.getElementById('gtr-days');
+  const allDays=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  daysDiv.innerHTML=allDays.map(d=>`<button onclick="this.classList.toggle('on')" class="ab-btn${cfg.days.includes(d)?' on':''}" data-d="${d}" style="padding:4px 10px;font-size:11px">${d}</button>`).join('');
+  document.getElementById('guitar-cfg-modal').style.display='flex';
+}
+function closeGuitarCfg(){document.getElementById('guitar-cfg-modal').style.display='none';}
+function saveGuitarCfg(){
+  const freq=+document.getElementById('gtr-freq').value||3;
+  const time=document.getElementById('gtr-time').value||'21:00';
+  const dur=+document.getElementById('gtr-dur').value||20;
+  const days=[...document.querySelectorAll('#gtr-days .on')].map(b=>b.dataset.d);
+  const cfg={freq,days,time,dur};
+  localStorage.setItem('omni_guitar_cfg',JSON.stringify(cfg));
+  closeGuitarCfg();
+  showToast('Guitar config saved ✓');
+  renderDay();
+}
+
+// ── Guitar timer in live view ─────────────────────────────────────────────────
+let _gtrTimerMs=0,_gtrTimerEnd=0,_gtrTimerInt=null;
+function openGuitarTimer(){
+  const cfg=_getGuitarCfg();
+  const durMs=(cfg.dur||20)*60*1000;
+  _gtrTimerEnd=Date.now()+durMs;
+  _gtrTimerMs=durMs;
+  // Show a simple overlay timer
+  _showGtrTimerOverlay(cfg.dur||20);
+}
+function _showGtrTimerOverlay(totalMin){
+  let ov=document.getElementById('gtr-timer-ov');
+  if(!ov){
+    ov=document.createElement('div');
+    ov.id='gtr-timer-ov';
+    ov.style.cssText='position:fixed;inset:0;z-index:8000;background:rgba(10,5,0,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px';
+    document.body.appendChild(ov);
+  }
+  _gtrTimerInt=setInterval(_gtrTick,500);
+  _gtrTick();
+}
+function _gtrTick(){
+  const rem=Math.max(0,_gtrTimerEnd-Date.now());
+  const m=Math.floor(rem/60000),s=Math.floor((rem%60000)/1000);
+  const ov=document.getElementById('gtr-timer-ov');if(!ov)return;
+  const pct=Math.min(100,(1-(rem/_gtrTimerMs))*100);
+  ov.innerHTML=`
+    <div style="font-size:11px;font-weight:700;color:#6a5a48;letter-spacing:.2em;text-transform:uppercase">🎸 Guitar Practice</div>
+    <div style="font-size:72px;font-weight:200;color:#fff;font-family:var(--mono);letter-spacing:.04em">${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}</div>
+    <div style="width:220px;height:3px;background:rgba(255,255,255,.12);border-radius:2px">
+      <div style="height:100%;width:${pct}%;background:var(--acc3);border-radius:2px;transition:width .5s"></div>
+    </div>
+    <div style="display:flex;gap:12px;margin-top:8px">
+      <button onclick="_gtrFinish(true)" style="padding:10px 24px;background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok);border-radius:8px;font-size:13px;font-weight:700">✓ Done</button>
+      <button onclick="_gtrFinish(false)" style="padding:10px 24px;background:var(--bg3);color:var(--tx3);border:1px solid var(--bd);border-radius:8px;font-size:13px">Cancel</button>
+    </div>
+  `;
+  if(rem===0){clearInterval(_gtrTimerInt);beepSetDone&&beepSetDone();}
+}
+async function _gtrFinish(done){
+  clearInterval(_gtrTimerInt);
+  const ov=document.getElementById('gtr-timer-ov');if(ov)ov.remove();
+  if(done){
+    const d=new Date();d.setDate(d.getDate()+_dayOff);
+    const dateStr=d.toISOString().split('T')[0];
+    _habSetDone('guitar',dateStr,true);
+    await _logHabit('guitar',dateStr,{dur_min:_getGuitarCfg().dur});
+    renderDay();
+    showToast('Guitar session logged ✓');
+  }
+}
+
 // ── PULL TO REFRESH ───────────────────────────────────────────────────────────
 function _initPTR(){
   const scr=document.getElementById('scr');
@@ -2873,6 +3157,11 @@ function abSetSpeed(s){
   _abSpeed=s;
   if(_abAudio)_abAudio.playbackRate=s;
   document.querySelectorAll('.ab-spd').forEach(b=>b.classList.toggle('on',+b.dataset.s===s));
+}
+function abSeekLive(e,barEl){
+  if(!_abAudio||!_abAudio.duration)return;
+  const pct=(e.clientX-barEl.getBoundingClientRect().left)/barEl.offsetWidth;
+  _abAudio.currentTime=Math.max(0,Math.min(_abAudio.duration,pct*_abAudio.duration));
 }
 function abSeek(e){
   if(!_abAudio||!_abAudio.duration)return;
@@ -3047,6 +3336,7 @@ function addLiveNote(idx,ds){const bs=getNotes(idx,ds);bs.push({text:'',depth:0}
 // ═══════════════════════════════════════════════════
 let _gymLiveOpen=false,_gymLiveSessType='',_gymLiveDurMins=90,_gymLiveStartMs=0;
 let _gymLiveExs=[],_gymLiveRestType=null,_gymLiveRestEndMs=0,_gymLiveRestBeepDone=false,_gymLiveInterval=null;
+let _gymLiveExpandedEx=-1; // -1 = auto (first incomplete)
 const GYM_SET_REST_MS=45000,GYM_EX_REST_MS=90000;
 
 function openGymLivePicker(type){
@@ -3059,7 +3349,7 @@ function openGymLivePicker(type){
 function openGymLive(type){
   _gymLiveSessType=type;const exs=_exForType(type);
   _gymLiveExs=exs.map(ex=>({id:ex.id,name:ex.name,type,sets:REPSCHEME.map((r,i)=>({num:i+1,reps:r,weight:_lastW(ex.id)||'',done:false}))}));
-  _gymLiveRestType=null;_gymLiveRestEndMs=0;_gymLiveRestBeepDone=false;_gymLiveStartMs=Date.now();
+  _gymLiveRestType=null;_gymLiveRestEndMs=0;_gymLiveRestBeepDone=false;_gymLiveStartMs=Date.now();_gymLiveExpandedEx=-1;
   _gymLiveOpen=true;el('live-overlay').classList.add('on');el('btn-live').classList.add('active');
   _gymLiveRender();if(_gymLiveInterval)clearInterval(_gymLiveInterval);_gymLiveInterval=setInterval(_gymLiveTick,500);
 }
@@ -3067,6 +3357,10 @@ function closeGymLive(){
   _gymLiveOpen=false;el('live-overlay').classList.remove('on');el('btn-live').classList.remove('active');
   if(_gymLiveInterval){clearInterval(_gymLiveInterval);_gymLiveInterval=null;}
   if(_liveFrozen)toggleFreeze();if(_liveWake){try{_liveWake.release();}catch(e){}_liveWake=null;}
+}
+function glToggleEx(ei){
+  _gymLiveExpandedEx=(_gymLiveExpandedEx===ei)?-1:ei;
+  _gymLiveRender();
 }
 function _gymLiveRender(){
   const elapsed=(Date.now()-_gymLiveStartMs)/60000;const rem=_gymLiveDurMins-elapsed;
@@ -3080,23 +3374,25 @@ function _gymLiveRender(){
   const pf=el('live-prog-fill');if(pf){pf.style.width=pct+'%';pf.className='live-prog-fill '+(pct<50?'ahead':pct<90?'':'behind');}
   const now=new Date();const nt=el('live-now-t');if(nt)nt.textContent=_p(now.getHours())+':'+_p(now.getMinutes())+':'+_p(now.getSeconds());
   const endT=new Date(_gymLiveStartMs+_gymLiveDurMins*60000);const ne=el('live-now-end');if(ne)ne.textContent='→ '+_p(endT.getHours())+':'+_p(endT.getMinutes());
-  const activeExIdx=_gymLiveExs.findIndex(ex=>ex.sets.some(s=>!s.done));
+  const firstIncompleteIdx=_gymLiveExs.findIndex(ex=>ex.sets.some(s=>!s.done));
+  const expandedIdx=_gymLiveExpandedEx>=0?_gymLiveExpandedEx:firstIncompleteIdx;
   let body=`<div class="gl-sess-info"><span class="gl-sess-type">${_gymLiveSessType}</span><span class="gl-sess-prog">${_gymLiveExs.filter(ex=>ex.sets.every(s=>s.done)).length}/${_gymLiveExs.length} exercises</span></div>`;
   _gymLiveExs.forEach((ex,ei)=>{
-    const allDone=ex.sets.every(s=>s.done);const isActive=ei===activeExIdx;
-    body+=`<div class="gl-ex-block${isActive?' active':''}${allDone?' done-ex':''}" id="glex-${ei}"><div class="gl-ex-hdr">${gymIcon(ex.name)}<div class="gl-ex-name${allDone?' done-name':''}">${ex.name}</div>${allDone?'<span style="color:var(--ok);font-size:14px">✓</span>':''}</div>`;
-    if(isActive||allDone){ex.sets.forEach((set,si)=>{body+=`<div class="gl-set-row"><div class="gl-set-dot${set.done?' done':''}" onclick="glTickSet(${ei},${si})">${set.done?'✓':set.num}</div><span class="gl-set-reps">${set.reps} rep</span><input type="number" class="gl-set-w" value="${set.weight}" placeholder="0" step="0.5" onchange="glSetW(${ei},${si},this.value)" onclick="this.select()"><span class="gl-set-unit">${unit()}</span></div>`;});}
-    else{body+=`<div style="padding:.28rem .8rem;font-size:11px;color:#333">${ex.sets.length} sets</div>`;}
-    if(isActive&&_gymLiveRestType){const restLeft=Math.max(0,(_gymLiveRestEndMs-Date.now())/1000);const total=_gymLiveRestType==='set'?GYM_SET_REST_MS/1000:GYM_EX_REST_MS/1000;const pct2=Math.max(0,Math.min(100,(1-restLeft/total)*100));const done2=restLeft<=0;const cls=done2?'done-rest':_gymLiveRestType==='set'?'set-rest':'ex-rest';const fillCls=done2?'':_gymLiveRestType==='set'?'set-fill':'ex-fill';const m2=Math.floor(restLeft/60),s2=Math.round(restLeft%60);const tStr=done2?'Go!':`${m2>0?m2+'m ':''}${String(s2).padStart(2,'0')}s`;body+=`<div class="gl-rest"><span class="gl-rest-lbl">${_gymLiveRestType==='set'?'Set rest':'Exercise rest'}</span><span class="gl-rest-val ${cls}" id="gl-rest-val">${tStr}</span><div class="gl-rest-bg"><div class="gl-rest-fill ${fillCls}" id="gl-rest-fill" style="width:${pct2}%"></div></div><button class="gl-rest-skip" onclick="glSkipRest()">Skip ›</button></div>`;}
+    const allDone=ex.sets.every(s=>s.done);const isActive=ei===firstIncompleteIdx&&!allDone;const isExpanded=ei===expandedIdx;
+    body+=`<div class="gl-ex-block${isActive?" active":""}${allDone?" done-ex":""}" id="glex-${ei}"><div class="gl-ex-hdr" onclick="glToggleEx(${ei})" style="cursor:pointer">${gymIcon(ex.name)}<div class="gl-ex-name${allDone?" done-name":""}">${ex.name}</div>${allDone?"<span style=\"color:var(--ok);font-size:14px\">✓</span>":""}<span style="color:#444;font-size:11px;margin-left:auto;flex-shrink:0">${isExpanded?"▲":"▼"}</span></div>`;
+    if(isExpanded){ex.sets.forEach((set,si)=>{body+=`<div class="gl-set-row"><div class="gl-set-dot${set.done?" done":""}" onclick="glTickSet(${ei},${si})">${set.done?"✓":set.num}</div><span class="gl-set-reps">${set.reps} rep</span><input type="number" class="gl-set-w" value="${set.weight}" placeholder="0" step="0.5" onchange="glSetW(${ei},${si},this.value)" onclick="this.select()"><span class="gl-set-unit">${unit()}</span></div>`;});}
+    else{body+=`<div style="padding:.28rem .8rem;font-size:11px;color:#444">${ex.sets.length} sets · ${ex.sets.filter(s=>s.done).length} done</div>`;}
+    if(isExpanded&&_gymLiveRestType){const restLeft=Math.max(0,(_gymLiveRestEndMs-Date.now())/1000);const total=_gymLiveRestType==="set"?GYM_SET_REST_MS/1000:GYM_EX_REST_MS/1000;const pct2=Math.max(0,Math.min(100,(1-restLeft/total)*100));const done2=restLeft<=0;const cls=done2?"done-rest":_gymLiveRestType==="set"?"set-rest":"ex-rest";const fillCls=done2?"":_gymLiveRestType==="set"?"set-fill":"ex-fill";const m2=Math.floor(restLeft/60),s2=Math.round(restLeft%60);const tStr=done2?"Go!":`${m2>0?m2+"m ":""}${String(s2).padStart(2,"0")}s`;body+=`<div class="gl-rest"><span class="gl-rest-lbl">${_gymLiveRestType==="set"?"Set rest":"Exercise rest"}</span><span class="gl-rest-val ${cls}" id="gl-rest-val">${tStr}</span><div class="gl-rest-bg"><div class="gl-rest-fill ${fillCls}" id="gl-rest-fill" style="width:${pct2}%"></div></div><button class="gl-rest-skip" onclick="glSkipRest()">Skip ›</button></div>`;}
     body+=`</div>`;
   });
-  if(activeExIdx===-1){body+=`<div style="margin:.5rem .8rem;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:10px;padding:1.25rem;text-align:center"><div style="font-size:28px;margin-bottom:8px">💪</div><div style="font-size:15px;font-weight:700;color:#e0e0e0;margin-bottom:4px">Session complete!</div><div style="font-size:12px;color:#555;margin-bottom:1rem">${_gymLiveExs.length} exercises · ${Math.round(elapsed)} min</div><button onclick="glSaveAndClose()" style="padding:10px 24px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:var(--font)">Save & Exit</button></div>`;}
+  const abPlaying=typeof _abAudio!=="undefined"&&_abAudio&&!_abAudio.paused;
+  const abTrackName=typeof _abFiles!=="undefined"&&_abFiles.length?(_abFiles[_abIdx]?.name||"").replace(/\.[^.]+$/,""):"No audio loaded";
+  const abDur=typeof _abAudio!=="undefined"&&_abAudio?.duration||0;const abPos=typeof _abAudio!=="undefined"&&_abAudio?.currentTime||0;
+  const abPct=abDur>0?((abPos/abDur)*100).toFixed(1):0;
+  const abSpd=typeof _abSpeed!=="undefined"?_abSpeed:1;
+  body+=`<div style="margin:.5rem .8rem;background:#0d0b08;border:1px solid #1e1a14;border-radius:10px;padding:.65rem .85rem"><div style="display:flex;align-items:center;gap:7px;margin-bottom:.32rem"><span style="font-size:13px">🎧</span><span style="flex:1;font-size:10px;color:#6a5a48;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${abTrackName}</span><button onclick="abLinkFolder()" style="font-size:9px;color:var(--acc3);background:none;border:none;padding:0;font-weight:600">Folder</button></div><div style="height:2px;background:rgba(255,255,255,.08);border-radius:1px;margin-bottom:.38rem;cursor:pointer;position:relative" onclick="abSeekLive(event,this)"><div style="height:100%;width:${abPct}%;background:var(--acc3);border-radius:1px"></div></div><div style="display:flex;align-items:center;gap:5px"><button onclick="abSkipBack()" style="padding:2px 7px;font-size:10px;font-weight:600;background:rgba(255,255,255,.06);color:#a08060;border-radius:3px;border:1px solid rgba(255,255,255,.08)">−30</button><button onclick="abTogglePlay();_gymLiveRender()" style="padding:2px 10px;font-size:11px;font-weight:700;background:${abPlaying?"var(--acc)":"rgba(255,255,255,.08)"};color:${abPlaying?"#fff":"#a08060"};border-radius:3px;border:1px solid rgba(255,255,255,.12)">${abPlaying?"⏸":"▶"}</button><button onclick="abSkipFwd()" style="padding:2px 7px;font-size:10px;font-weight:600;background:rgba(255,255,255,.06);color:#a08060;border-radius:3px;border:1px solid rgba(255,255,255,.08)">+30</button><button onclick="abPrev()" style="padding:2px 7px;font-size:10px;background:rgba(255,255,255,.04);color:#555;border-radius:3px;border:1px solid rgba(255,255,255,.06)">⏮</button><button onclick="abNext()" style="padding:2px 7px;font-size:10px;background:rgba(255,255,255,.04);color:#555;border-radius:3px;border:1px solid rgba(255,255,255,.06)">⏭</button><span style="flex:1"></span>${[1,1.2,1.5,2].map(s=>`<button onclick="abSetSpeed(${s});_gymLiveRender()" style="font-size:9px;padding:2px 5px;background:${abSpd===s?"rgba(255,255,255,.14)":"rgba(255,255,255,.04)"};color:${abSpd===s?"#d4c4a8":"#555"};border-radius:2px;border:1px solid rgba(255,255,255,.07)">${s}×</button>`).join("")}</div></div>`;
+  if(firstIncompleteIdx===-1){body+=`<div style="margin:.5rem .8rem;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:10px;padding:1.25rem;text-align:center"><div style="font-size:28px;margin-bottom:8px">💪</div><div style="font-size:15px;font-weight:700;color:#e0e0e0;margin-bottom:4px">Session complete!</div><div style="font-size:12px;color:#555;margin-bottom:1rem">${_gymLiveExs.length} exercises · ${Math.round(elapsed)} min</div><button onclick="glSaveAndClose()" style="padding:10px 24px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:var(--font)">Save & Exit</button></div>`;}
   else{body+=`<div style="margin:.5rem .8rem"><div style="display:flex;gap:8px"><button onclick="glSaveAndClose()" style="flex:1;padding:9px;background:#1a1a1a;color:#666;border:1px solid #2a2a2a;border-radius:8px;font-size:12px;font-family:var(--font)">Save & Exit</button><button onclick="closeGymLive()" style="flex:1;padding:9px;background:transparent;color:#444;border:1px solid #1a1a1a;border-radius:8px;font-size:12px;font-family:var(--font)">Exit without saving</button></div></div>`;}
-  el('live-body').innerHTML=body;
-}
-function _gymLiveTick(){
-  if(!_gymLiveOpen)return;
-  const elapsed=(Date.now()-_gymLiveStartMs)/60000;const rem=_gymLiveDurMins-elapsed;
   const{str,ot}=_fmtCd(rem);
   const cdEl=el('live-cd-val');if(cdEl){cdEl.textContent=str;cdEl.className='live-cd-val'+(ot?' ot':'');}
   const lbl=el('live-cd-lbl');if(lbl)lbl.textContent=ot?'Overtime':'Remaining';
