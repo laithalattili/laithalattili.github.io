@@ -451,7 +451,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
         <div class="hdr-date" id="hdr-date">–</div>
       </div>
       <div class="hdr-r">
-        <button class="hbtn hbtn-live" id="btn-live" onclick="openLive()" title="Live mode">⚡</button><button class="hbtn" id="btn-star" onclick="setDefault()" title="Set default">⭐</button>
+        <button class="hbtn hbtn-live" id="btn-live" onclick="_hdrFlash()" title="Live mode / Audio">⚡</button><button class="hbtn" id="btn-star" onclick="setDefault()" title="Set default">⭐</button>
         <button class="hbtn" id="btn-wake" onclick="toggleWake()" title="Screen on">☀️</button>
         <button class="hbtn" onclick="lockApp()" title="Lock">🔒</button>
         <button class="hbtn" onclick="openSettings()" title="Settings">⚙️</button>
@@ -3219,8 +3219,13 @@ function abRender(){
 // ── Open bar from header ⚡ button ────────────────────────────────────────────
 
 function _hdrFlash(){
-  // If gym tab active → gym live mode; otherwise → audio player
-  if(_curTab==='gym'){openLive();}else{openAudioPlayer();}
+  if(_curTab==='gym'){
+    const t=_todayType();
+    if(t)openGymLivePicker(t);
+    else showToast('No gym session scheduled today');
+  }else{
+    openAudioPlayer();
+  }
 }
 
 async function openAudioPlayer(){
