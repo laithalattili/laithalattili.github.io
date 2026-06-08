@@ -23148,7 +23148,7 @@ function _renderEditCatChips(selectedCat){
       const sel=[];
       list.innerHTML=TUTORS.map(t=>{
         const checked=sel.includes(t.name);
-        return`<label style="display:flex;align-items:center;gap:4px;font-size:11px;padding:2px 6px;border:1px solid #99f6e4;border-radius:4px;cursor:pointer;background:${checked?'#ccfbf1':'#fff'}"><input type="checkbox" value="${t.name}" ${checked?'checked':''} onchange="_tmtgUpdateLabel()"> ${t.name}</label>`;
+        return`<label style="display:flex;align-items:center;gap:4px;font-size:11px;padding:2px 6px;border:1px solid #99f6e4;border-radius:4px;cursor:pointer;background:${checked?'#ccfbf1':'#fff'}"><input type="checkbox" value="${t.name}" ${checked?'checked':''} onchange="updateTutorMtgLabel()"> ${t.name}</label>`;
       }).join('');
     }
     setRecur('biweekly',document.getElementById('rb-biweekly'));
