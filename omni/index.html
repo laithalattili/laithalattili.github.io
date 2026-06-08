@@ -3365,17 +3365,31 @@ let _gymLiveExpandedEx=-1; // -1 = auto (first incomplete)
 const GYM_SET_REST_MS=45000,GYM_EX_REST_MS=90000;
 
 function openGymLivePicker(type){
-  // Check if today has a gym slot in timetable — use its duration
-  const now=new Date();const nowM=now.getHours()*60+now.getMinutes();const dayName=DS[now.getDay()];
+  const now=new Date();const dayName=DS[now.getDay()];
   let slotDurMins=null;
-  for(let i=0;i<WSLOTS.length;i++){
-    const c=WSLOTS[i]?.[dayName];
-    if(c&&(c.tp==='gym'||c.tp==='sports'||(c.l||'').toLowerCase().includes('gym'))){
-      const endT=WSLOTS[i+1]?.t;
-      if(endT){slotDurMins=t2m(endT)-t2m(WSLOTS[i].t);}
-      break;
+
+  // First: check if user pinned gym to a specific slot
+  const pinnedTime=localStorage.getItem('omni_gym_slot_time');
+  if(pinnedTime){
+    const pinnedIdx=WSLOTS.findIndex(s=>s.t===pinnedTime);
+    if(pinnedIdx>=0){
+      const endT=WSLOTS[pinnedIdx+1]?.t;
+      if(endT)slotDurMins=t2m(endT)-t2m(pinnedTime);
     }
   }
+
+  // Fallback: look for a gym-labelled slot in timetable
+  if(!slotDurMins){
+    for(let i=0;i<WSLOTS.length;i++){
+      const c=WSLOTS[i]?.[dayName];
+      if(c&&(c.tp==='gym'||c.tp==='sports'||(c.l||'').toLowerCase().includes('gym'))){
+        const endT=WSLOTS[i+1]?.t;
+        if(endT){slotDurMins=t2m(endT)-t2m(WSLOTS[i].t);}
+        break;
+      }
+    }
+  }
+
   if(slotDurMins&&slotDurMins>10){openGymLive(slotDurMins,type);return;}
   const t=parseInt(prompt('Session duration (minutes)','90'))||90;
   if(!t||t<5)return;
