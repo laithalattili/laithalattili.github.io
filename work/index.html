@@ -1705,12 +1705,30 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
 
 <!-- EDIT MODAL -->
 <div class="modal-overlay" id="edit-modal">
-  <div class="modal">
+  <div class="modal" style="max-width:420px">
     <div class="modal-title" id="edit-modal-title">Edit Slot</div>
     <div style="font-size:11px;color:#868e96;margin-bottom:.75rem" id="edit-modal-sub"></div>
+
+    <!-- STEP 1: Category (drives everything) -->
+    <div style="margin-bottom:.85rem">
+      <div style="font-size:11px;font-weight:600;color:#495057;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Category</div>
+      <div id="edit-cat-chips" style="display:flex;flex-wrap:wrap;gap:5px"></div>
+      <input type="hidden" id="edit-cat" value="">
+      <input type="hidden" id="edit-type" value="empty">
+    </div>
+
+    <!-- STEP 2: Label + suggestions -->
+    <div style="margin-bottom:.75rem">
+      <div style="font-size:11px;font-weight:600;color:#495057;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Label <span style="font-size:10px;color:#adb5bd;font-weight:400;text-transform:none">(optional for Empty)</span></div>
+      <input type="text" id="edit-label" placeholder="Type or pick a suggestion..." autocomplete="off" oninput="editLabelInput(this.value)" style="width:100%;font-size:13px;padding:7px 8px;border:1px solid #dee2e6;border-radius:6px;background:#fff;color:#212529">
+      <!-- Label suggestions (shown after category is picked) -->
+      <div id="edit-label-suggestions-row" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px"></div>
+    </div>
+
+    <!-- STEP 3: Time -->
     <div style="display:flex;gap:8px;margin-bottom:.75rem">
       <div style="flex:1">
-        <div style="font-size:12px;font-weight:500;color:#495057;margin-bottom:4px">Day</div>
+        <div style="font-size:11px;font-weight:600;color:#495057;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Day</div>
         <select id="edit-day-override" style="width:100%;font-size:12px;padding:7px 8px;border:1px solid #dee2e6;border-radius:6px;background:#fff;color:#212529">
           <option value="">Same day</option>
           <option value="Mon">Monday</option>
@@ -1721,67 +1739,32 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
         </select>
       </div>
       <div style="flex:1">
-        <div style="font-size:12px;font-weight:500;color:#495057;margin-bottom:4px">Start Time</div>
+        <div style="font-size:11px;font-weight:600;color:#495057;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Start</div>
         <input type="time" id="edit-time-override" style="width:100%;font-size:12px;padding:7px 8px;border:1px solid #dee2e6;border-radius:6px;background:#fff;color:#212529">
       </div>
       <div style="flex:1">
-        <div style="font-size:12px;font-weight:500;color:#495057;margin-bottom:4px">End Time</div>
-        <select id="edit-endtime-override" style="width:100%;font-size:12px;padding:7px 8px;border:1px solid #dee2e6;border-radius:6px;background:#fff;color:#212529">
-          <option value="">Single slot</option>
-        </select>
+        <div style="font-size:11px;font-weight:600;color:#495057;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">End</div>
+        <input type="time" id="edit-endtime-override" placeholder="slot end" style="width:100%;font-size:12px;padding:7px 8px;border:1px solid #dee2e6;border-radius:6px;background:#fff;color:#212529">
       </div>
     </div>
+
+    <!-- STEP 4: Recurrence -->
     <div style="margin-bottom:.75rem">
-      <div style="font-size:12px;font-weight:500;color:#495057;margin-bottom:6px">Quick Fill</div>
-      <div class="quick-slot-btns">
-        <button class="qsb free" onclick="quickSlot('Free','free')">Free</button>
-        <button class="qsb mtg" onclick="quickSlot('Parents Mtg','mtg')">Parents' Meeting</button>
-        <button class="qsb abs" onclick="quickSlot('ABS Support','abs')">ABS Support</button>
-        <button class="qsb zpl" onclick="quickSlot('ZPL Support','zpl')">ZPL Support</button>
-        <button class="qsb" style="background:#ccfbf1;border-color:#5eead4;color:#0f766e" onclick="openTutorMeetingPicker()">🤝 Tutor Meeting</button>
-      </div>
-      <!-- Tutor meeting picker (hidden until activated) -->
-      <div id="tutor-mtg-picker" style="display:none;background:#f0fdfa;border:1px solid #99f6e4;border-radius:var(--rsm);padding:.6rem .75rem;margin-bottom:.5rem">
-        <div style="font-size:11px;font-weight:600;color:#0f766e;margin-bottom:.4rem">Select tutor(s) for this meeting:</div>
-        <div id="tutor-mtg-list" style="display:flex;flex-wrap:wrap;gap:4px"></div>
-        <div style="font-size:10px;color:#5eead4;margin-top:.4rem">Tick all tutors meeting at this slot · label updates automatically</div>
-      </div>
-    </div>
-    <div class="input-row">
-      <label>Label</label>
-      <input type="text" id="edit-label" placeholder="e.g. 7A2, House Mtg, Free..." autocomplete="off" list="edit-label-suggestions" oninput="editLabelInput(this.value)">
-      <datalist id="edit-label-suggestions"></datalist>
-    </div>
-    <div class="input-row">
-      <label>Category <span style="font-size:10px;color:#adb5bd;font-weight:400">(drives Active Mode)</span></label>
-      <div id="edit-cat-chips" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:2px"></div>
-      <input type="hidden" id="edit-cat" value="">
-    </div>
-    <div class="input-row"><label>Colour</label>
-      <div class="color-swatches">
-        <div class="swatch" style="background:#dcfce7" data-tp="free" onclick="selectSwatch('free',this)" title="Free"></div>
-        <div class="swatch" style="background:#d97706" data-tp="go" onclick="selectSwatch('go',this)" title="Commitment"></div>
-        <div class="swatch" style="background:#7c3aed" data-tp="duty" onclick="selectSwatch('duty',this)" title="Duty"></div>
-        <div class="swatch" style="background:#1d4ed8" data-tp="lesson" onclick="selectSwatch('lesson',this)" title="Lesson"></div>
-        <div class="swatch" style="background:#5b21b6" data-tp="mtg" onclick="selectSwatch('mtg',this)" title="Meeting"></div>
-        <div class="swatch" style="background:#0e7490" data-tp="abs" onclick="selectSwatch('abs',this)" title="ABS Support"></div>
-        <div class="swatch" style="background:#0369a1" data-tp="zpl" onclick="selectSwatch('zpl',this)" title="ZPL Support"></div>
-        <div class="swatch" style="background:#be185d" data-tp="c1" onclick="selectSwatch('c1',this)" title="Custom Pink"></div>
-        <div class="swatch" style="background:#b45309" data-tp="c2" onclick="selectSwatch('c2',this)" title="Custom Brown"></div>
-        <div class="swatch" style="background:#065f46" data-tp="c3" onclick="selectSwatch('c3',this)" title="Custom Dark Green"></div>
-        <div class="swatch" style="background:#0d9488" data-tp="tmtg" onclick="selectSwatch('tmtg',this)" title="Tutor Meeting"></div>
-        <div class="swatch" style="background:#f1f3f5;border:1px solid #dee2e6" data-tp="personal" onclick="selectSwatch('personal',this)" title="Personal"></div>
-      </div>
-      <input type="hidden" id="edit-type" value="free">
-    </div>
-    <div class="input-row"><label>Recurrence</label>
+      <div style="font-size:11px;font-weight:600;color:#495057;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Recurrence</div>
       <div class="recur-toggle">
-        <button class="recur-btn active" id="rb-once" onclick="setRecur('once',this)">One-time</button>
+        <button class="recur-btn active" id="rb-once" onclick="setRecur('once',this)">Once</button>
         <button class="recur-btn" id="rb-weekly" onclick="setRecur('weekly',this)">Weekly</button>
         <button class="recur-btn" id="rb-biweekly" onclick="setRecur('biweekly',this)">Biweekly</button>
       </div>
       <input type="hidden" id="edit-recur" value="once">
     </div>
+
+    <!-- Tutor meeting picker (shown when tmtg selected) -->
+    <div id="tutor-mtg-picker" style="display:none;background:#f0fdfa;border:1px solid #99f6e4;border-radius:var(--rsm);padding:.6rem .75rem;margin-bottom:.5rem">
+      <div style="font-size:11px;font-weight:600;color:#0f766e;margin-bottom:.4rem">Select tutor(s):</div>
+      <div id="tutor-mtg-list" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+    </div>
+
     <div class="modal-btns">
       <button class="modal-btn cancel" onclick="closeEditModal()">Cancel</button>
       <button class="modal-btn reset-slot" onclick="resetSlot()">Reset</button>
@@ -23087,9 +23070,14 @@ function openEditModal(slotIdx,day){
   const tp=cur?cur.tp:'free';
   document.getElementById('edit-type').value=tp;
   document.querySelectorAll('.swatch').forEach(s=>{s.classList.remove('selected');if(s.dataset.tp===tp)s.classList.add('selected');});
-  // Category — use explicit cat if set, else derive from tp for existing entries
-  const cat=cur&&cur.cat?cur.cat:(cur?cur.tp:'free');
+  // Category — use explicit cat if set, map legacy to new, default to empty
+  let cat=cur&&cur.cat?cur.cat:(cur?cur.tp:'empty');
+  if(cat==='free'||cat==='sleep'||cat==='personal')cat='empty';
+  if(cat==='mtg')cat='go';
+  if(cat==='abs'||cat==='zpl')cat='support';
+  if(cat==='c1'||cat==='c2'||cat==='c3')cat='go';
   document.getElementById('edit-cat').value=cat;
+  document.getElementById('edit-type').value=cat;
   _renderEditCatChips(cat);
   // Label suggestions: class names first, then history
   _populateLabelSuggestions(label);
@@ -23117,17 +23105,43 @@ function openEditModal(slotIdx,day){
 function _renderEditCatChips(selectedCat){
   const el=document.getElementById('edit-cat-chips');if(!el)return;
   const defs=getCatDefs();
-  const order=['lesson','duty','mtg','tmtg','go','abs','zpl','free','personal','c1','c2','c3'];
+  // Only show built-in categories (not legacy aliases)
+  const builtIn=['lesson','duty','go','tmtg','support','empty'];
+  // Also show user-created categories from settings
+  const userCats=Object.keys(defs).filter(k=>!CAT_DEFAULTS[k]&&defs[k].label);
+  const order=[...builtIn,...userCats];
   el.innerHTML=order.map(k=>{
     const d=defs[k];if(!d)return'';
-    const sel=selectedCat===k;
-    return`<div class="edit-cat-chip${sel?' selected':''}" style="background:${d.color};color:${d.text}" onclick="selectEditCat('${k}')" title="${d.label}">${d.label}</div>`;
+    const sel=selectedCat===k||(selectedCat==='free'&&k==='empty')||(selectedCat==='sleep'&&k==='empty')||(selectedCat==='personal'&&k==='empty')||(selectedCat==='mtg'&&k==='go')||(selectedCat==='abs'&&k==='support')||(selectedCat==='zpl'&&k==='support');
+    return`<div class="edit-cat-chip${sel?' selected':''}" style="background:${d.color};color:${d.text};border:2px solid ${sel?d.text:'transparent'}" onclick="selectEditCat('${k}')">${d.label}</div>`;
   }).join('');
+  // Show label suggestions based on category
+  _renderLabelSuggestions(selectedCat);
+  // Show/hide tutor picker
+  const tp=document.getElementById('tutor-mtg-picker');
+  if(tp)tp.style.display=selectedCat==='tmtg'?'block':'none';
+  if(selectedCat==='tmtg')_populateTutorMtgList();
+}
+function _renderLabelSuggestions(cat){
+  const row=document.getElementById('edit-label-suggestions-row');if(!row)return;
+  // Get label history for this category
+  const hist=_getLabelHistory();
+  const catHist=(hist[cat]||[]).slice(0,6);
+  // Built-in suggestions per category
+  const builtInSugs={duty:['House Duty','Canteen Duty','Gym Duty','Sleep Duty','Free Time Duty','Night Duty'],go:['House Meeting','CPD','Training','AOR','Briefing'],support:['ABS Support','ZPL Support','1:1 Support'],lesson:[],tmtg:[],empty:['Free','Sleep','Break','Lunch','Dinner']};
+  const base=(builtInSugs[cat]||[]);
+  // Also add class names for lesson
+  const classSugs=cat==='lesson'?CLASSES.map(c=>c.id):[];
+  const all=[...new Set([...catHist,...classSugs,...base])];
+  row.innerHTML=all.slice(0,8).map(s=>`<button onclick="document.getElementById('edit-label').value='${s}';editLabelInput('${s}')" style="font-size:11px;padding:2px 8px;border:1px solid #dee2e6;border-radius:12px;background:#f8f9fa;color:#495057;cursor:pointer">${s}</button>`).join('');
 }
 
 function selectEditCat(cat){
   document.getElementById('edit-cat').value=cat;
+  document.getElementById('edit-type').value=cat;
   _renderEditCatChips(cat);
+  // Auto-clear label for empty category
+  if(cat==='empty'){const lbl=document.getElementById('edit-label');if(lbl&&!lbl.value)lbl.placeholder='e.g. Free, Sleep, Break...';}
 }
 
 function editLabelInput(val){
@@ -27894,19 +27908,22 @@ function _updateSatUI(){
 // ═══════════════════════════════════════════════════════════════
 
 const CAT_DEFAULTS={
-  lesson:  {label:'Lesson',        color:'#1d4ed8',text:'#fff', commit:true, mode:'lesson'},
-  duty:    {label:'Boarding Duty', color:'#7c3aed',text:'#fff', commit:true, mode:'simple'},
-  mtg:     {label:'Meeting',       color:'#5b21b6',text:'#fff', commit:true, mode:'simple'},
-  tmtg:    {label:'Tutor Meeting', color:'#0d9488',text:'#fff', commit:true, mode:'tutormtg'},
-  go:      {label:'Commitment',    color:'#d97706',text:'#fff', commit:true, mode:'simple'},
-  abs:     {label:'Cover/Absence', color:'#0e7490',text:'#fff', commit:true, mode:'simple'},
-  zpl:     {label:'Zero Period',   color:'#0369a1',text:'#fff', commit:true, mode:'simple'},
-  free:    {label:'Free',          color:'#dcfce7',text:'#166534',commit:false,mode:null},
-  personal:{label:'Personal',      color:'#f1f3f5',text:'#868e96',commit:false,mode:null},
-  c1:      {label:'Custom 1',      color:'#be185d',text:'#fff', commit:true, mode:'simple'},
-  c2:      {label:'Custom 2',      color:'#b45309',text:'#fff', commit:true, mode:'simple'},
-  c3:      {label:'Custom 3',      color:'#065f46',text:'#fff', commit:true, mode:'simple'},
-  sleep:   {label:'Sleep',         color:'#e9ecef',text:'#adb5bd',commit:false,mode:null},
+  lesson: {label:'Lesson',         color:'#1d4ed8',text:'#fff', commit:true,  mode:'lesson',   builtIn:true},
+  duty:   {label:'Boarding Duty',  color:'#7c3aed',text:'#fff', commit:true,  mode:'simple',   builtIn:true},
+  go:     {label:'Commitment',     color:'#d97706',text:'#fff', commit:true,  mode:'simple',   builtIn:true},
+  tmtg:   {label:'Tutor Meeting',  color:'#0d9488',text:'#fff', commit:true,  mode:'tutormtg', builtIn:true},
+  support:{label:'Lesson Support', color:'#0e7490',text:'#fff', commit:true,  mode:'simple',   builtIn:true},
+  empty:  {label:'Empty',          color:'#f1f3f5',text:'#868e96',commit:false,mode:null,      builtIn:true},
+  // Legacy aliases for backward compatibility
+  mtg:    {label:'Commitment',     color:'#d97706',text:'#fff', commit:true,  mode:'simple',   legacy:true},
+  abs:    {label:'Lesson Support', color:'#0e7490',text:'#fff', commit:true,  mode:'simple',   legacy:true},
+  zpl:    {label:'Lesson Support', color:'#0e7490',text:'#fff', commit:true,  mode:'simple',   legacy:true},
+  free:   {label:'Empty',          color:'#f1f3f5',text:'#868e96',commit:false,mode:null,      legacy:true},
+  personal:{label:'Empty',         color:'#f1f3f5',text:'#868e96',commit:false,mode:null,      legacy:true},
+  sleep:  {label:'Empty',          color:'#f1f3f5',text:'#868e96',commit:false,mode:null,      legacy:true},
+  c1:     {label:'Custom 1',       color:'#be185d',text:'#fff', commit:true,  mode:'simple',   legacy:true},
+  c2:     {label:'Custom 2',       color:'#b45309',text:'#fff', commit:true,  mode:'simple',   legacy:true},
+  c3:     {label:'Custom 3',       color:'#065f46',text:'#fff', commit:true,  mode:'simple',   legacy:true},
 };
 
 function getCatDefs(){
@@ -27914,8 +27931,16 @@ function getCatDefs(){
   const ov=S.categoryDefs||{};Object.keys(ov).forEach(k=>{if(base[k])Object.assign(base[k],ov[k]);});
   return base;
 }
-function getCat(tp){return getCatDefs()[tp]||{label:tp,color:'#555',text:'#fff',commit:false,mode:null};}
-function isCommitment(tp){return getCat(tp).commit;}
+function getCat(tp){
+  const defs=getCatDefs();
+  if(defs[tp])return defs[tp];
+  return{label:tp||'Empty',color:'#f1f3f5',text:'#868e96',commit:false,mode:null};
+}
+function isCommitment(tp){
+  if(!tp)return false;
+  if(['empty','free','sleep','personal'].includes(tp))return false;
+  return getCat(tp).commit;
+}
 
 function toggleCatCommitment(tp){
   if(!S.categoryDefs)S.categoryDefs={};
@@ -28298,9 +28323,14 @@ function amGetCtx(){
   const cell=getCustomForWeek(offset,ci,dayName)||SLOTS[ci][dayName];if(!cell)return null;
   let endIdx=ci;
   for(let i=ci+1;i<SLOTS.length;i++){const c=getCustomForWeek(offset,i,dayName)||SLOTS[i][dayName];if(c&&c.l===cell.l&&c.tp===cell.tp)endIdx=i;else break;}
-  const et=slotEndTime(endIdx),em=t2m(et),sm=t2m(getSlotTime(ci));
+  const et=slotEndTime(endIdx),sm=t2m(getSlotTime(ci));
+  // Use custom end time if set on this slot
+  const _cust=getCustomForWeek(offset,ci,dayName)||SLOTS[ci][dayName];
+  const _custEt=_cust&&_cust.customEndTime?_cust.customEndTime:null;
+  const em=_custEt?t2m(_custEt):t2m(et);
+  const etDisplay=_custEt||et;
   const rem=em-nm,dur=em-sm,el=nm-sm,pct=dur>0?Math.min(100,Math.max(0,el/dur*100)):0;
-  return{dayName,offset,slotIdx:ci,endIdx,label:cell.l,tp:cell.tp,cat:getCat(cell.cat||cell.tp),st:getSlotTime(ci),et,rem,dur,el,pct};
+  return{dayName,offset,slotIdx:ci,endIdx,label:cell.l,tp:cell.tp,cat:getCat(cell.cat||cell.tp),st:getSlotTime(ci),et:etDisplay,rem,dur,el,pct};
 }
 function amGetNext(){
   const now=new Date(),di=now.getDay(),nm=now.getHours()*60+now.getMinutes()+now.getSeconds()/60;
