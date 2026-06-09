@@ -25560,7 +25560,9 @@ const LEVEL_CLASSES=['lv0','lv1','lv2','lv3'];
 let _activeListsTab='hawking';
 function setListsTab(tab,btn){
   _activeListsTab=tab;
-  document.querySelectorAll('.lists-stab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+  document.querySelectorAll('.lists-stab').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  else{const autoBtn=document.querySelector('.lists-stab[onclick*="\''+tab+'\'"]');if(autoBtn)autoBtn.classList.add('active');}
   document.querySelectorAll('.lists-panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('lists-'+tab).classList.add('active');
   if(tab==='hawking')renderHawkingList();
@@ -28886,7 +28888,7 @@ function _amClassRosterHtml(cls){
       ${neg>0?`<span onclick="openNegRemoveModal('${cls.id}','${name.replace(/'/g,"\\'")}',event)" title="Tap to remove" style="font-size:10px;font-weight:700;color:#f87171;min-width:14px;text-align:center;cursor:pointer">${neg} ✕</span>`:'<span style="min-width:14px"></span>'}
     </div>`;
   }).join('');
-  const openLink=collapsed?'':` <a href="#" onclick="setListsTab('teaching',null);switchClass('${cls.id}',null);document.getElementById('am-panel').classList.remove('open');_amOpen=false;return false;" style="font-size:10px;color:#60a5fa;margin-left:auto">Open list →</a>`;
+  const openLink=collapsed?'':` <a href="#" onclick="amClose();switchClass('${cls.id}',null);switchTab('lists');setListsTab('teaching',null);return false;" style="font-size:10px;color:#60a5fa;margin-left:auto">Open list →</a>`;
   return`<div class="am-cl-section" style="margin-top:6px">
     <div class="am-cl-hdr" style="cursor:pointer" onclick="amToggleRoster('${cls.id}')">
       <span class="am-cl-title">📚 ${_esc(cls.name)} · ${cls.students.length} students${hpBadge}${negBadge}</span>
