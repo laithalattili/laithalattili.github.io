@@ -24003,7 +24003,7 @@ function renderTimetable(){
       const _cellClick=ttEditMode?`openEditModal(${idx},'${d}')`:`openSlotNotes(${idx},'${d}',${offset})`;
       if(!cell){
         const _pSlotsE=getPersonalSlotsForDay(d,dayDateStrs[activeDays.indexOf(d)]).filter(function(ps){const ss=t2m(ps.start_time),se=t2m(ps.end_time),cs=t2m(getSlotTime(idx));const ce=idx+1<SLOTS.length?t2m(getSlotTime(idx+1)):cs+30;return ss<ce&&se>cs;});
-        const _pHtmlE=_pSlotsE.length?_pSlotsE.map(function(){return '<span class=\"personal-pill\" onclick=\"event.stopPropagation();window.open('https://laithalattili.github.io/omni/','_blank')\">👤 Personal</span>';}).join(''):'';
+        const _pHtmlE=_pSlotsE.length?_pSlotsE.map(function(){return '<span class="personal-pill" onclick="var _=function(){window.open(\"https://laithalattili.github.io/omni/\",\"_blank\")};event.stopPropagation();_()">👤 Personal</span>';}).join(''):'';
         h+=`${tdOpen}<div class="tt-inner${ttEditMode?' editable':''}" onclick="${_cellClick}"></div>`+_pHtmlE+`</td>`;return;
       }
 
@@ -24021,7 +24021,7 @@ function renderTimetable(){
       const outlineDot=hasOutline?`<div style="width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,.5);margin-top:1px;align-self:center"></div>`:'';
       const cb=isCC?'border:2px solid #f59f00;box-shadow:0 0 6px rgba(245,159,0,.4)':'';
       const _pSlots=getPersonalSlotsForDay(d,dayDateStrs[activeDays.indexOf(d)]).filter(function(ps){const ss=t2m(ps.start_time),se=t2m(ps.end_time),cs=t2m(getSlotTime(idx));const ce=idx+1<SLOTS.length?t2m(getSlotTime(idx+1)):cs+30;return ss<ce&&se>cs;});
-      const _pHtml=_pSlots.length?_pSlots.map(function(){return '<span class=\"personal-pill\" onclick=\"event.stopPropagation();window.open('https://laithalattili.github.io/omni/','_blank')\">👤 Personal</span>';}).join(''):'';
+      const _pHtml=_pSlots.length?_pSlots.map(function(){return '<span class="personal-pill" onclick="var _=function(){window.open(\"https://laithalattili.github.io/omni/\",\"_blank\")};event.stopPropagation();_()">👤 Personal</span>';}).join(''):'';
       h+=`${tdOpen}<div class="tt-inner c-${cell.tp}${half}${customClass}${ttEditMode?' editable':''}" style="${cb}" onclick="${_cellClick}">${label}${noteHtml}${outlineDot}`+_pHtml+`</td>`;
     });
     h+=timeCellR+'</tr>';
