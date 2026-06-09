@@ -665,6 +665,18 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
   </div>
 </div>
 
+
+<!-- HABIT TIME PICKER SHEET -->
+<div class="sh-wrap" id="hab-time-sh">
+  <div class="sh" style="max-height:70vh;display:flex;flex-direction:column">
+    <div class="sh-drag"></div>
+    <div id="hab-time-sh-body" style="overflow-y:auto;flex:1"></div>
+    <div style="padding:.5rem .8rem;border-top:1px solid var(--bd)">
+      <button onclick="closeSheet('hab-time-sh')" style="width:100%;padding:10px;background:var(--bg3);color:var(--tx2);border:1px solid var(--bd);border-radius:8px;font-size:13px">Close</button>
+    </div>
+  </div>
+</div>
+
 </div><!-- /app -->
 
 <!-- AUDIO PLAYER BAR -->
@@ -1523,15 +1535,26 @@ function _bKey(e,i){
 function _esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 // ── TIMED TASKS ───────────────────────────────────────────────────────────────
-function _slotTasks(tasks,time){
+function _slotTasks(tasks,time,dateStr){
   const hints=JSON.parse(localStorage.getItem('omni_work_hints')||'{}');
   const gymSlot=localStorage.getItem('omni_gym_slot_time')||'';
-  return tasks.filter(t=>{
+  const taskRows=tasks.filter(t=>{
     if(t._t?.taskTime===time)return true;
     if(t.src==='work'&&hints[t.id]===time)return true;
     if(t.src==='gym'&&gymSlot===time)return true;
     return false;
   });
+  // Add habits assigned to this slot
+  const ds=dateStr||_dayDate();
+  const habTypes=['gym','book','film','course','guitar'];
+  habTypes.forEach(type=>{
+    if(_habSlotTime(type,ds)===time){
+      const labels={gym:'Gym session',book:'Reading',film:'Film',course:'Course',guitar:'Guitar Practice'};
+      const done=type==='gym'?!!HAB_DATA.gym:_habDone(type,ds);
+      taskRows.push({id:'__hab_'+type,text:labels[type],src:'habit',habType:type,done,dk:'__hab_'+type+'_'+ds,_t:{taskTime:time}});
+    }
+  });
+  return taskRows;
 }
 function _unscheduled(tasks){return tasks;} // show all tasks below, timed ones show time badge
 function openAddTaskAtTime(slotTime){
@@ -1610,7 +1633,7 @@ function renderDay(){
         const isFreeP=['free','personal'].includes(sl.tp);
         const isSleepP=sl.tp==='sleep';
         const endTP=WSLOTS[sl.idx+1]?.t||'00:00';
-        const stP=_slotTasks(allTasks,sl.time);const hasNP=hasNotes(sl.idx,dateStr);
+        const stP=_slotTasks(allTasks,sl.time,dateStr);const hasNP=hasNotes(sl.idx,dateStr);
         if(isSleepP){
           slotsHtml+=`<div class="slot sleep-slot" style="opacity:.35"><div class="slot-hdr"><span class="slot-tr">${sl.time} –${endTP}</span><span class="slot-pip" style="background:#a0968a"></span><span class="slot-lbl" style="color:var(--tx4);font-style:italic">Sleep</span></div></div>`;
           return;
@@ -1625,7 +1648,7 @@ function renderDay(){
       const isCur=isToday&&sl.idx===curIdx;
       const isNxt=isToday&&!isCur&&!isFree&&futSlots.slice(0,fi).every(s=>s.idx===curIdx||['free','personal'].includes(s.tp));
       const endT=WSLOTS[sl.idx+1]?.t||'00:00';
-      const st=_slotTasks(allTasks,sl.time);
+      const st=_slotTasks(allTasks,sl.time,dateStr);
       const hasN=hasNotes(sl.idx,dateStr);
       // Bold: end time of current slot, start time of next slot
       const boldEnd=isCur;
@@ -1643,14 +1666,16 @@ function renderDay(){
         return;
       }
       slotsHtml+=`<div class="slot${isCur?' now':isNxt?' nxt':''}${isFree?' free-slot':''}"><div class="slot-hdr">${trHtml}<span class="slot-pip" style="background:${catCol(sl.tp)}"></span><span class="slot-lbl">${isFree&&!isCur?'':sl.label}</span>${badge}<button class="slot-notes-btn${hasN?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')">${hasN?'📝':'·'}</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:14px;color:var(--acc);background:none;border:none;padding:0 3px;opacity:.7;line-height:1">+</button></div>${isCur?'<div class="slot-now-bar"></div>':''}${st.length?`<div class="slot-tasks">${st.map(t=>{
-    const isWork=t.src==='work';const isGym2=t.src==='gym';
+    const isWork=t.src==='work';const isGym2=t.src==='gym';const isHabit=t.src==='habit';
     const removeBtn=isWork
-      ? `<button onclick="removeWorkHint('${t.id}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px" title="Remove from slot">×</button>`
+      ? `<button onclick="removeWorkHint('${t.id}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`
       : isGym2
-        ? `<button onclick="localStorage.removeItem('omni_gym_slot_time');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px" title="Remove from slot">×</button>`
-        : `<button onclick="unassignTask('${t.id}','${dateStr}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px" title="Remove from slot">×</button>`;
-    const slotCbClick=isGym2?`switchTab('gym')`:`toggleDone('${t.dk}',this);setTimeout(renderDay,50)`;
-    const slotCbInner=isGym2?(t.gymDone?'<span style="color:var(--ok);font-size:10px">✓</span>':'🏋️'):(t.done?'<span style="color:var(--ok);font-size:10px">✓</span>':'');
+        ? `<button onclick="localStorage.removeItem('omni_gym_slot_time');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`
+        : isHabit
+          ? `<button onclick="_habSetSlotTime('${t.habType}','${dateStr}','');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`
+          : `<button onclick="unassignTask('${t.id}','${dateStr}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`;
+    const slotCbClick=isGym2?`switchTab('gym')`:isHabit?`_tickHabitAndRefresh('${t.habType}','${dateStr}')`:`toggleDone('${t.dk}',this);setTimeout(renderDay,50)`;
+    const slotCbInner=isGym2?(t.gymDone?'<span style="color:var(--ok);font-size:10px">✓</span>':'🏋️'):((t.done||t.gymDone)?'<span style="color:var(--ok);font-size:10px">✓</span>':'');
     return`<div class="slot-task-row"><div class="slot-task-cb${(t.done||t.gymDone)?' on':''}" onclick="${slotCbClick}">${slotCbInner}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div>${removeBtn}</div>`;
   }).join('')}</div>`:''}</div>`;
     });
@@ -2920,17 +2945,46 @@ async function loadHabitsFor(dateStr){
 
 // ── Habit log helpers ─────────────────────────────────────────────────────────
 function _habKey(type,dateStr){return'omni_hab_'+type+'_'+dateStr;}
+
+function _habSlotTime(type,dateStr){return localStorage.getItem('omni_hab_slot_'+type+'_'+dateStr)||'';}
+function _habSetSlotTime(type,dateStr,time){
+  if(time)localStorage.setItem('omni_hab_slot_'+type+'_'+dateStr,time);
+  else localStorage.removeItem('omni_hab_slot_'+type+'_'+dateStr);
+}
+function _habPickTime(type,dateStr){
+  // Show a simple time picker sheet
+  const cur=_habSlotTime(type,dateStr);
+  const slots=WSLOTS.filter((_,i)=>{const d=new Date(dateStr+'T12:00:00');const dn=DS[d.getDay()];const c=WSLOTS[i]?.[dn];return c&&c.tp!=='sleep';});
+  let h=`<div style="padding:.5rem .8rem .25rem;font-size:13px;font-weight:700;color:var(--tx)">Assign to time slot</div>`;
+  if(cur){h+=`<div style="display:flex;align-items:center;gap:8px;padding:.35rem .8rem;border-bottom:.5px solid var(--bd);background:var(--sur2)"><span style="font-family:var(--mono);font-size:12px;color:var(--acc);font-weight:700">${cur}</span><span style="flex:1;font-size:12px;color:var(--tx)">Currently assigned</span><button onclick="_habSetSlotTime('${type}','${dateStr}','');closeSheet('hab-time-sh');renderDay();renderHabits('${dateStr}',DS[new Date().getDay()])" style="font-size:11px;color:var(--er);background:none;border:none;padding:0 4px">× Remove</button></div>`;}
+  slots.forEach(s=>{
+    const d=new Date(dateStr+'T12:00:00');const dn=DS[d.getDay()];const c=s[dn];
+    const endT=WSLOTS[WSLOTS.indexOf(s)+1]?.t||'';
+    const isSel=s.t===cur;
+    h+=`<div style="display:flex;align-items:center;gap:8px;padding:.38rem .8rem;border-bottom:.5px solid var(--bd);cursor:pointer;background:${isSel?'var(--sur2)':'var(--sur)'}" onclick="_habSetSlotTime('${type}','${dateStr}','${s.t}');closeSheet('hab-time-sh');renderDay();renderHabits('${dateStr}',DS[new Date().getDay()])">
+      <span style="font-family:var(--mono);font-size:12px;color:var(--tx2);width:48px">${s.t}</span>
+      <span style="font-size:12px;color:var(--tx);flex:1">${['free','personal'].includes(c?.tp)?'Free':c?.l||''}</span>
+      ${isSel?'<span style="color:var(--acc);font-size:12px">✓</span>':''}
+    </div>`;
+  });
+  document.getElementById('hab-time-sh-body').innerHTML=h;
+  document.getElementById('hab-time-sh').classList.add('on');
+}
+function closeSheet(id){const el=document.getElementById(id);if(el)el.classList.remove('on');}
+
 function _habDone(type,dateStr){return localStorage.getItem(_habKey(type,dateStr))==='1';}
 function _habSetDone(type,dateStr,val){localStorage.setItem(_habKey(type,dateStr),val?'1':'0');}
 
 async function _logHabit(type,dateStr,meta={}){
   if(!_OK)return;
+  // Also store in localStorage as reliable fallback
+  localStorage.setItem('omni_hab_log_'+type+'_'+dateStr,JSON.stringify({type,dateStr,meta,logged_at:new Date().toISOString()}));
   try{
     await supaFrom('omni_habit_log').upsert(
       {date:dateStr,type,meta:JSON.stringify(meta),logged_at:new Date().toISOString()},
       {onConflict:'date,type'}
     );
-  }catch(e){}
+  }catch(e){console.warn('Habit log (table may not exist yet):',e.message);}
 }
 
 // ── Render habits ─────────────────────────────────────────────────────────────
@@ -2947,12 +3001,14 @@ async function renderHabits(dateStr,dayName){
 
   // ── GYM ───────────────────────────────────────────────────────────────────
   const gymDone=!!HAB_DATA.gym;
+  const gymSlot=_habSlotTime('gym',dateStr);
   h+=`<div class="habit-row${gymDone?' done':''}">
     <span class="habit-icon">🏋️</span>
     <div class="habit-body">
       <div class="habit-name">Gym${gymDone?' — '+HAB_DATA.gym.session_type:''}</div>
-      <div class="habit-sub">${gymDone?'Session logged ✓':'No session today'}</div>
+      <div class="habit-sub">${gymDone?'Session logged ✓':'No session today'}${gymSlot?' · 📌'+gymSlot:''}</div>
     </div>
+    <button onclick="_habPickTime('gym','${dateStr}')" style="font-size:10px;background:none;border:none;padding:0 4px;color:${gymSlot?'var(--acc)':'var(--tx4)'}">📌</button>
     <div class="habit-tick${gymDone?' on':''}" style="pointer-events:none">${gymDone?'✓':''}</div>
   </div>`;
 
@@ -2968,6 +3024,7 @@ async function renderHabits(dateStr,dayName){
       <div class="habit-name">${bookTitle}</div>
       <div class="habit-sub">${pages?'Today: '+pages+' pages':'Daily reading'}${bookDone?' ✓':''}</div>
     </div>
+    <button onclick="_habPickTime('book','${dateStr}')" style="font-size:10px;background:none;border:none;padding:0 4px;color:${_habSlotTime('book',dateStr)?'var(--acc)':'var(--tx4)'}">📌</button>
     <div class="habit-tick${bookDone?' on':''}" onclick="_tickHabit('book','${dateStr}',${JSON.stringify(JSON.stringify(bookMeta))})">${bookDone?'✓':''}</div>
   </div>`;
 
@@ -2982,6 +3039,7 @@ async function renderHabits(dateStr,dayName){
         <div class="habit-name">${filmData.title}</div>
         <div class="habit-sub">${filmMeta.year||''} ${filmMeta.director?'· '+filmMeta.director:''}${filmDone?' — Watched ✓':''}</div>
       </div>
+      <button onclick="_habPickTime('film','${dateStr}')" style="font-size:10px;background:none;border:none;padding:0 4px;color:${_habSlotTime('film',dateStr)?'var(--acc)':'var(--tx4)'}">📌</button>
       <div class="habit-tick${filmDone?' on':''}" onclick="_tickHabit('film','${dateStr}',${JSON.stringify(JSON.stringify(filmMeta))})">${filmDone?'✓':''}</div>
     </div>`;
   }
@@ -2997,6 +3055,7 @@ async function renderHabits(dateStr,dayName){
         <div class="habit-name">${courseData.title}</div>
         <div class="habit-sub">${courseMeta.episode||courseMeta.session?'Session '+(courseMeta.episode||courseMeta.session):'Daily session'}${courseDone?' ✓':''}</div>
       </div>
+      <button onclick="_habPickTime('course','${dateStr}')" style="font-size:10px;background:none;border:none;padding:0 4px;color:${_habSlotTime('course',dateStr)?'var(--acc)':'var(--tx4)'}">📌</button>
       <div class="habit-tick${courseDone?' on':''}" onclick="_tickHabit('course','${dateStr}',${JSON.stringify(JSON.stringify(courseMeta))})">${courseDone?'✓':''}</div>
     </div>`;
   }
@@ -3026,6 +3085,9 @@ async function renderHabits(dateStr,dayName){
   el.innerHTML=h;
 }
 
+function _tickHabitAndRefresh(type,dateStr){
+  _tickHabit(type,dateStr,{}).then(()=>renderDay());
+}
 async function _tickHabit(type,dateStr,metaJson){
   const was=_habDone(type,dateStr);
   _habSetDone(type,dateStr,!was);
