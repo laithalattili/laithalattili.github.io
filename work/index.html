@@ -28695,6 +28695,7 @@ function _amLessonHtml(ctx,nowStr){
 
   // Student roster
   html+=_amRosterHtml(label);
+  html+=_amSeatingHtml(label);
   html+=_amNextHtml(amGetNext());
   return html;
 }
@@ -28845,6 +28846,36 @@ function _amRosterHtml(label){
   </div>`;
 }
 
+function _amSeatingHtml(label){
+  const cls=CLASSES.find(c=>c.id===label||c.name===label||c.id.toLowerCase()===label.toLowerCase());
+  if(!cls)return'';
+  migrateSeatData(cls);
+  const groups=cls.seating&&cls.seating.groups;
+  if(!groups||!groups.length)return'';
+  const colors=['#1d4ed8','#7c3aed','#b45309','#0e7490','#be185d','#065f46','#9333ea','#dc2626','#0369a1','#d97706','#4d7c0f','#be123c'];
+  const collapsed=localStorage.getItem('am_seating_collapsed_'+cls.id)!=='0';
+  const groupsHtml=groups.map(function(grp,gi){
+    const color=colors[gi%colors.length];
+    const stuList=(grp.students||[]).filter(function(s){return s&&s.trim();});
+    if(!stuList.length)return'';
+    return '<div style="display:inline-block;margin:3px;padding:4px 8px;background:'+color+'22;border:1px solid '+color+'44;border-radius:6px;vertical-align:top">'
+      +'<div style="font-size:9px;font-weight:700;color:'+color+';margin-bottom:3px">'+_esc(grp.name||'Group '+(gi+1))+'</div>'
+      +stuList.map(function(s){return '<div style="font-size:11px;color:#ccc">'+_esc(s)+'</div>';}).join('')
+      +'</div>';
+  }).join('');
+  return '<div class="am-roster-wrap">'
+    +'<div class="am-roster-hdr" onclick="amToggleSeating(\''+cls.id+'\')" >'
+    +'<span class="am-roster-title">&#128195; Seating · '+groups.length+' groups</span>'
+    +'<span style="color:#444;font-size:12px">'+(collapsed?'&#9656;':'&#9662;')+'</span>'
+    +'</div>'
+    +(collapsed?'':'<div class="am-roster-body open" style="padding:8px">'+groupsHtml+'</div>')
+    +'</div>';
+}
+function amToggleSeating(classId){
+  try{const c=localStorage.getItem('am_seating_collapsed_'+classId);
+  localStorage.setItem('am_seating_collapsed_'+classId,c==='0'?'1':'0');}catch(e){}
+  _amLastCtxKey='';amRender();
+}
 function amAddHP(classId,studentName,e){
   if(e)e.stopPropagation();
   addPoint(classId,studentName,1,e);
