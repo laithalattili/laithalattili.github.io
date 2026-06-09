@@ -1644,15 +1644,16 @@ function renderDay(){
     }
     return{time:s.t,label:c.l||c.label||'',tp:c.tp||c.type||'free',idx:i};
   }).filter(Boolean);
-  // Inject personal slots for this date
-  const todayPersonal=PERSONAL_SLOTS.filter(ps=>{
+  // Build personal slots for this date, keyed by start_time for fast lookup
+  const _todayPS=PERSONAL_SLOTS.filter(ps=>{
     if(ps.recurrence==='once')return ps.date===dateStr;
     if(ps.recurrence==='weekly')return ps.day_of_week===dayName;
     if(ps.recurrence==='daily')return true;
     return false;
   });
-  // Personal slots will be shown as a distinct slot type in the timetable
-  // (rendered inline via _getPersonalSlotsForTime helper)
+  // Build a map: time → personal slot (for rendering inside the sorted slot list)
+  const _psMap={};
+  _todayPS.forEach(ps=>{if(ps.start_time)_psMap[ps.start_time]=ps;});
   const hasComm=allSlots.some(s=>!['free','personal'].includes(s.tp));
   let curIdx=-1;if(isToday)for(let i=0;i<WSLOTS.length;i++){if(nowM>=t2m(WSLOTS[i]?.t))curIdx=i;}
   const allTasks=getTasksFor(_dayOff);
@@ -1720,9 +1721,11 @@ function renderDay(){
       const isSleep=sl.tp==='sleep';
       if(isSleep){
         // Sleep slot: minimal display, no actions
-        slotsHtml+=`<div class="slot sleep-slot${isCur?' now':''}"><div class="slot-hdr">${trHtml}<span class="slot-pip" style="background:#a0968a"></span><span class="slot-lbl" style="color:var(--tx4);font-style:italic">Sleep</span>${badge}</div>${isCur?'<div class="slot-now-bar"></div>':''}</div>`;
+        const sSt=_slotTasks(allTasks,sl.time,dateStr);
+        slotsHtml+=`<div class="slot sleep-slot${isCur?' now':''}"><div class="slot-hdr">${trHtml}<span class="slot-pip" style="background:#a0968a"></span><span class="slot-lbl" style="color:var(--tx4);font-style:italic">Sleep</span>${badge}<button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:13px;color:var(--tx4);background:none;border:none;padding:0 3px;opacity:.4;line-height:1">+</button></div>${isCur?'<div class="slot-now-bar"></div>':''}${sSt.length?`<div class="slot-tasks">${sSt.map(t=>{const removeBtn=t.src==='work'?`<button onclick="removeWorkHint('${t.id}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`:`<button onclick="unassignTask('${t.id}','${dateStr}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`;return`<div class="slot-task-row"><div class="slot-task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div>${removeBtn}</div>`;}).join('')}</div>`:''}</div>`;
         return;
       }
+      const nextSlTime=futSlots[fi+1]?.time||'24:00';
       slotsHtml+=`<div class="slot${isCur?' now':isNxt?' nxt':''}${isFree?' free-slot':''}"><div class="slot-hdr">${trHtml}<span class="slot-pip" style="background:${catCol(sl.tp)}"></span><span class="slot-lbl">${isFree&&!isCur?'':sl.label}</span>${badge}<button class="slot-notes-btn${hasN?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')">${hasN?'📝':'·'}</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:13px;color:var(--tx4);background:none;border:none;padding:0 3px;opacity:.5;line-height:1">+</button></div>${isCur?'<div class="slot-now-bar"></div>':''}${st.length?`<div class="slot-tasks">${st.map(t=>{
     const isWork=t.src==='work';const isGym2=t.src==='gym';const isHabit=t.src==='habit';
     const removeBtn=isWork
@@ -1738,32 +1741,31 @@ function renderDay(){
     const slotCbInner=isGym2?(t.gymDone?'<span style="color:var(--ok);font-size:10px">✓</span>':'🏋️'):isHabit&&t.habType==='gym'?(gymHabDone?'<span style="color:var(--ok);font-size:10px">✓</span>':'🏋️'):((t.done||t.gymDone)?'<span style="color:var(--ok);font-size:10px">✓</span>':'');
     return`<div class="slot-task-row"><div class="slot-task-cb${(t.done||t.gymDone)?' on':''}" onclick="${slotCbClick}">${slotCbInner}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div>${removeBtn}</div>`;
   }).join('')}</div>`:''}</div>`;
+      _renderPSBetween(sl.time, nextSlTime);
     });
+    // Render any personal slots that fall between two work slot times
+    function _renderPSBetween(fromTime, toTime){
+      Object.values(_psMap).forEach(ps=>{
+        if(!ps.start_time)return;
+        const t=ps.start_time;
+        const inRange=toTime?t2m(t)>=t2m(fromTime)&&t2m(t)<t2m(toTime):t2m(t)>=t2m(fromTime);
+        if(!inRange)return;
+        const endT=ps.end_time||'';
+        const pst=_slotTasks(allTasks,t,dateStr);
+        const psTasksHtml=pst.length?`<div class="slot-tasks">${pst.map(t2=>{
+          const isWork2=t2.src==='work';const isGym2=t2.src==='gym';const isHabit2=t2.src==='habit';
+          const removeBtn2=isWork2?`<button onclick="removeWorkHint('${t2.id}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`:isGym2?`<button onclick="localStorage.removeItem('omni_gym_slot_time');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`:isHabit2?`<button onclick="_habSetSlotTime('${t2.habType}','${dateStr}','');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`:`<button onclick="unassignTask('${t2.id}','${dateStr}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`;
+          const gymHabDone3=isHabit2&&t2.habType==='gym'?!!HAB_DATA.gym:false;
+          const cbClick3=isGym2?`switchTab('gym')`:isHabit2&&t2.habType==='gym'?(gymHabDone3?`unlogGymQuick()`:`logGymQuick()`):isHabit2?`_tickHabitAndRefresh('${t2.habType}','${dateStr}')`:`toggleDone('${t2.dk}',this);setTimeout(renderDay,50)`;
+          const cbInner3=(t2.done||t2.gymDone)?'<span style="color:var(--ok);font-size:10px">✓</span>':'';
+          return`<div class="slot-task-row"><div class="slot-task-cb${(t2.done||t2.gymDone)?' on':''}" onclick="${cbClick3}">${cbInner3}</div><div class="slot-task-tx${t2.done?' done':''}">${t2.text}</div>${removeBtn2}</div>`;
+        }).join('')}</div>`:'';
+        slotsHtml+=`<div class="slot personal-slot"><div class="slot-hdr"><span class="slot-tr">${t} <b>–${endT}</b></span><span class="slot-pip" style="background:#7080c0"></span><span class="slot-lbl">${ps.title}</span><button onclick="openEditPersonalSlot('${ps.id}')" style="font-size:11px;color:#7080c0;background:none;border:none;padding:0 4px">✎</button><button onclick="openSlotTaskPicker('${t}','${dateStr}')" style="font-size:20px;font-weight:300;color:#7080c0;background:none;border:none;padding:0 3px;line-height:1">+</button></div>${psTasksHtml}</div>`;
+      });
+    }
     if(!allSlots.length)slotsHtml+='<div class="empty"><div class="empty-i">🏖️</div><div class="empty-t">No slots today</div></div>';
-    // Personal slots from Omni
-    todayPersonal.forEach(ps=>{
-      const endT=ps.end_time||'';
-      const psTime=ps.start_time||'';
-      const pst=_slotTasks(allTasks,psTime,dateStr);
-      slotsHtml+=`<div class="slot personal-slot">
-        <div class="slot-hdr">
-          <span class="slot-tr">${psTime} <b>–${endT}</b></span>
-          <span class="slot-pip" style="background:#7080c0"></span>
-          <span class="slot-lbl">${ps.title}</span>
-          <button onclick="openEditPersonalSlot('${ps.id}')" style="font-size:11px;color:#7080c0;background:none;border:none;padding:0 4px">✎</button>
-          <button onclick="openSlotTaskPicker('${psTime}','${dateStr}')" style="font-size:20px;font-weight:300;color:#7080c0;background:none;border:none;padding:0 4px;line-height:1;opacity:.9">+</button>
-        </div>
-        ${pst.length?`<div class="slot-tasks">${pst.map(t=>{
-          const isWork=t.src==='work';const isGym2=t.src==='gym';const isHabit=t.src==='habit';
-          const gymHabLogged=isHabit&&t.habType==='gym'?!!HAB_DATA.gym:false;
-          const removeBtn=isWork?`<button onclick="removeWorkHint('${t.id}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`:isGym2?`<button onclick="localStorage.removeItem('omni_gym_slot_time');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`:isHabit?`<button onclick="_habSetSlotTime('${t.habType}','${dateStr}','');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`:`<button onclick="unassignTask('${t.id}','${dateStr}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`;
-          const gymHabDone2=isHabit&&t.habType==='gym'?!!HAB_DATA.gym:false;
-          const slotCbClick2=isGym2?`switchTab('gym')`:isHabit&&t.habType==='gym'?(gymHabDone2?`unlogGymQuick()`:`logGymQuick()`):isHabit?`_tickHabitAndRefresh('${t.habType}','${dateStr}')`:`toggleDone('${t.dk}',this);setTimeout(renderDay,50)`;
-          const cbInner2=isGym2?(t.gymDone?'<span style="color:var(--ok);font-size:10px">✓</span>':'🏋️'):((t.done||t.gymDone)?'<span style="color:var(--ok);font-size:10px">✓</span>':'');
-          return`<div class="slot-task-row"><div class="slot-task-cb${(t.done||t.gymDone)?' on':''}" onclick="${slotCbClick2}">${cbInner2}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div>${removeBtn}</div>`;
-        }).join('')}</div>`:''}
-      </div>`;
-    });
+    // Render any personal slots after the last work slot (e.g. 23:00+)
+    _renderPSBetween('23:00','25:00');
   }
   el('day-slots').innerHTML=slotsHtml;
   // Update night button state
