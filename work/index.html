@@ -28857,9 +28857,7 @@ function _amRosterHtml(label){
 }
 
 function _amSeatingHtml(label){
-  console.log('_amSeatingHtml called with label=',label,'CLASSES count=',CLASSES.length);
   const cls=CLASSES.find(c=>c.id===label||c.name===label||c.id.toLowerCase()===label.toLowerCase());
-  console.log('cls found=',cls?cls.id:'NOT FOUND','seating=',JSON.stringify(cls&&cls.seating).slice(0,80));
   if(!cls)return'';
   // Build groups from seating data without mutating cls
   let groups=[];
