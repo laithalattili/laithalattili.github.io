@@ -1348,10 +1348,9 @@ async function loadWorkData(){
 
 function _applyTtCustom(ttCustom){
   window._ttCustomData=ttCustom;
-  // Log first few keys so we can see the actual format
   const keys=Object.keys(ttCustom||{});
   if(keys.length){
-    console.log('ttCustom keys sample:',keys.slice(0,3));
+    console.log('ttCustom ALL keys:',JSON.stringify(keys));
     console.log('ttCustom first value:',JSON.stringify(ttCustom[keys[0]]));
   }else{
     console.log('ttCustom: empty');
