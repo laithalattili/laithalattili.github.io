@@ -1365,11 +1365,27 @@ function _slotForDate(slotIdx, dateStr){
   const dayName=DS[d.getDay()];
   const base=sl[dayName];
   if(!base)return null;
-  // Check for a date+time override
-  const key=dateStr+'_'+sl.t;
-  const override=window._ttCustomData?.[key];
-  if(override){
-    return{...base,...override,l:override.l||override.label||base.l,tp:override.tp||override.type||base.tp};
+  if(!window._ttCustomData)return base;
+  const ttc=window._ttCustomData;
+  // Try multiple possible key formats the Work app might use
+  const tryKeys=[
+    dateStr+'_'+sl.t,                    // YYYY-MM-DD_HH:MM
+    dateStr+'T'+sl.t,                    // YYYY-MM-DDTHH:MM
+    sl.t+'_'+dateStr,                    // HH:MM_YYYY-MM-DD
+    dateStr.replace(/-/g,'/')+'_'+sl.t,  // YYYY/MM/DD_HH:MM
+  ];
+  for(const key of tryKeys){
+    if(ttc[key]){
+      const ov=ttc[key];
+      console.log('ttCustom match:',key,'→',JSON.stringify(ov));
+      return{...base,...ov,l:ov.l||ov.label||ov.title||base.l,tp:ov.tp||ov.type||ov.category||base.tp};
+    }
+  }
+  // Also check if the key is just the slot time (for recurring overrides)
+  const dayKey=dayName+'_'+sl.t;
+  if(ttc[dayKey]){
+    const ov=ttc[dayKey];
+    return{...base,...ov,l:ov.l||ov.label||base.l,tp:ov.tp||ov.type||base.tp};
   }
   return base;
 }
@@ -1681,7 +1697,8 @@ function renderDay(){
         : isHabit
           ? `<button onclick="_habSetSlotTime('${t.habType}','${dateStr}','');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`
           : `<button onclick="unassignTask('${t.id}','${dateStr}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`;
-    const slotCbClick=isGym2?`switchTab('gym')`:isHabit&&t.habType==='gym'?`switchTab('gym')`:isHabit?`_tickHabitAndRefresh('${t.habType}','${dateStr}')`:`toggleDone('${t.dk}',this);setTimeout(renderDay,50)`;
+    const gymHabLogged=isHabit&&t.habType==='gym'?!!HAB_DATA.gym:false;
+    const slotCbClick=isGym2?`switchTab('gym')`:isHabit&&t.habType==='gym'?(gymHabLogged?`unlogGymQuick()`:`logGymQuick()`):isHabit?`_tickHabitAndRefresh('${t.habType}','${dateStr}')`:`toggleDone('${t.dk}',this);setTimeout(renderDay,50)`;
     const gymHabDone=isHabit&&t.habType==='gym'?!!HAB_DATA.gym:false;
     const slotCbInner=isGym2?(t.gymDone?'<span style="color:var(--ok);font-size:10px">✓</span>':'🏋️'):isHabit&&t.habType==='gym'?(gymHabDone?'<span style="color:var(--ok);font-size:10px">✓</span>':'🏋️'):((t.done||t.gymDone)?'<span style="color:var(--ok);font-size:10px">✓</span>':'');
     return`<div class="slot-task-row"><div class="slot-task-cb${(t.done||t.gymDone)?' on':''}" onclick="${slotCbClick}">${slotCbInner}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div>${removeBtn}</div>`;
@@ -3010,14 +3027,14 @@ async function renderHabits(dateStr,dayName){
   // ── GYM ───────────────────────────────────────────────────────────────────
   const gymDone=!!HAB_DATA.gym;
   const gymSlot=_habSlotTime('gym',dateStr);
-  h+=`<div class="habit-row${gymDone?' done':''}">
+  h+=`<div class="habit-row${gymDone?' done':(typeof GPROG!=='undefined'&&GPROG)?'':' skipped'}">
     <span class="habit-icon">🏋️</span>
     <div class="habit-body">
       <div class="habit-name">Gym${gymDone?' — '+HAB_DATA.gym.session_type:''}</div>
       <div class="habit-sub">${gymDone?'Session logged ✓':'No session today'}${gymSlot?' · 📌'+gymSlot:''}</div>
     </div>
     <button onclick="_habPickTime('gym','${dateStr}')" style="font-size:10px;background:none;border:none;padding:0 4px;color:${gymSlot?'var(--acc)':'var(--tx4)'}">📌</button>
-    <div class="habit-tick${gymDone?' on':''}" style="pointer-events:none">${gymDone?'✓':''}</div>
+    <div class="habit-tick${gymDone?' on':''}" onclick="${gymDone?'unlogGymQuick()':'logGymQuick()'}">${gymDone?'✓':''}</div>
   </div>`;
 
   // ── BOOK ──────────────────────────────────────────────────────────────────
@@ -3761,6 +3778,43 @@ function glTickSet(ei,si){
 }
 function glSetW(ei,si,v){_gymLiveExs[ei].sets[si].weight=v;const sets=_gymLiveExs[ei].sets;for(let i=si+1;i<sets.length;i++){if(!sets[i].done)sets[i].weight=v;}}
 function glSkipRest(){_gymLiveRestType=null;_gymLiveRestBeepDone=true;_gymLiveRender();}
+
+async function logGymQuick(){
+  // Log a gym session without full set data — used when ticking from habit/slot
+  if(_hasSessToday()){showToast('Session already logged');return;}
+  const type=typeof _todayType==='function'?_todayType():'Session';
+  if(!type){showToast('No gym day today');return;}
+  try{
+    const{data:sess,error}=await supaFrom('omni_gym_sessions')
+      .insert({date:todayStr(),session_type:type,programme_id:GPROG?.id||null,notes:'Quick log'})
+      .select().single();
+    if(!error&&sess){
+      GSESS.unshift(sess);
+      HAB_DATA.gym=sess;  // update local state immediately
+      showToast('Gym session logged ✓');
+      renderDay();
+      if(typeof renderGymToday==='function')renderGymToday();
+    }else{
+      showToast('Log failed: '+(error?.message||'unknown'));
+    }
+  }catch(e){showToast('Log failed');console.error(e);}
+}
+
+async function unlogGymQuick(){
+  const sess=GSESS.find(s=>s.date===todayStr());
+  if(!sess){showToast('No session to remove');return;}
+  try{
+    await supaFrom('omni_gym_sets').delete().eq('session_id',sess.id);
+    await supaFrom('omni_gym_sessions').delete().eq('id',sess.id);
+    GSESS=GSESS.filter(s=>s.id!==sess.id);
+    GSETS=GSETS.filter(s=>s.session_id!==sess.id);
+    HAB_DATA.gym=null;
+    showToast('Session removed');
+    renderDay();
+    if(typeof renderGymToday==='function')renderGymToday();
+  }catch(e){showToast('Remove failed');console.error(e);}
+}
+
 async function glSaveAndClose(){
   const type=_gymLiveSessType;
   const{data:sess,error}=await supaFrom('omni_gym_sessions').insert({date:todayStr(),session_type:type,programme_id:GPROG?.id||null,notes:''}).select().single();
