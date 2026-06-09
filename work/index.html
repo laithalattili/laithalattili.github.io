@@ -23711,6 +23711,7 @@ function renderTodayView(){
           </label>
         </div>
       </div>
+      ${(function(){var _d=new Date();_d.setDate(_d.getDate()+tdDayOffset);var slotDateStr=_d.getFullYear()+'-'+String(_d.getMonth()+1).padStart(2,'0')+'-'+String(_d.getDate()).padStart(2,'0');var ps=getPersonalSlotsForDay(dayName,slotDateStr).filter(function(p){var ss=t2m(p.start_time),se=t2m(p.end_time),cs=t2m(slot.t),ce=idx+1<SLOTS.length?t2m(SLOTS[idx+1].t):cs+30;return ss<ce&&se>cs;});return ps.length?'<div style="padding:3px 10px 4px;background:#f5f3ff;border-top:1px solid #e9d5ff">'+ps.map(function(){return '<span class="personal-pill" onclick="openOmni(event)">\u{1f464} Personal</span>';}).join('')+'</div>':'';})()}
     </div>`;
   });
 
