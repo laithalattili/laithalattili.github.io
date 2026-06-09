@@ -2900,10 +2900,10 @@ let HAB_LOADED=false;
 // ── Load habits data for a given date ────────────────────────────────────────
 async function loadHabitsFor(dateStr){
   HAB_DATA={gym:null,book:null,film:null,course:null};
-  if(!_ok)return;
+  if(!_OK)return;
   try{
     // Schedule feed for date (from Life Manager)
-    const{data:feed}=await supa.from('omni_schedule_feed')
+    const{data:feed}=await supaFrom('omni_schedule_feed')
       .select('*').eq('date',dateStr);
     if(feed){
       feed.forEach(row=>{
@@ -2913,8 +2913,7 @@ async function loadHabitsFor(dateStr){
       });
     }
     // Gym: check if session exists
-    const{data:gym}=await supa.from('omni_gym_sessions')
-      .select('id,session_type').eq('date',dateStr).limit(1);
+    const{data:gym}=await supaFrom('omni_gym_sessions').select('id,session_type').eq('date',dateStr).limit(1);
     if(gym?.length)HAB_DATA.gym=gym[0];
   }catch(e){console.warn('Habits load',e);}
 }
@@ -2925,9 +2924,9 @@ function _habDone(type,dateStr){return localStorage.getItem(_habKey(type,dateStr
 function _habSetDone(type,dateStr,val){localStorage.setItem(_habKey(type,dateStr),val?'1':'0');}
 
 async function _logHabit(type,dateStr,meta={}){
-  if(!_ok)return;
+  if(!_OK)return;
   try{
-    await supa.from('omni_habit_log').upsert(
+    await supaFrom('omni_habit_log').upsert(
       {date:dateStr,type,meta:JSON.stringify(meta),logged_at:new Date().toISOString()},
       {onConflict:'date,type'}
     );
