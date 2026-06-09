@@ -28857,7 +28857,9 @@ function _amRosterHtml(label){
 }
 
 function _amSeatingHtml(label){
+  console.log('_amSeatingHtml called with label=',label,'CLASSES count=',CLASSES.length);
   const cls=CLASSES.find(c=>c.id===label||c.name===label||c.id.toLowerCase()===label.toLowerCase());
+  console.log('cls found=',cls?cls.id:'NOT FOUND','seating=',JSON.stringify(cls&&cls.seating).slice(0,80));
   if(!cls)return'';
   // Build groups from seating data without mutating cls
   let groups=[];
@@ -29001,7 +29003,7 @@ function _amLessonHtml(ctx,nowStr){
   const live=snGetLive(offset,slotIdx,dayName);
   const liveItems=live.filter(b=>b.text.trim());
   const state=_getCheckState(offset,slotIdx,dayName);
-  html+=`<div class="am-cl-section" style="margin-top:6px"><div class="cl-section-sep" style="color:#f59f00;border-top:none;padding-top:0">⊙ This occurrence</div>${liveItems.length?liveItems.map(b=>{const d2=!!state[b.id];return`<div class="cl-item${d2?' done':''}" data-id="${b.id}"><div class="cl-check${d2?' checked':''}" onclick="amToggleCheck('${b.id}',true,${JSON.stringify(d2)})"></div><span style="font-size:10px;color:#f59f00;margin-right:5px">◆</span><span class="cl-text" style="color:${d2?'#444':'#fbbf24'};${d2?'text-decoration:line-through;':''}flex:1">${_esc(b.text)}</span><span class="cl-live-badge">LIVE</span></div>`;}).join(''):''}<div class="am-live-add"><input class="am-live-input" id="am-live-inp" placeholder="+ note" onkeydown="if(event.key==='Enter'){amAddLiveItem();event.preventDefault();}" /><button class="am-live-submit" onclick="amAddLiveItem()">+</button></div></div>`;
+  html+=`<div class="am-cl-section" style="margin-top:6px"><div class="cl-section-sep" style="color:#f59f00;border-top:none;padding-top:0">⊙ This occurrence</div>${liveItems.length?liveItems.map(b=>{const d2=!!state[b.id];return`<div class="cl-item${d2?' done':''}" data-id="${b.id}"><div class="cl-check${d2?' checked':''}" onclick="amToggleCheck('${b.id}',true,${JSON.stringify(d2)})"></div><span style="font-size:10px;color:#f59f00;margin-right:5px">◆</span><span class="cl-text" style="color:${d2?'#444':'#fbbf24'};${d2?'text-decoration:line-through;':''}flex:1">${_esc(b.text)}</span><span class="cl-live-badge">LIVE</span><button onclick=\"amDeleteLiveItem('${b.id}',event)\" style=\"background:none;border:none;color:#555;font-size:14px;cursor:pointer;padding:0 2px;margin-left:2px\">&times;</button></div>`;}).join(''):''}<div class="am-live-add"><input class="am-live-input" id="am-live-inp" placeholder="+ note" onkeydown="if(event.key==='Enter'){amAddLiveItem();event.preventDefault();}" /><button class="am-live-submit" onclick="amAddLiveItem()">+</button></div></div>`;
   if(linkedClass)html+=_amClassRosterHtml(linkedClass);
   html+=_amNextHtml(amGetNext());
   return html;
@@ -29288,6 +29290,14 @@ function amToggleCheck(id,isLive,wasDone){
   amRender();
 }
 
+function amDeleteLiveItem(id,e){
+  if(e)e.stopPropagation();
+  const ctx=amGetCtx();if(!ctx)return;
+  let live=snGetLive(ctx.offset,ctx.slotIdx,ctx.dayName).slice();
+  live=live.filter(function(b){return b.id!==id;});
+  snSaveLive(ctx.offset,ctx.slotIdx,ctx.dayName,live);
+  _amLastCtxKey='';amRender();
+}
 function amQuickCapture(text){
   const ctx=amGetCtx();if(!ctx)return;
   const live=snGetLive(ctx.offset,ctx.slotIdx,ctx.dayName).slice();
