@@ -177,6 +177,8 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
 .slot{margin:0 .6rem .22rem;border-radius:var(--r);border:1px solid var(--bd);background:var(--sur);overflow:hidden;transition:border-color .15s}
 .slot.free-slot{background:#f4fbf4;border-color:#d0ebd0}
 .slot.sleep-slot{background:#f0eee8;border-color:#ddd8cf;opacity:.6}
+.slot.personal-slot{background:#f0f4ff;border-color:#c5cff5;border-style:dashed}
+.slot.personal-slot .slot-lbl{color:#5060a0;font-style:italic}
 .slot.sleep-slot .slot-tr{color:var(--tx4)}
 .slot.now{border-color:var(--acc);border-width:2px;box-shadow:0 0 0 1px rgba(184,88,40,.1)}
 .slot.now .slot-tr{font-size:12px}
@@ -520,6 +522,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
           <button onclick="toggleTasksCol()" id="tasks-col-bar-btn" style="flex:1;font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:3px 8px">Tasks ↕</button>
           <button onclick="toggleNight()" id="night-btn" style="font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:3px 8px">🌙</button>
           <button onclick="loadWorkData().then(renderDay)" title="Reload work tasks" style="font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:3px 8px">↻</button>
+          <button onclick="openAddPersonalSlot(_dayDate())" title="Add personal time block" style="font-size:10px;font-weight:700;color:#7080c0;background:#f0f4ff;border:1px solid #c5cff5;border-radius:var(--r3);padding:3px 8px">+ Event</button>
         </div>
         <div id="day-slots"></div>
         <div id="day-habits"></div>
@@ -613,6 +616,51 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
     <div style="display:flex;gap:8px">
       <button onclick="closeGuitarCfg()" style="flex:1;padding:10px;background:var(--sur);color:var(--tx2);border:1px solid var(--bd2);border-radius:8px;font-size:13px;font-weight:500">Cancel</button>
       <button onclick="saveGuitarCfg()" style="flex:2;padding:11px;background:var(--acc);color:#fff;border-radius:8px;font-size:13px;font-weight:700;border:none">Save</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- PERSONAL SLOT MODAL -->
+<div class="md-wrap" id="personal-slot-modal" style="position:fixed;inset:0;z-index:600;display:none;align-items:center;justify-content:center;padding:1rem;background:rgba(0,0,0,.45)">
+  <div class="md" style="background:var(--sur);border-radius:14px;width:100%;max-width:380px;padding:1.1rem;max-height:84vh;overflow-y:auto">
+    <div style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:.9rem" id="ps-modal-title">Add Personal Event</div>
+    <div class="inp" style="display:flex;flex-direction:column;gap:4px;margin-bottom:.65rem">
+      <label style="font-size:9px;font-weight:700;color:var(--tx4);text-transform:uppercase">Title</label>
+      <input type="text" id="ps-title" placeholder="Guitar practice, Call Mum..." style="padding:9px 10px;border:1px solid var(--bd2);border-radius:5px;background:var(--sur);color:var(--tx);font-size:14px">
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:.65rem">
+      <div class="inp" style="flex:1;display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:9px;font-weight:700;color:var(--tx4);text-transform:uppercase">Start</label>
+        <input type="time" id="ps-start" style="padding:9px 10px;border:1px solid var(--bd2);border-radius:5px;background:var(--sur);color:var(--tx);font-size:14px">
+      </div>
+      <div class="inp" style="flex:1;display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:9px;font-weight:700;color:var(--tx4);text-transform:uppercase">End</label>
+        <input type="time" id="ps-end" style="padding:9px 10px;border:1px solid var(--bd2);border-radius:5px;background:var(--sur);color:var(--tx);font-size:14px">
+      </div>
+    </div>
+    <div class="inp" style="display:flex;flex-direction:column;gap:4px;margin-bottom:.65rem">
+      <label style="font-size:9px;font-weight:700;color:var(--tx4);text-transform:uppercase">Recurrence</label>
+      <select id="ps-recur" style="padding:9px 10px;border:1px solid var(--bd2);border-radius:5px;background:var(--sur);color:var(--tx);font-size:14px" onchange="_psRecurChange()">
+        <option value="once">Once (specific date)</option>
+        <option value="weekly">Weekly (same day)</option>
+        <option value="daily">Every day</option>
+      </select>
+    </div>
+    <div id="ps-date-row" class="inp" style="display:flex;flex-direction:column;gap:4px;margin-bottom:.65rem">
+      <label style="font-size:9px;font-weight:700;color:var(--tx4);text-transform:uppercase">Date</label>
+      <input type="date" id="ps-date" style="padding:9px 10px;border:1px solid var(--bd2);border-radius:5px;background:var(--sur);color:var(--tx);font-size:14px">
+    </div>
+    <div id="ps-day-row" class="inp" style="display:none;flex-direction:column;gap:4px;margin-bottom:.65rem">
+      <label style="font-size:9px;font-weight:700;color:var(--tx4);text-transform:uppercase">Day of week</label>
+      <select id="ps-dow" style="padding:9px 10px;border:1px solid var(--bd2);border-radius:5px;background:var(--sur);color:var(--tx);font-size:14px">
+        <option>Mon</option><option>Tue</option><option>Wed</option><option>Thu</option><option>Fri</option><option>Sat</option><option>Sun</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:.5rem">
+      <button id="ps-delete-btn" onclick="deletePersonalSlot()" style="padding:10px;background:var(--er-bg,#fff0f0);color:var(--er,#c00);border:1px solid var(--er,#c00)33;border-radius:8px;font-size:13px;display:none">Delete</button>
+      <button onclick="closePersonalSlotModal()" style="flex:1;padding:10px;background:var(--sur);color:var(--tx2);border:1px solid var(--bd2);border-radius:8px;font-size:13px">Cancel</button>
+      <button onclick="savePersonalSlot()" style="flex:2;padding:11px;background:var(--acc);color:#fff;border-radius:8px;font-size:13px;font-weight:700;border:none">Save</button>
     </div>
   </div>
 </div>
@@ -1253,23 +1301,59 @@ const WSLOTS_STATIC=[
 // Assign immediately — do not wait for async load
 let WSLOTS=WSLOTS_STATIC;
 
+// Personal slots from Omni stored here
+let PERSONAL_SLOTS=[];
+
 async function loadWorkData(){
-  // Timetable is hardcoded — WSLOTS already set above
-  // Only fetch plan tasks from Supabase
   if(!_OK)return;
   try{
-    const{data}=await supaFrom('work_app_data').select('value').eq('key','settings').single();
-    if(data?.value){
-      const v=typeof data.value==='string'?JSON.parse(data.value):data.value;
-      WTASKS=v.planData||[];
-      WCATS=v.planCategories||WCATS;
-      console.log('WTASKS loaded:',WTASKS.length,'tasks,',WCATS.length,'cats');
-    }else{
-      console.warn('work_app_data key=settings: no data returned');
-    }
+    // Load plan tasks + categories
+    const{data:wd}=await supaFrom('work_app_data').select('key,value')
+      .in('key',['settings','ttCustom']);
+    if(wd){
+      wd.forEach(row=>{
+        const v=typeof row.value==='string'?JSON.parse(row.value):row.value;
+        if(row.key==='settings'){
+          WTASKS=v.planData||[];
+          WCATS=v.planCategories||WCATS;
+          console.log('WTASKS:',WTASKS.length,'WCATS:',WCATS.length);
+        }
+        if(row.key==='ttCustom'&&v){
+          // Apply slot overrides to WSLOTS
+          _applyTtCustom(v);
+        }
+      });
+    }else{console.warn('work_app_data: no data');}
+    // Load personal slots defined in Omni
+    try{
+      const{data:ps}=await supaFrom('omni_personal_slots').select('*');
+      if(ps)PERSONAL_SLOTS=ps;
+    }catch(e){console.warn('Personal slots load:',e);}
     _workLoaded=true;
     if(typeof _curTab!=='undefined'&&_curTab==='planner')renderDay();
-  }catch(e){console.warn('Work tasks load error:',e);}
+  }catch(e){console.warn('Work data load error:',e);}
+}
+
+function _applyTtCustom(ttCustom){
+  // ttCustom keys are "YYYY-MM-DD_HH:MM" → {l,tp} overrides for specific dates
+  // We store these and apply them in renderDay when building slot labels
+  window._ttCustomData=ttCustom;
+}
+
+// Get the label/type for a slot on a specific date, applying any ttCustom override
+function _slotForDate(slotIdx, dateStr){
+  const sl=WSLOTS_STATIC[slotIdx];if(!sl)return null;
+  const d=new Date(dateStr+'T12:00:00');
+  const dayName=DS[d.getDay()];
+  const base=sl[dayName];
+  if(!base)return null;
+  // Check for a date+time override
+  const key=dateStr+'_'+sl.t;
+  const override=window._ttCustomData?.[key];
+  if(override){
+    return{...base,...override,l:override.l||override.label||base.l,tp:override.tp||override.type||base.tp};
+  }
+  return base;
 }
 
 async function loadOmniTasks(){
@@ -1471,13 +1555,23 @@ function renderDay(){
   const now=new Date();const nowM=now.getHours()*60+now.getMinutes();
   const showNight=localStorage.getItem('omni_night')==='1';
   const allSlots=WSLOTS.map((s,i)=>{
-    const c=s[dayName];if(!c)return null;
+    const c=typeof _slotForDate==='function'?_slotForDate(i,dateStr):s[dayName];
+    if(!c)return null;
     if(c.tp==='sleep'){
       if(!showNight)return null;
       return{time:s.t,label:'Sleep',tp:'sleep',idx:i};
     }
-    return{time:s.t,label:c.l,tp:c.tp,idx:i};
+    return{time:s.t,label:c.l||c.label||'',tp:c.tp||c.type||'free',idx:i};
   }).filter(Boolean);
+  // Inject personal slots for this date
+  const todayPersonal=PERSONAL_SLOTS.filter(ps=>{
+    if(ps.recurrence==='once')return ps.date===dateStr;
+    if(ps.recurrence==='weekly')return ps.day_of_week===dayName;
+    if(ps.recurrence==='daily')return true;
+    return false;
+  });
+  // Personal slots will be shown as a distinct slot type in the timetable
+  // (rendered inline via _getPersonalSlotsForTime helper)
   const hasComm=allSlots.some(s=>!['free','personal'].includes(s.tp));
   let curIdx=-1;if(isToday)for(let i=0;i<WSLOTS.length;i++){if(nowM>=t2m(WSLOTS[i]?.t))curIdx=i;}
   const allTasks=getTasksFor(_dayOff);
@@ -1561,6 +1655,18 @@ function renderDay(){
   }).join('')}</div>`:''}</div>`;
     });
     if(!allSlots.length)slotsHtml+='<div class="empty"><div class="empty-i">🏖️</div><div class="empty-t">No slots today</div></div>';
+    // Personal slots from Omni
+    todayPersonal.forEach(ps=>{
+      const endT=ps.end_time||'';
+      slotsHtml+=`<div class="slot personal-slot">
+        <div class="slot-hdr">
+          <span class="slot-tr">${ps.start_time} <b>–${endT}</b></span>
+          <span class="slot-pip" style="background:#7080c0"></span>
+          <span class="slot-lbl">🔒 ${ps.title}</span>
+          <button onclick="openEditPersonalSlot('${ps.id}')" style="font-size:11px;color:#7080c0;background:none;border:none;padding:0 4px">✎</button>
+        </div>
+      </div>`;
+    });
   }
   el('day-slots').innerHTML=slotsHtml;
   // Update night button state
@@ -1597,6 +1703,7 @@ function renderDay(){
   } // end if(true)
   el('day-tasks').innerHTML=th;
 }
+function _dayDate(){const d=new Date();d.setDate(d.getDate()+_dayOff);return d.toISOString().split('T')[0];}
 function toggleNight(){
   const cur=localStorage.getItem('omni_night')==='1';
   localStorage.setItem('omni_night',cur?'0':'1');
@@ -3008,6 +3115,83 @@ async function _gtrFinish(done){
     renderDay();
     showToast('Guitar session logged ✓');
   }
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PERSONAL SLOTS — time blocks defined in Omni, visible in Work app
+// ══════════════════════════════════════════════════════════════════════════════
+let _editingPsId=null;
+
+function openAddPersonalSlot(dateStr){
+  _editingPsId=null;
+  document.getElementById('ps-modal-title').textContent='Add Personal Event';
+  document.getElementById('ps-title').value='';
+  document.getElementById('ps-start').value='';
+  document.getElementById('ps-end').value='';
+  document.getElementById('ps-recur').value='once';
+  document.getElementById('ps-date').value=dateStr||new Date().toISOString().split('T')[0];
+  document.getElementById('ps-delete-btn').style.display='none';
+  _psRecurChange();
+  document.getElementById('personal-slot-modal').style.display='flex';
+}
+function openEditPersonalSlot(id){
+  const ps=PERSONAL_SLOTS.find(p=>p.id===id);if(!ps)return;
+  _editingPsId=id;
+  document.getElementById('ps-modal-title').textContent='Edit Personal Event';
+  document.getElementById('ps-title').value=ps.title||'';
+  document.getElementById('ps-start').value=ps.start_time||'';
+  document.getElementById('ps-end').value=ps.end_time||'';
+  document.getElementById('ps-recur').value=ps.recurrence||'once';
+  document.getElementById('ps-date').value=ps.date||'';
+  document.getElementById('ps-dow').value=ps.day_of_week||'Mon';
+  document.getElementById('ps-delete-btn').style.display='';
+  _psRecurChange();
+  document.getElementById('personal-slot-modal').style.display='flex';
+}
+function closePersonalSlotModal(){
+  document.getElementById('personal-slot-modal').style.display='none';
+  _editingPsId=null;
+}
+function _psRecurChange(){
+  const r=document.getElementById('ps-recur').value;
+  document.getElementById('ps-date-row').style.display=r==='once'?'flex':'none';
+  document.getElementById('ps-day-row').style.display=r==='weekly'?'flex':'none';
+}
+async function savePersonalSlot(){
+  const title=document.getElementById('ps-title').value.trim();
+  if(!title){showToast('Title required');return;}
+  const recur=document.getElementById('ps-recur').value;
+  const row={
+    title,
+    start_time:document.getElementById('ps-start').value,
+    end_time:document.getElementById('ps-end').value,
+    recurrence:recur,
+    date:recur==='once'?document.getElementById('ps-date').value:null,
+    day_of_week:recur==='weekly'?document.getElementById('ps-dow').value:null,
+  };
+  try{
+    if(_editingPsId){
+      await supaFrom('omni_personal_slots').update(row).eq('id',_editingPsId);
+      PERSONAL_SLOTS=PERSONAL_SLOTS.map(p=>p.id===_editingPsId?{...p,...row}:p);
+    }else{
+      const{data}=await supaFrom('omni_personal_slots').insert(row).select().single();
+      if(data)PERSONAL_SLOTS.push(data);
+    }
+    closePersonalSlotModal();
+    renderDay();
+    showToast('Saved ✓');
+  }catch(e){showToast('Save failed');console.error(e);}
+}
+async function deletePersonalSlot(){
+  if(!_editingPsId)return;
+  try{
+    await supaFrom('omni_personal_slots').delete().eq('id',_editingPsId);
+    PERSONAL_SLOTS=PERSONAL_SLOTS.filter(p=>p.id!==_editingPsId);
+    closePersonalSlotModal();
+    renderDay();
+    showToast('Deleted');
+  }catch(e){showToast('Delete failed');console.error(e);}
 }
 
 // ── PULL TO REFRESH ───────────────────────────────────────────────────────────
