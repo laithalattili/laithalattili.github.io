@@ -2924,20 +2924,49 @@ function openSlotTaskPicker(time,dateStr){
   if(others.length){
     html+=`<div class="sec-lbl" style="padding:.2rem .8rem .05rem;font-size:9px">TAP TO ASSIGN</div>`;
     const pGrp=others.filter(t=>t.src==='omni'||t.src==='gym');
-    const wGrps=WCATS.map(c=>({id:c.id,name:c.name,color:c.color,tasks:others.filter(t=>t.src==='work'&&(t._t?.cat===c.id||t._t?.category===c.id))})).filter(g=>g.tasks.length);
-    const wOth=others.filter(t=>t.src==='work'&&!WCATS.some(c=>c.id===t._t?.cat||c.id===t._t?.category));
-    const grps=[{key:'pg',label:'Personal',color:'var(--acc)',tasks:pGrp},...wGrps.map(g=>({key:'wg_'+g.id,label:g.name,color:g.color,tasks:g.tasks})),...(wOth.length?[{key:'wo',label:'Other Work',color:'var(--tx4)',tasks:wOth}]:[])].filter(g=>g.tasks.length);
+    // Build habits group — show all habits not yet assigned to this slot
+    const habTypes2=['gym','book','film','course','guitar'];
+    const habLabels2={gym:'🏋️ Gym session',book:'📖 Reading',film:'🎬 Film',course:'🎓 Course',guitar:'🎸 Guitar Practice'};
+    const habTasks2=habTypes2
+      .filter(type=>{
+        // Only show if: habit is relevant today AND not already at this slot
+        if(type==='gym')return typeof _todayType==='function'&&_todayType();
+        if(type==='film')return!!HAB_DATA.film;
+        if(type==='course')return!!HAB_DATA.course;
+        return true; // book and guitar always show
+      })
+      .map(type=>({
+        id:'__hab2_'+type,text:habLabels2[type],src:'habit',habType:type,
+        done:type==='gym'?!!HAB_DATA.gym:_habDone(type,dateStr),
+        alreadyHere:_habSlotTime(type,dateStr)===time,
+        currentSlot:_habSlotTime(type,dateStr)||''
+      }));
+    const grps=[
+      {key:'hab',label:'Habits',color:'#9060c0',tasks:habTasks2},
+      {key:'pg',label:'Personal',color:'var(--acc)',tasks:pGrp},
+      ...wGrps.map(g=>({key:'wg_'+g.id,label:g.name,color:g.color,tasks:g.tasks})),
+      ...(wOth.length?[{key:'wo',label:'Other Work',color:'var(--tx4)',tasks:wOth}]:[])
+    ].filter(g=>g.tasks.length);
     grps.forEach(g=>{
       const ck='omni_pk_'+g.key;const col=localStorage.getItem(ck)==='1';
       html+=`<div style="border-bottom:.5px solid var(--bd)"><div style="display:flex;align-items:center;gap:7px;padding:.32rem .8rem;cursor:pointer;background:var(--bg2)" onclick="var k='omni_pk_${g.key}';localStorage.setItem(k,localStorage.getItem(k)==='1'?'0':'1');openSlotTaskPicker('${time}','${dateStr}')"><span style="width:7px;height:7px;border-radius:50%;background:${g.color};flex-shrink:0"></span><span style="font-size:11px;font-weight:700;color:var(--tx2);flex:1">${g.label}</span><span style="font-size:10px;color:var(--tx4)">${g.tasks.length}</span><span style="font-size:10px;color:var(--tx4);margin-left:4px">${col?'▶':'▼'}</span></div>`;
-      if(!col){
-        g.tasks.forEach(t=>{
-          const isElsewhere=t._t?.taskTime&&t._t.taskTime!==time;
-          const ttLabel=isElsewhere?' 📌'+t._t.taskTime:'';
-          const fn=t.src==='omni'?"assignTask('"+t.id+"','"+time+"','"+dateStr+"')":t.src==='gym'?"assignGymToSlot('"+time+"')": "assignWorkTaskToSlot('"+t.id+"','"+time+"')";
-          html+=`<div style="display:flex;align-items:center;gap:8px;padding:.33rem .8rem .33rem 1.5rem;border-top:.5px solid var(--bd);cursor:pointer" onclick="${fn}"><span style="color:var(--acc)">→</span><span style="font-size:13px;color:var(--tx);flex:1">${t.text}${ttLabel}</span></div>`;
-        });
-      }
+       if(!col){
+         g.tasks.forEach(t=>{
+           if(t.src==='habit'){
+             const alreadyHere=_habSlotTime(t.habType,dateStr)===time;
+             const curSlot=_habSlotTime(t.habType,dateStr);
+             const curMark=curSlot&&!alreadyHere?' (📌'+curSlot+')':'';
+             const doneMark=t.done?'✓ ':'';
+             const fn=alreadyHere?`_habSetSlotTime('${t.habType}','${dateStr}','');renderDay();openSlotTaskPicker('${time}','${dateStr}')`:  `_habSetSlotTime('${t.habType}','${dateStr}','${time}');closeSheet('slot-picker-sh');renderDay()`;
+             html+=`<div style="display:flex;align-items:center;gap:8px;padding:.33rem .8rem .33rem 1.5rem;border-top:.5px solid var(--bd);cursor:pointer;background:${alreadyHere?'rgba(144,96,192,.08)':''}" onclick="${fn}"><span style="color:${alreadyHere?'var(--er)':'#9060c0'};font-size:13px">${alreadyHere?'×':'→'}</span><span style="font-size:13px;color:var(--tx);flex:1">${doneMark}${t.text}${curMark}</span>${alreadyHere?'<span style="font-size:10px;color:var(--tx4)">remove</span>':''}</div>`;
+             return;
+           }
+           const isElsewhere=t._t?.taskTime&&t._t.taskTime!==time;
+           const ttLabel=isElsewhere?' 📌'+t._t.taskTime:'';
+           const fn=t.src==='omni'?"assignTask('"+t.id+"','"+time+"','"+dateStr+"')":t.src==='gym'?"assignGymToSlot('"+time+"')":"assignWorkTaskToSlot('"+t.id+"','"+time+"')";
+           html+=`<div style="display:flex;align-items:center;gap:8px;padding:.33rem .8rem .33rem 1.5rem;border-top:.5px solid var(--bd);cursor:pointer" onclick="${fn}"><span style="color:var(--acc)">→</span><span style="font-size:13px;color:var(--tx);flex:1">${t.text}${ttLabel}</span></div>`;
+         });
+       }
       html+=`</div>`;
     });
   }
