@@ -1321,7 +1321,7 @@ async function loadWorkData(){
   try{
     // Load plan tasks + categories
     const{data:wd}=await supaFrom('work_app_data').select('key,value')
-      .in('key',['settings','ttCustom']);
+      .in('key',['settings','ttCustom','globalDefault']);
     if(wd){
       wd.forEach(row=>{
         const v=typeof row.value==='string'?JSON.parse(row.value):row.value;
@@ -1331,8 +1331,11 @@ async function loadWorkData(){
           console.log('WTASKS:',WTASKS.length,'WCATS:',WCATS.length);
         }
         if(row.key==='ttCustom'&&v){
-          // Apply slot overrides to WSLOTS
           _applyTtCustom(v);
+        }
+        if(row.key==='globalDefault'&&v){
+          window._workGlobalDefault=v;
+          console.log('globalDefault loaded, termStart:',v.termStart||v.schoolStart||v.startDate||JSON.stringify(v).substring(0,100));
         }
       });
     }else{console.warn('work_app_data: no data');}
@@ -1358,6 +1361,18 @@ function _applyTtCustom(ttCustom){
 }
 
 // Get the label/type for a slot on a specific date, applying any ttCustom override
+function _schoolWeekNum(dateStr){
+  // Calculate school week number (0-based) from term start date
+  const gd=window._workGlobalDefault||{};
+  // Try common field names for term start
+  const startStr=gd.termStart||gd.schoolStart||gd.startDate||gd.weekOneStart||gd.term1Start||null;
+  if(!startStr)return null;
+  const start=new Date(startStr+'T00:00:00');
+  const target=new Date(dateStr+'T00:00:00');
+  const diffDays=Math.round((target-start)/86400000);
+  return Math.floor(diffDays/7);
+}
+
 function _slotForDate(slotIdx, dateStr){
   const sl=WSLOTS_STATIC[slotIdx];if(!sl)return null;
   const d=new Date(dateStr+'T12:00:00');
@@ -1366,27 +1381,23 @@ function _slotForDate(slotIdx, dateStr){
   if(!base)return null;
   if(!window._ttCustomData)return base;
   const ttc=window._ttCustomData;
-  // Try multiple possible key formats the Work app might use
-  const tryKeys=[
-    dateStr+'_'+sl.t,                    // YYYY-MM-DD_HH:MM
-    dateStr+'T'+sl.t,                    // YYYY-MM-DDTHH:MM
-    sl.t+'_'+dateStr,                    // HH:MM_YYYY-MM-DD
-    dateStr.replace(/-/g,'/')+'_'+sl.t,  // YYYY/MM/DD_HH:MM
-  ];
-  for(const key of tryKeys){
+  // Key format: "schoolWeekNum_slotIdx_DayName" e.g. "0_17_Tue"
+  const schoolWeek=_schoolWeekNum(dateStr);
+  if(schoolWeek!==null){
+    const key=schoolWeek+'_'+slotIdx+'_'+dayName;
     if(ttc[key]){
       const ov=ttc[key];
-      console.log('ttCustom match:',key,'→',JSON.stringify(ov));
-      return{...base,...ov,l:ov.l||ov.label||ov.title||base.l,tp:ov.tp||ov.type||ov.category||base.tp};
+      return{...base,...ov,l:ov.l||ov.label||ov.title||base.l,tp:_ttcTpToOmni(ov.tp||ov.type||ov.cat)||base.tp};
     }
   }
-  // Also check if the key is just the slot time (for recurring overrides)
-  const dayKey=dayName+'_'+sl.t;
-  if(ttc[dayKey]){
-    const ov=ttc[dayKey];
-    return{...base,...ov,l:ov.l||ov.label||base.l,tp:ov.tp||ov.type||base.tp};
-  }
   return base;
+}
+
+function _ttcTpToOmni(tp){
+  // Map Work app type codes to Omni type codes
+  if(!tp)return null;
+  const map={c1:'commitment',c2:'commitment',lesson:'lesson',l:'lesson',duty:'duty',d:'duty',free:'free',f:'free',mtg:'commitment',tutor:'commitment',support:'lesson'};
+  return map[tp.toLowerCase()]||tp;
 }
 
 async function loadOmniTasks(){
