@@ -25896,7 +25896,17 @@ function renderClassContent(){
 function migrateSeatData(cls){
   const s=cls.seating;
   if(s&&s.groups)return; // already new format
-  cls.seating={groups:[]};
+  // Convert old rows/cols/seats format to groups (one group per row)
+  if(s&&s.seats&&s.cols){
+    const groups=[];
+    for(let r=0;r<(s.rows||1);r++){
+      const rowStudents=s.seats.slice(r*s.cols,(r+1)*s.cols).filter(function(n){return n&&n!=='null';});
+      if(rowStudents.length)groups.push({name:'Row '+(r+1),students:rowStudents});
+    }
+    cls.seating={groups};
+  } else {
+    cls.seating={groups:[]};
+  }
 }
 
 function buildSeatGrid(cls){
@@ -28849,6 +28859,9 @@ function _amRosterHtml(label){
 function _amSeatingHtml(label){
   const cls=CLASSES.find(c=>c.id===label||c.name===label||c.id.toLowerCase()===label.toLowerCase());
   if(!cls)return'';
+  // Check for saved seating override in classData
+  const savedData=S.classData&&S.classData[cls.id];
+  if(savedData&&savedData.seating)cls.seating=savedData.seating;
   migrateSeatData(cls);
   const groups=cls.seating&&cls.seating.groups;
   if(!groups||!groups.length)return'';
