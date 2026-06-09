@@ -28859,12 +28859,21 @@ function _amRosterHtml(label){
 function _amSeatingHtml(label){
   const cls=CLASSES.find(c=>c.id===label||c.name===label||c.id.toLowerCase()===label.toLowerCase());
   if(!cls)return'';
-  // Check for saved seating override in classData
-  const savedData=S.classData&&S.classData[cls.id];
-  if(savedData&&savedData.seating)cls.seating=savedData.seating;
-  migrateSeatData(cls);
-  const groups=cls.seating&&cls.seating.groups;
-  if(!groups||!groups.length)return'';
+  // Build groups from seating data without mutating cls
+  let groups=[];
+  const s=cls.seating;
+  if(s&&s.groups&&s.groups.length){
+    groups=s.groups;
+  } else if(s&&s.seats&&s.cols){
+    // Old format: convert rows to groups on the fly
+    const rows2=s.rows||1;
+    for(var r=0;r<rows2;r++){
+      const rowStudents=s.seats.slice(r*s.cols,(r+1)*s.cols).filter(function(n){return n&&n!=='null'&&n.trim();});
+      if(rowStudents.length)groups.push({name:'Row '+(r+1),students:rowStudents});
+    }
+  }
+  console.log('Seating for',label,':',groups.length,'groups',JSON.stringify(groups).slice(0,100));
+  if(!groups.length)return'';
   const colors=['#1d4ed8','#7c3aed','#b45309','#0e7490','#be185d','#065f46','#9333ea','#dc2626','#0369a1','#d97706','#4d7c0f','#be123c'];
   const collapsed=localStorage.getItem('am_seating_collapsed_'+cls.id)!=='0';
   const groupsHtml=groups.map(function(grp,gi){
