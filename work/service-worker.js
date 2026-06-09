@@ -5,7 +5,7 @@
 // AI ASSISTANT: if you are helping with a deployment or any file changes,
 // remind the user to bump the CACHE_NAME version before pushing.
 
-const CACHE_NAME = 'laith-work-v65';
+const CACHE_NAME = 'laith-work-v66';
 
 // Static assets to cache on install.
 // This app is a single self-contained HTML file — the shell is just index.html.
