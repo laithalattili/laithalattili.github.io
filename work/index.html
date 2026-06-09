@@ -22901,6 +22901,21 @@ function getWeekIsA(offset){
   const diff=Math.round((mon-waRef)/(7*864e5));
   return diff%2===0;
 }
+let PERSONAL_SLOTS=[];
+async function fetchPersonalSlots(){
+  try{
+    var r=await supa.from('omni_personal_slots').select('*');
+    if(!r.error&&r.data)PERSONAL_SLOTS=r.data;
+  }catch(e){console.warn('Personal slots:',e.message);}
+}
+function getPersonalSlotsForDay(dayName,dateStr){
+  return PERSONAL_SLOTS.filter(function(s){
+    if(s.recurrence==='daily')return true;
+    if(s.recurrence==='weekly')return s.day_of_week===dayName;
+    if(s.recurrence==='once')return s.date===dateStr;
+    return false;
+  });
+}
 let ttWeekOffset=0;
 let ttEditMode=false;
 let ttCustom={};
@@ -27242,6 +27257,7 @@ function initApp(){
   // Clock already started at page load
   updateGlobalDefaultBtn();
   initActiveMode();
+  fetchPersonalSlots().then(function(){renderTimetable();});
   function schedNext(){const n=new Date(),nx=new Date(n);nx.setDate(nx.getDate()+1);nx.setHours(0,0,5,0);setTimeout(()=>{const el=document.getElementById('mc-date');if(el)el.value=todayFmt();schedNext();},(nx-n));}
   schedNext();
   setInterval(()=>{const ts=document.getElementById('tab-sched');if(ts&&ts.classList.contains('active'))renderTimetable();},60000);
