@@ -1347,9 +1347,15 @@ async function loadWorkData(){
 }
 
 function _applyTtCustom(ttCustom){
-  // ttCustom keys are "YYYY-MM-DD_HH:MM" → {l,tp} overrides for specific dates
-  // We store these and apply them in renderDay when building slot labels
   window._ttCustomData=ttCustom;
+  // Log first few keys so we can see the actual format
+  const keys=Object.keys(ttCustom||{});
+  if(keys.length){
+    console.log('ttCustom keys sample:',keys.slice(0,3));
+    console.log('ttCustom first value:',JSON.stringify(ttCustom[keys[0]]));
+  }else{
+    console.log('ttCustom: empty');
+  }
 }
 
 // Get the label/type for a slot on a specific date, applying any ttCustom override
@@ -1549,7 +1555,8 @@ function _slotTasks(tasks,time,dateStr){
   const habTypes=['gym','book','film','course','guitar'];
   habTypes.forEach(type=>{
     if(_habSlotTime(type,ds)===time){
-      const labels={gym:'Gym session',book:'Reading',film:'Film',course:'Course',guitar:'Guitar Practice'};
+      const gymType2=typeof _todayType==='function'?_todayType():null;
+  const labels={gym:gymType2?'Gym: '+gymType2+' Session':'Gym session',book:'Reading',film:'Film',course:'Course',guitar:'Guitar Practice'};
       const done=type==='gym'?!!HAB_DATA.gym:_habDone(type,ds);
       taskRows.push({id:'__hab_'+type,text:labels[type],src:'habit',habType:type,done,dk:'__hab_'+type+'_'+ds,_t:{taskTime:time}});
     }
@@ -1674,8 +1681,9 @@ function renderDay(){
         : isHabit
           ? `<button onclick="_habSetSlotTime('${t.habType}','${dateStr}','');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`
           : `<button onclick="unassignTask('${t.id}','${dateStr}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`;
-    const slotCbClick=isGym2?`switchTab('gym')`:isHabit?`_tickHabitAndRefresh('${t.habType}','${dateStr}')`:`toggleDone('${t.dk}',this);setTimeout(renderDay,50)`;
-    const slotCbInner=isGym2?(t.gymDone?'<span style="color:var(--ok);font-size:10px">✓</span>':'🏋️'):((t.done||t.gymDone)?'<span style="color:var(--ok);font-size:10px">✓</span>':'');
+    const slotCbClick=isGym2?`switchTab('gym')`:isHabit&&t.habType==='gym'?`switchTab('gym')`:isHabit?`_tickHabitAndRefresh('${t.habType}','${dateStr}')`:`toggleDone('${t.dk}',this);setTimeout(renderDay,50)`;
+    const gymHabDone=isHabit&&t.habType==='gym'?!!HAB_DATA.gym:false;
+    const slotCbInner=isGym2?(t.gymDone?'<span style="color:var(--ok);font-size:10px">✓</span>':'🏋️'):isHabit&&t.habType==='gym'?(gymHabDone?'<span style="color:var(--ok);font-size:10px">✓</span>':'🏋️'):((t.done||t.gymDone)?'<span style="color:var(--ok);font-size:10px">✓</span>':'');
     return`<div class="slot-task-row"><div class="slot-task-cb${(t.done||t.gymDone)?' on':''}" onclick="${slotCbClick}">${slotCbInner}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div>${removeBtn}</div>`;
   }).join('')}</div>`:''}</div>`;
     });
@@ -2807,12 +2815,12 @@ async function init(){
     renderDay(); // always re-render — cheap if not on planner, needed for gym task
   }).catch(()=>{});
   // Realtime: auto-reload work tasks when Work app saves changes
-  if(_OK){
+  if(_OK&&supa&&typeof supa.channel==='function'){
     try{
       supa.channel('omni_work_sync')
         .on('postgres_changes',{event:'UPDATE',schema:'public',table:'work_app_data',filter:'key=eq.settings'},
           async()=>{console.log('Work data changed, reloading...');await loadWorkData();})
-        .subscribe();
+        .subscribe((status)=>{if(status==='CHANNEL_ERROR')console.warn('Realtime channel error');});
     }catch(e){console.warn('Realtime subscription failed:',e);}
   }
   el('ld').classList.add('gone');
