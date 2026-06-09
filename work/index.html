@@ -836,6 +836,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 <body>
 <div id="err-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);color:#fff;font-size:12px;padding:20px;z-index:99999;overflow:auto;font-family:monospace;white-space:pre-wrap"></div>
 <script>
+function openOmni(e){if(e){e.stopPropagation();e.preventDefault();}window.open('https://laithalattili.github.io/omni/','_blank');}
 window.onerror=function(msg,src,line,col,err){
   var o=document.getElementById('err-overlay');
   if(o){o.style.display='block';o.textContent='JS ERROR: '+msg+' | Line:'+line+' | '+(err&&err.stack?err.stack:'');}
@@ -24038,7 +24039,7 @@ function renderTimetable(){
       const cb=isCC?'border:2px solid #f59f00;box-shadow:0 0 6px rgba(245,159,0,.4)':'';
       const _pSlots=getPersonalSlotsForDay(d,dayDateStrs[activeDays.indexOf(d)]).filter(function(ps){const ss=t2m(ps.start_time),se=t2m(ps.end_time),cs=t2m(getSlotTime(idx));const ce=idx+1<SLOTS.length?t2m(getSlotTime(idx+1)):cs+30;return ss<ce&&se>cs;});
       const _pHtml=_pSlots.length?_pSlots.map(function(ps){return '<span class="personal-pill" onclick="openOmni(event)">👤 '+ps.start_time+'–'+ps.end_time+'</span>';}).join(''):'';
-      h+=`${tdOpen}<div class="tt-inner c-${cell.tp}${half}${customClass}${ttEditMode?' editable':''}" style="${cb}" onclick="${_cellClick}">${label}${noteHtml}${outlineDot}`+_pHtml+`</td>`;
+      h+=`${tdOpen}<div class="tt-inner c-${cell.tp}${half}${customClass}${ttEditMode?' editable':''}" style="${cb}" onclick="${_cellClick}">${label}${noteHtml}${outlineDot}</div>`+_pHtml+`</td>`;
     });
     h+=timeCellR+'</tr>';
   });
