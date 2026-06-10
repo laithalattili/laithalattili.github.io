@@ -23631,6 +23631,9 @@ function renderTodayView(){
 
     // Handle hw off-week
     if(!custom&&base&&base.hw){
+      // Still respect past slot collapse
+      const _hwExtSlot=(idx<EARLY_SLOT_COUNT||idx>=LATE_SLOT_START);
+      if(isPastSlot&&ttCollapsePast&&!_hwExtSlot)return;
       const act=(base.hw==='kris'||base.hw==='canteen'||base.hw==='gym3')?wA:!wA;
       if(!act){
         const slotClass=`today-slot${isPastSlot?' past':''}`;
