@@ -23133,11 +23133,8 @@ function openEditModal(slotIdx,day){
   if(timeOverride)timeOverride.value=SLOTS[slotIdx]?getSlotTime(slotIdx):'';
   const endSel=document.getElementById('edit-endtime-override');
   if(endSel){
-    endSel.innerHTML='<option value="">Single slot</option>';
-    const startM=t2m(SLOTS[slotIdx].t);
-    SLOTS.forEach((s,i)=>{if(t2m(s.t)>startM)endSel.innerHTML+=`<option value="${i}">${s.t}</option>`;});
-    const existingEnd=custom?custom.endSlotIdx:null;
-    if(existingEnd)endSel.value=existingEnd;
+    // Time input — populate with existing customEndTime if set
+    endSel.value=custom&&custom.customEndTime?custom.customEndTime:'';
   }
   document.getElementById('edit-modal').classList.add('open');
 }
