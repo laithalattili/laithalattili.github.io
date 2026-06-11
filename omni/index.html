@@ -1341,7 +1341,10 @@ async function loadWorkData(){
           WTASKS=v.planData||[];
           WCATS=v.planCategories||WCATS;
           // tt-weeks-date is the school week reference date
-          if(v['tt-weeks-date'])window._termStart=v['tt-weeks-date'];
+          if(v['tt-weeks-date']){
+            window._termStart=v['tt-weeks-date'];
+            console.log('tt-weeks-date value:',JSON.stringify(v['tt-weeks-date']));
+          }
           const startFields=['termStart','schoolStart','startDate','weekOneStart','term1Start','semesterStart','calStart','yearStart','firstWeek','tt-weeks-date'];
           const found=startFields.find(f=>v[f]);
           if(found&&!window._termStart)window._termStart=v[found];
@@ -1379,23 +1382,21 @@ function _applyTtCustom(ttCustom){
 
 // Get the label/type for a slot on a specific date, applying any ttCustom override
 function _schoolWeekNum(dateStr){
-  // Use termStart from settings if available
   if(window._termStart){
-    const start=new Date(window._termStart+'T00:00:00');
-    const target=new Date(dateStr+'T00:00:00');
-    const diffDays=Math.round((target-start)/86400000);
-    return Math.floor(diffDays/7);
+    const ts=window._termStart;
+    const startStr=typeof ts==='string'?ts:(ts.date||ts.startDate||ts.start||null);
+    if(startStr){
+      const start=new Date(startStr.substring(0,10)+'T00:00:00');
+      const target=new Date(dateStr+'T00:00:00');
+      const diffDays=Math.round((target-start)/86400000);
+      const wn=Math.floor(diffDays/7);
+      return wn;
+    }
   }
-  // Fallback: use ISO week difference from a Monday reference
-  // All current ttCustom keys use "0_" — find the Monday of the week
-  // containing the date, then compare to the Monday of today's week
   const toMonday=d=>{const day=d.getDay()||7;const m=new Date(d);m.setDate(d.getDate()-day+1);m.setHours(0,0,0,0);return m;};
   const targetMon=toMonday(new Date(dateStr+'T12:00:00'));
-  // Use the week containing today as week 0 reference if no termStart
-  // (this means ttCustom entries from THIS week will match)
   const todayMon=toMonday(new Date());
-  const diffWeeks=Math.round((targetMon-todayMon)/(7*86400000));
-  return diffWeeks; // 0=this week, -1=last week, 1=next week
+  return Math.round((targetMon-todayMon)/(7*86400000));
 }
 
 function _slotForDate(slotIdx, dateStr){
@@ -1406,13 +1407,38 @@ function _slotForDate(slotIdx, dateStr){
   if(!base)return null;
   if(!window._ttCustomData)return base;
   const ttc=window._ttCustomData;
-  // Key format: "schoolWeekNum_slotIdx_DayName" e.g. "0_17_Tue"
   const schoolWeek=_schoolWeekNum(dateStr);
   if(schoolWeek!==null){
     const key=schoolWeek+'_'+slotIdx+'_'+dayName;
     if(ttc[key]){
       const ov=ttc[key];
-      return{...base,...ov,l:ov.l||ov.label||ov.title||base.l,tp:_ttcTpToOmni(ov.tp||ov.type||ov.cat)||base.tp};
+      const endTime=(ov.endSlotIdx!=null&&WSLOTS_STATIC[ov.endSlotIdx])?WSLOTS_STATIC[ov.endSlotIdx].t:null;
+      return{...base,...ov,
+        l:ov.l||ov.label||ov.title||base.l,
+        tp:_ttcTpToOmni(ov.tp||ov.type||ov.cat)||base.tp,
+        endTime
+      };
+    }
+    // Check if this slot is COVERED by an override that starts at an earlier slot
+    // (i.e. an override with endSlotIdx >= slotIdx started before this slot)
+    for(const [k,ov] of Object.entries(ttc)){
+      const parts=k.split('_');
+      if(parts.length<3)continue;
+      const [kWeek,kSlot,kDay]=parts;
+      if(+kWeek!==schoolWeek||kDay!==dayName)continue;
+      const startIdx=+kSlot;
+      const endIdx=ov.endSlotIdx;
+      if(endIdx!=null&&startIdx<slotIdx&&endIdx>=slotIdx){
+        // This slot is covered — show same label but mark as continuation
+        const endTime=WSLOTS_STATIC[endIdx]?.t||null;
+        return{...base,...ov,
+          l:ov.l||ov.label||ov.title||base.l,
+          tp:_ttcTpToOmni(ov.tp||ov.type||ov.cat)||base.tp,
+          endTime,
+          _continuation:true,
+          _coverStart:WSLOTS_STATIC[startIdx]?.t
+        };
+      }
     }
   }
   return base;
@@ -1645,7 +1671,7 @@ function renderDay(){
       if(isLateNight&&!showNight)return null;
       return{time:s.t,label:'Sleep',tp:'sleep',idx:i};
     }
-    return{time:s.t,label:c.l||c.label||'',tp:c.tp||c.type||'free',idx:i};
+    return{time:s.t,label:c.l||c.label||'',tp:c.tp||c.type||'free',idx:i,endTime:c.endTime||null};
   }).filter(Boolean);
   // Build personal slots for this date, keyed by start_time for fast lookup
   const _todayPS=PERSONAL_SLOTS.filter(ps=>{
@@ -1661,7 +1687,7 @@ function renderDay(){
   let curIdx=-1;if(isToday)for(let i=0;i<WSLOTS.length;i++){if(nowM>=t2m(WSLOTS[i]?.t))curIdx=i;}
   const allTasks=getTasksFor(_dayOff);
   const pastSlots=[],futSlots=[];
-  allSlots.forEach(sl=>{const endT=WSLOTS[sl.idx+1]?.t||'00:00';(isToday&&hasComm&&t2m(endT)<=nowM&&sl.idx<curIdx?pastSlots:futSlots).push(sl);});
+  allSlots.forEach(sl=>{const endT=sl.endTime||WSLOTS[sl.idx+1]?.t||'00:00';(isToday&&hasComm&&t2m(endT)<=nowM&&sl.idx<curIdx?pastSlots:futSlots).push(sl);});
 
   const slotsCol=localStorage.getItem('omni_slots_col')==='1';
   const tasksCol=localStorage.getItem('omni_tasks_col')==='1';
@@ -1706,10 +1732,12 @@ function renderDay(){
     }
     // Current and future slots
     futSlots.forEach((sl,fi)=>{
+      // Skip continuation slots — they're covered by an earlier slot's endTime display
+      if(sl._continuation)return;
       const isFree=['free','personal'].includes(sl.tp);
       const isCur=isToday&&sl.idx===curIdx;
       const isNxt=isToday&&!isCur&&!isFree&&futSlots.slice(0,fi).every(s=>s.idx===curIdx||['free','personal'].includes(s.tp));
-      const endT=WSLOTS[sl.idx+1]?.t||'00:00';
+      const endT=sl.endTime||WSLOTS[sl.idx+1]?.t||'00:00';
       const st=_slotTasks(allTasks,sl.time,dateStr);
       const hasN=hasNotes(sl.idx,dateStr);
       // Bold: end time of current slot, start time of next slot
