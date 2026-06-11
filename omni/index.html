@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -1636,7 +1639,10 @@ function renderDay(){
     const c=typeof _slotForDate==='function'?_slotForDate(i,dateStr):s[dayName];
     if(!c)return null;
     if(c.tp==='sleep'){
-      if(!showNight)return null;
+      // 23:00 slot always visible; 00:00–06:00 only in night mode
+      const slotMinutes=t2m(s.t);
+      const isLateNight=slotMinutes>=0&&slotMinutes<420; // 00:00–07:00
+      if(isLateNight&&!showNight)return null;
       return{time:s.t,label:'Sleep',tp:'sleep',idx:i};
     }
     return{time:s.t,label:c.l||c.label||'',tp:c.tp||c.type||'free',idx:i};
@@ -1922,25 +1928,55 @@ function renderWeek(){
     }
     if(!wkTaskCol){
       const catMap2={};WCATS.forEach(c=>{catMap2[c.id]=c;});
-      // Group by category
       const wkByCat={};const wkUncat=[];const wkPersonal=[];
       undoneTasks.forEach(t=>{
         if(t.src==='work'){if(t._t?.cat&&catMap2[t._t.cat]){if(!wkByCat[t._t.cat])wkByCat[t._t.cat]=[];wkByCat[t._t.cat].push(t);}else wkUncat.push(t);}
         else wkPersonal.push(t);
       });
-      // Render with category colour bars
+      // Render personal first, then work categories — each collapsible
+      const wkCatKey=d=>'omni_wkcat_'+off+'_'+d;
+      const wkCatCol=d=>localStorage.getItem(wkCatKey(d))==='1';
+      // Personal
+      if(wkPersonal.length){
+        const pCol=wkCatCol('personal');
+        html+=`<div style="display:flex;align-items:center;gap:5px;padding:.22rem .6rem .18rem;background:rgba(184,88,40,.07);border-bottom:.5px solid rgba(184,88,40,.15);cursor:pointer" onclick="var k='${wkCatKey('personal')}';localStorage.setItem(k,localStorage.getItem(k)==='1'?'0':'1');renderWeek()">
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--acc);flex-shrink:0"></span>
+          <span style="font-size:9px;font-weight:700;color:var(--acc);flex:1;text-transform:uppercase;letter-spacing:.06em">Personal</span>
+          <span style="font-size:9px;color:var(--tx4)">${wkPersonal.length}</span>
+          <span style="font-size:9px;color:var(--tx4);margin-left:2px">${pCol?'▶':'▼'}</span>
+        </div>`;
+        if(!pCol){wkPersonal.forEach(t=>{
+          html+=`<div style="display:flex;align-items:center;gap:6px;padding:.28rem .6rem;border-bottom:.3px solid var(--bd);border-left:3px solid var(--acc)44"><div style="width:14px;height:14px;border-radius:2px;border:1.5px solid var(--acc);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;background:${t.done?'var(--ok-bg)':'transparent'}" onclick="wkTick('${t.dk}',this,${off})">${t.done?'<span style="color:var(--ok);font-size:8px">✓</span>':''}</div><span style="font-size:11px;color:${t.done?'var(--tx4)':'var(--tx2)'};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${t.done?'text-decoration:line-through':''}">${t.text}</span></div>`;
+        });}
+      }
+      // Work categories
       WCATS.forEach(cat=>{
         const cts=wkByCat[cat.id];if(!cts?.length)return;
-        cts.forEach(t=>{
+        const cCol=wkCatCol(cat.id);
+        html+=`<div style="display:flex;align-items:center;gap:5px;padding:.22rem .6rem .18rem;background:${cat.color}11;border-bottom:.5px solid ${cat.color}22;cursor:pointer" onclick="var k='${wkCatKey(cat.id)}';localStorage.setItem(k,localStorage.getItem(k)==='1'?'0':'1');renderWeek()">
+          <span style="width:6px;height:6px;border-radius:50%;background:${cat.color};flex-shrink:0"></span>
+          <span style="font-size:9px;font-weight:700;color:${cat.color};flex:1;text-transform:uppercase;letter-spacing:.06em">${cat.name}</span>
+          <span style="font-size:9px;color:var(--tx4)">${cts.length}</span>
+          <span style="font-size:9px;color:var(--tx4);margin-left:2px">${cCol?'▶':'▼'}</span>
+        </div>`;
+        if(!cCol){cts.forEach(t=>{
           const tc=t.tier===1?cat.color:t.tier===2&&t.urg?'var(--wa)':cat.color+'99';
           html+=`<div style="display:flex;align-items:center;gap:6px;padding:.28rem .6rem;border-bottom:.3px solid var(--bd);border-left:3px solid ${cat.color}55"><div style="width:14px;height:14px;border-radius:2px;border:1.5px solid ${tc};flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;background:${t.done?'var(--ok-bg)':'transparent'}" onclick="wkTick('${t.dk}',this,${off})">${t.done?'<span style="color:var(--ok);font-size:8px">✓</span>':''}</div><span style="font-size:11px;color:${t.done?'var(--tx4)':'var(--tx2)'};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${t.done?'text-decoration:line-through':''}">${t.text}</span></div>`;
-        });
+        });}
       });
-      wkUncat.concat(wkPersonal).forEach(t=>{
-        const tc=t.tier===1?'var(--acc)':t.tier===2&&t.urg?'var(--wa)':'var(--bd2)';
-        html+=`<div style="display:flex;align-items:center;gap:6px;padding:.28rem .6rem;border-bottom:.3px solid var(--bd)"><div style="width:14px;height:14px;border-radius:2px;border:1.5px solid ${tc};flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;background:${t.done?'var(--ok-bg)':'transparent'}" onclick="wkTick('${t.dk}',this,${off})">${t.done?'<span style="color:var(--ok);font-size:8px">✓</span>':''}</div><span style="font-size:11px;color:${t.done?'var(--tx4)':'var(--tx2)'};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${t.done?'text-decoration:line-through':''}">${t.text}</span></div>`;
-      });
-      if(undoneTasks.length>5){const rem=undoneTasks.length-5;html+=`<div style="padding:.18rem .6rem;font-size:10px;color:var(--acc);font-weight:700;cursor:pointer" onclick="wkExpand(${off})">${wkTaskExp?'Show less ↑':'+'+rem+' more'}</div>`;}
+      // Uncategorised work
+      if(wkUncat.length){
+        const uCol=wkCatCol('other');
+        html+=`<div style="display:flex;align-items:center;gap:5px;padding:.22rem .6rem .18rem;background:var(--bg2);border-bottom:.5px solid var(--bd);cursor:pointer" onclick="var k='${wkCatKey('other')}';localStorage.setItem(k,localStorage.getItem(k)==='1'?'0':'1');renderWeek()">
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--tx4);flex-shrink:0"></span>
+          <span style="font-size:9px;font-weight:700;color:var(--tx3);flex:1;text-transform:uppercase;letter-spacing:.06em">Other</span>
+          <span style="font-size:9px;color:var(--tx4)">${wkUncat.length}</span>
+          <span style="font-size:9px;color:var(--tx4);margin-left:2px">${uCol?'▶':'▼'}</span>
+        </div>`;
+        if(!uCol){wkUncat.forEach(t=>{
+          html+=`<div style="display:flex;align-items:center;gap:6px;padding:.28rem .6rem;border-bottom:.3px solid var(--bd)"><div style="width:14px;height:14px;border-radius:2px;border:1.5px solid var(--bd2);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;background:${t.done?'var(--ok-bg)':'transparent'}" onclick="wkTick('${t.dk}',this,${off})">${t.done?'<span style="color:var(--ok);font-size:8px">✓</span>':''}</div><span style="font-size:11px;color:${t.done?'var(--tx4)':'var(--tx2)'};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${t.done?'text-decoration:line-through':''}">${t.text}</span></div>`;
+        });}
+      }
       if(doneTasks.length)html+=`<div style="padding:.18rem .6rem;font-size:10px;color:var(--tx4)">✓ ${doneTasks.length} done</div>`;
     }
     html+=`</div></div>`;
