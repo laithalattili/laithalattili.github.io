@@ -23304,7 +23304,8 @@ function saveSlot(){
     if(found>=0)targetSlot=found;
   }
   const endSelEl=document.getElementById('edit-endtime-override');
-  const customEndTime=endSelEl&&endSelEl.value?endSelEl.value:null;const endSlotIdx=null;
+  const customEndTime=endSelEl&&endSelEl.value?endSelEl.value:null;
+  const endSlotIdx=null;
   const catVal=document.getElementById('edit-cat').value||document.getElementById('edit-type').value||'empty';
   // If user picked a colour for a custom cat, update it in settings
   const customColor=document.getElementById('edit-custom-color')&&document.getElementById('edit-custom-color').value;
@@ -23922,9 +23923,14 @@ function renderTimetable(){
     let i=0;
     while(i<SLOTS.length){
       const custom=getCustomForWeek(offset,i,d);
-      if(custom&&custom.endSlotIdx&&custom.endSlotIdx>i){
-        for(let j=i+1;j<=custom.endSlotIdx;j++)skipCells.add(j+'_'+d);
-        i=custom.endSlotIdx+1;
+      let _custEndIdx=custom&&custom.endSlotIdx?custom.endSlotIdx:null;
+      if(!_custEndIdx&&custom&&custom.customEndTime){
+        const _etm2=t2m(custom.customEndTime);
+        for(let _i2=i+1;_i2<SLOTS.length;_i2++){if(t2m(SLOTS[_i2].t)<_etm2)_custEndIdx=_i2;else break;}
+      }
+      if(_custEndIdx&&_custEndIdx>i){
+        for(let j=i+1;j<=_custEndIdx;j++)skipCells.add(j+'_'+d);
+        i=_custEndIdx+1;
       } else i++;
     }
   });
@@ -24021,8 +24027,13 @@ function renderTimetable(){
 
       // Skip if this is a continuation of a span
       if(skipCells.has(idx+'_'+d)){h+='';return;}
-      const isSpanStart=cell&&cell.endSlotIdx&&cell.endSlotIdx>idx;
-      const rowSpan=isSpanStart?(cell.endSlotIdx-idx+1):1;
+      let _endSlotIdx=cell&&cell.endSlotIdx?cell.endSlotIdx:null;
+      if(!_endSlotIdx&&cell&&cell.customEndTime){
+        const _etm=t2m(cell.customEndTime);
+        for(let _i=idx+1;_i<SLOTS.length;_i++){if(t2m(SLOTS[_i].t)<_etm)_endSlotIdx=_i;else break;}
+      }
+      const isSpanStart=_endSlotIdx&&_endSlotIdx>idx;
+      const rowSpan=isSpanStart?(_endSlotIdx-idx+1):1;
       const tdOpen=rowSpan>1?`<td class="${tdCls}" rowspan="${rowSpan}" style="vertical-align:middle">`:`<td class="${tdCls}">`;
       const _cellClick=ttEditMode?`openEditModal(${idx},'${d}')`:`openSlotNotes(${idx},'${d}',${offset})`;
       if(!cell){
@@ -28222,7 +28233,8 @@ function openSlotNotes(slotIdx,day,week){
   // Render header
   document.getElementById('notes-title').textContent=label;
   const slotTime=getSlotTime(slotIdx);
-  const endTime=slotEndTime(slotIdx);
+  const _custEnd2=custom&&custom.customEndTime?custom.customEndTime:null;
+  const endTime=_custEnd2||slotEndTime(slotIdx);
   document.getElementById('notes-sub').textContent=`${slotTime}–${endTime} · ${day} W${getWeekNumber(week)}`;
   _updateNotesRecurChip();
   notesRenderBody();
