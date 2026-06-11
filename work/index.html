@@ -23130,7 +23130,7 @@ function openEditModal(slotIdx,day){
   const dayOverride=document.getElementById('edit-day-override');
   if(dayOverride)dayOverride.value='';
   const timeOverride=document.getElementById('edit-time-override');
-  if(timeOverride)timeOverride.value=SLOTS[slotIdx]?getSlotTime(slotIdx):'';
+  if(timeOverride)timeOverride.value=(custom&&custom.customStartTime)?custom.customStartTime:(SLOTS[slotIdx]?getSlotTime(slotIdx):'');
   const endSel=document.getElementById('edit-endtime-override');
   if(endSel){
     // Time input — populate with existing customEndTime if set
