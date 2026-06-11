@@ -28456,13 +28456,16 @@ function amGetCtx(){
   let endIdx=ci;
   for(let i=ci+1;i<SLOTS.length;i++){const c=getCustomForWeek(offset,i,dayName)||SLOTS[i][dayName];if(c&&c.l===cell.l&&c.tp===cell.tp)endIdx=i;else break;}
   const et=slotEndTime(endIdx),sm=t2m(getSlotTime(ci));
-  // Use custom end time if set on this slot
+  // Use custom start/end time if set on this slot
   const _cust=getCustomForWeek(offset,ci,dayName)||SLOTS[ci][dayName];
   const _custEt=_cust&&_cust.customEndTime?_cust.customEndTime:null;
+  const _custSt=_cust&&_cust.customStartTime?_cust.customStartTime:null;
   const em=_custEt?t2m(_custEt):t2m(et);
+  const smEff=_custSt?t2m(_custSt):sm;
   const etDisplay=_custEt||et;
-  const rem=em-nm,dur=em-sm,el=nm-sm,pct=dur>0?Math.min(100,Math.max(0,el/dur*100)):0;
-  return{dayName,offset,slotIdx:ci,endIdx,label:cell.l,tp:cell.tp,cat:getCat(cell.cat||cell.tp),st:getSlotTime(ci),et:etDisplay,rem,dur,el,pct};
+  const stDisplay=_custSt||getSlotTime(ci);
+  const rem=em-nm,dur=em-smEff,el=nm-smEff,pct=dur>0?Math.min(100,Math.max(0,el/dur*100)):0;
+  return{dayName,offset,slotIdx:ci,endIdx,label:cell.l,tp:cell.tp,cat:getCat(cell.cat||cell.tp),st:stDisplay,et:etDisplay,rem,dur,el,pct};
 }
 function amGetNext(){
   const now=new Date(),di=now.getDay(),nm=now.getHours()*60+now.getMinutes()+now.getSeconds()/60;
