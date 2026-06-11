@@ -1337,14 +1337,11 @@ async function loadWorkData(){
         if(row.key==='settings'){
           WTASKS=v.planData||[];
           WCATS=v.planCategories||WCATS;
-          // Look for term/school start date in settings
-          const startFields=['termStart','schoolStart','startDate','weekOneStart','term1Start','semesterStart','calStart','yearStart','firstWeek'];
+          // tt-weeks-date is the school week reference date
+          if(v['tt-weeks-date'])window._termStart=v['tt-weeks-date'];
+          const startFields=['termStart','schoolStart','startDate','weekOneStart','term1Start','semesterStart','calStart','yearStart','firstWeek','tt-weeks-date'];
           const found=startFields.find(f=>v[f]);
-          if(found)window._termStart=v[found];
-          else{
-            // Log all top-level keys to find the right one
-            console.log('settings keys:',Object.keys(v).join(','));
-          }
+          if(found&&!window._termStart)window._termStart=v[found];
           console.log('WTASKS:',WTASKS.length,'WCATS:',WCATS.length,'termStart:',window._termStart);
         }
         if(row.key==='ttCustom'&&v){
@@ -2946,8 +2943,8 @@ function openSlotTaskPicker(time,dateStr){
     const grps=[
       {key:'hab',label:'Habits',color:'#9060c0',tasks:habTasks2},
       {key:'pg',label:'Personal',color:'var(--acc)',tasks:pGrp},
-      ...wGrps.map(g=>({key:'wg_'+g.id,label:g.name,color:g.color,tasks:g.tasks})),
-      ...(wOth.length?[{key:'wo',label:'Other Work',color:'var(--tx4)',tasks:wOth}]:[])
+      ...WCATS.map(c=>({key:'wg_'+c.id,label:c.name,color:c.color,tasks:others.filter(t=>t.src==='work'&&(t._t?.cat===c.id||t._t?.category===c.id))})).filter(g=>g.tasks.length),
+      ...(others.filter(t=>t.src==='work'&&!WCATS.some(c=>c.id===t._t?.cat||c.id===t._t?.category)).length?[{key:'wo',label:'Other Work',color:'var(--tx4)',tasks:others.filter(t=>t.src==='work'&&!WCATS.some(c=>c.id===t._t?.cat||c.id===t._t?.category))}]:[])
     ].filter(g=>g.tasks.length);
     grps.forEach(g=>{
       const ck='omni_pk_'+g.key;const col=localStorage.getItem(ck)==='1';
