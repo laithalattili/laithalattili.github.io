@@ -22782,7 +22782,7 @@ function firstName(n){return(n||'').split(' ')[0];}
 
 // ── PERSISTENCE ───────────────────────────────────────
 const mcState={};
-function saveState(){try{localStorage.setItem('mcState',JSON.stringify(mcState));localStorage.setItem('ttCustom',JSON.stringify(ttCustom));}catch(e){}}
+function saveState(){try{localStorage.setItem('mcState',JSON.stringify(mcState));localStorage.setItem('ttCustom',JSON.stringify(ttCustom));supaSave('ttCustom',JSON.stringify(ttCustom));}catch(e){}}
 function loadState(){try{const mc=localStorage.getItem('mcState');if(mc)Object.assign(mcState,JSON.parse(mc));const tc=localStorage.getItem('ttCustom');if(tc)Object.assign(ttCustom,JSON.parse(tc));}catch(e){}}
 function saveTask(id,cb){try{localStorage.setItem('task_'+id,cb.checked?'1':'0');}catch(e){}const t=document.getElementById(id+'-text');if(t)t.classList.toggle('done',cb.checked);}
 function loadTasks(ids){ids.forEach(id=>{try{if(localStorage.getItem('task_'+id)==='1'){const cb=document.getElementById(id);if(cb){cb.checked=true;const t=document.getElementById(id+'-text');if(t)t.classList.add('done');}}}catch(e){}});}
@@ -24055,9 +24055,18 @@ function renderTimetable(){
       const hasOutline=snHasContent(idx,d,offset);
       const outlineDot=hasOutline?`<div style="width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,.5);margin-top:1px;align-self:center"></div>`:'';
       const cb=isCC?'border:2px solid #f59f00;box-shadow:0 0 6px rgba(245,159,0,.4)':'';
+      // Sub-slot: split cell into event + free remainder
+      if(cell&&cell.isSubSlot&&cell.subStartTime&&cell.subEndTime){
+        const _bg2=bgMap[cell.tp]||'#d97706',_tx2=textMap[cell.tp]||'#fff';
+        h+=`${tdOpen}<div style="display:flex;flex-direction:column;height:100%;gap:1px;padding:1px">`;
+        h+=`<div style="background:${_bg2};color:${_tx2};border-radius:3px;padding:2px 4px;font-size:10px;font-weight:600;cursor:pointer;line-height:1.3" onclick="${_cellClick}">${cell.subStartTime.slice(0,5)}–${cell.subEndTime.slice(0,5)} ${_esc(cell.l)}</div>`;
+        h+=`<div style="background:#dcfce7;color:#166534;border-radius:3px;padding:2px 4px;font-size:9px;cursor:pointer;line-height:1.3;flex:1" onclick="openSlotRemainder(${idx},'${d}',${offset})">Free</div>`;
+        h+='</div></td>';
+      } else {
       const _pSlots=getPersonalSlotsForDay(d,dayDateStrs[activeDays.indexOf(d)]).filter(function(ps){const ss=t2m(ps.start_time),se=t2m(ps.end_time),cs=t2m(getSlotTime(idx));const ce=idx+1<SLOTS.length?t2m(getSlotTime(idx+1)):cs+30;return ss<ce&&se>cs;});
       const _pHtml=_pSlots.length?_pSlots.map(function(ps){return '<span class="personal-pill" onclick="openOmni(event)">👤 '+ps.start_time+'–'+ps.end_time+'</span>';}).join(''):'';
       h+=`${tdOpen}<div class="tt-inner c-${cell.tp}${half}${customClass}${ttEditMode?' editable':''}" style="${cb}" onclick="${_cellClick}">${label}${noteHtml}${outlineDot}</div>`+_pHtml+`</td>`;
+      }
     });
     h+=timeCellR+'</tr>';
   });
@@ -27290,6 +27299,11 @@ function initApp(){
   updateGlobalDefaultBtn();
   initActiveMode();
   fetchPersonalSlots().then(function(){renderTimetable();});
+  // Expose slot structure + custom slots to Supabase for Omni
+  setTimeout(function(){
+    supaSave('slotTimes',JSON.stringify(SLOTS.map(function(s){return{t:s.t};})));
+    supaSave('ttCustom',JSON.stringify(ttCustom));
+  },2000);
   function schedNext(){const n=new Date(),nx=new Date(n);nx.setDate(nx.getDate()+1);nx.setHours(0,0,5,0);setTimeout(()=>{const el=document.getElementById('mc-date');if(el)el.value=todayFmt();schedNext();},(nx-n));}
   schedNext();
   setInterval(()=>{const ts=document.getElementById('tab-sched');if(ts&&ts.classList.contains('active'))renderTimetable();},60000);
@@ -28213,9 +28227,9 @@ let _notes={open:false,slotIdx:0,day:'',week:0,tab:'plan',recur:'once',label:'',
 let _editBullets=[]; // working copy for the editor
 let _editLiveBullets=[];
 
-function openSlotNotes(slotIdx,day,week){
+function openSlotNotes(slotIdx,day,week,labelOverride){
   const cell=getCustomForWeek(week,slotIdx,day)||SLOTS[slotIdx][day];
-  const label=cell?cell.l:'—';
+  const label=labelOverride||(cell?cell.l:'—');
   const tp=cell?cell.tp:'free';
   const cat=cell?(cell.cat||cell.tp):'free'; // use explicit cat, fall back to tp
   _notes={open:true,slotIdx,day,week,tab:'plan',label,tp,cat};
