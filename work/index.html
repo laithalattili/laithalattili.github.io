@@ -28233,7 +28233,8 @@ function openSlotNotes(slotIdx,day,week){
   // Render header
   document.getElementById('notes-title').textContent=label;
   const slotTime=getSlotTime(slotIdx);
-  const _custEnd2=custom&&custom.customEndTime?custom.customEndTime:null;
+  const _customSlot=getCustomForWeek(week,slotIdx,day);
+  const _custEnd2=_customSlot&&_customSlot.customEndTime?_customSlot.customEndTime:null;
   const endTime=_custEnd2||slotEndTime(slotIdx);
   document.getElementById('notes-sub').textContent=`${slotTime}–${endTime} · ${day} W${getWeekNumber(week)}`;
   _updateNotesRecurChip();
