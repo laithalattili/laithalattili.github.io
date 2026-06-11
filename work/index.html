@@ -23304,7 +23304,7 @@ function saveSlot(){
     if(found>=0)targetSlot=found;
   }
   const endSelEl=document.getElementById('edit-endtime-override');
-  const endSlotIdx=endSelEl&&endSelEl.value?parseInt(endSelEl.value):null;
+  const customEndTime=endSelEl&&endSelEl.value?endSelEl.value:null;const endSlotIdx=null;
   const catVal=document.getElementById('edit-cat').value||document.getElementById('edit-type').value||'empty';
   // If user picked a colour for a custom cat, update it in settings
   const customColor=document.getElementById('edit-custom-color')&&document.getElementById('edit-custom-color').value;
@@ -23313,7 +23313,7 @@ function saveSlot(){
     S.categoryDefs[catVal].text=document.getElementById('edit-custom-text').value||'#fff';
     saveSettings();
   }
-  const evtData={l:document.getElementById('edit-label').value||'',tp:document.getElementById('edit-type').value||'free',cat:catVal,recur:document.getElementById('edit-recur').value||'once',placedWeek:week,endSlotIdx};
+  const evtData={l:document.getElementById('edit-label').value||'',tp:document.getElementById('edit-type').value||'free',cat:catVal,recur:document.getElementById('edit-recur').value||'once',placedWeek:week,endSlotIdx,customEndTime};
   // Record label history for quick-fill suggestions
   _saveLabelHistory(evtData.l,evtData.tp,catVal);
   // Save for each slot in range
