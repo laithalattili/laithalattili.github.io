@@ -305,7 +305,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .tt-tc-time{font-size:8px;color:var(--text3);display:block;padding-top:2px}
 .tt-tc-period{font-size:9px;font-weight:600;color:var(--text2);display:block}
 .tt-cell{padding:1px;vertical-align:middle;text-align:center;height:28px}
-.tt-inner{border-radius:3px;padding:2px;font-size:8px;font-weight:500;line-height:1.2;min-height:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;cursor:default}
+.tt-inner{border-radius:3px;padding:2px;font-size:8px;font-weight:500;line-height:1.2;min-height:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;cursor:default}.tt-inner.span-cell{min-height:unset;height:100%;width:100%;position:absolute;top:0;left:0;box-sizing:border-box}
 .tt-inner.base-slot{opacity:.9}
 .tt-inner.custom-slot{border:1.5px solid rgba(0,0,0,.2)}
 .tt-inner.editable{cursor:pointer}
@@ -399,7 +399,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .tt-tc-time{font-size:8px;color:var(--text3);display:block;padding-top:2px}
 .tt-tc-period{font-size:9px;font-weight:600;color:var(--text2);display:block}
 .tt-cell{padding:1px;vertical-align:middle;text-align:center;height:28px}
-.tt-inner{border-radius:3px;padding:2px;font-size:8px;font-weight:500;line-height:1.2;min-height:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;cursor:default}
+.tt-inner{border-radius:3px;padding:2px;font-size:8px;font-weight:500;line-height:1.2;min-height:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;cursor:default}.tt-inner.span-cell{min-height:unset;height:100%;width:100%;position:absolute;top:0;left:0;box-sizing:border-box}
 .tt-inner.base-slot{opacity:.9}
 .tt-inner.custom-slot{border:1.5px solid rgba(0,0,0,.2)}
 .tt-inner.editable{cursor:pointer}
@@ -23934,12 +23934,9 @@ function renderTimetable(){
       const _startIsClean2=!custom||!custom.customStartTime||custom.customStartTime===getSlotTime(i);
       const _endIsClean2=custom&&custom.customEndTime&&SLOTS.some(s=>s.t===custom.customEndTime);
       if(_custEndIdx&&_custEndIdx>i&&_startIsClean2&&_endIsClean2){
-        for(let j=i+1;j<=_custEndIdx;j++){skipCells.add(j+'_'+d);console.log('SKIP ADD '+j+'_'+d);}
+        for(let j=i+1;j<=_custEndIdx;j++)skipCells.add(j+'_'+d);
         i=_custEndIdx+1;
-      } else {
-        if(custom&&custom.customEndTime)console.log('SKIP MISS i='+i+' d='+d+' _custEndIdx='+_custEndIdx+' sc2='+_startIsClean2+' ec2='+_endIsClean2+' cet='+custom.customEndTime);
-        i++;
-      }
+      } else i++;
     }
   });
 
@@ -24044,9 +24041,8 @@ function renderTimetable(){
       const _startIsClean=!cell.customStartTime||cell.customStartTime===getSlotTime(idx);
       const _endIsClean=cell&&cell.customEndTime&&SLOTS.some(s=>s.t===cell.customEndTime);
       const isSpanStart=_endSlotIdx&&_endSlotIdx>idx&&_startIsClean&&_endIsClean;
-      if(cell&&cell.customEndTime)console.log('SPAN CHECK idx='+idx+' d='+d+' endSlotIdx='+_endSlotIdx+' startClean='+_startIsClean+' endClean='+_endIsClean+' isSpan='+isSpanStart+' cst='+cell.customStartTime+' cet='+cell.customEndTime);
       const rowSpan=isSpanStart?(_endSlotIdx-idx+1):1;
-      const tdOpen=rowSpan>1?`<td class="${tdCls}" rowspan="${rowSpan}" style="vertical-align:middle">`:`<td class="${tdCls}">`;
+      const tdOpen=rowSpan>1?`<td class="${tdCls}" rowspan="${rowSpan}" style="vertical-align:middle;position:relative;padding:0">`:`<td class="${tdCls}">`;
       const _cellClick=ttEditMode?`openEditModal(${idx},'${d}')`:`openSlotNotes(${idx},'${d}',${offset})`;
       if(!cell){
         const _pSlotsE=getPersonalSlotsForDay(d,dayDateStrs[activeDays.indexOf(d)]).filter(function(ps){const ss=t2m(ps.start_time),se=t2m(ps.end_time),cs=t2m(getSlotTime(idx));const ce=idx+1<SLOTS.length?t2m(getSlotTime(idx+1)):cs+30;return ss<ce&&se>cs;});
@@ -24083,8 +24079,8 @@ function renderTimetable(){
       } else {
       const _pSlots=getPersonalSlotsForDay(d,dayDateStrs[activeDays.indexOf(d)]).filter(function(ps){const ss=t2m(ps.start_time),se=t2m(ps.end_time),cs=t2m(getSlotTime(idx));const ce=idx+1<SLOTS.length?t2m(getSlotTime(idx+1)):cs+30;return ss<ce&&se>cs;});
       const _pHtml=_pSlots.length?_pSlots.map(function(ps){return '<span class="personal-pill" onclick="openOmni(event)">👤 '+ps.start_time+'–'+ps.end_time+'</span>';}).join(''):'';
-      const _spanStyle=rowSpan>1?'height:100%;box-sizing:border-box;':'';
-      h+=`${tdOpen}<div class="tt-inner c-${cell.tp}${half}${customClass}${ttEditMode?' editable':''}" style="${cb}${_spanStyle}" onclick="${_cellClick}">${label}${noteHtml}${outlineDot}</div>`+_pHtml+`</td>`;
+      const _spanCls=rowSpan>1?' span-cell':'';
+      h+=`${tdOpen}<div class="tt-inner${_spanCls} c-${cell.tp}${half}${customClass}${ttEditMode?' editable':''}" style="${cb}" onclick="${_cellClick}">${label}${noteHtml}${outlineDot}</div>`+_pHtml+`</td>`;
       }
     });
     h+=timeCellR+'</tr>';
