@@ -1397,8 +1397,6 @@ function _applyTtCustom(ttCustom){
   const keys=Object.keys(ttCustom||{});
   if(keys.length){
     console.log('ttCustom ALL keys:',JSON.stringify(keys));
-    const _friKeys=keys.filter(k=>k.includes('_Fri')||k.includes('_Thu'));
-    _friKeys.forEach(k=>console.log('TtC entry',k,JSON.stringify(ttCustom[k])));
     console.log('ttCustom first value:',JSON.stringify(ttCustom[keys[0]]));
   }else{
     console.log('ttCustom: empty');
@@ -1735,6 +1733,7 @@ function renderDay(){
       // endSlotIdx is exclusive — skip all slots from i+1 up to endSlotIdx
       for(let j=i+1;j<ov.endSlotIdx&&j<WSLOTS.length;j++)skippedSlots.add(j);
     }
+    if(ov)console.log('WorkEvt pushed:',realStart,'–',realEnd,label,'customEndTime:',ov.customEndTime,'spanEnd:',spanEnd);
     _workEvts.push({time:realStart,end:realEnd,endTime:realEnd,label,tp,idx:i,src:'work'});
   }
   // Merge personal slots into unified timeline
