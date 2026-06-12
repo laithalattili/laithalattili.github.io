@@ -1397,6 +1397,8 @@ function _applyTtCustom(ttCustom){
   const keys=Object.keys(ttCustom||{});
   if(keys.length){
     console.log('ttCustom ALL keys:',JSON.stringify(keys));
+    const _friKeys=keys.filter(k=>k.includes('_Fri')||k.includes('_Thu'));
+    _friKeys.forEach(k=>console.log('TtC entry',k,JSON.stringify(ttCustom[k])));
     console.log('ttCustom first value:',JSON.stringify(ttCustom[keys[0]]));
   }else{
     console.log('ttCustom: empty');
