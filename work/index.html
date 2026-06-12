@@ -23934,9 +23934,12 @@ function renderTimetable(){
       const _startIsClean2=!custom||!custom.customStartTime||custom.customStartTime===getSlotTime(i);
       const _endIsClean2=custom&&custom.customEndTime&&SLOTS.some(s=>s.t===custom.customEndTime);
       if(_custEndIdx&&_custEndIdx>i&&_startIsClean2&&_endIsClean2){
-        for(let j=i+1;j<=_custEndIdx;j++)skipCells.add(j+'_'+d);
+        for(let j=i+1;j<=_custEndIdx;j++){skipCells.add(j+'_'+d);console.log('SKIP ADD '+j+'_'+d);}
         i=_custEndIdx+1;
-      } else i++;
+      } else {
+        if(custom&&custom.customEndTime)console.log('SKIP MISS i='+i+' d='+d+' _custEndIdx='+_custEndIdx+' sc2='+_startIsClean2+' ec2='+_endIsClean2+' cet='+custom.customEndTime);
+        i++;
+      }
     }
   });
 
