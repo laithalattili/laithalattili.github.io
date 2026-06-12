@@ -1715,6 +1715,7 @@ function renderDay(){
   // The ttCustom key format is: schoolWeek_workAppIdx_dayName
   const _daySlots=WSLOTS.filter(s=>t2m(s.t)>=420); // slots from 07:00+
   const _nightSlots=WSLOTS.filter(s=>t2m(s.t)<420); // 00:00-06:59
+  console.log('_daySlots[0]:',_daySlots[0]?.t,'_daySlots[1]:',_daySlots[1]?.t,'total:',_daySlots.length);
 
   for(let ii=0;ii<_daySlots.length;ii++){
     if(skippedSlots.has(ii))continue;
