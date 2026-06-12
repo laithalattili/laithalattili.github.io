@@ -1710,57 +1710,41 @@ function renderDay(){
   // Build unified work events using spec algorithm
   const skippedSlots=new Set();
   const _workEvts=[];
-  // Use Work app slot times if available (correct indices for ttCustom lookup)
-  // Work app indices start at 07:00 (index 0), WSLOTS has overnight slots prepended
-  let _iterSlots;
-  if(_SLOT_TIMES.length>0){
-    _iterSlots=_SLOT_TIMES.map((s,i)=>{
-      const ws=WSLOTS.find(w=>w.t===s.t)||{t:s.t};
-      return{ws,wtIdx:i};
-    });
-  }else{
-    // No slotTimes from Supabase yet — calculate offset from WSLOTS
-    // Work app index 0 = first non-overnight slot (>=07:00)
-    const _overnightCount=WSLOTS.filter(s=>t2m(s.t)<t2m('07:00')).length;
-    _iterSlots=WSLOTS.map((s,i)=>({ws:s,wtIdx:i-_overnightCount})).filter(e=>e.wtIdx>=0);
-  }
+  // Build Work app index → WSLOTS index map
+  // Work app indices start at first non-overnight slot (07:00 = index 0)
+  // The ttCustom key format is: schoolWeek_workAppIdx_dayName
+  const _daySlots=WSLOTS.filter(s=>t2m(s.t)>=420); // slots from 07:00+
+  const _nightSlots=WSLOTS.filter(s=>t2m(s.t)<420); // 00:00-06:59
 
-  // Always include overnight sleep slots separately
-  const _sleepSlots=showNight?WSLOTS.filter(s=>t2m(s.t)<420):[];
-
-  for(let ii=0;ii<_iterSlots.length;ii++){
+  for(let ii=0;ii<_daySlots.length;ii++){
     if(skippedSlots.has(ii))continue;
-    const {ws:s,wtIdx}=_iterSlots[ii];
-    const slotMinutes=t2m(s.t);
-    const isLateNight=slotMinutes>=0&&slotMinutes<420;
-    if(isLateNight&&!showNight)continue;
-    const key=schoolWeek+'_'+wtIdx+'_'+dayName;
+    const s=_daySlots[ii];
+    const key=schoolWeek+'_'+ii+'_'+dayName;
     const rawOv=ttc[key];
     const ov=rawOv&&typeof _eventMatchesWeek==='function'&&_eventMatchesWeek(rawOv,schoolWeek)?rawOv:null;
     const base=s[dayName];
     if(!base&&!ov)continue;
     const realStart=ov?.customStartTime||s.t;
-    // endSlotIdx uses Work app indices — look up in _iterSlots
-    const endSlotEntry=ov?.endSlotIdx!=null?_iterSlots[ov.endSlotIdx]:null;
-    const endSlotTime=endSlotEntry?.ws?.t||null;
-    const nextSlot=_iterSlots[ii+1]?.ws?.t||'00:00';
-    const realEnd=ov?.customEndTime||endSlotTime||nextSlot;
+    // endSlotIdx is Work app index — look up in _daySlots
+    const endSlotTime=ov?.endSlotIdx!=null?(_daySlots[ov.endSlotIdx]?.t||null):null;
+    const nextSlotTime=_daySlots[ii+1]?.t||'00:00';
+    const realEnd=ov?.customEndTime||endSlotTime||nextSlotTime;
     const label=ov?(ov.l||ov.label||base?.l||''):(base?.l||'');
     const tp=ov?_ttcTpToOmni(ov.tp||ov.cat||'free'):(base?.tp||'free');
-    // Skip continuation slots
     const spanEnd=ov?.customEndTime||endSlotTime;
     if(spanEnd){
       const endM=t2m(spanEnd);
-      for(let j=ii+1;j<_iterSlots.length;j++){if(t2m(_iterSlots[j].ws.t)<endM)skippedSlots.add(j);else break;}
+      for(let j=ii+1;j<_daySlots.length;j++){if(t2m(_daySlots[j].t)<endM)skippedSlots.add(j);else break;}
     } else if(ov?.endSlotIdx!=null){
-      for(let j=ii+1;j<ov.endSlotIdx&&j<_iterSlots.length;j++)skippedSlots.add(j);
+      for(let j=ii+1;j<ov.endSlotIdx;j++)skippedSlots.add(j);
     }
-    _workEvts.push({time:realStart,end:realEnd,endTime:realEnd,label,tp,idx:wtIdx,src:'work'});
+    _workEvts.push({time:realStart,end:realEnd,endTime:realEnd,label,tp,idx:ii,src:'work'});
   }
   // Add overnight sleep slots when night mode on
   if(showNight){
-    _sleepSlots.forEach(s=>{
-      _workEvts.push({time:s.t,end:WSLOTS[WSLOTS.indexOf(s)+1]?.t||s.t,endTime:WSLOTS[WSLOTS.indexOf(s)+1]?.t||s.t,label:'Sleep',tp:'sleep',idx:-1,src:'work'});
+    _nightSlots.forEach((s,ni)=>{
+      const nextT=_nightSlots[ni+1]?.t||_daySlots[0]?.t||'07:00';
+      _workEvts.push({time:s.t,end:nextT,endTime:nextT,label:'Sleep',tp:'sleep',idx:-1,src:'work'});
     });
   }
   // Merge personal slots into unified timeline
