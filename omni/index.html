@@ -1793,7 +1793,7 @@ function renderDay(){
     if(pastSlots.length){
       const first=pastSlots[0].time;
       const lastPast=pastSlots[pastSlots.length-1];
-      const lastEnd=WSLOTS[lastPast.idx+1]?.t||lastPast.time;
+      const lastEnd=lastPast.endTime||lastPast.end||_daySlots[lastPast.idx+1]?.t||lastPast.time;
       const pastExp=localStorage.getItem('omni_past_exp_'+dateStr)==='1';
       slotsHtml+=`<div class="past-sum" id="past-sum-row" style="${pastExp?'display:none':''}">
         <span style="font-family:var(--mono);font-size:10px;color:var(--tx3);white-space:nowrap">${first}–${lastEnd}</span>
@@ -1803,7 +1803,7 @@ function renderDay(){
       pastSlots.forEach(sl=>{
         const isFreeP=['free','personal'].includes(sl.tp);
         const isSleepP=sl.tp==='sleep';
-        const endTP=WSLOTS[sl.idx+1]?.t||'00:00';
+        const endTP=sl.endTime||sl.end||_daySlots[sl.idx+1]?.t||'00:00';
         const stP=_slotTasks(allTasks,sl.time,dateStr);const hasNP=hasNotes(sl.idx,dateStr);
         if(isSleepP){
           slotsHtml+=`<div class="slot sleep-slot" style="opacity:.35"><div class="slot-hdr"><span class="slot-tr">${sl.time} –${endTP}</span><span class="slot-pip" style="background:#a0968a"></span><span class="slot-lbl" style="color:var(--tx4);font-style:italic">Sleep</span></div></div>`;
@@ -1831,8 +1831,7 @@ function renderDay(){
       const isCur=_isCurrentSlot(sl);
       const isNxt=_isNextSlot(sl,fi,futSlots);
       const isPersonalSlot=false;
-      if(sl.time==='07:00'||sl.time==='07:30')console.log('slot',sl.time,'endTime:',sl.endTime,'end:',sl.end,'idx:',sl.idx,'dayslot+1:',_daySlots[sl.idx+1]?.t);
-      const endT=sl.endTime||sl.end||(_daySlots[sl.idx+1]?.t)||'00:00';
+      const endT=sl.endTime||sl.end||_daySlots[sl.idx+1]?.t||'00:00';
       const st=_slotTasks(allTasks,sl.time,dateStr);
       const hasN=hasNotes(sl.idx,dateStr);
       // Bold: end time of current slot, start time of next slot
@@ -1972,7 +1971,7 @@ function toggleTasksCol(){
 
 function _pastCollapse(slots){
   if(!slots.length)return'';
-  const first=slots[0].time;const last=slots[slots.length-1];const endT=WSLOTS[last.endIdx+1]?.t||last.time;
+  const first=slots[0].time;const last=slots[slots.length-1];const endT=last.endTime||last.end||_daySlots[last.idx+1]?.t||last.time;
   return`<div class="past-col" onclick="this.style.display='none'">
     <div class="past-col-in">
       <span class="slot-time">${first}</span>
