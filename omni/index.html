@@ -1413,7 +1413,6 @@ function _schoolWeekNum(dateStr){
       const target=new Date(dateStr+'T00:00:00');
       const diffDays=Math.round((target-start)/86400000);
       const wn=Math.floor(diffDays/7);
-      console.log('schoolWeek for',dateStr,':',wn,'(termStart:',startStr,')');
       return wn;
     }
   }
@@ -1422,7 +1421,6 @@ function _schoolWeekNum(dateStr){
   const targetMon=toMonday(new Date(dateStr+'T12:00:00'));
   const todayMon=toMonday(new Date());
   const rel=Math.round((targetMon-todayMon)/(7*86400000));
-  console.log('schoolWeek fallback for',dateStr,':',rel,'(no termStart)');
   return rel;
 }
 
@@ -1717,17 +1715,23 @@ function renderDay(){
     if(isLateNight&&!showNight)continue;
     const key=schoolWeek+'_'+i+'_'+dayName;
     const rawOv=ttc[key];
-    if(rawOv&&i>=17&&i<=20)console.log('ttCustom check key:',key,'found:',!!rawOv,'matches:',rawOv?_eventMatchesWeek(rawOv,schoolWeek):false,'placedWeek:',rawOv?.placedWeek);
     const ov=rawOv&&typeof _eventMatchesWeek==='function'&&_eventMatchesWeek(rawOv,schoolWeek)?rawOv:null;
     const base=s[dayName];
     if(!base&&!ov)continue;
     const realStart=ov?.customStartTime||s.t;
-    const realEnd=ov?.customEndTime||(WSLOTS[i+1]?.t||'00:00');
+    // endSlotIdx points to the slot AFTER the event ends (exclusive)
+    const endSlotTime=ov?.endSlotIdx!=null?WSLOTS[ov.endSlotIdx]?.t:null;
+    const realEnd=ov?.customEndTime||endSlotTime||(WSLOTS[i+1]?.t||'00:00');
     const label=ov?(ov.l||ov.label||base?.l||''):(base?.l||'');
     const tp=ov?_ttcTpToOmni(ov.tp||ov.cat||'free'):(base?.tp||'free');
-    if(ov?.customEndTime){
-      const endM=t2m(ov.customEndTime);
+    // Skip continuation slots for spanning events (via customEndTime or endSlotIdx)
+    const spanEnd=ov?.customEndTime||endSlotTime;
+    if(spanEnd){
+      const endM=t2m(spanEnd);
       for(let j=i+1;j<WSLOTS.length;j++){if(t2m(WSLOTS[j].t)<endM)skippedSlots.add(j);else break;}
+    } else if(ov?.endSlotIdx!=null){
+      // endSlotIdx is exclusive — skip all slots from i+1 up to endSlotIdx
+      for(let j=i+1;j<ov.endSlotIdx&&j<WSLOTS.length;j++)skippedSlots.add(j);
     }
     _workEvts.push({time:realStart,end:realEnd,endTime:realEnd,label,tp,idx:i,src:'work'});
   }
