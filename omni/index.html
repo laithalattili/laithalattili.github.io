@@ -1765,7 +1765,13 @@ function renderDay(){
   const allTasks=getTasksFor(_dayOff);
   const pastSlots=[],futSlots=[];
   // Split into past/future using time comparison
-  allSlots.forEach(sl=>{
+  // Add nextSlotTime to each slot for render fallback
+  allSlots.forEach((sl,i,arr)=>{
+    if(!sl.endTime||sl.endTime==='00:00'){
+      // Find next slot's start time as fallback endTime
+      const next=arr.find((_,j)=>j>i&&arr[j].time!==sl.time);
+      if(next)sl.endTime=next.time;
+    }
     const endT=sl.endTime||sl.end||'00:00';
     const isPast=isToday&&hasComm&&t2m(endT)<=nowM&&t2m(sl.time)<nowM;
     (isPast?pastSlots:futSlots).push(sl);
@@ -1826,10 +1832,11 @@ function renderDay(){
         slotsHtml+=`<div class="slot personal-slot"><div class="slot-hdr"><span class="slot-tr">${sl.time} <b>–${sl.end||sl.endTime}</b></span><span class="slot-pip" style="background:#7080c0"></span><span class="slot-lbl">${sl.label}</span><button onclick="openEditPersonalSlot('${sl.psId}')" style="font-size:11px;color:#7080c0;background:none;border:none;padding:0 4px">✎</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:20px;font-weight:300;color:#7080c0;background:none;border:none;padding:0 3px;line-height:1">+</button></div>${psTasksHtml}</div>`;
         return;
       }
-      // Hide free work slots that overlap with a personal event at the same time
-      const _psAtTime=sl.src==='work'&&['free','sleep'].includes(sl.tp)?
-        _todayPS.find(ps=>ps.start_time===sl.time):null;
-      if(_psAtTime)return; // personal event covers this slot
+      // Hide free/empty work slots that have a personal event at the same time
+      if(sl.src==='work'&&['free','sleep'].includes(sl.tp)){
+        const hasPersonalHere=allSlots.some(s=>s.src==='personal'&&s.time===sl.time);
+        if(hasPersonalHere)return;
+      }
       const isFree=['free','sleep'].includes(sl.tp)&&sl.src==='work';
       const isCur=_isCurrentSlot(sl);
       const isNxt=_isNextSlot(sl,fi,futSlots);
