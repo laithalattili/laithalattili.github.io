@@ -1756,6 +1756,7 @@ function _renderDayNow(){
   // Merge personal slots into unified timeline
   const _personalEvts=_todayPS.map(ps=>({time:ps.start_time,end:ps.end_time||'',endTime:ps.end_time||'',label:ps.title,tp:'personal',idx:-1,src:'personal',psId:ps.id,ps}));
   // Strict dedup: one work slot per time (prefer labelled/named over free)
+  if(PERSONAL_SLOTS.filter(p=>p.start_time==='21:30').length>1)console.warn('Duplicate personal slots at 21:30:',PERSONAL_SLOTS.filter(p=>p.start_time==='21:30').length);
   const _wSeen=new Map();
   _workEvts.forEach(ev=>{
     const existing=_wSeen.get(ev.time);
@@ -1853,10 +1854,18 @@ function _renderDayNow(){
         slotsHtml+=`<div class="slot personal-slot"><div class="slot-hdr"><span class="slot-tr">${sl.time} <b>–${sl.end||sl.endTime}</b></span><span class="slot-pip" style="background:#7080c0"></span><span class="slot-lbl">${sl.label}</span><button onclick="openEditPersonalSlot('${sl.psId}')" style="font-size:11px;color:#7080c0;background:none;border:none;padding:0 4px">✎</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:20px;font-weight:300;color:#7080c0;background:none;border:none;padding:0 3px;line-height:1">+</button></div>${psTasksHtml}</div>`;
         return;
       }
-      // Hide free/empty work slots that have a personal event at the same time
+      // Hide free/empty work slots covered by a personal event's time range
       if(sl.src==='work'&&['free','sleep'].includes(sl.tp)){
-        const hasPersonalHere=allSlots.some(s=>s.src==='personal'&&s.time===sl.time);
-        if(hasPersonalHere)return;
+        const slM=t2m(sl.time);
+        const coveredByPersonal=allSlots.some(s=>{
+          if(s.src!=='personal')return false;
+          const psStart=t2m(s.time);
+          // Use s.end (original from DB) as it's set before endTime fixup
+          const psEnd=t2m(s.end||s.endTime||'00:00');
+          if(psEnd===0)return false; // no valid end time
+          return slM>=psStart&&slM<psEnd;
+        });
+        if(coveredByPersonal)return;
       }
       const isFree=['free','sleep'].includes(sl.tp)&&sl.src==='work';
       const isCur=_isCurrentSlot(sl);
