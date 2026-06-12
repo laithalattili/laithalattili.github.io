@@ -27321,8 +27321,11 @@ function initApp(){
   fetchPersonalSlots().then(function(){renderTimetable();});
   // Expose slot structure + custom slots to Supabase for Omni
   setTimeout(function(){
-    supaSave('slotTimes',JSON.stringify(SLOTS.map(function(s){return{t:s.t};})));
+    supaSave('slotTimes',JSON.stringify(SLOTS.filter(function(s){return s.t>='07:00';}).map(function(s){return{t:s.t};})));
     supaSave('ttCustom',JSON.stringify(ttCustom));
+    const _w1=getW1Ref();
+    const _termStart=_w1.getFullYear()+'-'+String(_w1.getMonth()+1).padStart(2,'0')+'-'+String(_w1.getDate()).padStart(2,'0');
+    supaSave('termStart',_termStart);
   },2000);
   function schedNext(){const n=new Date(),nx=new Date(n);nx.setDate(nx.getDate()+1);nx.setHours(0,0,5,0);setTimeout(()=>{const el=document.getElementById('mc-date');if(el)el.value=todayFmt();schedNext();},(nx-n));}
   schedNext();
