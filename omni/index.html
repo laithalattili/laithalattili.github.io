@@ -1678,7 +1678,14 @@ function openAddTaskAtTime(slotTime){
 }
 
 // ── RENDER DAY ────────────────────────────────────────────────────────────────
+let _rdTimer=null;
 function renderDay(){
+  // Debounce: cancel any pending render and schedule a fresh one
+  if(_rdTimer)clearTimeout(_rdTimer);
+  _rdTimer=setTimeout(_renderDayNow,30);
+}
+function _renderDayNow(){
+  _rdTimer=null;
   const d=new Date();d.setDate(d.getDate()+_dayOff);
   const dayName=DS[d.getDay()];const dateStr=d.toISOString().split('T')[0];
   const isToday=_dayOff===0;
