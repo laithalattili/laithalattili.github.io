@@ -1831,6 +1831,7 @@ function renderDay(){
       const isCur=_isCurrentSlot(sl);
       const isNxt=_isNextSlot(sl,fi,futSlots);
       const isPersonalSlot=false;
+      if(sl.time==='07:00'||sl.time==='07:30')console.log('slot',sl.time,'endTime:',sl.endTime,'end:',sl.end,'idx:',sl.idx,'dayslot+1:',_daySlots[sl.idx+1]?.t);
       const endT=sl.endTime||sl.end||(_daySlots[sl.idx+1]?.t)||'00:00';
       const st=_slotTasks(allTasks,sl.time,dateStr);
       const hasN=hasNotes(sl.idx,dateStr);
