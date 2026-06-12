@@ -23339,6 +23339,7 @@ function saveSlot(){
   // Hide tutor picker
   const picker=document.getElementById('tutor-mtg-picker');
   if(picker)picker.style.display='none';
+  console.log('[saveSlot] key=',week+'_'+targetSlot+'_'+targetDay,'data=',JSON.stringify(evtData));
   saveState();closeEditModal();renderTimetable();
 }
 function resetSlot(){
