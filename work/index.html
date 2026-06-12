@@ -24041,6 +24041,7 @@ function renderTimetable(){
       const _startIsClean=!cell.customStartTime||cell.customStartTime===getSlotTime(idx);
       const _endIsClean=cell&&cell.customEndTime&&SLOTS.some(s=>s.t===cell.customEndTime);
       const isSpanStart=_endSlotIdx&&_endSlotIdx>idx&&_startIsClean&&_endIsClean;
+      if(cell&&cell.customEndTime)console.log('SPAN CHECK idx='+idx+' d='+d+' endSlotIdx='+_endSlotIdx+' startClean='+_startIsClean+' endClean='+_endIsClean+' isSpan='+isSpanStart+' cst='+cell.customStartTime+' cet='+cell.customEndTime);
       const rowSpan=isSpanStart?(_endSlotIdx-idx+1):1;
       const tdOpen=rowSpan>1?`<td class="${tdCls}" rowspan="${rowSpan}" style="vertical-align:middle">`:`<td class="${tdCls}">`;
       const _cellClick=ttEditMode?`openEditModal(${idx},'${d}')`:`openSlotNotes(${idx},'${d}',${offset})`;
