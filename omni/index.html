@@ -1348,18 +1348,15 @@ async function loadWorkData(){
           const startFields=['termStart','schoolStart','startDate','weekOneStart','term1Start','semesterStart','calStart','yearStart','firstWeek','tt-weeks-date'];
           const found=startFields.find(f=>v[f]);
           if(found&&!window._termStart)window._termStart=v[found];
-          console.log('WTASKS:',WTASKS.length,'WCATS:',WCATS.length,'termStart:',window._termStart);
         }
         if(row.key==='ttCustom'&&v){
           _applyTtCustom(v);
         }
         if(row.key==='slotTimes'&&Array.isArray(v)&&v.length){
           _rebuildWSlots(v);
-          console.log('slotTimes loaded:',v.length,'slots');
         }
         if(row.key==='globalDefault'&&v){
           window._workGlobalDefault=v;
-          console.log('globalDefault loaded, termStart:',v.termStart||v.schoolStart||v.startDate||JSON.stringify(v).substring(0,100));
         }
       });
     }else{console.warn('work_app_data: no data');}
@@ -1392,17 +1389,13 @@ function _rebuildWSlots(slotTimesArr){
     const sleepSlots=WSLOTS_STATIC.filter(s=>t2m(s.t)<420);
     WSLOTS=[...sleepSlots,...WSLOTS].sort((a,b)=>t2m(a.t)-t2m(b.t));
   }
-  console.log('WSLOTS rebuilt:',WSLOTS.length,'slots, slotTimes:',slotTimesArr.length);
 }
 
 function _applyTtCustom(ttCustom){
   window._ttCustomData=ttCustom;
   const keys=Object.keys(ttCustom||{});
   if(keys.length){
-    console.log('ttCustom ALL keys:',JSON.stringify(keys));
-    console.log('ttCustom first value:',JSON.stringify(ttCustom[keys[0]]));
   }else{
-    console.log('ttCustom: empty');
   }
 }
 
@@ -1715,18 +1708,22 @@ function renderDay(){
   // The ttCustom key format is: schoolWeek_workAppIdx_dayName
   const _daySlots=WSLOTS.filter(s=>t2m(s.t)>=420); // slots from 07:00+
   const _nightSlots=WSLOTS.filter(s=>t2m(s.t)<420); // 00:00-06:59
+  // Work app slot indices are offset by 7 from Omni's _daySlots
+  // (Work app slotTimes starts at 00:00 with 7 overnight slots before 07:00)
+  const _WORK_IDX_OFFSET=_SLOT_TIMES.length>0?0:7;
 
   for(let ii=0;ii<_daySlots.length;ii++){
     if(skippedSlots.has(ii))continue;
     const s=_daySlots[ii];
-    const key=schoolWeek+'_'+ii+'_'+dayName;
+    const key=schoolWeek+'_'+(ii+_WORK_IDX_OFFSET)+'_'+dayName;
     const rawOv=ttc[key];
     const ov=rawOv&&typeof _eventMatchesWeek==='function'&&_eventMatchesWeek(rawOv,schoolWeek)?rawOv:null;
     const base=s[dayName];
     if(!base&&!ov)continue;
     const realStart=ov?.customStartTime||s.t;
-    // endSlotIdx is Work app index — look up in _daySlots
-    const endSlotTime=ov?.endSlotIdx!=null?(_daySlots[ov.endSlotIdx]?.t||null):null;
+    // endSlotIdx uses Work app indices — subtract offset to get _daySlots index
+    const endSlotIdx=ov?.endSlotIdx!=null?ov.endSlotIdx-_WORK_IDX_OFFSET:null;
+    const endSlotTime=endSlotIdx!=null?(_daySlots[endSlotIdx]?.t||null):null;
     const nextSlotTime=_daySlots[ii+1]?.t||'00:00';
     const realEnd=ov?.customEndTime||endSlotTime||nextSlotTime;
     const label=ov?(ov.l||ov.label||base?.l||''):(base?.l||'');
@@ -1735,8 +1732,8 @@ function renderDay(){
     if(spanEnd){
       const endM=t2m(spanEnd);
       for(let j=ii+1;j<_daySlots.length;j++){if(t2m(_daySlots[j].t)<endM)skippedSlots.add(j);else break;}
-    } else if(ov?.endSlotIdx!=null){
-      for(let j=ii+1;j<ov.endSlotIdx;j++)skippedSlots.add(j);
+    } else if(endSlotIdx!=null){
+      for(let j=ii+1;j<endSlotIdx;j++)skippedSlots.add(j);
     }
     _workEvts.push({time:realStart,end:realEnd,endTime:realEnd,label,tp,idx:ii,src:'work'});
   }
