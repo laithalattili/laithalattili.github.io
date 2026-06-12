@@ -1708,22 +1708,25 @@ function renderDay(){
   // The ttCustom key format is: schoolWeek_workAppIdx_dayName
   const _daySlots=WSLOTS.filter(s=>t2m(s.t)>=420); // slots from 07:00+
   const _nightSlots=WSLOTS.filter(s=>t2m(s.t)<420); // 00:00-06:59
-  // Work app slot indices are offset by 7 from Omni's _daySlots
-  // (Work app slotTimes starts at 00:00 with 7 overnight slots before 07:00)
-  const _WORK_IDX_OFFSET=_SLOT_TIMES.length>0?0:7;
+  // Build time→workAppIndex lookup using the full slot array (including overnight)
+  // Work app indices match the full WSLOTS or _SLOT_TIMES array starting from 00:00
+  const _fullSlots=_SLOT_TIMES.length>0?_SLOT_TIMES:WSLOTS;
+  const _timeToWorkIdx={};
+  _fullSlots.forEach((s,i)=>{_timeToWorkIdx[s.t]=i;});
 
   for(let ii=0;ii<_daySlots.length;ii++){
     if(skippedSlots.has(ii))continue;
     const s=_daySlots[ii];
-    const key=schoolWeek+'_'+(ii+_WORK_IDX_OFFSET)+'_'+dayName;
+    const wtIdx=_timeToWorkIdx[s.t]??-1;
+    if(wtIdx<0)continue;
+    const key=schoolWeek+'_'+wtIdx+'_'+dayName;
     const rawOv=ttc[key];
     const ov=rawOv&&typeof _eventMatchesWeek==='function'&&_eventMatchesWeek(rawOv,schoolWeek)?rawOv:null;
     const base=s[dayName];
     if(!base&&!ov)continue;
     const realStart=ov?.customStartTime||s.t;
-    // endSlotIdx uses Work app indices — subtract offset to get _daySlots index
-    const endSlotIdx=ov?.endSlotIdx!=null?ov.endSlotIdx-_WORK_IDX_OFFSET:null;
-    const endSlotTime=endSlotIdx!=null?(_daySlots[endSlotIdx]?.t||null):null;
+    // endSlotIdx is Work app index — look up time directly from _fullSlots
+    const endSlotTime=ov?.endSlotIdx!=null?(_fullSlots[ov.endSlotIdx]?.t||null):null;
     const nextSlotTime=_daySlots[ii+1]?.t||'00:00';
     const realEnd=ov?.customEndTime||endSlotTime||nextSlotTime;
     const label=ov?(ov.l||ov.label||base?.l||''):(base?.l||'');
@@ -1732,8 +1735,10 @@ function renderDay(){
     if(spanEnd){
       const endM=t2m(spanEnd);
       for(let j=ii+1;j<_daySlots.length;j++){if(t2m(_daySlots[j].t)<endM)skippedSlots.add(j);else break;}
-    } else if(endSlotIdx!=null){
-      for(let j=ii+1;j<endSlotIdx;j++)skippedSlots.add(j);
+    } else if(ov?.endSlotIdx!=null&&endSlotTime){
+      // Skip slots between start and endSlotIdx using time
+      const endM=t2m(endSlotTime);
+      for(let j=ii+1;j<_daySlots.length;j++){if(t2m(_daySlots[j].t)<endM)skippedSlots.add(j);else break;}
     }
     _workEvts.push({time:realStart,end:realEnd,endTime:realEnd,label,tp,idx:ii,src:'work'});
   }
