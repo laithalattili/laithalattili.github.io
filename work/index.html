@@ -23339,7 +23339,6 @@ function saveSlot(){
   // Hide tutor picker
   const picker=document.getElementById('tutor-mtg-picker');
   if(picker)picker.style.display='none';
-  console.log('[saveSlot] key=',week+'_'+targetSlot+'_'+targetDay,'data=',JSON.stringify(evtData));
   saveState();closeEditModal();renderTimetable();
 }
 function resetSlot(){
@@ -28249,8 +28248,8 @@ function openSlotNotes(slotIdx,day,week,labelOverride){
   if(!_editLiveBullets.length)_editLiveBullets=[{id:_nid(),text:'',depth:0}];
   // Render header
   document.getElementById('notes-title').textContent=label;
-  const slotTime=getSlotTime(slotIdx);
   const _customSlot=getCustomForWeek(week,slotIdx,day);
+  const slotTime=(_customSlot&&_customSlot.customStartTime)?_customSlot.customStartTime:getSlotTime(slotIdx);
   const _custEnd2=_customSlot&&_customSlot.customEndTime?_customSlot.customEndTime:null;
   const endTime=_custEnd2||slotEndTime(slotIdx);
   document.getElementById('notes-sub').textContent=`${slotTime}–${endTime} · ${day} W${getWeekNumber(week)}`;
