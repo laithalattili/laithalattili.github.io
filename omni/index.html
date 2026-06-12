@@ -1748,7 +1748,13 @@ function renderDay(){
   }
   // Merge personal slots into unified timeline
   const _personalEvts=_todayPS.map(ps=>({time:ps.start_time,end:ps.end_time||'',endTime:ps.end_time||'',label:ps.title,tp:'personal',idx:-1,src:'personal',psId:ps.id,ps}));
-  const allSlots=[..._workEvts,..._personalEvts].sort((a,b)=>t2m(a.time)-t2m(b.time));
+  // Deduplicate: if two work slots have the same time, keep the one with a label
+  const _seen=new Map();
+  [..._workEvts,..._personalEvts].forEach(ev=>{
+    const k=ev.time+'_'+ev.src;
+    if(!_seen.has(k)||ev.label)_seen.set(k,ev);
+  });
+  const allSlots=[..._seen.values()].sort((a,b)=>t2m(a.time)-t2m(b.time));
   const hasComm=allSlots.some(s=>!['free','personal'].includes(s.tp));
   let curIdx=-1;if(isToday)for(let i=0;i<WSLOTS.length;i++){if(nowM>=t2m(WSLOTS[i]?.t))curIdx=i;}
   // For unified timeline: current slot = the one whose time <= now < endTime
@@ -1769,7 +1775,7 @@ function renderDay(){
   allSlots.forEach((sl,i,arr)=>{
     if(!sl.endTime||sl.endTime==='00:00'){
       // Find next slot's start time as fallback endTime
-      const next=arr.find((_,j)=>j>i&&arr[j].time!==sl.time);
+      const next=arr.slice(i+1).find(s=>s.time!==sl.time);
       if(next)sl.endTime=next.time;
     }
     const endT=sl.endTime||sl.end||'00:00';
