@@ -23617,98 +23617,104 @@ function renderTodayView(){
     if(baseTp!=='sleep')return true; // non-sleep extended slot — show it
     return false; // pure sleep slot, no custom — hide unless extended
   });
-  todaySlotsToShow.forEach(idx=>{const slot=SLOTS[idx];
+  // Build time-driven event list — use actual customStartTime/customEndTime, skip span continuations
+  const _dateD=new Date();_dateD.setDate(_dateD.getDate()+tdDayOffset);
+  const slotDateStr=_dateD.getFullYear()+'-'+String(_dateD.getMonth()+1).padStart(2,'0')+'-'+String(_dateD.getDate()).padStart(2,'0');
+  const skippedIdxs=new Set();
+  const dayEvents=[];
+  todaySlotsToShow.forEach(idx=>{
+    if(skippedIdxs.has(idx))return;
+    const slot=SLOTS[idx];
     const custom=getCustomForWeek(offset,idx,dayName);
     const base=slot[dayName];
     const cell=custom||base;
     if(!cell)return;
-    const tEnd=slotEndTime(idx);
-    const period=PERIODS[idx]||'';
-    const isCur=isToday&&idx===curIdx;
-    const isNext=isToday&&idx===nextIdx;
-    const isPastSlot=isToday&&curIdx>=0&&nm>=0&&t2m(tEnd)<=nm;
-    const note=getNote(idx,dayName);
-
     // Handle hw off-week
     if(!custom&&base&&base.hw){
-      // Still respect past slot collapse
-      const _hwExtSlot=(idx<EARLY_SLOT_COUNT||idx>=LATE_SLOT_START);
-      if(isPastSlot&&ttCollapsePast&&!_hwExtSlot)return;
       const act=(base.hw==='kris'||base.hw==='canteen'||base.hw==='gym3')?wA:!wA;
-      if(!act){
-        const slotClass=`today-slot${isPastSlot?' past':''}`;
-        html+=`<div class="${slotClass}" id="tslot-${idx}" style="border:none;margin-bottom:3px;border-radius:6px;overflow:hidden">
-          <div onclick="toggleTodayNote(${idx},'${dayName}')" style="background:#dcfce7;padding:.5rem .85rem;display:flex;align-items:center;gap:10px;cursor:pointer">
-            <div style="display:flex;flex-direction:column;min-width:58px">
-              <span style="font-size:10px;color:#166534;opacity:.8">${slot.t}–${tEnd}</span>
-              ${period?`<span style="font-size:9px;font-weight:700;color:#166534;opacity:.6">${period}</span>`:''}
-            </div>
-            <div style="font-size:13px;font-weight:600;color:#166534;flex:1">Free</div>
-          </div>
-          <div class="today-note-area" id="tnote-${idx}">
-            <textarea class="today-note-ta" id="tnote-ta-${idx}" rows="2" placeholder="Add a note...">${note}</textarea>
-            <div class="today-note-btns">
-              <button class="today-note-save" onclick="saveTodayNote(${idx},'${dayName}')">Save</button>
-              <button class="today-note-clear" onclick="clearTodayNote(${idx},'${dayName}')">Clear</button>
-              <label class="today-note-recur"><input type="checkbox" id="tnote-perm-${idx}" ${slotNotes['perm_'+idx+'_'+dayName]?'checked':''}> Permanent</label>
-            </div>
-          </div></div>`;
-        return;
+      if(!act){dayEvents.push({idx,cell:{l:'Free',tp:'free'},tStart:slot.t,tEnd:slotEndTime(idx),isFreeHw:true});return;}
+    }
+    // Compute actual start/end times
+    const tStart=custom&&custom.customStartTime?custom.customStartTime:slot.t;
+    let tEnd=custom&&custom.customEndTime?custom.customEndTime:slotEndTime(idx);
+    // Mark continuation slots as skipped
+    if(custom&&custom.customEndTime){
+      const etm=t2m(custom.customEndTime);
+      for(let j=idx+1;j<SLOTS.length;j++){
+        if(t2m(SLOTS[j].t)<etm)skippedIdxs.add(j);
+        else break;
       }
     }
+    dayEvents.push({idx,cell,tStart,tEnd,isFreeHw:false});
+  });
 
+  // Determine current event by actual time
+  let curEventIdx=-1,nextEventIdx=-1;
+  if(isToday&&nm>=0){
+    for(let i=0;i<dayEvents.length;i++){
+      if(nm>=t2m(dayEvents[i].tStart)&&nm<t2m(dayEvents[i].tEnd))curEventIdx=i;
+    }
+    if(curEventIdx>=0){
+      for(let i=curEventIdx+1;i<dayEvents.length;i++){
+        if(dayEvents[i].cell.tp!=='free'&&dayEvents[i].cell.tp!=='sleep'){nextEventIdx=i;break;}
+      }
+      if(nextEventIdx<0&&curEventIdx+1<dayEvents.length)nextEventIdx=curEventIdx+1;
+    }
+  }
+
+  // Inject collapsed past summary
+  if(ttCollapsePast&&curEventIdx>0){
+    const pastEvts=dayEvents.slice(0,curEventIdx).filter(e=>{
+      const isExt=(e.idx<EARLY_SLOT_COUNT||e.idx>=LATE_SLOT_START);
+      return !isExt;
+    });
+    if(pastEvts.length){
+      const fromT=pastEvts[0].tStart;
+      const toT=dayEvents[curEventIdx].tStart;
+      html+=`<div class="today-slot-past-slim" onclick="expandAllPast()" title="Tap to expand all past slots" style="justify-content:space-between">
+        <span style="font-size:9px;color:#adb5bd">${fromT} – ${toT}</span>
+        <span style="font-size:10px;color:#adb5bd">${pastEvts.length} past slot${pastEvts.length!==1?'s':''}</span>
+        <span style="font-size:9px;color:#ced4da">▸ expand</span>
+      </div>`;
+    }
+  }
+
+  dayEvents.forEach((ev,ei)=>{
+    const{idx,cell,tStart,tEnd,isFreeHw}=ev;
+    const isCur=ei===curEventIdx;
+    const isNext=ei===nextEventIdx;
+    const isPastSlot=isToday&&nm>=0&&t2m(tEnd)<=nm;
+    const isExtSlot=(idx<EARLY_SLOT_COUNT||idx>=LATE_SLOT_START);
+    if(isPastSlot&&ttCollapsePast&&!isExtSlot&&!isCur)return;
+    const note=getNote(idx,dayName);
     const bg=bgMap[cell.tp]||'#ddd';
     const tx=textMap[cell.tp]||'#333';
     const slotClass=`today-slot${isCur?' current':''}${isPastSlot?' past':''}`;
-
-    // Collapsed past slot rendering (not for extended sleep slots)
-    const isExtSlot=(idx<EARLY_SLOT_COUNT||idx>=LATE_SLOT_START);
-    if(isPastSlot&&ttCollapsePast&&!isExtSlot){
-      // Skip — we render a single summary block before the current slot
-      return;
-    }
-    // If this is the current slot and ttCollapsePast is on, inject summary before it
-    if(isCur&&ttCollapsePast){
-      const pastSlots=todaySlotsToShow.filter(si=>{
-        const isE=(si<EARLY_SLOT_COUNT||si>=LATE_SLOT_START);
-        return !isE&&si<curIdx;
-      });
-      if(pastSlots.length){
-        const fromT=SLOTS[pastSlots[0]].t;
-        const toT=slot.t;
-        html+=`<div class="today-slot-past-slim" onclick="expandAllPast()" title="Tap to expand all past slots" style="justify-content:space-between">
-          <span style="font-size:9px;color:#adb5bd">${fromT} – ${toT}</span>
-          <span style="font-size:10px;color:#adb5bd">${pastSlots.length} past slot${pastSlots.length!==1?'s':''}</span>
-          <span style="font-size:9px;color:#ced4da">▸ expand</span>
-        </div>`;
-      }
-    }
-
-    // Build time display — enhanced for current and next slots
-    let timeDisplay,endDisplay='';
-    if(isCur){
-      // Current slot: big end time
-      timeDisplay=`<span style="font-size:11px;color:${tx};opacity:.85;line-height:1.2">${slot.t}</span>`;
-      endDisplay=`<span style="font-size:13px;font-weight:800;color:${tx};background:rgba(0,0,0,.15);padding:1px 6px;border-radius:4px;margin-left:4px">→${tEnd}</span>`;
-    }else if(isNext){
-      // Next slot: start time pops
-      timeDisplay=`<span style="font-size:13px;font-weight:800;color:${tx};background:rgba(0,0,0,.12);padding:1px 6px;border-radius:4px">${slot.t}</span>`;
-      endDisplay=`<span style="font-size:10px;color:${tx};opacity:.7;margin-left:4px">–${tEnd}</span>`;
-    }else{
-      timeDisplay=`<span style="font-size:10px;color:${tx};opacity:.8;line-height:1.2">${slot.t}–${tEnd}</span>`;
-    }
-
     const curGlow=isCur?'box-shadow:inset 0 0 0 2px #f59f00;':'';
     const notePreview=note?`<span style="font-size:11px;color:${tx};opacity:.75;font-style:italic">${note}</span>`:'';
+
+    let timeDisplay,endDisplay='';
+    if(isCur){
+      timeDisplay=`<span style="font-size:11px;color:${tx};opacity:.85;line-height:1.2">${tStart}</span>`;
+      endDisplay=`<span style="font-size:13px;font-weight:800;color:${tx};background:rgba(0,0,0,.15);padding:1px 6px;border-radius:4px;margin-left:4px">→${tEnd}</span>`;
+    }else if(isNext){
+      timeDisplay=`<span style="font-size:13px;font-weight:800;color:${tx};background:rgba(0,0,0,.12);padding:1px 6px;border-radius:4px">${tStart}</span>`;
+      endDisplay=`<span style="font-size:10px;color:${tx};opacity:.7;margin-left:4px">–${tEnd}</span>`;
+    }else{
+      timeDisplay=`<span style="font-size:10px;color:${tx};opacity:.8;line-height:1.2">${tStart}–${tEnd}</span>`;
+    }
+
+    const pSlots=getPersonalSlotsForDay(dayName,slotDateStr).filter(function(p){
+      var ss=t2m(p.start_time),se=t2m(p.end_time),cs=t2m(tStart),ce=t2m(tEnd);
+      return ss<ce&&se>cs;
+    });
+    const pHtml=pSlots.length?'<div style="padding:3px 10px 4px;background:#f5f3ff;border-top:1px solid #e9d5ff">'+pSlots.map(function(p){return '<span class="personal-pill" onclick="openOmni(event)">👤 '+p.start_time+'–'+p.end_time+'</span>';}).join('')+'</div>':'';
 
     html+=`<div class="${slotClass}" id="tslot-${idx}" style="border:none;margin-bottom:3px;border-radius:6px;overflow:hidden">
       <div onclick="toggleTodayNote(${idx},'${dayName}')" style="background:${bg};padding:.6rem .85rem;${curGlow}cursor:pointer">
         <div style="display:flex;align-items:center;gap:10px;width:100%">
-          <div style="display:flex;flex-direction:column;min-width:68px;flex-shrink:0">
-            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px">${timeDisplay}${endDisplay}</div>
-            ${period?`<span style="font-size:9px;font-weight:700;color:${tx};opacity:.7">${period}</span>`:''}
-          </div>
-          <div style="font-size:13px;font-weight:600;color:${tx};flex:1">${cell.l}</div>
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px;min-width:68px;flex-shrink:0">${timeDisplay}${endDisplay}</div>
+          <div style="font-size:13px;font-weight:600;color:${tx};flex:1">${cell.l||''}</div>
           ${notePreview}
         </div>
       </div>
@@ -23722,7 +23728,7 @@ function renderTodayView(){
           </label>
         </div>
       </div>
-      ${(function(){var _d=new Date();_d.setDate(_d.getDate()+tdDayOffset);var slotDateStr=_d.getFullYear()+'-'+String(_d.getMonth()+1).padStart(2,'0')+'-'+String(_d.getDate()).padStart(2,'0');var ps=getPersonalSlotsForDay(dayName,slotDateStr).filter(function(p){var ss=t2m(p.start_time),se=t2m(p.end_time),cs=t2m(slot.t),ce=idx+1<SLOTS.length?t2m(SLOTS[idx+1].t):cs+30;return ss<ce&&se>cs;});return ps.length?'<div style="padding:3px 10px 4px;background:#f5f3ff;border-top:1px solid #e9d5ff">'+ps.map(function(p){return '<span class="personal-pill" onclick="openOmni(event)">👤 '+p.start_time+'–'+p.end_time+'</span>';}).join('')+'</div>':'';})()}
+      ${pHtml}
     </div>`;
   });
 
