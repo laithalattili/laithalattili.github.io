@@ -1748,16 +1748,20 @@ function renderDay(){
   }
   // Merge personal slots into unified timeline
   const _personalEvts=_todayPS.map(ps=>({time:ps.start_time,end:ps.end_time||'',endTime:ps.end_time||'',label:ps.title,tp:'personal',idx:-1,src:'personal',psId:ps.id,ps}));
-  // Deduplicate work slots by time (keep labelled over unlabelled)
+  // Strict dedup: one work slot per time (prefer labelled/named over free)
   const _wSeen=new Map();
   _workEvts.forEach(ev=>{
-    const k=ev.time;
-    const existing=_wSeen.get(k);
-    if(!existing||(!existing.label&&ev.label)||ev.tp!=='free')_wSeen.set(k,ev);
+    const existing=_wSeen.get(ev.time);
+    if(!existing)_wSeen.set(ev.time,ev);
+    else if(!existing.label&&ev.label)_wSeen.set(ev.time,ev);
+    else if(existing.tp==='free'&&ev.tp!=='free')_wSeen.set(ev.time,ev);
   });
-  // Deduplicate personal slots by psId
+  // Strict dedup personal slots by psId, then by time
   const _pSeen=new Map();
-  _personalEvts.forEach(ev=>{if(ev.psId)_pSeen.set(ev.psId,ev);else _pSeen.set(ev.time+'_p',ev);});
+  _personalEvts.forEach(ev=>{
+    const k=ev.psId||ev.time+'_p';
+    if(!_pSeen.has(k))_pSeen.set(k,ev);
+  });
   const allSlots=[..._wSeen.values(),..._pSeen.values()].sort((a,b)=>t2m(a.time)-t2m(b.time));
   const hasComm=allSlots.some(s=>!['free','personal'].includes(s.tp));
   let curIdx=-1;if(isToday)for(let i=0;i<WSLOTS.length;i++){if(nowM>=t2m(WSLOTS[i]?.t))curIdx=i;}
