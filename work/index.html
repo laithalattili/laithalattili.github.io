@@ -23930,10 +23930,7 @@ function renderTimetable(){
         const _etm2=t2m(custom.customEndTime);
         for(let _i2=i+1;_i2<SLOTS.length;_i2++){if(t2m(SLOTS[_i2].t)<_etm2)_custEndIdx=_i2;else break;}
       }
-      // Only do clean rowspan if start is on-boundary AND end lands exactly on a slot time
-      const _startIsClean2=!custom||!custom.customStartTime||custom.customStartTime===getSlotTime(i);
-      const _endIsClean2=custom&&custom.customEndTime&&SLOTS.some(s=>s.t===custom.customEndTime);
-      if(_custEndIdx&&_custEndIdx>i&&_startIsClean2&&_endIsClean2){
+      if(_custEndIdx&&_custEndIdx>i){
         for(let j=i+1;j<=_custEndIdx;j++)skipCells.add(j+'_'+d);
         i=_custEndIdx+1;
       } else i++;
@@ -24037,11 +24034,13 @@ function renderTimetable(){
         const _etm=t2m(cell.customEndTime);
         for(let _i=idx+1;_i<SLOTS.length;_i++){if(t2m(SLOTS[_i].t)<_etm)_endSlotIdx=_i;else break;}
       }
-      // Clean span: only merge rows when start is on-boundary AND end lands exactly on a slot time
+      // Always span when event crosses slot boundaries
+      const isSpanStart=_endSlotIdx&&_endSlotIdx>idx;
+      const rowSpan=isSpanStart?(_endSlotIdx-idx+1):1;
+      // Clean span: start AND end both land exactly on slot boundaries → full fill
       const _startIsClean=!cell.customStartTime||cell.customStartTime===getSlotTime(idx);
       const _endIsClean=cell&&cell.customEndTime&&SLOTS.some(s=>s.t===cell.customEndTime);
-      const isSpanStart=_endSlotIdx&&_endSlotIdx>idx&&_startIsClean&&_endIsClean;
-      const rowSpan=isSpanStart?(_endSlotIdx-idx+1):1;
+      const isCleanSpan=isSpanStart&&_startIsClean&&_endIsClean;
       const tdOpen=rowSpan>1?`<td class="${tdCls}" rowspan="${rowSpan}" style="vertical-align:middle;position:relative;padding:0">`:`<td class="${tdCls}">`;
       const _cellClick=ttEditMode?`openEditModal(${idx},'${d}')`:`openSlotNotes(${idx},'${d}',${offset})`;
       if(!cell){
@@ -24057,7 +24056,7 @@ function renderTimetable(){
       const customClass=custom?' custom-slot':' base-slot';
       let label=cell.l,half='';
       // Mode 2: mid-slot time — show time prefix only when NOT a clean span
-      if(custom&&(cell.customStartTime||cell.customEndTime)&&!isSpanStart){
+      if(custom&&(cell.customStartTime||cell.customEndTime)&&!isCleanSpan){
         const _cs=cell.customStartTime||getSlotTime(idx);
         const _ce=cell.customEndTime||slotEndTime(idx);
         label='<span style="font-size:8px;opacity:.7;display:block;line-height:1.4">'+_cs+'–'+_ce+'</span>'+(_esc(cell.l)||'');
@@ -24079,7 +24078,7 @@ function renderTimetable(){
       } else {
       const _pSlots=getPersonalSlotsForDay(d,dayDateStrs[activeDays.indexOf(d)]).filter(function(ps){const ss=t2m(ps.start_time),se=t2m(ps.end_time),cs=t2m(getSlotTime(idx));const ce=idx+1<SLOTS.length?t2m(getSlotTime(idx+1)):cs+30;return ss<ce&&se>cs;});
       const _pHtml=_pSlots.length?_pSlots.map(function(ps){return '<span class="personal-pill" onclick="openOmni(event)">👤 '+ps.start_time+'–'+ps.end_time+'</span>';}).join(''):'';
-      const _spanCls=rowSpan>1?' span-cell':'';
+      const _spanCls=isCleanSpan?' span-cell':'';
       h+=`${tdOpen}<div class="tt-inner${_spanCls} c-${cell.tp}${half}${customClass}${ttEditMode?' editable':''}" style="${cb}" onclick="${_cellClick}">${label}${noteHtml}${outlineDot}</div>`+_pHtml+`</td>`;
       }
     });
