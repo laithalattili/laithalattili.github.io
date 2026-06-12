@@ -2,9 +2,6 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -1805,7 +1802,7 @@ function renderDay(){
       pastSlots.forEach(sl=>{
         const isFreeP=['free','personal'].includes(sl.tp);
         const isSleepP=sl.tp==='sleep';
-        const endTP=sl.endTime||sl.end||_daySlots[sl.idx+1]?.t||'00:00';
+        const endTP=sl.endTime||sl.end||'00:00';
         const stP=_slotTasks(allTasks,sl.time,dateStr);const hasNP=hasNotes(sl.idx,dateStr);
         if(isSleepP){
           slotsHtml+=`<div class="slot sleep-slot" style="opacity:.35"><div class="slot-hdr"><span class="slot-tr">${sl.time} –${endTP}</span><span class="slot-pip" style="background:#a0968a"></span><span class="slot-lbl" style="color:var(--tx4);font-style:italic">Sleep</span></div></div>`;
@@ -1829,11 +1826,15 @@ function renderDay(){
         slotsHtml+=`<div class="slot personal-slot"><div class="slot-hdr"><span class="slot-tr">${sl.time} <b>–${sl.end||sl.endTime}</b></span><span class="slot-pip" style="background:#7080c0"></span><span class="slot-lbl">${sl.label}</span><button onclick="openEditPersonalSlot('${sl.psId}')" style="font-size:11px;color:#7080c0;background:none;border:none;padding:0 4px">✎</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:20px;font-weight:300;color:#7080c0;background:none;border:none;padding:0 3px;line-height:1">+</button></div>${psTasksHtml}</div>`;
         return;
       }
-      const isFree=['free','personal','sleep'].includes(sl.tp);
+      // Hide free work slots that overlap with a personal event at the same time
+      const _psAtTime=sl.src==='work'&&['free','sleep'].includes(sl.tp)?
+        _todayPS.find(ps=>ps.start_time===sl.time):null;
+      if(_psAtTime)return; // personal event covers this slot
+      const isFree=['free','sleep'].includes(sl.tp)&&sl.src==='work';
       const isCur=_isCurrentSlot(sl);
       const isNxt=_isNextSlot(sl,fi,futSlots);
       const isPersonalSlot=false;
-      const endT=sl.endTime||sl.end||_daySlots[sl.idx+1]?.t||'00:00';
+      const endT=sl.endTime||sl.end||'00:00';
       const st=_slotTasks(allTasks,sl.time,dateStr);
       const hasN=hasNotes(sl.idx,dateStr);
       // Bold: end time of current slot, start time of next slot
@@ -1852,7 +1853,7 @@ function renderDay(){
         slotsHtml+=`<div class="slot sleep-slot${isCur?' now':''}"><div class="slot-hdr">${trHtml}<span class="slot-pip" style="background:#a0968a"></span><span class="slot-lbl" style="color:var(--tx4);font-style:italic">Sleep</span>${badge}<button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:13px;color:var(--tx4);background:none;border:none;padding:0 3px;opacity:.4;line-height:1">+</button></div>${isCur?'<div class="slot-now-bar"></div>':''}${sSt.length?`<div class="slot-tasks">${sSt.map(t=>{const removeBtn=t.src==='work'?`<button onclick="removeWorkHint('${t.id}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`:`<button onclick="unassignTask('${t.id}','${dateStr}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`;return`<div class="slot-task-row"><div class="slot-task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t.done?' done':''}">${t.text}</div>${removeBtn}</div>`;}).join('')}</div>`:''}</div>`;
         return;
       }
-        slotsHtml+=`<div class="slot${isCur?' now':isNxt?' nxt':''}${isFree?' free-slot':''}"><div class="slot-hdr">${trHtml}<span class="slot-pip" style="background:${catCol(sl.tp)}"></span><span class="slot-lbl">${isFree&&!isCur?'':sl.label}</span>${badge}<button class="slot-notes-btn${hasN?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')">${hasN?'📝':'·'}</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:13px;color:var(--tx4);background:none;border:none;padding:0 3px;opacity:.5;line-height:1">+</button></div>${isCur?'<div class="slot-now-bar"></div>':''}${st.length?`<div class="slot-tasks">${st.map(t=>{
+        slotsHtml+=`<div class="slot${isCur?' now':isNxt?' nxt':''}${isFree?' free-slot':''}"><div class="slot-hdr">${trHtml}<span class="slot-pip" style="background:${catCol(sl.tp)}"></span><span class="slot-lbl">${isFree?'':sl.label}</span>${badge}<button class="slot-notes-btn${hasN?' has-notes':''}" onclick="openNotes(${sl.idx},'${dateStr}','${sl.label}')">${hasN?'📝':'·'}</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:13px;color:var(--tx4);background:none;border:none;padding:0 3px;opacity:.5;line-height:1">+</button></div>${isCur?'<div class="slot-now-bar"></div>':''}${st.length?`<div class="slot-tasks">${st.map(t=>{
     const isWork=t.src==='work';const isGym2=t.src==='gym';const isHabit=t.src==='habit';
     const removeBtn=isWork
       ? `<button onclick="removeWorkHint('${t.id}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`
