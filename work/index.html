@@ -24079,7 +24079,8 @@ function renderTimetable(){
       } else {
       const _pSlots=getPersonalSlotsForDay(d,dayDateStrs[activeDays.indexOf(d)]).filter(function(ps){const ss=t2m(ps.start_time),se=t2m(ps.end_time),cs=t2m(getSlotTime(idx));const ce=idx+1<SLOTS.length?t2m(getSlotTime(idx+1)):cs+30;return ss<ce&&se>cs;});
       const _pHtml=_pSlots.length?_pSlots.map(function(ps){return '<span class="personal-pill" onclick="openOmni(event)">👤 '+ps.start_time+'–'+ps.end_time+'</span>';}).join(''):'';
-      h+=`${tdOpen}<div class="tt-inner c-${cell.tp}${half}${customClass}${ttEditMode?' editable':''}" style="${cb}" onclick="${_cellClick}">${label}${noteHtml}${outlineDot}</div>`+_pHtml+`</td>`;
+      const _spanStyle=rowSpan>1?'height:100%;box-sizing:border-box;':'';
+      h+=`${tdOpen}<div class="tt-inner c-${cell.tp}${half}${customClass}${ttEditMode?' editable':''}" style="${cb}${_spanStyle}" onclick="${_cellClick}">${label}${noteHtml}${outlineDot}</div>`+_pHtml+`</td>`;
       }
     });
     h+=timeCellR+'</tr>';
