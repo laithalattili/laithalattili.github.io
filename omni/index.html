@@ -1711,13 +1711,19 @@ function renderDay(){
   const skippedSlots=new Set();
   const _workEvts=[];
   // Use Work app slot times if available (correct indices for ttCustom lookup)
-  // Fall back to WSLOTS filtered to non-overnight slots
-  const _iterSlots=_SLOT_TIMES.length>0
-    ? _SLOT_TIMES.map((s,i)=>{
-        const ws=WSLOTS.find(w=>w.t===s.t)||{t:s.t};
-        return{ws,wtIdx:i}; // wtIdx = Work app index used in ttCustom keys
-      })
-    : WSLOTS.map((s,i)=>({ws:s,wtIdx:i}));
+  // Work app indices start at 07:00 (index 0), WSLOTS has overnight slots prepended
+  let _iterSlots;
+  if(_SLOT_TIMES.length>0){
+    _iterSlots=_SLOT_TIMES.map((s,i)=>{
+      const ws=WSLOTS.find(w=>w.t===s.t)||{t:s.t};
+      return{ws,wtIdx:i};
+    });
+  }else{
+    // No slotTimes from Supabase yet — calculate offset from WSLOTS
+    // Work app index 0 = first non-overnight slot (>=07:00)
+    const _overnightCount=WSLOTS.filter(s=>t2m(s.t)<t2m('07:00')).length;
+    _iterSlots=WSLOTS.map((s,i)=>({ws:s,wtIdx:i-_overnightCount})).filter(e=>e.wtIdx>=0);
+  }
 
   // Always include overnight sleep slots separately
   const _sleepSlots=showNight?WSLOTS.filter(s=>t2m(s.t)<420):[];
