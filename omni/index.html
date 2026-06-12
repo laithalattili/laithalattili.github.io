@@ -1413,13 +1413,17 @@ function _schoolWeekNum(dateStr){
       const target=new Date(dateStr+'T00:00:00');
       const diffDays=Math.round((target-start)/86400000);
       const wn=Math.floor(diffDays/7);
+      console.log('schoolWeek for',dateStr,':',wn,'(termStart:',startStr,')');
       return wn;
     }
   }
+  // Fallback: relative to today
   const toMonday=d=>{const day=d.getDay()||7;const m=new Date(d);m.setDate(d.getDate()-day+1);m.setHours(0,0,0,0);return m;};
   const targetMon=toMonday(new Date(dateStr+'T12:00:00'));
   const todayMon=toMonday(new Date());
-  return Math.round((targetMon-todayMon)/(7*86400000));
+  const rel=Math.round((targetMon-todayMon)/(7*86400000));
+  console.log('schoolWeek fallback for',dateStr,':',rel,'(no termStart)');
+  return rel;
 }
 
 function _slotForDate(slotIdx, dateStr){
@@ -1712,7 +1716,9 @@ function renderDay(){
     const isLateNight=slotMinutes>=0&&slotMinutes<420;
     if(isLateNight&&!showNight)continue;
     const key=schoolWeek+'_'+i+'_'+dayName;
-    const ov=ttc[key]&&typeof _eventMatchesWeek==='function'&&_eventMatchesWeek(ttc[key],schoolWeek)?ttc[key]:null;
+    const rawOv=ttc[key];
+    if(rawOv&&i>=17&&i<=20)console.log('ttCustom check key:',key,'found:',!!rawOv,'matches:',rawOv?_eventMatchesWeek(rawOv,schoolWeek):false,'placedWeek:',rawOv?.placedWeek);
+    const ov=rawOv&&typeof _eventMatchesWeek==='function'&&_eventMatchesWeek(rawOv,schoolWeek)?rawOv:null;
     const base=s[dayName];
     if(!base&&!ov)continue;
     const realStart=ov?.customStartTime||s.t;
