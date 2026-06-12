@@ -23930,7 +23930,10 @@ function renderTimetable(){
         const _etm2=t2m(custom.customEndTime);
         for(let _i2=i+1;_i2<SLOTS.length;_i2++){if(t2m(SLOTS[_i2].t)<_etm2)_custEndIdx=_i2;else break;}
       }
-      if(_custEndIdx&&_custEndIdx>i){
+      // Only do clean rowspan if start is on-boundary AND end lands exactly on a slot time
+      const _startIsClean2=!custom||!custom.customStartTime||custom.customStartTime===getSlotTime(i);
+      const _endIsClean2=custom&&custom.customEndTime&&SLOTS.some(s=>s.t===custom.customEndTime);
+      if(_custEndIdx&&_custEndIdx>i&&_startIsClean2&&_endIsClean2){
         for(let j=i+1;j<=_custEndIdx;j++)skipCells.add(j+'_'+d);
         i=_custEndIdx+1;
       } else i++;
@@ -24034,7 +24037,10 @@ function renderTimetable(){
         const _etm=t2m(cell.customEndTime);
         for(let _i=idx+1;_i<SLOTS.length;_i++){if(t2m(SLOTS[_i].t)<_etm)_endSlotIdx=_i;else break;}
       }
-      const isSpanStart=_endSlotIdx&&_endSlotIdx>idx;
+      // Clean span: only merge rows when start is on-boundary AND end lands exactly on a slot time
+      const _startIsClean=!cell.customStartTime||cell.customStartTime===getSlotTime(idx);
+      const _endIsClean=cell&&cell.customEndTime&&SLOTS.some(s=>s.t===cell.customEndTime);
+      const isSpanStart=_endSlotIdx&&_endSlotIdx>idx&&_startIsClean&&_endIsClean;
       const rowSpan=isSpanStart?(_endSlotIdx-idx+1):1;
       const tdOpen=rowSpan>1?`<td class="${tdCls}" rowspan="${rowSpan}" style="vertical-align:middle">`:`<td class="${tdCls}">`;
       const _cellClick=ttEditMode?`openEditModal(${idx},'${d}')`:`openSlotNotes(${idx},'${d}',${offset})`;
@@ -24050,6 +24056,12 @@ function renderTimetable(){
 
       const customClass=custom?' custom-slot':' base-slot';
       let label=cell.l,half='';
+      // Mode 2: mid-slot time — show time prefix only when NOT a clean span
+      if(custom&&(cell.customStartTime||cell.customEndTime)&&!isSpanStart){
+        const _cs=cell.customStartTime||getSlotTime(idx);
+        const _ce=cell.customEndTime||slotEndTime(idx);
+        label='<span style="font-size:8px;opacity:.7;display:block;line-height:1.4">'+_cs+'–'+_ce+'</span>'+(_esc(cell.l)||'');
+      }
       if(!custom&&base&&base.hw){const act=(base.hw==='kris'||base.hw==='canteen'||base.hw==='gym3')?wA:!wA;if(!act){
         h+=`${tdOpen}<div class="tt-inner c-free base-slot${ttEditMode?' editable':''}" onclick="${_cellClick}">Free</div></td>`;return;}}
       const note=getNote(idx,d);
