@@ -23103,17 +23103,19 @@ let _lpTimer=null;
 function _lpStart(e,idx,day){
   _lpTimer=setTimeout(()=>{
     _lpTimer=null;
-    // Vibrate feedback if supported
     if(navigator.vibrate)navigator.vibrate(40);
-    // Open edit modal directly without entering edit mode
-    openEditModal(idx,day);
+    // Prevent the click event from firing after long press
+    _lpSuppressClick=true;
+    setTimeout(()=>{_lpSuppressClick=false;},600);
+    openEditModal(idx,day,true);
   },500);
 }
+let _lpSuppressClick=false;
 function _lpEnd(e){
   if(_lpTimer){clearTimeout(_lpTimer);_lpTimer=null;}
 }
-function openEditModal(slotIdx,day){
-  if(!ttEditMode)return;
+function openEditModal(slotIdx,day,_bypassEditMode){
+  if(!ttEditMode&&!_bypassEditMode)return;
   editSlotInfo={slotIdx,day,week:ttWeekOffset};
   const custom=getCustomForWeek(ttWeekOffset,slotIdx,day);
   const base=SLOTS[slotIdx][day];
@@ -23205,17 +23207,19 @@ function _startNewCat(){
   chips.parentNode.insertBefore(div,chips.nextSibling);
 }
 function _confirmNewCat(){
-  const name=document.getElementById('new-cat-name').value.trim();
+  const nameEl=document.getElementById('new-cat-name');
+  const colorEl=document.getElementById('new-cat-color');
+  const name=nameEl?nameEl.value.trim():'';
   if(!name)return;
-  const color=document.getElementById('new-cat-color').value||'#be185d';
+  const color=(colorEl?colorEl.value:'')||'#be185d';
   const id='ucat_'+Date.now();
   if(!S.categoryDefs)S.categoryDefs={};
   S.categoryDefs[id]={label:name,color,text:'#fff',commit:true,mode:'simple'};
   saveSettings();
+  // Remove panel before re-rendering chips
   const el=document.getElementById('new-cat-inline');
-  if(el)el.style.display='none';
+  if(el)el.remove();
   selectEditCat(id);
-  _renderEditCatChips(id);
 }
 function pickCustomCatColor(el){
   document.querySelectorAll('#edit-custom-colors .swatch').forEach(s=>s.classList.remove('selected'));
