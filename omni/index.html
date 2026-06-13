@@ -1705,6 +1705,7 @@ function _renderDayNow(){
   const _psMap={};
   _todayPS.forEach(ps=>{if(ps.start_time)_psMap[ps.start_time]=ps;});
   // Build unified work events using spec algorithm
+  const _personalEvts=_todayPS.map(ps=>({time:ps.start_time,end:ps.end_time||'',endTime:ps.end_time||'',label:ps.title,tp:'personal',idx:-1,src:'personal',psId:ps.id,ps}));
   const skippedSlots=new Set();
   const _workEvts=[];
   // Build Work app index → WSLOTS index map
@@ -1757,7 +1758,6 @@ function _renderDayNow(){
     });
   }
   // Merge personal slots into unified timeline
-  const _personalEvts=_todayPS.map(ps=>({time:ps.start_time,end:ps.end_time||'',endTime:ps.end_time||'',label:ps.title,tp:'personal',idx:-1,src:'personal',psId:ps.id,ps}));
   // Strict dedup: one work slot per time (prefer labelled/named over free)
   const _wSeen=new Map();
   _workEvts.forEach(ev=>{
