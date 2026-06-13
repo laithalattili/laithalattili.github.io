@@ -1722,7 +1722,12 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       <div id="edit-cat-chips" style="display:flex;flex-wrap:wrap;gap:5px"></div>
       <!-- Custom category colour (shown when a user cat is selected or creating new) -->
       <div id="edit-custom-cat-row" style="display:none;margin-top:8px;padding:8px;background:#f8f9fa;border-radius:6px;border:1px solid #e9ecef">
-        <div style="font-size:11px;color:#868e96;margin-bottom:6px">Custom category colour:</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+          <input id="edit-custom-cat-name" type="text" placeholder="Category name..." style="flex:1;font-size:12px;padding:4px 7px;border:1px solid #dee2e6;border-radius:4px;background:#fff">
+          <button onclick="_saveCustomCatName()" style="font-size:11px;padding:4px 9px;background:#495057;color:#fff;border:none;border-radius:4px;cursor:pointer">Rename</button>
+          <button onclick="_deleteCustomCat()" style="font-size:11px;padding:4px 9px;background:#dc2626;color:#fff;border:none;border-radius:4px;cursor:pointer">Delete</button>
+        </div>
+        <div style="font-size:11px;color:#868e96;margin-bottom:6px">Colour:</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px" id="edit-custom-colors">
           <div class="swatch" style="background:#1d4ed8" data-color="#1d4ed8" data-text="#fff" onclick="pickCustomCatColor(this)"></div>
           <div class="swatch" style="background:#7c3aed" data-color="#7c3aed" data-text="#fff" onclick="pickCustomCatColor(this)"></div>
@@ -23170,7 +23175,12 @@ function _renderEditCatChips(selectedCat){
   `<div class="edit-cat-chip" style="background:#f8f9fa;color:#495057;border:2px dashed #dee2e6" onclick="_startNewCat()">+ New</div>`;
   // Show custom color row if user-created cat selected
   const row=document.getElementById('edit-custom-cat-row');
-  if(row)row.style.display=(userCats.includes(selectedCat))?'block':'none';
+  const isUserCat=userCats.includes(selectedCat);
+  if(row)row.style.display=isUserCat?'block':'none';
+  if(isUserCat){
+    const nameField=document.getElementById('edit-custom-cat-name');
+    if(nameField)nameField.value=defs[selectedCat]?defs[selectedCat].label:'';
+  }
   // Show label suggestions based on category
   _renderLabelSuggestions(selectedCat);
   // Show/hide tutor picker
@@ -23220,6 +23230,27 @@ function _confirmNewCat(){
   const el=document.getElementById('new-cat-inline');
   if(el)el.remove();
   selectEditCat(id);
+}
+function _saveCustomCatName(){
+  const catId=document.getElementById('edit-cat').value;
+  const nameEl=document.getElementById('edit-custom-cat-name');
+  if(!catId||!nameEl||!catId.startsWith('ucat_'))return;
+  const name=nameEl.value.trim();
+  if(!name)return;
+  if(!S.categoryDefs)S.categoryDefs={};
+  if(!S.categoryDefs[catId])S.categoryDefs[catId]={};
+  S.categoryDefs[catId].label=name;
+  saveSettings();
+  _renderEditCatChips(catId);
+}
+function _deleteCustomCat(){
+  const catId=document.getElementById('edit-cat').value;
+  if(!catId||!catId.startsWith('ucat_'))return;
+  if(!confirm('Delete this category? Slots using it will keep their label but lose the category.'))return;
+  if(S.categoryDefs)delete S.categoryDefs[catId];
+  saveSettings();
+  selectEditCat('empty');
+  _renderEditCatChips('empty');
 }
 function pickCustomCatColor(el){
   document.querySelectorAll('#edit-custom-colors .swatch').forEach(s=>s.classList.remove('selected'));
