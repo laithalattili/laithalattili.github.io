@@ -1778,6 +1778,18 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       </div>
     </div>
 
+    <!-- Boarding register toggles -->
+    <div id="boarding-flags-section" style="margin-top:.6rem;display:flex;flex-direction:column;gap:6px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#495057">
+        <input type="checkbox" id="edit-boarding-register" style="width:15px;height:15px;accent-color:#7c3aed;cursor:pointer">
+        <span>Boarding register <span style="color:#aaa;font-size:11px">(boarders only)</span></span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#495057">
+        <input type="checkbox" id="edit-house-register" style="width:15px;height:15px;accent-color:#7c3aed;cursor:pointer">
+        <span>House register <span style="color:#aaa;font-size:11px">(all house members)</span></span>
+      </label>
+    </div>
+
     <!-- STEP 4: Recurrence -->
     <div style="margin-bottom:.75rem">
       <div style="font-size:11px;font-weight:600;color:#495057;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Recurrence</div>
@@ -23156,6 +23168,15 @@ function openEditModal(slotIdx,day,_bypassEditMode){
     // Time input — populate with existing customEndTime if set
     endSel.value=custom&&custom.customEndTime?custom.customEndTime:'';
   }
+  // Boarding register flags
+  const brEl=document.getElementById('edit-boarding-register');
+  const hrEl=document.getElementById('edit-house-register');
+  if(brEl)brEl.checked=!!(custom&&custom.boarding_register);
+  if(hrEl)hrEl.checked=!!(custom&&custom.house_register);
+  if(brEl&&hrEl){
+    brEl.onchange=function(){if(this.checked)hrEl.checked=false;};
+    hrEl.onchange=function(){if(this.checked)brEl.checked=false;};
+  }
   document.getElementById('edit-modal').classList.add('open');
 }
 
@@ -23385,7 +23406,11 @@ function saveSlot(){
     S.categoryDefs[catVal].text=document.getElementById('edit-custom-text').value||'#fff';
     saveSettings();
   }
-  const evtData={l:document.getElementById('edit-label').value||'',tp:document.getElementById('edit-type').value||'free',cat:catVal,recur:document.getElementById('edit-recur').value||'once',placedWeek:week,endSlotIdx,customStartTime,customEndTime};
+  const _brEl=document.getElementById('edit-boarding-register');
+  const _hrEl=document.getElementById('edit-house-register');
+  const boarding_register=!!((_brEl&&_brEl.checked));
+  const house_register=!!((_hrEl&&_hrEl.checked));
+  const evtData={l:document.getElementById('edit-label').value||'',tp:document.getElementById('edit-type').value||'free',cat:catVal,recur:document.getElementById('edit-recur').value||'once',placedWeek:week,endSlotIdx,customStartTime,customEndTime,boarding_register,house_register};
   // Record label history for quick-fill suggestions
   _saveLabelHistory(evtData.l,evtData.tp,catVal);
   // Save for each slot in range
@@ -29266,6 +29291,21 @@ function amRender(){
     const newInp=document.getElementById('am-live-inp');
     if(newInp&&prevVal){newInp.value=prevVal;}
     if(isLesson)_amScrollToCurrent();
+    // Boarding register button
+    const _custSlot=getCustomForWeek(offset,slotIdx,dayName);
+    const _hasBR=_custSlot&&_custSlot.boarding_register;
+    const _hasHR=_custSlot&&_custSlot.house_register;
+    if(_hasBR||_hasHR){
+      const _bLabel=_hasBR?'Open Boarding Register':'Open House Register';
+      const _bDiv=document.createElement('div');
+      _bDiv.id='am-boarding-btn';
+      _bDiv.style.cssText='margin:12px 16px 0;display:flex;';
+      const _bA=document.createElement('a');
+      _bA.href='/boarding/';_bA.target='_blank';
+      _bA.style.cssText='flex:1;display:flex;align-items:center;justify-content:center;gap:8px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:10px;padding:12px 16px;font-size:14px;font-weight:600;letter-spacing:.02em';
+      _bA.innerHTML='<span style="font-size:18px">\uD83C\uDFE0</span>'+_bLabel;
+      _bDiv.appendChild(_bA);body.appendChild(_bDiv);
+    }
   } else {
     // Tick only — update numbers without rebuilding DOM
     const{str,ot}=_fmtCd(rem);
