@@ -28117,7 +28117,11 @@ const CAT_DEFAULTS={
 
 function getCatDefs(){
   const base={};Object.keys(CAT_DEFAULTS).forEach(k=>base[k]={...CAT_DEFAULTS[k]});
-  const ov=S.categoryDefs||{};Object.keys(ov).forEach(k=>{if(base[k])Object.assign(base[k],ov[k]);});
+  const ov=S.categoryDefs||{};
+  Object.keys(ov).forEach(k=>{
+    if(base[k])Object.assign(base[k],ov[k]); // override existing
+    else base[k]={...ov[k]}; // add new user-defined category
+  });
   return base;
 }
 function getCat(tp){
