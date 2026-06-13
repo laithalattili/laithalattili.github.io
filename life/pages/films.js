@@ -1115,7 +1115,12 @@ PAGES.editFilmModal = (filmId, app, films, onDone) => {
 PAGES.unwatchFilm = async (filmId, filmTitle, app, onDone) => {
   let logs = [];
   try {
-    logs = await DB.query('watch_log', { filter: { film_id: filmId }, order: 'date.desc' });
+    // Use direct fetch to avoid UUID encoding issues in DB.query filter
+    const res = await fetch(
+      `${DB.url}/rest/v1/watch_log?film_id=eq.${filmId}&order=date.desc`,
+      { headers: DB.headers() }
+    );
+    logs = await res.json();
   } catch(e) { app.notify('Error: '+e.message,'error'); return; }
 
   if (logs.length === 0) {
@@ -1143,12 +1148,12 @@ PAGES.unwatchFilm = async (filmId, filmTitle, app, onDone) => {
       try {
         await DB.delete('watch_log', btn.dataset.id);
         // Remove from UI
-        btn.closest('div').remove();
+        btn.closest('div[style]').remove();
         // If no more logs, update film status back to to-watch
         const remaining = document.querySelectorAll('.btn-del-watch').length;
         if (remaining === 0) {
           await DB.update('films', filmId, { status: 'to-watch', updated_at: new Date().toISOString() });
-          app.notify('All watches removed — status reset to to-watch','success');
+          app.notify('All watches removed — film reset to to-watch','success');
           app.closeModal();
         } else {
           app.notify('Entry removed','success');
