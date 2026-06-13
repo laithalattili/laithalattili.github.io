@@ -23099,6 +23099,19 @@ function lockEditMode(){
 }
 
 let editSlotInfo=null;
+let _lpTimer=null;
+function _lpStart(e,idx,day){
+  _lpTimer=setTimeout(()=>{
+    _lpTimer=null;
+    // Vibrate feedback if supported
+    if(navigator.vibrate)navigator.vibrate(40);
+    // Open edit modal directly without entering edit mode
+    openEditModal(idx,day);
+  },500);
+}
+function _lpEnd(e){
+  if(_lpTimer){clearTimeout(_lpTimer);_lpTimer=null;}
+}
 function openEditModal(slotIdx,day){
   if(!ttEditMode)return;
   editSlotInfo={slotIdx,day,week:ttWeekOffset};
@@ -23174,14 +23187,35 @@ function _renderEditCatChips(selectedCat){
   }
 }
 function _startNewCat(){
-  const name=prompt('New category name:');
-  if(!name||!name.trim())return;
+  // Show inline new-cat creator instead of prompt
+  const existing=document.getElementById('new-cat-inline');
+  if(existing){existing.style.display=existing.style.display==='none'?'block':'none';return;}
+  const chips=document.getElementById('edit-cat-chips');
+  const div=document.createElement('div');
+  div.id='new-cat-inline';
+  div.style.cssText='margin-top:8px;padding:8px;background:#f0f4ff;border-radius:6px;border:1px solid #c7d2fe;';
+  div.innerHTML=`<div style="font-size:11px;color:#6366f1;font-weight:600;margin-bottom:6px">New category</div>
+    <input id="new-cat-name" type="text" placeholder="Category name..." style="width:100%;font-size:13px;padding:6px 8px;border:1px solid #c7d2fe;border-radius:5px;margin-bottom:6px;box-sizing:border-box">
+    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px" id="new-cat-swatches">
+      ${['#1d4ed8','#7c3aed','#d97706','#0d9488','#be185d','#dc2626','#065f46','#9333ea','#b45309','#0e7490'].map(c=>`<div onclick="this.parentNode.querySelectorAll('div').forEach(d=>d.style.outline='none');this.style.outline='3px solid #312e81';this.dataset.sel='1';document.getElementById('new-cat-color').value='${c}'" style="width:22px;height:22px;border-radius:50%;background:${c};cursor:pointer"></div>`).join('')}
+    </div>
+    <input type="hidden" id="new-cat-color" value="#be185d">
+    <button onclick="_confirmNewCat()" style="background:#6366f1;color:#fff;border:none;border-radius:5px;padding:5px 14px;font-size:12px;cursor:pointer;font-weight:600">Add</button>
+    <button onclick="document.getElementById('new-cat-inline').style.display='none'" style="background:none;border:none;color:#868e96;font-size:12px;cursor:pointer;margin-left:6px">Cancel</button>`;
+  chips.parentNode.insertBefore(div,chips.nextSibling);
+}
+function _confirmNewCat(){
+  const name=document.getElementById('new-cat-name').value.trim();
+  if(!name)return;
+  const color=document.getElementById('new-cat-color').value||'#be185d';
   const id='ucat_'+Date.now();
-  const color='#be185d',text='#fff';
   if(!S.categoryDefs)S.categoryDefs={};
-  S.categoryDefs[id]={label:name.trim(),color,text,commit:true,mode:'simple'};
+  S.categoryDefs[id]={label:name,color,text:'#fff',commit:true,mode:'simple'};
   saveSettings();
+  const el=document.getElementById('new-cat-inline');
+  if(el)el.style.display='none';
   selectEditCat(id);
+  _renderEditCatChips(id);
 }
 function pickCustomCatColor(el){
   document.querySelectorAll('#edit-custom-colors .swatch').forEach(s=>s.classList.remove('selected'));
@@ -24049,6 +24083,8 @@ function renderTimetable(){
       const isCleanSpan=isSpanStart&&_startIsClean&&_endIsClean;
       const tdOpen=rowSpan>1?`<td class="${tdCls}" rowspan="${rowSpan}" style="vertical-align:middle;position:relative;padding:0">`:`<td class="${tdCls}">`;
       const _cellClick=ttEditMode?`openEditModal(${idx},'${d}')`:`openSlotNotes(${idx},'${d}',${offset})`;
+      const _longPress=`_lpStart(event,${idx},'${d}')`;
+      const _longPressEnd=`_lpEnd(event)`;
       if(!cell){
         const _pSlotsE=getPersonalSlotsForDay(d,dayDateStrs[activeDays.indexOf(d)]).filter(function(ps){const ss=t2m(ps.start_time),se=t2m(ps.end_time),cs=t2m(getSlotTime(idx));const ce=idx+1<SLOTS.length?t2m(getSlotTime(idx+1)):cs+30;return ss<ce&&se>cs;});
         const _pHtmlE=_pSlotsE.length?_pSlotsE.map(function(ps){return '<span class="personal-pill" onclick="openOmni(event)">👤 '+ps.start_time+'–'+ps.end_time+'</span>';}).join(''):'';
@@ -24085,7 +24121,7 @@ function renderTimetable(){
       const _pSlots=getPersonalSlotsForDay(d,dayDateStrs[activeDays.indexOf(d)]).filter(function(ps){const ss=t2m(ps.start_time),se=t2m(ps.end_time),cs=t2m(getSlotTime(idx));const ce=idx+1<SLOTS.length?t2m(getSlotTime(idx+1)):cs+30;return ss<ce&&se>cs;});
       const _pHtml=_pSlots.length?_pSlots.map(function(ps){return '<span class="personal-pill" onclick="openOmni(event)">👤 '+ps.start_time+'–'+ps.end_time+'</span>';}).join(''):'';
       const _spanCls=isCleanSpan?' span-cell':'';
-      h+=`${tdOpen}<div class="tt-inner${_spanCls} c-${cell.tp}${half}${customClass}${ttEditMode?' editable':''}" style="${cb}" onclick="${_cellClick}">${label}${noteHtml}${outlineDot}</div>`+_pHtml+`</td>`;
+      h+=`${tdOpen}<div class="tt-inner${_spanCls} c-${cell.tp}${half}${customClass}${ttEditMode?' editable':''}" style="${cb}" onclick="${_cellClick}" ontouchstart="${_longPress}" ontouchend="${_longPressEnd}" ontouchmove="${_longPressEnd}">${label}${noteHtml}${outlineDot}</div>`+_pHtml+`</td>`;
       }
     });
     h+=timeCellR+'</tr>';
