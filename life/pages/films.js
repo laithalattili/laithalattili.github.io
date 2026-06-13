@@ -436,18 +436,18 @@ PAGES.filmsPlan = async (container, app) => {
     btn.addEventListener('click', async () => {
       try {
         await DB.update('film_plan', btn.dataset.id, { done: true });
-        // Also log the watch
+        // Log the watch and update status
         const filmId = btn.dataset.film;
         const film = filmMap[filmId];
-        if (film && !watchedIds.has(filmId)) {
+        if (film) {
+          // Always insert a watch log entry
           await DB.insert('watch_log', {
             film_id: filmId,
             date: today,
             session: 1
           });
-          if (film.status === 'to-watch') {
-            await DB.update('films', filmId, { status: 'watched', updated_at: new Date().toISOString() });
-          }
+          // Always update status to watched
+          await DB.update('films', filmId, { status: 'watched', updated_at: new Date().toISOString() });
         }
         app.notify('Marked as watched', 'success');
         PAGES.filmsPlan(container, app);
