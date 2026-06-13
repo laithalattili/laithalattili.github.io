@@ -478,32 +478,53 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
 
     <!-- DASHBOARD -->
     <div class="tab on" id="tab-dashboard" data-tab="dashboard">
-      <div class="dash-grid" id="dash-grid">
-        <div class="dc full" id="dc-work">
-          <div class="dc-lbl">Now at work</div>
-          <div class="dc-main" id="dc-work-m">–</div>
-          <div class="dc-sub" id="dc-work-s"></div>
+      <div id="dash-brief" style="padding:.6rem .7rem;display:flex;flex-direction:column;gap:.55rem;max-width:600px;margin:0 auto">
+
+        <!-- NOW SECTION -->
+        <div id="dc-now-block" style="background:var(--sur);border-radius:12px;padding:.75rem .9rem;border:1.5px solid var(--bd)">
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx4);margin-bottom:.35rem">Now</div>
+          <div id="dc-now-main" style="font-size:17px;font-weight:700;color:var(--tx);display:flex;align-items:center;gap:8px">–</div>
+          <div id="dc-now-time" style="font-family:var(--mono);font-size:11px;color:var(--tx4);margin-top:2px"></div>
+          <div id="dc-now-bar" style="height:3px;background:var(--bd);border-radius:2px;margin-top:.5rem;overflow:hidden">
+            <div id="dc-now-prog" style="height:100%;background:var(--acc);border-radius:2px;transition:width .5s"></div>
+          </div>
+          <div id="dc-next-block" style="margin-top:.55rem;padding-top:.5rem;border-top:1px solid var(--bd);display:flex;align-items:center;gap:6px">
+            <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx4)">Next</span>
+            <span id="dc-next-main" style="font-size:13px;font-weight:600;color:var(--tx2)">–</span>
+            <span id="dc-next-time" style="font-family:var(--mono);font-size:11px;color:var(--tx4);margin-left:auto"></span>
+          </div>
         </div>
-        <div class="dc">
-          <div class="dc-lbl">Today's tasks</div>
-          <div class="dc-main" id="dc-tasks-m" style="font-size:12px">–</div>
+
+        <!-- TASKS SECTION -->
+        <div style="background:var(--sur);border-radius:12px;padding:.75rem .9rem;border:1px solid var(--bd)">
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx4);margin-bottom:.4rem">Tasks today</div>
+          <div id="dc-tasks-rows" style="display:flex;flex-direction:column;gap:.3rem"></div>
         </div>
-        <div class="dc">
-          <div class="dc-lbl">Finance</div>
-          <div class="dc-main" id="dc-fin-m" style="font-size:12px">–</div>
+
+        <!-- HABITS SECTION -->
+        <div style="background:var(--sur);border-radius:12px;padding:.75rem .9rem;border:1px solid var(--bd)">
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx4);margin-bottom:.5rem">Habits</div>
+          <div id="dc-habits-row" style="display:flex;gap:.6rem;flex-wrap:wrap"></div>
         </div>
-        <div class="dc">
-          <div class="dc-lbl">Reading</div>
-          <div class="dc-main" id="dc-read-m" style="font-size:11px;line-height:1.3">–</div>
+
+        <!-- READING CARD -->
+        <div id="dc-reading-card" style="background:var(--sur);border-radius:12px;padding:.75rem .9rem;border:1px solid var(--bd)">
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx4);margin-bottom:.35rem">Reading today</div>
+          <div id="dc-reading-main" style="color:var(--tx4);font-size:12px">–</div>
         </div>
-        <div class="dc">
-          <div class="dc-lbl">Gym</div>
-          <div class="dc-main" id="dc-gym-m" style="font-size:12px">–</div>
+
+        <!-- FILM CARD -->
+        <div id="dc-film-card" style="background:var(--sur);border-radius:12px;padding:.75rem .9rem;border:1px solid var(--bd);display:none">
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx4);margin-bottom:.35rem">Film this week</div>
+          <div id="dc-film-main" style="color:var(--tx4);font-size:12px">–</div>
         </div>
-        <div class="dc full" style="padding:.55rem .75rem">
-          <div class="dc-lbl">Outfit today</div>
+
+        <!-- OUTFIT -->
+        <div style="background:var(--sur);border-radius:12px;padding:.75rem .9rem;border:1px solid var(--bd)">
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx4);margin-bottom:.35rem">Outfit today</div>
           <div id="dc-outfit"></div>
         </div>
+
       </div>
     </div>
 
@@ -2999,36 +3020,144 @@ async function deleteRhythm(){if(!_editRhId||!confirm('Delete?'))return;await su
 // DASHBOARD
 // ═══════════════════════════════════════════════════
 function renderDash(){
-  const now=new Date();const nowM=now.getHours()*60+now.getMinutes();const dayName=DS[now.getDay()];
-  // Work slot
-  const allS=WSLOTS.map((s,i)=>{const c=s[dayName];if(!c||c.tp==='sleep')return null;return{time:s.t,label:c.l,tp:c.tp,idx:i};}).filter(Boolean);
-  let curIdx=-1;for(let i=0;i<WSLOTS.length;i++){if(nowM>=t2m(WSLOTS[i]?.t))curIdx=i;}
-  let cur=null,nxt=null;
-  if(curIdx>=0){const c=WSLOTS[curIdx][dayName];if(c&&c.tp!=='sleep')cur={...c,time:WSLOTS[curIdx].t};}
-  for(let i=curIdx+1;i<WSLOTS.length;i++){const c=WSLOTS[i]?.[dayName];if(c&&!['free','sleep'].includes(c.tp)){nxt={...c,time:WSLOTS[i].t};break;}}
-  const wm=el('dc-work-m');if(wm){if(cur){const col=catCol(cur.tp);wm.innerHTML=`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${col};margin-right:6px;vertical-align:middle"></span>${cur.label}`;}else wm.textContent='–';}
-  const ws=el('dc-work-s');if(ws)ws.textContent=nxt?`Next: ${nxt.label} at ${nxt.time}`:'';
-  // Tasks preview
-  const tasks=getTasksFor(0).filter(t=>!t.done);
-  const tm=el('dc-tasks-m');
-  if(tm){
-    const dayLocked=tasks.filter(t=>t.tier===1&&!t.done);
-    const urgWindow=tasks.filter(t=>t.tier===2&&t.urg&&!t.done);
-    const window2=tasks.filter(t=>t.tier===2&&!t.urg&&!t.done);
-    if(!dayLocked.length&&!urgWindow.length&&!window2.length){
-      tm.innerHTML='<span style="color:var(--ok);font-weight:700">All clear ✓</span>';
-    } else {
-      tm.innerHTML=`${dayLocked.length?`<div style="color:var(--acc);font-size:11px;font-weight:700">🔴 ${dayLocked.length} due today</div>`:''}${urgWindow.length?`<div style="color:var(--wa);font-size:11px;font-weight:700">⚠️ ${urgWindow.length} last day</div>`:''}${window2.length?`<div style="font-size:11px;color:var(--tx2)">${window2.length} in window</div>`:''}`;
+  const now=new Date();const nowM=now.getHours()*60+now.getMinutes();
+  const dateStr=todayStr();const dayName=DS[now.getDay()];
+
+  // ── NOW block ──────────────────────────────────────────────────────────────
+  const _ds=_daySlots||WSLOTS.filter(s=>t2m(s.t)>=420);
+  let curSlot=null,nxtSlot=null,curStart=0,curEnd=0;
+  for(let i=0;i<_ds.length;i++){
+    const s=_ds[i];const sm=t2m(s.t);const em=t2m(_ds[i+1]?.t||'00:00')||1440;
+    if(nowM>=sm&&nowM<em){
+      const ttc=window._ttCustomData;const wIdx=window._timeToWorkIdx?.[s.t]??-1;
+      const wk=typeof _schoolWeekNum==='function'?_schoolWeekNum(dateStr):0;
+      const ov=ttc&&wIdx>=0?ttc[wk+'_'+wIdx+'_'+dayName]:null;
+      const base=s[dayName];
+      const label=ov?(ov.l||ov.label||base?.l||''):base?.l||'';
+      const tp=ov?_ttcTpToOmni(ov.tp||ov.cat||'free'):(base?.tp||'free');
+      curSlot={label,tp,time:s.t};curStart=sm;curEnd=em;
+      break;
     }
   }
-  // Finance stub
-  const fm=el('dc-fin-m');if(fm)fm.innerHTML='<span style="color:var(--tx4)">–</span>';
-  // Reading stub
-  const rm=el('dc-read-m');if(rm)rm.innerHTML='<span style="color:var(--tx4)">–</span>';
-  // Gym
-  const gm=el('dc-gym-m');
-  if(gm){if(_hasSessToday())gm.innerHTML='<span style="color:var(--ok);font-weight:700">✓ Done today</span>';else if(_todayType())gm.innerHTML=`<span style="font-weight:700">${_todayType()}</span> today`;else gm.innerHTML='<span style="color:var(--tx4)">Rest day</span>';}
-  // Outfit
+  for(let i=0;i<_ds.length;i++){
+    const s=_ds[i];const sm=t2m(s.t);if(sm<=nowM)continue;
+    const ttc=window._ttCustomData;const wIdx=window._timeToWorkIdx?.[s.t]??-1;
+    const wk=typeof _schoolWeekNum==='function'?_schoolWeekNum(dateStr):0;
+    const ov=ttc&&wIdx>=0?ttc[wk+'_'+wIdx+'_'+dayName]:null;
+    const base=s[dayName];
+    const label=ov?(ov.l||ov.label||base?.l||''):base?.l||'';
+    const tp=ov?_ttcTpToOmni(ov.tp||ov.cat||'free'):(base?.tp||'free');
+    if(tp&&!['free','sleep'].includes(tp)){nxtSlot={label,tp,time:s.t};break;}
+  }
+  // Also check personal slots
+  const todayPS=(PERSONAL_SLOTS||[]).filter(p=>{
+    if(p.recurrence==='once')return p.date===dateStr;
+    if(p.recurrence==='weekly')return p.day_of_week===dayName;
+    if(p.recurrence==='daily')return true;
+    return false;
+  });
+  const psNow=todayPS.find(p=>p.start_time&&t2m(p.start_time)<=nowM&&t2m(p.end_time||'00:00')>nowM);
+  if(psNow){curSlot={label:psNow.title,tp:'personal',time:psNow.start_time};curStart=t2m(psNow.start_time);curEnd=t2m(psNow.end_time||'00:00');}
+
+  const nowBlock=el('dc-now-main');
+  if(nowBlock){
+    if(curSlot){
+      const col=catCol(curSlot.tp)||'#aaa';
+      nowBlock.innerHTML=`<span style="width:10px;height:10px;border-radius:50%;background:${col};flex-shrink:0;display:inline-block"></span><span>${curSlot.label||'Free'}</span>`;
+    }else nowBlock.innerHTML='<span style="color:var(--tx4)">–</span>';
+  }
+  const nowTime=el('dc-now-time');
+  if(nowTime&&curSlot){const durLeft=curEnd-nowM;nowTime.textContent=curSlot.time+(durLeft>0?` · ${durLeft}min remaining`:'');}
+  // Progress bar
+  const prog=el('dc-now-prog');
+  if(prog&&curEnd>curStart){prog.style.width=Math.round((nowM-curStart)/(curEnd-curStart)*100)+'%';}
+  const nextMain=el('dc-next-main');const nextTime=el('dc-next-time');
+  if(nextMain)nextMain.textContent=nxtSlot?nxtSlot.label:'–';
+  if(nextTime)nextTime.textContent=nxtSlot?nxtSlot.time:'';
+
+  // ── TASKS block ────────────────────────────────────────────────────────────
+  const tasks=getTasksFor(0).filter(t=>!t.done);
+  const tr=el('dc-tasks-rows');
+  if(tr){
+    if(!tasks.length){tr.innerHTML='<span style="color:var(--ok);font-size:13px;font-weight:700">All clear ✓</span>';
+    }else{
+      const bycat={};
+      tasks.forEach(t=>{const cat=t._t?.cat||t.src||'other';if(!bycat[cat])bycat[cat]=[];bycat[cat].push(t);});
+      const catNames={};WCATS.forEach(c=>{catNames[c.id]=c.name;});
+      let html='';
+      // Tier 1 (due today) first
+      const tier1=tasks.filter(t=>t.tier===1);
+      const tier2u=tasks.filter(t=>t.tier===2&&t.urg);
+      const rest=tasks.filter(t=>t.tier!==1&&!(t.tier===2&&t.urg));
+      if(tier1.length)html+=`<div style="font-size:11px;font-weight:700;color:var(--acc)">🔴 ${tier1.length} due today</div>`;
+      if(tier2u.length)html+=`<div style="font-size:11px;font-weight:700;color:var(--wa)">⚠️ ${tier2u.length} urgent</div>`;
+      // Group rest by category
+      const cats=new Set(rest.map(t=>t._t?.cat||'other'));
+      cats.forEach(c=>{
+        const ct=rest.filter(t=>(t._t?.cat||'other')===c);
+        const name=catNames[c]||WCATS.find(w=>w.id===c)?.name||'Other';
+        const col=WCATS.find(w=>w.id===c)?.color||'var(--tx4)';
+        html+=`<div style="display:flex;align-items:center;gap:6px;font-size:12px"><span style="width:7px;height:7px;border-radius:50%;background:${col};flex-shrink:0"></span><span style="color:var(--tx2);flex:1">${name}</span><span style="font-family:var(--mono);font-size:11px;color:var(--tx4)">${ct.length}</span></div>`;
+      });
+      tr.innerHTML=html||'<span style="color:var(--tx4);font-size:12px">No tasks</span>';
+    }
+  }
+
+  // ── HABITS block ───────────────────────────────────────────────────────────
+  const habRow=el('dc-habits-row');
+  if(habRow){
+    const gymDone=_hasSessToday();const gymType=_todayType();
+    const bookDone=_habDone('book',dateStr);
+    const filmDone=_habDone('film',dateStr);
+    const guitarDone=_habDone('guitar',dateStr);
+    const habits=[
+      {icon:'🏋️',label:'Gym',done:gymDone,skip:!gymType,sub:gymType||'Rest'},
+      {icon:'📖',label:'Reading',done:bookDone,skip:false,sub:bookDone?'Done':'Due'},
+      {icon:'🎬',label:'Film',done:filmDone,skip:!HAB_DATA.film,sub:filmDone?'Watched':'Planned'},
+      {icon:'🎸',label:'Guitar',done:guitarDone,skip:false,sub:guitarDone?'Done':'Due'},
+    ];
+    habRow.innerHTML=habits.filter(h=>!h.skip).map(h=>`
+      <div style="flex:1;min-width:60px;display:flex;flex-direction:column;align-items:center;gap:3px;padding:.4rem .3rem;border-radius:8px;background:${h.done?'rgba(80,160,80,.08)':'var(--bg3)'};border:1px solid ${h.done?'rgba(80,160,80,.2)':'var(--bd)'}">
+        <div style="font-size:20px;line-height:1">${h.icon}</div>
+        <div style="font-size:9px;font-weight:700;color:${h.done?'var(--ok)':'var(--tx3)'};text-transform:uppercase;letter-spacing:.05em">${h.done?'✓':h.sub}</div>
+      </div>`).join('');
+  }
+
+  // ── READING card — load async ──────────────────────────────────────────────
+  const rc=el('dc-reading-main');
+  if(rc){
+    const feed=HAB_DATA.book;
+    if(feed){
+      const m=typeof feed.meta==='string'?JSON.parse(feed.meta||'{}'):feed.meta||{};
+      const title=feed.title||'Book';
+      const from=m.fromPage||m.from_page||'';
+      const to=m.toPage||m.to_page||'';
+      const done=_habDone('book',dateStr);
+      rc.innerHTML=`<div style="font-size:13px;font-weight:600;color:var(--tx)">${title}</div>
+        ${from&&to?`<div style="font-family:var(--mono);font-size:11px;color:var(--tx4);margin-top:2px">pp. ${from}–${to}</div>`:''}
+        <div style="margin-top:.35rem;font-size:11px;font-weight:700;color:${done?'var(--ok)':'var(--acc)'}">${done?'✓ Done today':'Not logged yet'}</div>`;
+    }else{
+      rc.innerHTML='<span style="color:var(--tx4);font-size:12px">No reading scheduled today</span>';
+    }
+  }
+
+  // ── FILM card — show if film planned this week ─────────────────────────────
+  const fc=el('dc-film-card');const fm2=el('dc-film-main');
+  if(fc&&fm2){
+    const feed=HAB_DATA.film;
+    if(feed){
+      fc.style.display='';
+      const m=typeof feed.meta==='string'?JSON.parse(feed.meta||'{}'):feed.meta||{};
+      const title=feed.title||'Film';
+      const runtime=m.runtime_mins?`${m.runtime_mins} min`:'';
+      const done=_habDone('film',dateStr);
+      fm2.innerHTML=`<div style="font-size:13px;font-weight:600;color:var(--tx)">${title}</div>
+        ${runtime?`<div style="font-family:var(--mono);font-size:11px;color:var(--tx4);margin-top:2px">${runtime}</div>`:''}
+        <div style="margin-top:.35rem;font-size:11px;font-weight:700;color:${done?'var(--ok)':'var(--acc)'}">${done?'✓ Watched':'Planned today'}</div>`;
+    }else fc.style.display='none';
+  }
+
+  // ── OUTFIT ─────────────────────────────────────────────────────────────────
   renderDashOutfit();
 }
 
@@ -3042,6 +3171,10 @@ function _afterUnlock(){
   if(saved==='planner'){
     setTimeout(()=>renderDay(),100);
     setTimeout(()=>{if(_curTab==='planner')renderDay();},2000);
+  }
+  if(saved==='dashboard'){
+    setTimeout(()=>renderDash(),300);
+    setInterval(()=>{if(_curTab==='dashboard')renderDash();},60000);
   }
   setInterval(_checkAutoLock,60000);
   _checkWeeklyLock();
@@ -3256,14 +3389,69 @@ function _habSetDone(type,dateStr,val){localStorage.setItem(_habKey(type,dateStr
 
 async function _logHabit(type,dateStr,meta={}){
   if(!_OK)return;
-  // Also store in localStorage as reliable fallback
   localStorage.setItem('omni_hab_log_'+type+'_'+dateStr,JSON.stringify({type,dateStr,meta,logged_at:new Date().toISOString()}));
   try{
     await supaFrom('omni_habit_log').upsert(
       {date:dateStr,type,meta:JSON.stringify(meta),logged_at:new Date().toISOString()},
       {onConflict:'date,type'}
     );
-  }catch(e){console.warn('Habit log (table may not exist yet):',e.message);}
+  }catch(e){console.warn('Habit log:',e.message);}
+
+  // ── Two-way sync to Life Manager tables ──────────────────────────────────
+  try{
+    if(type==='book'||type==='reading'){
+      // Write to reading_log using today's schedule feed entry
+      const feed=HAB_DATA.book;
+      if(feed){
+        const m=typeof feed.meta==='string'?JSON.parse(feed.meta||'{}'):feed.meta||{};
+        const bookId=feed.source_id;
+        const fromPage=m.fromPage||m.from_page||null;
+        const toPage=m.toPage||m.to_page||null;
+        const pagesPlanned=toPage&&fromPage?toPage-fromPage:0;
+        if(bookId){
+          // Check if already logged today
+          const{data:existing}=await supaFrom('reading_log')
+            .select('id').eq('book_id',bookId).eq('date',dateStr).eq('is_review',false).maybeSingle();
+          const entry={book_id:bookId,date:dateStr,pages_planned:pagesPlanned,pages_read:pagesPlanned,is_review:false,notes:'Logged from Omni',current_page_after:toPage};
+          if(existing?.id){
+            await supaFrom('reading_log').update(entry).eq('id',existing.id);
+          }else{
+            await supaFrom('reading_log').insert(entry);
+          }
+          // Update current_page on yearly_queue
+          if(toPage){
+            const{data:qr}=await supaFrom('yearly_queue').select('id').eq('book_id',bookId).maybeSingle();
+            if(qr?.id)await supaFrom('yearly_queue').update({current_page:toPage}).eq('id',qr.id);
+          }
+        }
+      }
+    }
+    else if(type==='film'){
+      const feed=HAB_DATA.film;
+      if(feed?.source_id){
+        const filmId=feed.source_id;
+        // Insert watch_log entry
+        const{data:existing}=await supaFrom('watch_log').select('id').eq('film_id',filmId).eq('date',dateStr).maybeSingle();
+        if(!existing){
+          await supaFrom('watch_log').insert({film_id:filmId,date:dateStr,session:1});
+          await supaFrom('films').update({status:'watched',updated_at:new Date().toISOString()}).eq('id',filmId);
+        }
+        // Mark film_plan as done if exists
+        const{data:fp}=await supaFrom('film_plan').select('id').eq('film_id',filmId).eq('done',false).eq('planned_date',dateStr).maybeSingle();
+        if(fp?.id)await supaFrom('film_plan').update({done:true}).eq('id',fp.id);
+      }
+    }
+    else if(type==='course'){
+      const feed=HAB_DATA.course;
+      if(feed?.source_id){
+        const m=typeof feed.meta==='string'?JSON.parse(feed.meta||'{}'):feed.meta||{};
+        const{data:existing}=await supaFrom('course_log').select('id').eq('course_id',feed.source_id).eq('date',dateStr).maybeSingle();
+        if(!existing){
+          await supaFrom('course_log').insert({course_id:feed.source_id,episode:m.episode||null,date:dateStr,notes:'Logged from Omni'});
+        }
+      }
+    }
+  }catch(e){console.warn('Life Manager sync:',e.message);}
 }
 
 // ── Render habits ─────────────────────────────────────────────────────────────
