@@ -440,13 +440,16 @@ PAGES.filmsPlan = async (container, app) => {
         const filmId = btn.dataset.film;
         const film = filmMap[filmId];
         if (film) {
-          // Always insert a watch log entry
-          await DB.insert('watch_log', {
-            film_id: filmId,
-            date: today,
-            session: 1
-          });
-          // Always update status to watched
+          try {
+            await DB.insert('watch_log', {
+              film_id: filmId,
+              date: today,
+              session: 1
+            });
+          } catch(insertErr) {
+            console.warn('watch_log insert failed:', insertErr.message);
+          }
+          // Update status regardless
           await DB.update('films', filmId, { status: 'watched', updated_at: new Date().toISOString() });
         }
         app.notify('Marked as watched', 'success');
@@ -1116,11 +1119,19 @@ PAGES.unwatchFilm = async (filmId, filmTitle, app, onDone) => {
   let logs = [];
   try {
     // Use direct fetch to avoid UUID encoding issues in DB.query filter
+    const sbUrl = CONFIG.supabase.url;
+    const sbKey = CONFIG.supabase.key;
     const res = await fetch(
-      `${DB.url}/rest/v1/watch_log?film_id=eq.${filmId}&order=date.desc`,
-      { headers: DB.headers() }
+      `${sbUrl}/rest/v1/watch_log?film_id=eq.${filmId}&order=date.desc`,
+      { headers: {
+        'apikey': sbKey,
+        'Authorization': `Bearer ${sbKey}`,
+        'Content-Type': 'application/json'
+      }}
     );
+    if (!res.ok) throw new Error(await res.text());
     logs = await res.json();
+    console.log('watch logs for', filmId, ':', logs.length);
   } catch(e) { app.notify('Error: '+e.message,'error'); return; }
 
   if (logs.length === 0) {
