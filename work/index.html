@@ -28614,14 +28614,17 @@ function _updateLiveBtn(){
   const btn=document.getElementById('am-live-btn');if(!btn)return;
   const ctx=amGetCtx();
   const isActiveCommit=ctx&&ctx.cat.commit;
+  // Also treat boarding-flagged slots as active
+  const _custLB=ctx?getCustomForWeek(ctx.offset,ctx.slotIdx,ctx.dayName):null;
+  const isBoardingActive=!!(_custLB&&(_custLB.boarding_register||_custLB.house_register));
   // Also glow if we're in the pre-start window for an upcoming commitment
   const mins=S.amAutoOpenMins||0;
   let inPreWindow=false;
-  if(!isActiveCommit&&mins>0){
+  if(!isActiveCommit&&!isBoardingActive&&mins>0){
     const next=amGetNext();
     inPreWindow=!!(next&&next.minUntil<=mins&&next.minUntil>=0);
   }
-  btn.classList.toggle('idle',!isActiveCommit&&!inPreWindow);
+  btn.classList.toggle('idle',!isActiveCommit&&!isBoardingActive&&!inPreWindow);
 }
 function amOpen(){
   _amOpen=true;_amDismissed=null;_amLastCtxKey='';
@@ -29229,6 +29232,58 @@ function amHandleLockTap(e){
   }
 }
 function _amVisHandler(){if(!document.hidden&&_amOpen){_amLastCtxKey='';amRender();}}
+// ── BOARDING REGISTER (inline Live mode) ──────────────────────────────────
+let _brState={};  // {studentName: 'present'|'absent'|'excused'|'left'|''}
+
+function _amBoardingRegisterHtml(type){
+  // Get boarders from HAWKING_STATUS + STUDENTS
+  const allBoarders=STUDENTS.filter(s=>(HAWKING_STATUS[s.name]||{}).boarder);
+  if(!allBoarders.length){
+    return '<div style="padding:24px;text-align:center;color:#666;font-size:13px">No boarders found.<br><span style="font-size:11px;color:#444">Add students in Settings → Boarders.</span></div>';
+  }
+  const statColor={'present':'#22c55e','absent':'#ef4444','excused':'#f59e0b','left':'#60a5fa','':'#444'};
+  const statBg={'present':'rgba(34,197,94,.18)','absent':'rgba(239,68,68,.18)','excused':'rgba(245,158,11,.18)','left':'rgba(96,165,250,.18)','':'transparent'};
+  const statLabel={'present':'✓ Present','absent':'✗ Absent','excused':'~ Excused','left':'↑ Left','':'— ?'};
+  const counts={present:0,absent:0,excused:0,left:0,unset:0};
+  allBoarders.forEach(s=>{const st=_brState[s.name]||'';if(st)counts[st]=(counts[st]||0)+1;else counts.unset++;});
+  const total=allBoarders.length;
+
+  let rows='';
+  allBoarders.forEach(s=>{
+    const st=_brState[s.name]||'';
+    const col=statColor[st];const bg=statBg[st];
+    rows+=`<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.06);background:${bg}">
+      <div style="flex:1;font-size:14px;color:#e0e0e0;font-weight:500">${s.name}</div>
+      <div style="display:flex;gap:6px">
+        ${['present','absent','excused','left'].map(opt=>`<button onclick="_brTap('${s.name}','${opt}')" style="font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid ${opt===st?statColor[opt]:'rgba(255,255,255,.15)'};background:${opt===st?'rgba(255,255,255,.12)':'transparent'};color:${opt===st?statColor[opt]:'#888'};cursor:pointer;font-weight:${opt===st?'700':'400'}">${opt==='present'?'✓':opt==='absent'?'✗':opt==='excused'?'~':'↑'}</button>`).join('')}
+      </div>
+    </div>`;
+  });
+
+  return `<div id="am-br-section" style="margin-top:12px;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,.1)">
+    <div style="padding:10px 16px;background:rgba(124,58,237,.25);display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:12px;font-weight:700;color:#c4b5fd;letter-spacing:.08em">${type==='boarding'?'BOARDING REGISTER':'HOUSE REGISTER'}</span>
+      <span style="font-size:11px;color:#aaa">${total-counts.unset}/${total} registered · <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444">${counts.absent||0}✗</span> <span style="color:#f59e0b">${counts.excused||0}~</span></span>
+    </div>
+    <div style="max-height:45vh;overflow-y:auto">${rows}</div>
+  </div>`;
+}
+
+function _brTap(name,status){
+  if(_brState[name]===status){delete _brState[name];}else{_brState[name]=status;}
+  // Re-render just the boarding section
+  const sec=document.getElementById('am-br-section');
+  if(sec){
+    const ctx=amGetCtx();if(!ctx)return;
+    const cust=getCustomForWeek(ctx.offset,ctx.slotIdx,ctx.dayName);
+    const type=cust&&cust.boarding_register?'boarding':'house';
+    const tmp=document.createElement('div');
+    tmp.innerHTML=_amBoardingRegisterHtml(type);
+    const newSec=tmp.querySelector('#am-br-section');
+    if(newSec)sec.parentNode.replaceChild(newSec,sec);
+  }
+}
+
 function amRender(){
   const ctx=amGetCtx();_updateLiveBtn();_amAutoCheck();
   const body=document.getElementById('am-body');if(!body)return;
@@ -29279,7 +29334,18 @@ function amRender(){
     if(titleEl)titleEl.textContent=label;
     if(subEl)subEl.textContent=`${st}–${et} · ${dayName}`;
     if(chip){chip.style.cssText=`background:${cat.color};color:${cat.text};display:inline-flex`;chip.textContent=cat.label;}
-    if(!cat.commit){body.innerHTML=_amFreeHtml(nowStr);return;}
+    // Check boarding flags — boarding register overrides empty/non-commit behaviour
+    const _custForBR=getCustomForWeek(offset,slotIdx,dayName);
+    const _isBoardingSlot=_custForBR&&(_custForBR.boarding_register||_custForBR.house_register);
+    if(!cat.commit&&!_isBoardingSlot){body.innerHTML=_amFreeHtml(nowStr);return;}
+    if(!cat.commit&&_isBoardingSlot){
+      // Render boarding register inline
+      if(titleEl)titleEl.textContent=label||(_custForBR.boarding_register?'Boarding Register':'House Register');
+      if(subEl)subEl.textContent=`${st}–${et} · ${dayName}`;
+      if(chip){chip.style.cssText='background:#7c3aed;color:#fff;display:inline-flex';chip.textContent=_custForBR.boarding_register?'Boarding':'House';}
+      body.innerHTML=_amBoardingRegisterHtml(_custForBR.boarding_register?'boarding':'house');
+      return;
+    }
     // Preserve live input value across rebuild
     const prevInp=document.getElementById('am-live-inp');
     const prevVal=prevInp?prevInp.value:'';
@@ -29291,20 +29357,13 @@ function amRender(){
     const newInp=document.getElementById('am-live-inp');
     if(newInp&&prevVal){newInp.value=prevVal;}
     if(isLesson)_amScrollToCurrent();
-    // Boarding register button
-    const _custSlot=getCustomForWeek(offset,slotIdx,dayName);
-    const _hasBR=_custSlot&&_custSlot.boarding_register;
-    const _hasHR=_custSlot&&_custSlot.house_register;
-    if(_hasBR||_hasHR){
-      const _bLabel=_hasBR?'Open Boarding Register':'Open House Register';
-      const _bDiv=document.createElement('div');
-      _bDiv.id='am-boarding-btn';
-      _bDiv.style.cssText='margin:12px 16px 0;display:flex;';
-      const _bA=document.createElement('a');
-      _bA.href='/boarding/';_bA.target='_blank';
-      _bA.style.cssText='flex:1;display:flex;align-items:center;justify-content:center;gap:8px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:10px;padding:12px 16px;font-size:14px;font-weight:600;letter-spacing:.02em';
-      _bA.innerHTML='<span style="font-size:18px">\uD83C\uDFE0</span>'+_bLabel;
-      _bDiv.appendChild(_bA);body.appendChild(_bDiv);
+    // Boarding register inline — append section after normal content
+    const _custSlot2=getCustomForWeek(offset,slotIdx,dayName);
+    if(_custSlot2&&(_custSlot2.boarding_register||_custSlot2.house_register)){
+      const _brType=_custSlot2.boarding_register?'boarding':'house';
+      const _brDiv=document.createElement('div');
+      _brDiv.innerHTML=_amBoardingRegisterHtml(_brType);
+      while(_brDiv.firstChild)body.appendChild(_brDiv.firstChild);
     }
   } else {
     // Tick only — update numbers without rebuilding DOM
