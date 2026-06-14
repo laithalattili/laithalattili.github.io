@@ -25722,10 +25722,8 @@ function chip(num, lbl, cls=''){
   return `<div class="totals-chip ${cls}"><span class="tc-num">${num}</span><span class="tc-lbl">${lbl}</span></div>`;
 }
 
-async function renderHawkingRegister(el){
-  // Always fetch fresh data from Supabase first
-  await _brLoadToday();
-  // Toggle: all house or boarders only
+function renderHawkingRegister(el){
+  // Render immediately with current _brState (no fetch — fetch is on tab open)
   const allHouse=window._regAllHouse||false;
   // Build people list
   let people=[];
@@ -25861,7 +25859,19 @@ function setHwkFilter(f,btn){
   _hwkFilter=f;
   document.querySelectorAll('.hwk-filter-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  renderHawkingList();
+  if(f==='register'){
+    // Fetch fresh data first, then render
+    _brSubscribeRealtime();
+    _brLoadToday().then(()=>{
+      const el=document.getElementById('hawking-list-content');
+      if(el&&_hwkFilter==='register')renderHawkingRegister(el);
+    });
+    // Show loading state immediately
+    const el=document.getElementById('hawking-list-content');
+    if(el)el.innerHTML='<div style="padding:2rem;text-align:center;color:#9ca3af;font-size:13px">Loading...</div>';
+  } else {
+    renderHawkingList();
+  }
 }
 
 function hwkCollapseAll(collapse){
@@ -25906,17 +25916,19 @@ function toggleHwkGrade(gr){
 
 function renderHawkingList(){
   const el=document.getElementById('hawking-list-content');if(!el)return;
-  // Always sync active button to current filter state
+  // Sync active button
   document.querySelectorAll('.hwk-filter-btn').forEach(b=>b.classList.remove('active'));
   const activeBtn=document.getElementById('hwk-f-'+_hwkFilter);
   if(activeBtn)activeBtn.classList.add('active');
+  // Hide count badge for register (has its own header)
+  const badge=document.getElementById('hwk-count-badge');
+  if(badge)badge.style.display=_hwkFilter==='register'?'none':'';
 
   if(_hwkFilter==='rooms'){
     renderHawkingByRoom(el);
     return;
   }
   if(_hwkFilter==='register'){
-    _brSubscribeRealtime();
     renderHawkingRegister(el);
     return;
   }
@@ -29450,21 +29462,22 @@ function _amBoardingRegisterHtml(type){
       const st=(_brState[p.name]||{}).status||'';
       const bg=statBg[st];
       globalIdx++;
-      rows+=`<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.05);background:${bg}">
+      const _safeBrN=p.name.replace(/"/g,"&quot;");
+      rows+=`<div data-br-name="${_safeBrN}" style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.05);background:${bg}">
         <span style="font-size:10px;color:#555;min-width:22px;text-align:right;font-variant-numeric:tabular-nums">${globalIdx}.</span>
         <div style="flex:1;font-size:13px;color:#e0e0e0;font-weight:500">${p.name}</div>
         <div style="display:flex;gap:4px">
-          ${['present','absent','excused','left'].map(opt=>`<button onclick="_brTap('${p.name}','${opt}')" style="font-size:11px;padding:4px 7px;border-radius:6px;border:1px solid ${opt===st?statColor[opt]:'rgba(255,255,255,.12)'};background:${opt===st?'rgba(255,255,255,.1)':'transparent'};color:${opt===st?statColor[opt]:'#666'};cursor:pointer;font-weight:${opt===st?'700':'400'}">${opt==='present'?'✓':opt==='absent'?'✗':opt==='excused'?'~':'↑'}</button>`).join('')}
+          ${['present','absent','excused','left'].map(opt=>`<button data-br-opt="${opt}" onclick="_brTap('${_safeBrN}','${opt}')" style="font-size:11px;padding:4px 7px;border-radius:6px;border:1px solid ${opt===st?statColor[opt]:'rgba(255,255,255,.12)'};background:${opt===st?'rgba(255,255,255,.1)':'transparent'};color:${opt===st?statColor[opt]:'#666'};cursor:pointer;font-weight:${opt===st?'700':'400'}">${opt==='present'?'✓':opt==='absent'?'✗':opt==='excused'?'~':'↑'}</button>`).join('')}
         </div>
       </div>`;
     });
 
     sectionsHtml+=`
-      <div style="border-bottom:1px solid rgba(255,255,255,.08)">
+      <div data-br-section="${sec.label}" style="border-bottom:1px solid rgba(255,255,255,.08)">
         <div onclick="_brSecToggle('${sec.label}')" style="display:flex;align-items:center;justify-content:space-between;padding:7px 14px;background:rgba(255,255,255,.04);cursor:pointer;user-select:none">
           <span style="font-size:11px;font-weight:600;color:#9ca3af;letter-spacing:.06em;text-transform:uppercase">${sec.label}</span>
           <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:10px;color:#aaa">${secReg}/${secTotal} · <span style="color:#22c55e">${secCounts.present||0}✓</span> <span style="color:#ef4444">${secCounts.absent||0}✗</span></span>
+            <span data-br-sec-count style="font-size:10px;color:#aaa">${secReg}/${secTotal} · <span style="color:#22c55e">${secCounts.present||0}✓</span> <span style="color:#ef4444">${secCounts.absent||0}✗</span></span>
             <span style="font-size:12px;color:#666">${isOpen?'▾':'▸'}</span>
           </div>
         </div>
@@ -29478,7 +29491,7 @@ function _amBoardingRegisterHtml(type){
         <span style="font-size:12px;color:#a78bfa">${chevron}</span>
         <span style="font-size:12px;font-weight:700;color:#c4b5fd;letter-spacing:.08em">${type==='boarding'?'BOARDING REGISTER':'HOUSE REGISTER'} <span style="font-weight:400;color:#888">(${total})</span></span>
       </div>
-      <span style="font-size:11px;color:#aaa">${total-counts.unset}/${total} · <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444">${counts.absent||0}✗</span> <span style="color:#f59e0b">${counts.excused||0}~</span> <span style="color:#60a5fa">${counts.left||0}↑</span></span>
+      <span id="br-overall-count" style="font-size:11px;color:#aaa">${total-counts.unset}/${total} · <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444">${counts.absent||0}✗</span> <span style="color:#f59e0b">${counts.excused||0}~</span> <span style="color:#60a5fa">${counts.left||0}↑</span></span>
     </div>
     ${_brCollapsed?'':('<div>'+sectionsHtml+'</div>')}
   </div>`;
@@ -29508,7 +29521,42 @@ function _brTap(name,status,sessionType){
   // Optimistic update — instant UI response
   if(cur===status){ delete _brState[name]; }
   else { _brState[name]={status,updatedAt:new Date().toISOString(),updatedBy:'HSM',sessionType:sType}; }
-  _brRerender();
+  // Surgical DOM update — find row by data-br-name, update buttons only
+  const newSt=(_brState[name]||{}).status||'';
+  const statColor={'present':'#22c55e','absent':'#ef4444','excused':'#f59e0b','left':'#60a5fa','late':'#a78bfa','':'#555'};
+  const statBg={'present':'rgba(34,197,94,.13)','absent':'rgba(239,68,68,.13)','excused':'rgba(245,158,11,.13)','left':'rgba(96,165,250,.13)','late':'rgba(167,139,250,.13)','':'transparent'};
+  const rowEl=document.querySelector(`[data-br-name="${name.replace(/"/g,'&quot;')}"]`);
+  if(rowEl){
+    rowEl.style.background=statBg[newSt];
+    rowEl.querySelectorAll('[data-br-opt]').forEach(btn=>{
+      const opt=btn.getAttribute('data-br-opt');
+      const active=opt===newSt;
+      btn.style.border=`1px solid ${active?statColor[opt]:'rgba(255,255,255,.12)'}`;
+      btn.style.background=active?'rgba(255,255,255,.1)':'transparent';
+      btn.style.color=active?statColor[opt]:'#666';
+      btn.style.fontWeight=active?'700':'400';
+    });
+    // Update section counts
+    const sec=rowEl.closest('[data-br-section]');
+    if(sec){
+      const countEl=sec.querySelector('[data-br-sec-count]');
+      if(countEl){
+        const names=[...sec.querySelectorAll('[data-br-name]')].map(r=>r.getAttribute('data-br-name'));
+        const sc={present:0,absent:0,excused:0,left:0,unset:0};
+        names.forEach(n=>{const st=(_brState[n]||{}).status||'';if(st)sc[st]=(sc[st]||0)+1;else sc.unset++;});
+        const reg=names.length-sc.unset;
+        countEl.innerHTML=`${reg}/${names.length} · <span style="color:#22c55e">${sc.present||0}✓</span> <span style="color:#ef4444">${sc.absent||0}✗</span>`;
+      }
+    }
+    // Update overall header counts
+    const allNames=[...document.querySelectorAll('[data-br-name]')].map(r=>r.getAttribute('data-br-name'));
+    const tot={present:0,absent:0,excused:0,left:0,unset:0};
+    allNames.forEach(n=>{const st=(_brState[n]||{}).status||'';if(st)tot[st]=(tot[st]||0)+1;else tot.unset++;});
+    const hdr=document.getElementById('br-overall-count');
+    if(hdr)hdr.innerHTML=`${allNames.length-tot.unset}/${allNames.length} · <span style="color:#22c55e">${tot.present||0}✓</span> <span style="color:#ef4444">${tot.absent||0}✗</span> <span style="color:#f59e0b">${tot.excused||0}~</span> <span style="color:#60a5fa">${tot.left||0}↑</span>`;
+  } else {
+    _brRerender(); // fallback
+  }
   _brRefreshListsTab();
   // Async Supabase sync with retry
   async function _syncBrTap(){
