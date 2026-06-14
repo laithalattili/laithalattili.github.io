@@ -1714,11 +1714,13 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       <div class="settings-section-body collapsed" id="ss-body-boarding_config">
 
         <!-- STAFF -->
-        <div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3)">Staff & Duty Days</div>
-        <div id="boarding-staff-list" style="padding:.5rem 1rem"></div>
-        <div style="padding:.3rem 1rem .6rem">
-          <button onclick="saveBoardingSettings()" style="font-size:12px;padding:6px 14px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600">Save Staff Settings</button>
+        <div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3)">Staff & Duty Schedule</div>
+        <div style="padding:.5rem 1rem .3rem;font-size:11px;color:var(--text3)">
+          Day states: <span style="background:#c4622d;color:#fff;border-radius:3px;padding:1px 5px;font-size:10px">ON</span> always on duty &nbsp;
+          <span style="background:#888;color:#fff;border-radius:3px;padding:1px 5px;font-size:10px">OFF</span> always off &nbsp;
+          <span style="background:#1971c2;color:#fff;border-radius:3px;padding:1px 5px;font-size:10px">A/B</span> alternates weekly
         </div>
+        <div id="boarding-staff-list" style="padding:.5rem 1rem"></div>
 
         <!-- REGISTRATION TIMES -->
         <div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3);margin-top:.5rem">Registration Points</div>
@@ -1781,10 +1783,12 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
         <!-- LOCATIONS -->
         <div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3);margin-top:.5rem">Locations</div>
         <div style="padding:.75rem 1rem">
-          <div id="bs-locations-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
+          <div id="bs-locations-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;min-height:28px"></div>
           <div style="display:flex;gap:6px">
-            <input type="text" id="bs-new-location" placeholder="Add location..." style="flex:1;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px">
-            <button onclick="addBoardingLocation()" style="font-size:12px;padding:5px 10px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer">+ Add</button>
+            <input type="text" id="bs-new-location" placeholder="New location name..." 
+              onkeydown="if(event.key==='Enter')addBoardingLocation()"
+              style="flex:1;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:6px">
+            <button onclick="addBoardingLocation()" style="font-size:12px;padding:6px 12px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600;white-space:nowrap">+ Add</button>
           </div>
         </div>
 
@@ -27572,7 +27576,8 @@ let _settingsSectionState={}; // sectionId -> true (collapsed) | false (open)
 
 function toggleSettingsSection(id,titleEl){
   if(id==='boarding_config'){
-    loadBoardingSettings();
+    // Small delay to let section open first
+    setTimeout(()=>loadBoardingSettings(),50);
   }
   // Load saved state
   try{const s=localStorage.getItem('settingsSections');if(s)_settingsSectionState=JSON.parse(s);}catch(e){}
@@ -29470,9 +29475,9 @@ function _amVisHandler(){if(!document.hidden&&_amOpen){_amLastCtxKey='';amRender
 // ── BOARDING SETTINGS ─────────────────────────────────────────
 let _boardingSettings={
   staff:[
-    {name:'',role:'HSM',dutyDays:['Mon','Tue','Wed','Thu','Fri','Sat','Sun']},
-    {name:'',role:'AHSM',dutyDays:['Mon','Wed','Fri']},
-    {name:'',role:'RT',dutyDays:['Tue','Thu','Sat']}
+    {name:'',role:'HSM',schedule:{Mon:'on',Tue:'on',Wed:'on',Thu:'on',Fri:'on',Sat:'alt',Sun:'alt'}},
+    {name:'',role:'AHSM',schedule:{Mon:'on',Tue:'off',Wed:'on',Thu:'off',Fri:'on',Sat:'alt',Sun:'alt'}},
+    {name:'',role:'RT',schedule:{Mon:'off',Tue:'on',Wed:'off',Thu:'on',Fri:'off',Sat:'on',Sun:'on'}}
   ],
   prepTime:'19:00',
   hoobTime:'21:30',
@@ -29518,26 +29523,55 @@ function _populateBSTimes(){
   });
 }
 
+function _bsDayState(staff,day){
+  // Returns 'on'|'off'|'alt' for a given day
+  const schedule=staff.schedule||{};
+  return schedule[day]||'off';
+}
+
+function _bsNextState(cur){
+  // Cycle: off → on → alt → off
+  if(cur==='off')return'on';
+  if(cur==='on')return'alt';
+  return'off';
+}
+
 function renderBoardingStaffSettings(){
   const el=document.getElementById('boarding-staff-list');if(!el)return;
   const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const roles={HSM:'Housemaster',AHSM:'Asst. Housemaster',RT:'Resident Tutor'};
+  const stateStyle={
+    on:{bg:'var(--accent)',color:'#fff',border:'var(--accent)',label:'ON'},
+    off:{bg:'transparent',color:'var(--text3)',border:'var(--border)',label:'—'},
+    alt:{bg:'#1971c2',color:'#fff',border:'#1971c2',label:'A/B'}
+  };
   let html='';
   (_boardingSettings.staff||[]).forEach((s,i)=>{
-    html+=`<div style="padding:.5rem 0;border-bottom:1px solid var(--border3);margin-bottom:.5rem">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <span style="font-size:11px;font-weight:700;color:var(--accent);width:50px">${s.role}</span>
+    // Ensure schedule object exists
+    if(!s.schedule)s.schedule={Mon:'off',Tue:'off',Wed:'off',Thu:'off',Fri:'off',Sat:'off',Sun:'off'};
+    html+=`<div style="padding:.75rem 0;border-bottom:1px solid var(--border3)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="font-size:10px;font-weight:700;color:#fff;background:var(--accent);border-radius:4px;padding:2px 6px;flex-shrink:0">${s.role}</span>
         <input type="text" value="${s.name||''}" placeholder="${roles[s.role]||s.role} name..."
           onchange="_bsUpdateStaffName(${i},this.value)"
           style="flex:1;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px">
       </div>
-      <div style="display:flex;gap:4px;flex-wrap:wrap">
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">
         ${days.map(d=>{
-          const on=(s.dutyDays||[]).includes(d);
-          return `<button onclick="_bsToggleDutyDay(${i},'${d}')" 
-            style="font-size:10px;padding:3px 7px;border-radius:5px;border:1px solid ${on?'var(--accent)':'var(--border)'};background:${on?'var(--accent)':'transparent'};color:${on?'#fff':'var(--text2)'};cursor:pointer;font-weight:${on?'700':'400'}">${d}</button>`;
+          const state=_bsDayState(s,d);
+          const st=stateStyle[state];
+          return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+            <span style="font-size:9px;color:var(--text3)">${d.slice(0,2)}</span>
+            <button onclick="_bsCycleDay(${i},'${d}')"
+              style="width:100%;padding:5px 2px;border-radius:5px;border:1px solid ${st.border};background:${st.bg};color:${st.color};cursor:pointer;font-size:9px;font-weight:700;min-width:32px">${st.label}</button>
+          </div>`;
         }).join('')}
       </div>
+      ${Object.values(s.schedule||{}).some(v=>v==='alt')?`
+      <div style="margin-top:6px;font-size:11px;color:var(--text3)">
+        A/B alternates each week. <span style="color:#1971c2;font-weight:600">A weeks = on duty</span>
+        <span style="font-size:10px;color:var(--text3)"> (based on school week number)</span>
+      </div>`:''}
     </div>`;
   });
   el.innerHTML=html;
@@ -29547,11 +29581,11 @@ function _bsUpdateStaffName(i,val){
   if(_boardingSettings.staff[i])_boardingSettings.staff[i].name=val;
 }
 
-function _bsToggleDutyDay(i,day){
+function _bsCycleDay(i,day){
   const staff=_boardingSettings.staff[i];if(!staff)return;
-  const idx=staff.dutyDays.indexOf(day);
-  if(idx>=0)staff.dutyDays.splice(idx,1);
-  else staff.dutyDays.push(day);
+  if(!staff.schedule)staff.schedule={};
+  const cur=staff.schedule[day]||'off';
+  staff.schedule[day]=_bsNextState(cur);
   renderBoardingStaffSettings();
 }
 
