@@ -586,7 +586,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .seat-controls{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.5rem}
 .seat-ctrl-btn{font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:var(--rsm);background:#fff;color:var(--text2);cursor:pointer}
 .seat-ctrl-btn.active-ctrl{background:var(--inf-bg);border-color:var(--inf-bd);color:var(--inf-tx)}
-.hwk-filter-btn{flex:1;padding:4px 2px;font-size:10px;font-weight:500;border:none;border-radius:var(--rxs);background:none;color:var(--text2);cursor:pointer;text-align:center;white-space:nowrap;min-width:0}
+.hwk-filter-btn{padding:5px 10px;font-size:11px;font-weight:500;border:none;border-radius:var(--rxs);background:none;color:var(--text2);cursor:pointer;text-align:center;white-space:nowrap;flex-shrink:0}
 .hwk-filter-btn.active{background:#fff;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.1)}
 .totals-chip{display:inline-flex;align-items:baseline;gap:4px;padding:4px 10px;border-radius:20px;font-size:11px;border:1px solid var(--border);background:#fff;white-space:nowrap}
 .totals-chip .tc-num{font-size:16px;font-weight:700;line-height:1;color:var(--text)}
@@ -1108,7 +1108,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
     <!-- Toolbar: filter + collapse controls -->
     <div id="hwk-toolbar">
     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-      <div id="hwk-filter-btns" style="display:flex;gap:3px;background:var(--bg3);border-radius:var(--rsm);padding:3px;flex:1;min-width:0">
+      <div id="hwk-filter-btns" style="display:flex;gap:2px;background:var(--bg3);border-radius:var(--rsm);padding:3px;flex-wrap:wrap">
         <button class="hwk-filter-btn active" id="hwk-f-all" onclick="setHwkFilter('all',this)">All</button>
         <button class="hwk-filter-btn" id="hwk-f-boarders" onclick="setHwkFilter('boarders',this)">Boarders</button>
         <button class="hwk-filter-btn" id="hwk-f-rooms" onclick="setHwkFilter('rooms',this)">Rooms</button>
@@ -29477,22 +29477,22 @@ function _brRerender(){
   const newSec=tmp.querySelector('#am-br-section');
   if(newSec)sec.parentNode.replaceChild(newSec,sec);
 }
-async function _brTap(name,status,sessionType){
+function _brTap(name,status,sessionType){
   const cur=(_brState[name]||{}).status;
   const sType=sessionType||_brGetType();
-  if(cur===status){
-    // deselect — delete from DB
-    delete _brState[name];
-    try{await supa.from('boarding_registrations').delete().eq('student_name',name).eq('register_date',_brToday());}catch(e){console.warn(e);}
-  } else {
-    const rec={student_name:name,register_date:_brToday(),status,updated_by:'HM',session_type:sType};
-    _brState[name]={status,updatedAt:new Date().toISOString(),updatedBy:'HM',sessionType:sType};
-    try{await supa.from('boarding_registrations').upsert(rec,{onConflict:'student_name,register_date'});}catch(e){console.warn(e);}
-    // Audit log
-    try{await supa.from('boarding_registration_history').insert({student_name:name,register_date:_brToday(),previous_status:cur||null,new_status:status,changed_by:'HM',session_type:sType});}catch(e){}
-  }
+  // Optimistic update — instant UI response
+  if(cur===status){ delete _brState[name]; }
+  else { _brState[name]={status,updatedAt:new Date().toISOString(),updatedBy:'HSM',sessionType:sType}; }
   _brRerender();
   _brRefreshListsTab();
+  // Async Supabase sync in background
+  if(cur===status){
+    supa.from('boarding_registrations').delete().eq('student_name',name).eq('register_date',_brToday()).then(()=>{}).catch(e=>console.warn(e));
+  } else {
+    const rec={student_name:name,register_date:_brToday(),status,updated_by:'HSM',session_type:sType};
+    supa.from('boarding_registrations').upsert(rec,{onConflict:'student_name,register_date'}).then(()=>{}).catch(e=>console.warn(e));
+    supa.from('boarding_registration_history').insert({student_name:name,register_date:_brToday(),previous_status:cur||null,new_status:status,changed_by:'HSM',session_type:sType}).then(()=>{}).catch(()=>{});
+  }
 }
 function _brToggleCollapse(){
   _brCollapsed=!_brCollapsed;
@@ -29516,46 +29516,63 @@ function openFireRegister(){
 
 function closeFireRegister(){
   _fireOpen=false;
-  // Fire data stays in DB (session_type='fire') but _brState is NOT modified
-  // Rerender normal live view
-  amRender();
+  // Use setTimeout to break out of any event handler context
+  setTimeout(()=>amRender(), 0);
 }
 
-async function _fireTap(name, status){
+function _fireTap(name, status){
   const cur=(_fireState[name]||{}).status;
-  if(cur===status){ delete _fireState[name]; }
-  else { _fireState[name]={status, updatedAt:new Date().toISOString()}; }
-  // Write to DB with session_type='fire' — separate from regular boarding entries
-  // Use a different key: student_name + date + 'fire' so it doesn't conflict
-  try{
-    await supa.from('boarding_registration_history').insert({
+  // Optimistic update
+  if(cur===status){ delete _fireState[name]; delete _brState[name]; }
+  else {
+    _fireState[name]={status, updatedAt:new Date().toISOString()};
+    // Also update _brState with fire tag so Register tab shows it
+    _brState[name]={status, updatedAt:new Date().toISOString(), updatedBy:'HSM', sessionType:'fire'};
+  }
+  _renderFireRegister();
+  _brRefreshListsTab();
+  // Async DB sync
+  if(cur===status){
+    supa.from('boarding_registrations').delete().eq('student_name',name).eq('register_date',_brToday()).then(()=>{}).catch(()=>{});
+  } else {
+    supa.from('boarding_registrations').upsert(
+      {student_name:name, register_date:_brToday(), status, updated_by:'HSM', session_type:'fire'},
+      {onConflict:'student_name,register_date'}
+    ).then(()=>{}).catch(()=>{});
+    supa.from('boarding_registration_history').insert({
       student_name:name, register_date:_brToday(),
       previous_status:cur||null, new_status:status,
       changed_by:'HSM', session_type:'fire'
-    });
-  }catch(e){}
-  _renderFireRegister();
-  _brRefreshListsTab();
+    }).then(()=>{}).catch(()=>{});
+  }
 }
 
 async function revertFromFire(){
-  // Restore _brState to pre-fire snapshot and update DB
-  _brState=JSON.parse(JSON.stringify(_firePreSnapshot));
+  if(!confirm('Revert all fire register changes and restore the previous state?'))return;
   const today=_brToday();
-  // Re-upsert all pre-fire statuses
-  const entries=Object.entries(_brState);
-  for(const [name,obj] of entries){
-    try{
-      await supa.from('boarding_registrations').upsert(
-        {student_name:name,register_date:today,status:obj.status,updated_by:obj.updatedBy||'HSM',session_type:obj.sessionType||'boarding'},
-        {onConflict:'student_name,register_date'}
-      );
-    }catch(e){}
+  const snapshot=JSON.parse(JSON.stringify(_firePreSnapshot));
+
+  // Delete all fire entries for today
+  const fireNames=Object.keys(_fireState);
+  for(const name of fireNames){
+    // If they had a pre-fire status, restore it; otherwise delete the row
+    if(snapshot[name]){
+      try{
+        await supa.from('boarding_registrations').upsert(
+          {student_name:name,register_date:today,status:snapshot[name].status,updated_by:snapshot[name].updatedBy||'HSM',session_type:snapshot[name].sessionType||'boarding'},
+          {onConflict:'student_name,register_date'}
+        );
+      }catch(e){}
+    } else {
+      try{
+        await supa.from('boarding_registrations').delete().eq('student_name',name).eq('register_date',today);
+      }catch(e){}
+    }
   }
-  // Clear fire state
+  // Restore _brState to snapshot
+  _brState=snapshot;
   _fireState={};
   _brRefreshListsTab();
-  alert('Reverted to pre-fire register state.');
 }
 
 function _renderFireRegister(){
@@ -29617,13 +29634,17 @@ function _renderFireRegister(){
     </div>`;
   });
 
-  body.innerHTML=`<div id="am-fire-section">
-    <div style="padding:10px 14px;background:rgba(220,38,38,.3);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
-      <span style="font-size:12px;font-weight:700;color:#fca5a5;letter-spacing:.08em">🔥 FIRE REGISTER</span>
-      <span style="font-size:11px;color:#aaa">${total-counts.unset}/${total} · <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444">${counts.absent||0}✗</span> <span style="color:#f59e0b">${counts.excused||0}~</span></span>
-      <button onclick="closeFireRegister()" style="font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;cursor:pointer;font-weight:600">✓ Done</button>
+  body.innerHTML=`<div id="am-fire-section" style="display:flex;flex-direction:column;min-height:100%">
+    <div style="padding:10px 14px;background:rgba(220,38,38,.3);display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <div>
+        <span style="font-size:12px;font-weight:700;color:#fca5a5;letter-spacing:.08em">🔥 FIRE REGISTER</span>
+        <span style="font-size:11px;color:#aaa;margin-left:8px">${total-counts.unset}/${total} · <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444">${counts.absent||0}✗</span> <span style="color:#f59e0b">${counts.excused||0}~</span></span>
+      </div>
     </div>
-    <div>${sectionsHtml}</div>
+    <div style="flex:1">${sectionsHtml}</div>
+    <div style="padding:12px 14px;border-top:1px solid rgba(255,255,255,.1)">
+      <button onclick="closeFireRegister()" style="width:100%;font-size:13px;padding:10px;border-radius:8px;border:none;background:#22c55e;color:#fff;cursor:pointer;font-weight:700;letter-spacing:.02em">✓ Done — Exit Fire Register</button>
+    </div>
   </div>`;
 }
 
