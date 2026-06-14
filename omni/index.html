@@ -3497,6 +3497,7 @@ async function renderHabits(dateStr,dayName){
   // ── BOOK ──────────────────────────────────────────────────────────────────
   const bookDone=_habDone('book',dateStr);
   const bookData=HAB_DATA.book;
+  if(bookData){
   const bookTitle=bookData?.title||'Reading';
   const bookMeta=bookData?.meta?JSON.parse(bookData.meta):{};
   const pages=bookMeta.pages_planned||bookMeta.pages||null;
@@ -3509,6 +3510,7 @@ async function renderHabits(dateStr,dayName){
     <button onclick="_habPickTime('book','${dateStr}')" style="font-size:10px;background:none;border:none;padding:0 4px;color:${_habSlotTime('book',dateStr)?'var(--acc)':'var(--tx4)'}">📌</button>
     <div class="habit-tick${bookDone?' on':''}" onclick="_tickHabit('book','${dateStr}',${JSON.stringify(JSON.stringify(bookMeta))})">${bookDone?'✓':''}</div>
   </div>`;
+  } // end if(bookData)
 
   // ── FILM ──────────────────────────────────────────────────────────────────
   const filmDone=_habDone('film',dateStr);
@@ -3588,6 +3590,16 @@ function _getGuitarCfg(){
 function openGuitarCfg(){
   const cfg=_getGuitarCfg();
   document.getElementById('gtr-freq').value=cfg.freq||3;
+  // Populate day checkboxes
+  const daysEl=document.getElementById('gtr-days');
+  if(daysEl){
+    const activeDays=cfg.days||[];
+    daysEl.innerHTML=DS.slice(1).concat(DS[0]).map((d,i)=>{
+      const dn=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i];
+      const on=activeDays.includes(dn);
+      return`<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:4px 8px;border-radius:6px;background:${on?'var(--acc)':'var(--bg3)'};color:${on?'#fff':'var(--tx2)'};border:1px solid ${on?'var(--acc)':'var(--bd)'}"><input type="checkbox" value="${dn}" ${on?'checked':''} style="display:none" onchange="this.parentElement.style.background=this.checked?'var(--acc)':'var(--bg3)';this.parentElement.style.color=this.checked?'#fff':'var(--tx2)';this.parentElement.style.borderColor=this.checked?'var(--acc)':'var(--bd)'">${dn}</label>`;
+    }).join('');
+  }
   document.getElementById('gtr-time').value=cfg.time||'21:00';
   document.getElementById('gtr-dur').value=cfg.dur||20;
   const daysDiv=document.getElementById('gtr-days');
@@ -3600,7 +3612,7 @@ function saveGuitarCfg(){
   const freq=+document.getElementById('gtr-freq').value||3;
   const time=document.getElementById('gtr-time').value||'21:00';
   const dur=+document.getElementById('gtr-dur').value||20;
-  const days=[...document.querySelectorAll('#gtr-days .on')].map(b=>b.dataset.d);
+  const days=Array.from(document.querySelectorAll('#gtr-days input[type=checkbox]:checked')).map(c=>c.value);
   const cfg={freq,days,time,dur};
   localStorage.setItem('omni_guitar_cfg',JSON.stringify(cfg));
   closeGuitarCfg();
