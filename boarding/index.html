@@ -232,6 +232,17 @@
       </div>
       <span class="reg-fetched" id="reg-fetched"></span>
     </div>
+    <!-- Grouping controls -->
+    <div style="display:flex;gap:6px;padding:8px 12px;background:#fff;border-bottom:1px solid var(--border);align-items:center;flex-wrap:wrap">
+      <div style="display:flex;background:var(--bg2);border-radius:6px;padding:2px;gap:2px" id="reg-group-seg">
+        <button onclick="setRegGroup('grade',this)" style="font-size:11px;padding:4px 10px;border-radius:4px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:700">Grade</button>
+        <button onclick="setRegGroup('room',this)" style="font-size:11px;padding:4px 10px;border-radius:4px;border:none;background:transparent;color:var(--text3);cursor:pointer;font-weight:400">Room</button>
+      </div>
+      <div style="display:flex;background:var(--bg2);border-radius:6px;padding:2px;gap:2px" id="reg-scope-seg">
+        <button onclick="setRegScope('boarders',this)" style="font-size:11px;padding:4px 10px;border-radius:4px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:700">Boarders</button>
+        <button onclick="setRegScope('house',this)" style="font-size:11px;padding:4px 10px;border-radius:4px;border:none;background:transparent;color:var(--text3);cursor:pointer;font-weight:400">All House</button>
+      </div>
+    </div>
     <div id="reg-list"></div>
   </div>
 
@@ -333,6 +344,8 @@ let _fireGroup='grade';
 let _fireSections={}; // section collapse state
 let _fireSubmitted=false;
 let _collapseState={}; // register section collapse
+let _regGroup='grade'; // 'grade' | 'room'
+let _regScope='boarders'; // 'boarders' | 'house'
 
 // ── INIT ──────────────────────────────────────────────────────
 async function init(){
@@ -682,14 +695,56 @@ function subscribeRealtime(){
     .subscribe();
 }
 
+function _regMakeRow(name, idx){
+  const st=(_brState[name]||{}).status||'';
+  const safe=name.replace(/"/g,'&quot;');
+  return `<div class="reg-row ${st}" data-name="${safe}">
+    <span class="reg-num">${idx}.</span>
+    <span class="reg-name">${name}</span>
+    <div class="reg-btns">
+      <button class="reg-btn ${st==='present'?'active-present':''}" data-opt="present" onclick="regTap('${safe}','present')">✓</button>
+      <button class="reg-btn ${st==='absent'?'active-absent':''}" data-opt="absent" onclick="regTap('${safe}','absent')">✗</button>
+      <button class="reg-btn ${st==='excused'?'active-excused':''}" data-opt="excused" onclick="regTap('${safe}','excused')">~</button>
+      <button class="reg-btn ${st==='left'?'active-left':''}" data-opt="left" onclick="regTap('${safe}','left')">↑</button>
+    </div>
+  </div>`;
+}
+
+function _regMakeSection(label, names){
+  const key='sec_'+label;
+  const isOpen=_collapseState[key]!==false;
+  const sc={present:0,absent:0,excused:0,left:0,unset:0};
+  names.forEach(n=>{const st=(_brState[n]||{}).status||'';if(st)sc[st]=(sc[st]||0)+1;else sc.unset++;});
+  const secReg=names.length-sc.unset;
+  let rows='';
+  let idx=0;
+  if(isOpen) names.forEach(n=>{idx++;rows+=_regMakeRow(n,idx);});
+  return {html:`<div>
+    <div class="reg-section-hdr" onclick="toggleRegSection('${key}')">
+      <span class="reg-section-label">${label}</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="reg-section-count">${secReg}/${names.length} · <span style="color:#16a34a">${sc.present||0}✓</span> <span style="color:#dc2626">${sc.absent||0}✗</span></span>
+        <span style="font-size:12px;color:var(--text3)">${isOpen?'▾':'▸'}</span>
+      </div>
+    </div>
+    ${isOpen?rows:''}
+  </div>`, count:names.length};
+}
+
 function renderRegister(){
-  const boarders=getBoarders();
+  // Build people list based on scope
+  let people=[];
+  if(_regScope==='boarders'){
+    people=getBoarders().map(s=>s.name);
+  } else {
+    // All house: boarders + day students
+    people=STUDENTS.map(s=>s.name);
+  }
+
+  // Count
   const counts={present:0,absent:0,excused:0,left:0,unset:0};
-  boarders.forEach(s=>{
-    const st=(_brState[s.name]||{}).status||'';
-    if(st)counts[st]=(counts[st]||0)+1;else counts.unset++;
-  });
-  const total=boarders.length;
+  people.forEach(n=>{const st=(_brState[n]||{}).status||'';if(st)counts[st]=(counts[st]||0)+1;else counts.unset++;});
+  const total=people.length;
   const registered=total-counts.unset;
 
   document.getElementById('reg-total').textContent=`${registered}/${total} registered`;
@@ -699,58 +754,66 @@ function renderRegister(){
   document.getElementById('reg-left').textContent=`${counts.left}↑`;
   document.getElementById('reg-fetched').textContent='fetched '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
 
-  // Group by grade
-  const grades=['G7','G8','G9','G10','G11','G12'];
-  const gradeMap={};
-  boarders.forEach(s=>{
-    const gr=getStudentGrade(s.name);
-    if(!gradeMap[gr])gradeMap[gr]=[];
-    gradeMap[gr].push(s.name);
-  });
-
   let html='';
-  let globalIdx=0;
-  grades.forEach(gr=>{
-    const names=gradeMap[gr];
-    if(!names||!names.length)return;
-    const isOpen=_collapseState[gr]!==false;
-    const sc={present:0,absent:0,excused:0,left:0,unset:0};
-    names.forEach(n=>{const st=(_brState[n]||{}).status||'';if(st)sc[st]=(sc[st]||0)+1;else sc.unset++;});
-    const secReg=names.length-sc.unset;
+  let totalIdx=0;
 
-    html+=`<div>
-      <div class="reg-section-hdr" onclick="toggleRegSection('${gr}')">
-        <span class="reg-section-label">${gr}</span>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="reg-section-count">${secReg}/${names.length} · <span style="color:#16a34a">${sc.present||0}✓</span> <span style="color:#dc2626">${sc.absent||0}✗</span></span>
-          <span style="font-size:12px;color:var(--text3)">${isOpen?'▾':'▸'}</span>
-        </div>
-      </div>`;
-    if(isOpen){
-      names.forEach(name=>{
-        globalIdx++;
-        const st=(_brState[name]||{}).status||'';
-        const safe=name.replace(/"/g,'&quot;');
-        html+=`<div class="reg-row ${st}" data-name="${safe}">
-          <span class="reg-num">${globalIdx}.</span>
-          <span class="reg-name">${name}</span>
-          <div class="reg-btns">
-            <button class="reg-btn ${st==='present'?'active-present':''}" data-opt="present" onclick="regTap('${safe}','present')">✓</button>
-            <button class="reg-btn ${st==='absent'?'active-absent':''}" data-opt="absent" onclick="regTap('${safe}','absent')">✗</button>
-            <button class="reg-btn ${st==='excused'?'active-excused':''}" data-opt="excused" onclick="regTap('${safe}','excused')">~</button>
-            <button class="reg-btn ${st==='left'?'active-left':''}" data-opt="left" onclick="regTap('${safe}','left')">↑</button>
-          </div>
-        </div>`;
-      });
-    }
-    html+='</div>';
-  });
+  if(_regGroup==='grade'){
+    const grades=['G7','G8','G9','G10','G11','G12','Unknown'];
+    const gradeMap={};
+    people.forEach(name=>{
+      const gr=getStudentGrade(name)||'Unknown';
+      if(!gradeMap[gr])gradeMap[gr]=[];
+      gradeMap[gr].push(name);
+    });
+    grades.forEach(gr=>{
+      const names=gradeMap[gr];
+      if(!names||!names.length)return;
+      const sec=_regMakeSection(gr,names);
+      // Re-number globally
+      const key='sec_'+gr;
+      const isOpen=_collapseState[key]!==false;
+      if(isOpen) names.forEach(()=>totalIdx++);
+      html+=sec.html;
+    });
+  } else {
+    // Group by room
+    const assigned=new Set();
+    BOARDER_ROOMS.forEach(r=>{
+      const names=(r.boarders||[]).filter(n=>people.includes(n));
+      if(!names.length)return;
+      assigned.add(...names);
+      html+=_regMakeSection(r.name||r.id||'Room',names).html;
+    });
+    // Unassigned
+    const unassigned=people.filter(n=>!BOARDER_ROOMS.some(r=>(r.boarders||[]).includes(n)));
+    if(unassigned.length) html+=_regMakeSection('No Room Assigned',unassigned).html;
+  }
 
-  document.getElementById('reg-list').innerHTML=html||'<div style="padding:2rem;text-align:center;color:var(--text3);font-size:13px">No boarders found.</div>';
+  document.getElementById('reg-list').innerHTML=html||'<div style="padding:2rem;text-align:center;color:var(--text3);font-size:13px">No students found.</div>';
 }
 
-function toggleRegSection(gr){
-  _collapseState[gr]=_collapseState[gr]===false?true:false;
+function setRegGroup(group, btn){
+  _regGroup=group;
+  document.querySelectorAll('#reg-group-seg button').forEach(b=>{
+    b.style.background=b===btn?'var(--accent)':'transparent';
+    b.style.color=b===btn?'#fff':'var(--text3)';
+    b.style.fontWeight=b===btn?'700':'400';
+  });
+  renderRegister();
+}
+
+function setRegScope(scope, btn){
+  _regScope=scope;
+  document.querySelectorAll('#reg-scope-seg button').forEach(b=>{
+    b.style.background=b===btn?'var(--accent)':'transparent';
+    b.style.color=b===btn?'#fff':'var(--text3)';
+    b.style.fontWeight=b===btn?'700':'400';
+  });
+  renderRegister();
+}
+
+function toggleRegSection(key){
+  _collapseState[key]=_collapseState[key]===false?true:false;
   renderRegister();
 }
 
