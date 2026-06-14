@@ -29509,7 +29509,8 @@ let _fireBoarderGrouping='grade'; // 'grade' | 'room'
 
 function openFireRegister(){
   _fireOpen=true;
-  _fireSubmitted=false;
+  // Don't reset _fireSubmitted here — keep revert button visible
+  // until user explicitly reverts
   _firePreSnapshot=JSON.parse(JSON.stringify(_brState));
   _fireState={};
   _fireScopeAllHouse=false;
@@ -29519,16 +29520,27 @@ function openFireRegister(){
   _renderFireRegister();
 }
 
+function _fireRestoreBody(){
+  const body=document.getElementById('am-body');
+  if(body){body.style.padding='';body.style.overflow='';body.style.position='';}
+}
 function closeFireRegister(){
   _fireOpen=false;
-  setTimeout(()=>amRender(), 0);
+  _fireRestoreBody();
+  setTimeout(()=>{amRender();_brRefreshListsTab();},0);
 }
 
 function submitFireRegister(){
   _fireSubmitted=true;
   _fireOpen=false;
-  setTimeout(()=>amRender(), 0);
-  _brRefreshListsTab();
+  // Show toast
+  const t=document.createElement('div');
+  t.textContent='🔥 Fire register submitted';
+  t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#22c55e;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:9999;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.3)';
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),2500);
+  _fireRestoreBody();
+  setTimeout(()=>{amRender();_brRefreshListsTab();},0);
 }
 
 function _fireTap(name, status){
@@ -29583,6 +29595,7 @@ async function revertFromFire(){
   // Restore _brState to snapshot
   _brState=snapshot;
   _fireState={};
+  _fireSubmitted=false;
   _brRefreshListsTab();
 }
 
@@ -29710,22 +29723,48 @@ function _renderFireRegister(){
     <button onclick="_fireBoarderGrouping='room';_renderFireRegister()" style="font-size:10px;padding:3px 8px;border-radius:5px;border:1px solid rgba(255,255,255,.2);background:${_fireBoarderGrouping==='room'?'rgba(255,255,255,.2)':'transparent'};color:${_fireBoarderGrouping==='room'?'#fff':'#aaa'};cursor:pointer">By Room</button>
   </div>`:'';
 
-  body.innerHTML=`<div id="am-fire-section" style="display:flex;flex-direction:column;min-height:100%">
-    <div style="padding:8px 14px;background:rgba(220,38,38,.3)">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <span style="font-size:12px;font-weight:700;color:#fca5a5;letter-spacing:.08em">🔥 FIRE REGISTER</span>
-        <span style="font-size:11px;color:#aaa">${total-counts.unset}/${total} · <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444">${counts.absent||0}✗</span> <span style="color:#f59e0b">${counts.excused||0}~</span></span>
+  // Escape panel-body scroll by positioning absolutely over the whole panel
+  body.style.padding='0';
+  body.style.overflow='hidden';
+  body.style.position='relative';
+
+  body.innerHTML=`<div id="am-fire-section" style="position:absolute;inset:0;display:flex;flex-direction:column;background:#111;overflow:hidden">
+
+    <!-- STICKY HEADER -->
+    <div style="flex-shrink:0;background:rgba(220,38,38,.35);border-bottom:1px solid rgba(255,255,255,.1)">
+      <!-- Title row -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px">
+        <span style="font-size:13px;font-weight:700;color:#fca5a5;letter-spacing:.06em">🔥 FIRE REGISTER</span>
+        <span style="font-size:11px;color:#aaa">${total-counts.unset}/${total} &nbsp;·&nbsp; <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444"> ${counts.absent||0}✗</span> <span style="color:#f59e0b"> ${counts.excused||0}~</span> <span style="color:#60a5fa"> ${counts.left||0}↑</span></span>
       </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
-        <div style="display:flex;gap:8px;align-items:center">${scopeCtrl}${groupCtrl}</div>
-        <button onclick="_fireToggleAllSections()" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1px solid rgba(255,255,255,.25);background:transparent;color:#ddd;cursor:pointer">${allExp?'Collapse All':'Expand All'}</button>
+      <!-- Controls row -->
+      <div style="padding:0 14px 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <!-- Scope toggle -->
+        <div style="display:flex;background:rgba(0,0,0,.3);border-radius:6px;padding:2px;gap:2px">
+          <button onclick="_fireScopeAllHouse=false;_renderFireRegister()" style="font-size:10px;padding:3px 10px;border-radius:4px;border:none;background:${!_fireScopeAllHouse?'rgba(255,255,255,.15)':'transparent'};color:${!_fireScopeAllHouse?'#fff':'#888'};cursor:pointer;font-weight:${!_fireScopeAllHouse?'700':'400'}">Boarders</button>
+          <button onclick="_fireScopeAllHouse=true;_renderFireRegister()" style="font-size:10px;padding:3px 10px;border-radius:4px;border:none;background:${_fireScopeAllHouse?'rgba(255,255,255,.15)':'transparent'};color:${_fireScopeAllHouse?'#fff':'#888'};cursor:pointer;font-weight:${_fireScopeAllHouse?'700':'400'}">All House</button>
+        </div>
+        ${!_fireScopeAllHouse?`<!-- Group toggle -->
+        <div style="display:flex;background:rgba(0,0,0,.3);border-radius:6px;padding:2px;gap:2px">
+          <button onclick="_fireBoarderGrouping='grade';_renderFireRegister()" style="font-size:10px;padding:3px 10px;border-radius:4px;border:none;background:${_fireBoarderGrouping==='grade'?'rgba(255,255,255,.15)':'transparent'};color:${_fireBoarderGrouping==='grade'?'#fff':'#888'};cursor:pointer;font-weight:${_fireBoarderGrouping==='grade'?'700':'400'}">Grade</button>
+          <button onclick="_fireBoarderGrouping='room';_renderFireRegister()" style="font-size:10px;padding:3px 10px;border-radius:4px;border:none;background:${_fireBoarderGrouping==='room'?'rgba(255,255,255,.15)':'transparent'};color:${_fireBoarderGrouping==='room'?'#fff':'#888'};cursor:pointer;font-weight:${_fireBoarderGrouping==='room'?'700':'400'}">Room</button>
+        </div>`:''}
+        <!-- Expand/collapse all — pushed to right -->
+        <button onclick="_fireToggleAllSections()" style="margin-left:auto;font-size:10px;padding:3px 10px;border-radius:5px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#bbb;cursor:pointer">${allExp?'Collapse All':'Expand All'}</button>
       </div>
     </div>
-    <div style="flex:1">${sectionsHtml||'<div style="padding:2rem;text-align:center;color:#666">No students found.</div>'}</div>
-    <div style="padding:10px 14px;display:flex;gap:8px;border-top:1px solid rgba(255,255,255,.08)">
-      <button onclick="closeFireRegister()" style="flex:1;font-size:12px;padding:9px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#aaa;cursor:pointer;font-weight:600">✕ Cancel</button>
-      <button onclick="submitFireRegister()" style="flex:2;font-size:13px;padding:9px;border-radius:8px;border:none;background:#22c55e;color:#fff;cursor:pointer;font-weight:700">✓ Submit Fire Register</button>
+
+    <!-- SCROLLABLE LIST -->
+    <div style="flex:1;overflow-y:auto">
+      ${sectionsHtml||'<div style="padding:2rem;text-align:center;color:#666;font-size:13px">No students found.</div>'}
     </div>
+
+    <!-- STICKY FOOTER -->
+    <div style="flex-shrink:0;padding:10px 14px;display:flex;gap:8px;background:#1a1a1a;border-top:1px solid rgba(255,255,255,.1)">
+      <button onclick="closeFireRegister()" style="flex:1;font-size:12px;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#aaa;cursor:pointer;font-weight:600;-webkit-tap-highlight-color:transparent">✕ Cancel</button>
+      <button onclick="submitFireRegister()" style="flex:2;font-size:13px;padding:10px;border-radius:8px;border:none;background:#22c55e;color:#fff;cursor:pointer;font-weight:700;-webkit-tap-highlight-color:transparent">✓ Submit Fire Register</button>
+    </div>
+
   </div>`;
 }
 
