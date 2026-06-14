@@ -956,6 +956,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       <span class="cat-chip" id="am-cat-chip" style="display:none"></span>
       <button class="panel-hdr-btn" onclick="amExportDocx()" title="Export notes">⬇ Export</button>
       <button class="panel-hdr-btn" onclick="amOpenNotes()" title="Open plan for this slot">📋 Edit plan</button>
+      <button class="panel-hdr-btn" onclick="openFireRegister()" title="Fire register" style="background:#dc2626;color:#fff;border-color:#dc2626;font-weight:700">🔥 Fire</button>
     </div>
   </div>
   <div class="am-quick-cap">
@@ -1107,7 +1108,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
     <!-- Toolbar: filter + collapse controls -->
     <div id="hwk-toolbar">
     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-      <div id="hwk-filter-btns" style="display:flex;gap:3px;background:var(--bg3);border-radius:var(--rsm);padding:3px;flex:1;min-width:0">
+      <div id="hwk-filter-btns" style="display:flex;gap:3px;background:var(--bg3);border-radius:var(--rsm);padding:3px;flex:1;min-width:0;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
         <button class="hwk-filter-btn active" id="hwk-f-all" onclick="setHwkFilter('all',this)">All</button>
         <button class="hwk-filter-btn" id="hwk-f-boarders" onclick="setHwkFilter('boarders',this)">Boarders</button>
         <button class="hwk-filter-btn" id="hwk-f-rooms" onclick="setHwkFilter('rooms',this)">By Room</button>
@@ -25888,6 +25889,8 @@ function renderHawkingList(){
     return;
   }
   if(_hwkFilter==='register'){
+    _brLoadToday();
+    _brSubscribeRealtime();
     renderHawkingRegister(el);
     return;
   }
@@ -28723,6 +28726,8 @@ function _updateLiveBtn(){
 }
 function amOpen(){
   _amOpen=true;_amDismissed=null;_amLastCtxKey='';
+  _brLoadToday();
+  _brSubscribeRealtime();
   document.getElementById('am-panel').classList.add('open');
   amRender();if(_amInterval)clearInterval(_amInterval);
   _amInterval=setInterval(amRender,500); // 500ms catches missed ticks on mobile
@@ -28737,6 +28742,7 @@ function amOpen(){
 }
 function amClose(){
   _amOpen=false;
+  _fireOpen=false;
   const ctx=amGetCtx();
   if(ctx){
     _amDismissed={day:ctx.dayName,si:ctx.slotIdx};
@@ -29328,9 +29334,51 @@ function amHandleLockTap(e){
 }
 function _amVisHandler(){if(!document.hidden&&_amOpen){_amLastCtxKey='';amRender();}}
 // ── BOARDING REGISTER (inline Live mode) ──────────────────────────────────
-let _brState={};  // {studentName: 'present'|'absent'|'excused'|'left'|''}
-
+// ── BOARDING REGISTER STATE (Supabase-synced) ────────────────
+let _brState={};  // {name: {status,updatedAt,updatedBy,sessionType}}
 let _brCollapsed=false;
+let _brRealtimeSub=null;
+let _brToday=()=>new Date().toISOString().split('T')[0];
+
+async function _brLoadToday(){
+  try{
+    const {data,error}=await supa.from('boarding_registrations')
+      .select('student_name,status,updated_at,updated_by,session_type')
+      .eq('register_date',_brToday());
+    if(error)throw error;
+    _brState={};
+    (data||[]).forEach(r=>{
+      _brState[r.student_name]={status:r.status,updatedAt:r.updated_at,updatedBy:r.updated_by,sessionType:r.session_type};
+    });
+    _brRerender();
+    _brRefreshListsTab();
+  }catch(e){console.warn('BR load error',e);}
+}
+
+function _brSubscribeRealtime(){
+  if(_brRealtimeSub)return;
+  _brRealtimeSub=supa.channel('boarding_reg_changes')
+    .on('postgres_changes',{event:'*',schema:'public',table:'boarding_registrations',filter:'register_date=eq.'+_brToday()},
+      payload=>{
+        const r=payload.new||{};
+        if(payload.eventType==='DELETE'){
+          delete _brState[payload.old.student_name];
+        } else {
+          _brState[r.student_name]={status:r.status,updatedAt:r.updated_at,updatedBy:r.updated_by,sessionType:r.session_type};
+        }
+        _brRerender();
+        _brRefreshListsTab();
+      })
+    .subscribe();
+}
+
+function _brRefreshListsTab(){
+  if(_hwkFilter==='register'){
+    const el=document.getElementById('hawking-list-content');
+    if(el)renderHawkingRegister(el);
+  }
+}
+
 function _amBoardingRegisterHtml(type){
   const statColor={'present':'#22c55e','absent':'#ef4444','excused':'#f59e0b','left':'#60a5fa','late':'#a78bfa','':'#555'};
   const statBg={'present':'rgba(34,197,94,.13)','absent':'rgba(239,68,68,.13)','excused':'rgba(245,158,11,.13)','left':'rgba(96,165,250,.13)','late':'rgba(167,139,250,.13)','':'transparent'};
@@ -29424,25 +29472,122 @@ function _brRerender(){
   const newSec=tmp.querySelector('#am-br-section');
   if(newSec)sec.parentNode.replaceChild(newSec,sec);
 }
-function _brTap(name,status){
+async function _brTap(name,status,sessionType){
   const cur=(_brState[name]||{}).status;
-  if(cur===status){delete _brState[name];}
-  else{_brState[name]={status,updatedAt:new Date().toISOString(),updatedBy:'HM'};}
-  _brRerender();
-  // Also refresh Lists register tab if it's visible
-  if(_hwkFilter==='register'){
-    const el=document.getElementById('hawking-list-content');
-    if(el)renderHawkingRegister(el);
+  const sType=sessionType||_brGetType();
+  if(cur===status){
+    // deselect — delete from DB
+    delete _brState[name];
+    try{await supa.from('boarding_registrations').delete().eq('student_name',name).eq('register_date',_brToday());}catch(e){console.warn(e);}
+  } else {
+    const rec={student_name:name,register_date:_brToday(),status,updated_by:'HM',session_type:sType};
+    _brState[name]={status,updatedAt:new Date().toISOString(),updatedBy:'HM',sessionType:sType};
+    try{await supa.from('boarding_registrations').upsert(rec,{onConflict:'student_name,register_date'});}catch(e){console.warn(e);}
+    // Audit log
+    try{await supa.from('boarding_registration_history').insert({student_name:name,register_date:_brToday(),previous_status:cur||null,new_status:status,changed_by:'HM',session_type:sType});}catch(e){}
   }
+  _brRerender();
+  _brRefreshListsTab();
 }
 function _brToggleCollapse(){
   _brCollapsed=!_brCollapsed;
   _brRerender();
 }
 
+// ── FIRE REGISTER ─────────────────────────────────────────────
+let _fireOpen=false;
+
+function openFireRegister(){
+  _fireOpen=true;
+  _brLoadToday();
+  _brSubscribeRealtime();
+  _renderFireRegister();
+}
+
+function _renderFireRegister(){
+  const body=document.getElementById('am-body');if(!body)return;
+  // Build all people grouped by grade
+  // Grade map: try to get grade from TUTORS (each student has a tutor, each tutor has a grade)
+  const gradeMap={};
+  STUDENTS.forEach(s=>{
+    const tut=TUTORS.find(t=>t.name===s.tutor);
+    const gr=tut?tut.grade:'Unknown';
+    if(!gradeMap[gr])gradeMap[gr]=[];
+    gradeMap[gr].push({name:s.name,type:(HAWKING_STATUS[s.name]||{}).boarder?'boarder':'day'});
+  });
+  // Add tutors to a Tutors group
+  if(TUTORS.length){
+    gradeMap['Staff']=TUTORS.map(t=>({name:t.name,type:'tutor'}));
+  }
+  const gradeOrder=['G7','G8','G9','G10','G11','G12','Staff','Unknown'];
+  const statColor={present:'#22c55e',absent:'#ef4444',excused:'#f59e0b',left:'#60a5fa',late:'#a78bfa','':'#555'};
+  const statBg={present:'rgba(34,197,94,.13)',absent:'rgba(239,68,68,.13)',excused:'rgba(245,158,11,.13)',left:'rgba(96,165,250,.13)',late:'rgba(167,139,250,.13)','':'transparent'};
+
+  // Overall counts
+  const allPeople=Object.values(gradeMap).flat();
+  const counts={present:0,absent:0,excused:0,left:0,unset:0};
+  allPeople.forEach(p=>{const st=(_brState[p.name]||{}).status||'';if(st)counts[st]=(counts[st]||0)+1;else counts.unset++;});
+  const total=allPeople.length;
+
+  let globalIdx=0;
+  let sectionsHtml='';
+  gradeOrder.forEach(gr=>{
+    const people=gradeMap[gr];
+    if(!people||!people.length)return;
+    const key='_fireSec_'+gr;
+    const isOpen=window[key]!==false;
+    const secCounts={present:0,absent:0,excused:0,left:0,unset:0};
+    people.forEach(p=>{const st=(_brState[p.name]||{}).status||'';if(st)secCounts[st]=(secCounts[st]||0)+1;else secCounts.unset++;});
+    const secReg=people.length-secCounts.unset;
+
+    let rows='';
+    people.forEach(p=>{
+      const st=(_brState[p.name]||{}).status||'';
+      const bg=statBg[st];
+      globalIdx++;
+      const typeTag=p.type==='tutor'?'<span style="font-size:9px;padding:1px 4px;border-radius:4px;background:rgba(167,139,250,.2);color:#a78bfa">Staff</span>':
+        p.type==='boarder'?'<span style="font-size:9px;padding:1px 4px;border-radius:4px;background:rgba(96,165,250,.2);color:#60a5fa">B</span>':
+        '<span style="font-size:9px;padding:1px 4px;border-radius:4px;background:rgba(255,255,255,.08);color:#666">D</span>';
+      rows+=`<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.05);background:${bg}">
+        <span style="font-size:10px;color:#555;min-width:22px;text-align:right">${globalIdx}.</span>
+        <div style="flex:1;font-size:13px;color:#e0e0e0;font-weight:500">${p.name} ${typeTag}</div>
+        <div style="display:flex;gap:4px">
+          ${['present','absent','excused','left'].map(opt=>`<button onclick="_brTap('${p.name}','${opt}','fire')" style="font-size:11px;padding:4px 7px;border-radius:6px;border:1px solid ${opt===st?statColor[opt]:'rgba(255,255,255,.12)'};background:${opt===st?'rgba(255,255,255,.1)':'transparent'};color:${opt===st?statColor[opt]:'#666'};cursor:pointer;font-weight:${opt===st?'700':'400'}">${opt==='present'?'✓':opt==='absent'?'✗':opt==='excused'?'~':'↑'}</button>`).join('')}
+        </div>
+      </div>`;
+    });
+
+    sectionsHtml+=`<div style="border-bottom:1px solid rgba(255,255,255,.08)">
+      <div onclick="_fireSecToggle('${gr}')" style="display:flex;align-items:center;justify-content:space-between;padding:7px 14px;background:rgba(220,38,38,.12);cursor:pointer;user-select:none">
+        <span style="font-size:11px;font-weight:700;color:#fca5a5;letter-spacing:.06em">${gr==='Staff'?'STAFF / TUTORS':gr}</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:10px;color:#aaa">${secReg}/${people.length} · <span style="color:#22c55e">${secCounts.present||0}✓</span> <span style="color:#ef4444">${secCounts.absent||0}✗</span></span>
+          <span style="font-size:12px;color:#666">${isOpen?'▾':'▸'}</span>
+        </div>
+      </div>
+      ${isOpen?'<div>'+rows+'</div>':''}
+    </div>`;
+  });
+
+  body.innerHTML=`<div id="am-fire-section">
+    <div style="padding:10px 14px;background:rgba(220,38,38,.3);display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:12px;font-weight:700;color:#fca5a5;letter-spacing:.08em">🔥 FIRE REGISTER</span>
+      <span style="font-size:11px;color:#aaa">${total-counts.unset}/${total} · <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444">${counts.absent||0}✗</span> <span style="color:#f59e0b">${counts.excused||0}~</span></span>
+    </div>
+    <div>${sectionsHtml}</div>
+  </div>`;
+}
+
+function _fireSecToggle(gr){
+  const key='_fireSec_'+gr;
+  window[key]=window[key]===false?true:false;
+  if(_fireOpen)_renderFireRegister();
+}
+
 function amRender(){
   const ctx=amGetCtx();_updateLiveBtn();_amAutoCheck();
   const body=document.getElementById('am-body');if(!body)return;
+  if(_fireOpen){_renderFireRegister();return;}
   const titleEl=document.getElementById('am-title'),subEl=document.getElementById('am-sub'),chip=document.getElementById('am-cat-chip');
   const now=new Date();
   const nowStr=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
