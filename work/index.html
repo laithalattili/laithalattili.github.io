@@ -1,3 +1,4 @@
+<!-- © 2026 Laith Al-Attili. All rights reserved. Unauthorised copying or reproduction of this software, in whole or in part, is strictly prohibited. -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -27635,7 +27636,7 @@ function initApp(){
   settingsUnlocked=false;
   const sl=document.getElementById('settings-locked');if(sl)sl.style.display='flex';
   const sc=document.getElementById('settings-content');if(sc)sc.style.display='none';
-  loadSettings();loadPeople();loadState();loadSlotNotes();loadHolidays();applyHolidaysToCalendar();loadCalCustomEvents();loadListsData();loadLinks();loadDuties();loadTutorMeetings();dsLoad();
+  loadSettings();loadPeople();loadState();loadSlotNotes();loadHolidays();applyHolidaysToCalendar();loadCalCustomEvents();loadListsData();loadLinks();loadDuties();loadTutorMeetings();dsLoad();loadBoardingSettings();
   buildMorningChecks();restoreMCState();
   initWeekTab();checkTaskReset();renderCustomFlowsList();
   // Apply global default (overrides individual defaults)
@@ -29555,12 +29556,16 @@ function renderBoardingStaffSettings(){
     const isAWeekNow=hasAlt?((curWeek-s.altAnchor)%2===0):false;
 
     html+=`<div style="padding:.75rem 0;border-bottom:1px solid var(--border3)">
-      <!-- Name row -->
+      <!-- Name + PIN row -->
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
         <span style="font-size:10px;font-weight:700;color:#fff;background:var(--accent);border-radius:4px;padding:3px 7px;flex-shrink:0">${s.role}</span>
         <input type="text" value="${s.name||''}" placeholder="${roles[s.role]||s.role} name..."
           onchange="_bsUpdateStaffName(${i},this.value)"
-          style="flex:1;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px">
+          style="flex:1;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;min-width:0">
+        <input type="password" value="${s.pin||''}" placeholder="6-digit PIN"
+          maxlength="6" pattern="[0-9]{6}" inputmode="numeric"
+          onchange="_bsUpdateStaffPin(${i},this.value)"
+          style="width:90px;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;flex-shrink:0;letter-spacing:3px">
       </div>
       <!-- Day grid -->
       <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden">
@@ -29612,6 +29617,14 @@ function _bsUpdateStaffName(i,val){
   if(_boardingSettings.staff[i])_boardingSettings.staff[i].name=val;
 }
 
+function _bsUpdateStaffPin(i,val){
+  // Only save if exactly 6 digits
+  if(_boardingSettings.staff[i]){
+    const clean=val.replace(/\D/g,'').slice(0,6);
+    _boardingSettings.staff[i].pin=clean;
+  }
+}
+
 function _bsCycleDay(i,day){
   const staff=_boardingSettings.staff[i];if(!staff)return;
   if(!staff.schedule)staff.schedule={};
@@ -29645,11 +29658,18 @@ function _bsRemoveLocation(i){
 }
 
 async function saveBoardingSettings(){
-  // Read staff name inputs directly (onchange may not fire on mobile before save)
-  const nameInputs=document.querySelectorAll('#boarding-staff-list input[type=text]');
-  nameInputs.forEach((inp,i)=>{
+  // Read staff name and PIN inputs directly (onchange may not fire on mobile before save)
+  const staffRows=document.querySelectorAll('#boarding-staff-list input[type=text]');
+  const pinRows=document.querySelectorAll('#boarding-staff-list input[type=password]');
+  staffRows.forEach((inp,i)=>{
     if(_boardingSettings.staff&&_boardingSettings.staff[i])
       _boardingSettings.staff[i].name=inp.value.trim();
+  });
+  pinRows.forEach((inp,i)=>{
+    if(_boardingSettings.staff&&_boardingSettings.staff[i]){
+      const clean=inp.value.replace(/\D/g,'').slice(0,6);
+      if(clean)_boardingSettings.staff[i].pin=clean;
+    }
   });
   // Read time fields
   const fields={
@@ -30612,5 +30632,6 @@ function initActiveMode(){
     });
   }
 </script>
+<div style="text-align:center;padding:12px;font-size:10px;color:#aaa;border-top:1px solid var(--border3);margin-top:8px">© 2026 Laith Al-Attili · All rights reserved</div>
 </body>
 </html>
