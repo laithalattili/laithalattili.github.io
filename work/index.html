@@ -25758,7 +25758,8 @@ function renderHawkingRegister(el){
     const bg=statBg[st];
     const updatedAt=stObj.updatedAt?_brFormatTime(stObj.updatedAt):'';
     const updatedBy=stObj.updatedBy||'';
-    const isFire=_fireSubmitted&&!!(_fireState[p.name]);
+    const fireObj=_fireSubmitted?(_fireState[p.name]||null):null;
+    const isFire=!!fireObj;
     const fireTag=isFire?' 🔥':'';
     const typeTag=p.type==='boarder'
       ?`<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#e0f2fe;color:#0369a1;border:1px solid #7dd3fc">Boarder</span>`
@@ -25766,17 +25767,26 @@ function renderHawkingRegister(el){
       ?`<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#f3e8ff;color:#6b21a8;border:1px solid #d8b4fe">Tutor</span>`
       :`<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1">Day</span>`;
     const statusBadge=`<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:8px;background:${bg};color:${col};border:1px solid ${col};white-space:nowrap">${statLabel[st]}</span>`;
-    const fireStatus=isFire?(_fireState[p.name]||{}).status:'';
-    const fireStatusBadge=isFire&&fireStatus?` <span style="font-size:9px;padding:1px 5px;border-radius:4px;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa">${fireStatus}</span>`:'';
-    const timeStr=updatedAt?`<span style="font-size:9px;color:${isFire?'#f97316':'#9ca3af'};display:block;margin-top:1px">${updatedAt}${updatedBy?' · '+updatedBy:''}${fireTag}${fireStatusBadge}</span>`:'';
-    rows+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #f1f5f9;background:${st!=='unregistered'?bg:'#fff'}">
+    const fireStatus=fireObj?fireObj.status:'';
+    const fireColor={present:'#16a34a',absent:'#dc2626',excused:'#d97706',left:'#2563eb'};
+    const fireStatBg={present:'#f0fdf4',absent:'#fef2f2',excused:'#fffbeb',left:'#eff6ff'};
+    // When fire submitted: show fire status as primary badge, normal as secondary
+    const displayBadge=isFire&&fireStatus
+      ?`<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+          <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:${fireStatBg[fireStatus]||'#fff7ed'};color:${fireColor[fireStatus]||'#c2410c'};border:1px solid ${fireColor[fireStatus]||'#f97316'};white-space:nowrap">🔥 ${fireStatus}</span>
+          ${st!=='unregistered'?`<span style="font-size:9px;color:#9ca3af">${statLabel[st]}</span>`:''}
+        </div>`
+      :statusBadge;
+    const rowBg=isFire&&fireStatus?(fireStatBg[fireStatus]||'#fff7ed'):(st!=='unregistered'?bg:'#fff');
+    const timeStr=updatedAt?`<span style="font-size:9px;color:#9ca3af;display:block;margin-top:1px">${updatedAt}${updatedBy?' · '+updatedBy:''}</span>`:'';
+    rows+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #f1f5f9;background:${rowBg}">
       <span style="font-size:10px;color:#d1d5db;min-width:18px;text-align:right;font-variant-numeric:tabular-nums">${i+1}</span>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:500;color:#111">${p.name}</div>
         ${timeStr}
       </div>
       ${typeTag}
-      ${statusBadge}
+      ${displayBadge}
     </div>`;
   });
 
@@ -29553,7 +29563,33 @@ function _fireTap(name, status){
   // Optimistic update — ONLY _fireState, never _brState
   if(cur===status){ delete _fireState[name]; }
   else { _fireState[name]={status, updatedAt:new Date().toISOString()}; }
-  _renderFireRegister();
+
+  // Surgical DOM update — only update the row that changed, no scroll reset
+  const newSt=(_fireState[name]||{}).status||'';
+  const statColor={present:'#22c55e',absent:'#ef4444',excused:'#f59e0b',left:'#60a5fa','':'#555'};
+  const statBg={present:'rgba(34,197,94,.13)',absent:'rgba(239,68,68,.13)',excused:'rgba(245,158,11,.13)',left:'rgba(96,165,250,.13)','':'transparent'};
+  // Find the row by data attribute and update it
+  const rowEl=document.querySelector(`[data-fire-name="${CSS.escape(name)}"]`);
+  if(rowEl){
+    rowEl.style.background=statBg[newSt];
+    const btns=rowEl.querySelectorAll('[data-fire-opt]');
+    btns.forEach(btn=>{
+      const opt=btn.getAttribute('data-fire-opt');
+      const active=opt===newSt;
+      btn.style.border=`1px solid ${active?statColor[opt]:'rgba(255,255,255,.12)'}`;
+      btn.style.background=active?'rgba(255,255,255,.1)':'transparent';
+      btn.style.color=active?statColor[opt]:'#666';
+      btn.style.fontWeight=active?'700':'400';
+    });
+    // Update summary counts in section header
+    _fireUpdateSectionCount(rowEl);
+    // Update overall count in fire header
+    _fireUpdateOverallCount();
+  } else {
+    // Fallback: full rebuild (shouldn't normally happen)
+    _renderFireRegister();
+  }
+
   // Write audit history only — never touches boarding_registrations
   if(cur!==status){
     supa.from('boarding_registration_history').insert({
@@ -29562,6 +29598,37 @@ function _fireTap(name, status){
       changed_by:'HSM', session_type:'fire'
     }).then(()=>{}).catch(()=>{});
   }
+}
+
+function _fireUpdateSectionCount(rowEl){
+  // Walk up to find the section container and update its count span
+  const section=rowEl.closest('[data-fire-section]');
+  if(!section)return;
+  const countEl=section.querySelector('[data-fire-sec-count]');
+  if(!countEl)return;
+  const rows=section.querySelectorAll('[data-fire-name]');
+  const sc={present:0,absent:0,excused:0,left:0,unset:0};
+  rows.forEach(r=>{
+    const n=r.getAttribute('data-fire-name');
+    const st=(_fireState[n]||{}).status||'';
+    if(st)sc[st]=(sc[st]||0)+1;else sc.unset++;
+  });
+  const reg=rows.length-sc.unset;
+  countEl.innerHTML=`${reg}/${rows.length} · <span style="color:#22c55e">${sc.present||0}✓</span> <span style="color:#ef4444">${sc.absent||0}✗</span>`;
+}
+
+function _fireUpdateOverallCount(){
+  const el=document.getElementById('fire-overall-count');
+  if(!el)return;
+  const allRows=document.querySelectorAll('[data-fire-name]');
+  const counts={present:0,absent:0,excused:0,left:0,unset:0};
+  allRows.forEach(r=>{
+    const n=r.getAttribute('data-fire-name');
+    const st=(_fireState[n]||{}).status||'';
+    if(st)counts[st]=(counts[st]||0)+1;else counts.unset++;
+  });
+  const total=allRows.length;
+  el.innerHTML=`${total-counts.unset}/${total} &nbsp;·&nbsp; <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444"> ${counts.absent||0}✗</span> <span style="color:#f59e0b"> ${counts.excused||0}~</span> <span style="color:#60a5fa"> ${counts.left||0}↑</span>`;
 }
 
 function revertFromFire(){
@@ -29628,11 +29695,12 @@ function _renderFireRegister(){
       :p.type==='boarder'
       ?'<span style="font-size:9px;padding:1px 4px;border-radius:4px;background:rgba(96,165,250,.2);color:#60a5fa">B</span>'
       :'<span style="font-size:9px;padding:1px 4px;border-radius:4px;background:rgba(255,255,255,.08);color:#999">D</span>';
-    return `<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.05);background:${bg}">
+    const safeName=p.name.replace(/"/g,'&quot;');
+    return `<div data-fire-name="${safeName}" style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.05);background:${bg}">
       <span style="font-size:10px;color:#555;min-width:22px;text-align:right">${idx}.</span>
       <div style="flex:1;font-size:13px;color:#e0e0e0;font-weight:500">${p.name} ${typeTag}</div>
       <div style="display:flex;gap:4px">
-        ${['present','absent','excused','left'].map(opt=>`<button onclick="_fireTap('${p.name}','${opt}')" style="font-size:11px;padding:4px 7px;border-radius:6px;border:1px solid ${opt===st?statColor[opt]:'rgba(255,255,255,.12)'};background:${opt===st?'rgba(255,255,255,.1)':'transparent'};color:${opt===st?statColor[opt]:'#666'};cursor:pointer;font-weight:${opt===st?'700':'400'}">${opt==='present'?'✓':opt==='absent'?'✗':opt==='excused'?'~':'↑'}</button>`).join('')}
+        ${['present','absent','excused','left'].map(opt=>`<button data-fire-opt="${opt}" onclick="_fireTap('${safeName}','${opt}')" style="font-size:11px;padding:4px 7px;border-radius:6px;border:1px solid ${opt===st?statColor[opt]:'rgba(255,255,255,.12)'};background:${opt===st?'rgba(255,255,255,.1)':'transparent'};color:${opt===st?statColor[opt]:'#666'};cursor:pointer;font-weight:${opt===st?'700':'400'}">${opt==='present'?'✓':opt==='absent'?'✗':opt==='excused'?'~':'↑'}</button>`).join('')}
       </div>
     </div>`;
   }
@@ -29644,11 +29712,11 @@ function _renderFireRegister(){
     const reg=people.length-sc.unset;
     let rows='';let idx=0;
     people.forEach(p=>{idx++;rows+=makeRow(p,idx);});
-    return `<div style="border-bottom:1px solid rgba(255,255,255,.08)">
+    return `<div data-fire-section="${label}" style="border-bottom:1px solid rgba(255,255,255,.08)">
       <div onclick="window['${key}']=window['${key}']===false?true:false;_renderFireRegister()" style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:${accentColor};cursor:pointer;user-select:none">
         <span style="font-size:11px;font-weight:700;color:#fca5a5;letter-spacing:.05em">${label}</span>
         <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:10px;color:#aaa">${reg}/${people.length} · <span style="color:#22c55e">${sc.present||0}✓</span> <span style="color:#ef4444">${sc.absent||0}✗</span></span>
+          <span data-fire-sec-count style="font-size:10px;color:#aaa">${reg}/${people.length} · <span style="color:#22c55e">${sc.present||0}✓</span> <span style="color:#ef4444">${sc.absent||0}✗</span></span>
           <span style="font-size:12px;color:#888">${isOpen?'▾':'▸'}</span>
         </div>
       </div>
@@ -29721,7 +29789,7 @@ function _renderFireRegister(){
       <!-- Title row -->
       <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px">
         <span style="font-size:13px;font-weight:700;color:#fca5a5;letter-spacing:.06em">🔥 FIRE REGISTER</span>
-        <span style="font-size:11px;color:#aaa">${total-counts.unset}/${total} &nbsp;·&nbsp; <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444"> ${counts.absent||0}✗</span> <span style="color:#f59e0b"> ${counts.excused||0}~</span> <span style="color:#60a5fa"> ${counts.left||0}↑</span></span>
+        <span id="fire-overall-count" style="font-size:11px;color:#aaa">${total-counts.unset}/${total} &nbsp;·&nbsp; <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444"> ${counts.absent||0}✗</span> <span style="color:#f59e0b"> ${counts.excused||0}~</span> <span style="color:#60a5fa"> ${counts.left||0}↑</span></span>
       </div>
       <!-- Controls row -->
       <div style="padding:0 14px 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
