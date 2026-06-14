@@ -1706,6 +1706,97 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
     </div><!-- end ss-body-app -->
     </div><!-- end settings-section app -->
 
+    <div class="settings-section">
+      <div class="settings-section-title" onclick="toggleSettingsSection('boarding_config',this)">
+        🏠 Boarding Configuration
+        <span id="ss-chev-boarding_config" style="font-size:12px;transition:transform .2s;display:inline-block">▼</span>
+      </div>
+      <div class="settings-section-body collapsed" id="ss-body-boarding_config">
+
+        <!-- STAFF -->
+        <div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3)">Staff & Duty Days</div>
+        <div id="boarding-staff-list" style="padding:.5rem 1rem"></div>
+        <div style="padding:.3rem 1rem .6rem">
+          <button onclick="saveBoardingSettings()" style="font-size:12px;padding:6px 14px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600">Save Staff Settings</button>
+        </div>
+
+        <!-- REGISTRATION TIMES -->
+        <div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3);margin-top:.5rem">Registration Points</div>
+        <div style="padding:.75rem 1rem;display:flex;flex-direction:column;gap:.5rem">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:var(--text2);width:140px;flex-shrink:0">Evening prep</span>
+            <input type="time" id="bs-prep-time" value="19:00" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;width:100px">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:var(--text2);width:140px;flex-shrink:0">Heads on beds</span>
+            <input type="time" id="bs-hoob-time" value="21:30" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;width:100px">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:var(--text2);width:140px;flex-shrink:0">Morning clearance</span>
+            <input type="time" id="bs-morning-time" value="07:15" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;width:100px">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:var(--text2);width:140px;flex-shrink:0">Leave floor by</span>
+            <input type="time" id="bs-floor-time" value="07:30" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;width:100px">
+          </div>
+        </div>
+
+        <!-- LIGHTS OUT -->
+        <div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3);margin-top:.5rem">Lights Out</div>
+        <div style="padding:.75rem 1rem;display:flex;flex-direction:column;gap:.5rem">
+          <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:2px">Weekday</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:var(--text2);width:140px;flex-shrink:0">G7–G10</span>
+            <input type="time" id="bs-lo-jnr-wd" value="22:00" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;width:100px">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:var(--text2);width:140px;flex-shrink:0">G11–G12</span>
+            <input type="time" id="bs-lo-snr-wd" value="22:30" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;width:100px">
+          </div>
+          <div style="font-size:11px;font-weight:600;color:var(--text3);margin-top:6px;margin-bottom:2px">Weekend</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:var(--text2);width:140px;flex-shrink:0">G7–G10</span>
+            <input type="time" id="bs-lo-jnr-we" value="22:30" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;width:100px">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:var(--text2);width:140px;flex-shrink:0">G11–G12</span>
+            <input type="time" id="bs-lo-snr-we" value="23:00" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;width:100px">
+          </div>
+        </div>
+
+        <!-- BOARDING WINDOW -->
+        <div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3);margin-top:.5rem">Boarding Time Window</div>
+        <div style="padding:.75rem 1rem;display:flex;flex-direction:column;gap:.5rem">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:var(--text2);width:140px;flex-shrink:0">Window starts</span>
+            <input type="time" id="bs-window-start" value="18:00" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;width:100px">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:var(--text2);width:140px;flex-shrink:0">Window ends</span>
+            <input type="time" id="bs-window-end" value="08:00" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;width:100px">
+            <span style="font-size:11px;color:var(--text3)">(next day)</span>
+          </div>
+        </div>
+
+        <!-- LOCATIONS -->
+        <div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3);margin-top:.5rem">Locations</div>
+        <div style="padding:.75rem 1rem">
+          <div id="bs-locations-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
+          <div style="display:flex;gap:6px">
+            <input type="text" id="bs-new-location" placeholder="Add location..." style="flex:1;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px">
+            <button onclick="addBoardingLocation()" style="font-size:12px;padding:5px 10px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer">+ Add</button>
+          </div>
+        </div>
+
+        <!-- SAVE ALL -->
+        <div style="padding:.75rem 1rem;border-top:1px solid var(--border3)">
+          <button onclick="saveBoardingSettings()" style="width:100%;font-size:13px;padding:9px;border-radius:8px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:700">Save All Boarding Settings</button>
+          <div id="bs-save-status" style="font-size:11px;color:#16a34a;text-align:center;margin-top:6px;display:none">✓ Saved</div>
+        </div>
+
+      </div><!-- end ss-body-boarding_config -->
+    </div><!-- end settings-section boarding_config -->
+
   </div><!-- end settings-content -->
 </div><!-- end tab-settings -->
 
@@ -27480,6 +27571,9 @@ function closeLinkModal(){document.getElementById('link-modal').classList.remove
 let _settingsSectionState={}; // sectionId -> true (collapsed) | false (open)
 
 function toggleSettingsSection(id,titleEl){
+  if(id==='boarding_config'){
+    loadBoardingSettings();
+  }
   // Load saved state
   try{const s=localStorage.getItem('settingsSections');if(s)_settingsSectionState=JSON.parse(s);}catch(e){}
   const body=document.getElementById('ss-body-'+id);
@@ -29372,6 +29466,146 @@ function amHandleLockTap(e){
 }
 function _amVisHandler(){if(!document.hidden&&_amOpen){_amLastCtxKey='';amRender();}}
 // ── BOARDING REGISTER (inline Live mode) ──────────────────────────────────
+
+// ── BOARDING SETTINGS ─────────────────────────────────────────
+let _boardingSettings={
+  staff:[
+    {name:'',role:'HSM',dutyDays:['Mon','Tue','Wed','Thu','Fri','Sat','Sun']},
+    {name:'',role:'AHSM',dutyDays:['Mon','Wed','Fri']},
+    {name:'',role:'RT',dutyDays:['Tue','Thu','Sat']}
+  ],
+  prepTime:'19:00',
+  hoobTime:'21:30',
+  morningTime:'07:15',
+  floorTime:'07:30',
+  lightsOutJnrWd:'22:00',
+  lightsOutSnrWd:'22:30',
+  lightsOutJnrWe:'22:30',
+  lightsOutSnrWe:'23:00',
+  windowStart:'18:00',
+  windowEnd:'08:00',
+  locations:['House','Music Building','Sports Hall','Medical Centre','Off Campus']
+};
+
+async function loadBoardingSettings(){
+  try{
+    const {data}=await supa.from('boarding_settings').select('key,value');
+    if(data&&data.length){
+      data.forEach(r=>{
+        try{
+          const parsed=JSON.parse(r.value);
+          _boardingSettings[r.key]=parsed;
+        }catch(e){_boardingSettings[r.key]=r.value;}
+      });
+    }
+  }catch(e){console.warn('BS load error',e);}
+  renderBoardingStaffSettings();
+  renderBoardingLocations();
+  _populateBSTimes();
+}
+
+function _populateBSTimes(){
+  const fields={
+    'bs-prep-time':'prepTime','bs-hoob-time':'hoobTime',
+    'bs-morning-time':'morningTime','bs-floor-time':'floorTime',
+    'bs-lo-jnr-wd':'lightsOutJnrWd','bs-lo-snr-wd':'lightsOutSnrWd',
+    'bs-lo-jnr-we':'lightsOutJnrWe','bs-lo-snr-we':'lightsOutSnrWe',
+    'bs-window-start':'windowStart','bs-window-end':'windowEnd'
+  };
+  Object.entries(fields).forEach(([id,key])=>{
+    const el=document.getElementById(id);
+    if(el&&_boardingSettings[key])el.value=_boardingSettings[key];
+  });
+}
+
+function renderBoardingStaffSettings(){
+  const el=document.getElementById('boarding-staff-list');if(!el)return;
+  const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const roles={HSM:'Housemaster',AHSM:'Asst. Housemaster',RT:'Resident Tutor'};
+  let html='';
+  (_boardingSettings.staff||[]).forEach((s,i)=>{
+    html+=`<div style="padding:.5rem 0;border-bottom:1px solid var(--border3);margin-bottom:.5rem">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:11px;font-weight:700;color:var(--accent);width:50px">${s.role}</span>
+        <input type="text" value="${s.name||''}" placeholder="${roles[s.role]||s.role} name..."
+          onchange="_bsUpdateStaffName(${i},this.value)"
+          style="flex:1;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px">
+      </div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        ${days.map(d=>{
+          const on=(s.dutyDays||[]).includes(d);
+          return `<button onclick="_bsToggleDutyDay(${i},'${d}')" 
+            style="font-size:10px;padding:3px 7px;border-radius:5px;border:1px solid ${on?'var(--accent)':'var(--border)'};background:${on?'var(--accent)':'transparent'};color:${on?'#fff':'var(--text2)'};cursor:pointer;font-weight:${on?'700':'400'}">${d}</button>`;
+        }).join('')}
+      </div>
+    </div>`;
+  });
+  el.innerHTML=html;
+}
+
+function _bsUpdateStaffName(i,val){
+  if(_boardingSettings.staff[i])_boardingSettings.staff[i].name=val;
+}
+
+function _bsToggleDutyDay(i,day){
+  const staff=_boardingSettings.staff[i];if(!staff)return;
+  const idx=staff.dutyDays.indexOf(day);
+  if(idx>=0)staff.dutyDays.splice(idx,1);
+  else staff.dutyDays.push(day);
+  renderBoardingStaffSettings();
+}
+
+function renderBoardingLocations(){
+  const el=document.getElementById('bs-locations-list');if(!el)return;
+  const locs=_boardingSettings.locations||[];
+  el.innerHTML=locs.map((l,i)=>`
+    <span style="display:inline-flex;align-items:center;gap:4px;background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:3px 10px;font-size:11px">
+      ${l}
+      <button onclick="_bsRemoveLocation(${i})" style="border:none;background:none;color:var(--text3);cursor:pointer;font-size:12px;padding:0 0 0 2px;line-height:1">×</button>
+    </span>`).join('');
+}
+
+function addBoardingLocation(){
+  const inp=document.getElementById('bs-new-location');if(!inp)return;
+  const val=inp.value.trim();if(!val)return;
+  if(!_boardingSettings.locations)_boardingSettings.locations=[];
+  _boardingSettings.locations.push(val);
+  inp.value='';
+  renderBoardingLocations();
+}
+
+function _bsRemoveLocation(i){
+  _boardingSettings.locations.splice(i,1);
+  renderBoardingLocations();
+}
+
+async function saveBoardingSettings(){
+  // Read time fields
+  const fields={
+    'bs-prep-time':'prepTime','bs-hoob-time':'hoobTime',
+    'bs-morning-time':'morningTime','bs-floor-time':'floorTime',
+    'bs-lo-jnr-wd':'lightsOutJnrWd','bs-lo-snr-wd':'lightsOutSnrWd',
+    'bs-lo-jnr-we':'lightsOutJnrWe','bs-lo-snr-we':'lightsOutSnrWe',
+    'bs-window-start':'windowStart','bs-window-end':'windowEnd'
+  };
+  Object.entries(fields).forEach(([id,key])=>{
+    const el=document.getElementById(id);
+    if(el)_boardingSettings[key]=el.value;
+  });
+
+  // Save all keys to Supabase boarding_settings
+  const entries=Object.entries(_boardingSettings).map(([key,value])=>({
+    key,value:JSON.stringify(value)
+  }));
+  try{
+    await supa.from('boarding_settings').upsert(entries,{onConflict:'key'});
+    const status=document.getElementById('bs-save-status');
+    if(status){status.style.display='block';setTimeout(()=>status.style.display='none',2500);}
+  }catch(e){
+    alert('Save failed: '+e.message);
+  }
+}
+
 // ── BOARDING REGISTER STATE (Supabase-synced) ────────────────
 let _brState={};  // {name: {status,updatedAt,updatedBy,sessionType}}
 let _brCollapsed=false;
