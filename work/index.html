@@ -1721,6 +1721,9 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
           <span style="background:#1971c2;color:#fff;border-radius:3px;padding:1px 5px;font-size:10px">A/B</span> alternates weekly
         </div>
         <div id="boarding-staff-list" style="padding:.5rem 1rem"></div>
+        <div style="padding:.5rem 1rem .75rem">
+          <button onclick="saveBoardingSettings()" style="width:100%;font-size:12px;padding:8px;border-radius:8px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:700">💾 Save Staff &amp; Schedule</button>
+        </div>
 
         <!-- REGISTRATION TIMES -->
         <div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3);margin-top:.5rem">Registration Points</div>
@@ -29642,6 +29645,12 @@ function _bsRemoveLocation(i){
 }
 
 async function saveBoardingSettings(){
+  // Read staff name inputs directly (onchange may not fire on mobile before save)
+  const nameInputs=document.querySelectorAll('#boarding-staff-list input[type=text]');
+  nameInputs.forEach((inp,i)=>{
+    if(_boardingSettings.staff&&_boardingSettings.staff[i])
+      _boardingSettings.staff[i].name=inp.value.trim();
+  });
   // Read time fields
   const fields={
     'bs-prep-time':'prepTime','bs-hoob-time':'hoobTime',
