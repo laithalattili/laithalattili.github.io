@@ -176,8 +176,18 @@
       <div class="pin-dot" id="pd5"></div>
     </div>
     <div class="pin-pad">
-      ${[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map(n=>`
-        <button class="pin-btn" onclick="pinKey('${n}')">${n}</button>`).join('')}
+      <button class="pin-btn" onclick="pinKey('1')">1</button>
+      <button class="pin-btn" onclick="pinKey('2')">2</button>
+      <button class="pin-btn" onclick="pinKey('3')">3</button>
+      <button class="pin-btn" onclick="pinKey('4')">4</button>
+      <button class="pin-btn" onclick="pinKey('5')">5</button>
+      <button class="pin-btn" onclick="pinKey('6')">6</button>
+      <button class="pin-btn" onclick="pinKey('7')">7</button>
+      <button class="pin-btn" onclick="pinKey('8')">8</button>
+      <button class="pin-btn" onclick="pinKey('9')">9</button>
+      <button class="pin-btn" style="background:transparent;cursor:default"></button>
+      <button class="pin-btn" onclick="pinKey('0')">0</button>
+      <button class="pin-btn" onclick="pinKey('⌫')">⌫</button>
     </div>
     <div id="pin-error" style="color:#ef4444;font-size:13px;margin-top:16px;min-height:20px"></div>
     <div class="pin-switch" onclick="showPickStep()">← Back</div>
@@ -446,12 +456,8 @@ function showPinScreen(){
   document.getElementById('app').style.display='none';
   _selectedStaff=null;
   _pinEntry='';
-  // If we have a stored identity, go straight to PIN entry
-  if(_identity){
-    showPinStep(_identity);
-  } else {
-    showPickStep();
-  }
+  // Always show pick step first so user confirms who they are
+  showPickStep();
 }
 
 function showPickStep(){
