@@ -297,6 +297,59 @@ PAGES.openBookSchedule = async (queueId, app) => {
       app.closeModal();
       app.notify('Schedule saved ✓', 'success');
       await app.refreshData();
+
+      // Write reading plan to omni_schedule_feed
+      try {
+        const sbUrl = CONFIG.supabase.url;
+        const sbKey = CONFIG.supabase.key;
+        const sbHeaders = {
+          'apikey': sbKey,
+          'Authorization': `Bearer ${sbKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates,return=minimal'
+        };
+
+        // Rebuild schedule for this book using updated phases
+        const freshQueue = app.yearQueue.find(q => q.id === queueId);
+        if (freshQueue && book) {
+          const freshPhases = app.phases.filter(p => p.queue_id === queueId).sort((a,b) => a.position - b.position);
+          const routine = app.routine || {};
+          const revRoutine = app.reviewRoutine || {};
+          const calRules = app.calRules || [];
+          const startDate = startDate || SCHEDULER.formatDate(new Date());
+
+          const { plan } = SCHEDULER.buildBookPlan(
+            freshQueue, freshPhases.length ? freshPhases : phases,
+            routine, revRoutine, calRules, startDate
+          );
+
+          // Write each reading day to omni_schedule_feed
+          const readingDays = plan.filter(d => d.type === 'reading' && d.pagesPlanned > 0);
+          for (const day of readingDays) {
+            await fetch(`${sbUrl}/rest/v1/omni_schedule_feed`, {
+              method: 'POST',
+              headers: sbHeaders,
+              body: JSON.stringify({
+                date: day.date,
+                type: 'reading',
+                title: book.title,
+                source_app: 'life',
+                source_id: book.id,
+                meta: JSON.stringify({
+                  fromPage: day.fromPage,
+                  toPage: day.toPage,
+                  pagesPlanned: day.pagesPlanned
+                }),
+                created_at: new Date().toISOString()
+              })
+            });
+          }
+        }
+      } catch (omniErr) {
+        console.warn('omni_schedule_feed write failed:', omniErr.message);
+        // Non-fatal — schedule is saved, Omni feed is best-effort
+      }
+
       PAGES.year(document.getElementById('main-content'), app);
     } catch (e) { app.notify('Failed: ' + e.message, 'error'); }
   });
