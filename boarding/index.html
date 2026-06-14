@@ -6,8 +6,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a1a1a">
-<title>Hawking Boarding</title>
+<title>Hawking House</title>
 <link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-title" content="Hawking House">
 <style>
   :root {
     --bg: #f2ede8;
@@ -149,7 +151,7 @@
 <!-- PIN / IDENTITY SCREEN -->
 <div id="pin-screen">
   <div class="pin-logo">🏠</div>
-  <div class="pin-title">Hawking Boarding</div>
+  <div class="pin-title">Hawking House</div>
   <div class="pin-sub">Who are you?</div>
   <div class="pin-cards" id="pin-cards">
     <div style="text-align:center;color:#666;font-size:13px;padding:20px">Loading staff...</div>
@@ -167,7 +169,7 @@
   <div class="hdr">
     <div class="hdr-logo">🏠</div>
     <div class="hdr-title">
-      <div class="hdr-title-main">Hawking Boarding</div>
+      <div class="hdr-title-main">Hawking House</div>
       <div class="hdr-title-sub" id="hdr-date">—</div>
     </div>
     <button class="fire-btn" onclick="openFireRegister()">🔥 Fire</button>
@@ -848,6 +850,13 @@ function showToast(msg,color='#22c55e'){
   t.style.color='#fff';
   document.body.appendChild(t);
   setTimeout(()=>t.remove(),2500);
+}
+
+// ── SERVICE WORKER ───────────────────────────────────────────
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/boarding/sw.js')
+    .then(r=>console.log('SW registered',r.scope))
+    .catch(e=>console.warn('SW failed',e));
 }
 
 // ── START ─────────────────────────────────────────────────────
