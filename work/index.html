@@ -29540,41 +29540,69 @@ function renderBoardingStaffSettings(){
   const el=document.getElementById('boarding-staff-list');if(!el)return;
   const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const roles={HSM:'Housemaster',AHSM:'Asst. Housemaster',RT:'Resident Tutor'};
-  const stateStyle={
-    on:{bg:'var(--accent)',color:'#fff',border:'var(--accent)',label:'ON'},
-    off:{bg:'transparent',color:'var(--text3)',border:'var(--border)',label:'—'},
-    alt:{bg:'#1971c2',color:'#fff',border:'#1971c2',label:'A/B'}
-  };
+  // Current school week number for A/B reference
+  const curWeek=getWeekNumber(0)||1;
   let html='';
   (_boardingSettings.staff||[]).forEach((s,i)=>{
-    // Ensure schedule object exists
     if(!s.schedule)s.schedule={Mon:'off',Tue:'off',Wed:'off',Thu:'off',Fri:'off',Sat:'off',Sun:'off'};
+    const hasAlt=Object.values(s.schedule).some(v=>v==='alt');
+    // altAnchor: which school week is the "A" (on duty) week — default to current week
+    if(hasAlt&&!s.altAnchor)s.altAnchor=curWeek;
+    // Is this week an A week for this staff member?
+    const isAWeekNow=hasAlt?((curWeek-s.altAnchor)%2===0):false;
+
     html+=`<div style="padding:.75rem 0;border-bottom:1px solid var(--border3)">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-        <span style="font-size:10px;font-weight:700;color:#fff;background:var(--accent);border-radius:4px;padding:2px 6px;flex-shrink:0">${s.role}</span>
+      <!-- Name row -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span style="font-size:10px;font-weight:700;color:#fff;background:var(--accent);border-radius:4px;padding:3px 7px;flex-shrink:0">${s.role}</span>
         <input type="text" value="${s.name||''}" placeholder="${roles[s.role]||s.role} name..."
           onchange="_bsUpdateStaffName(${i},this.value)"
           style="flex:1;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px">
       </div>
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">
-        ${days.map(d=>{
-          const state=_bsDayState(s,d);
-          const st=stateStyle[state];
-          return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">
-            <span style="font-size:9px;color:var(--text3)">${d.slice(0,2)}</span>
-            <button onclick="_bsCycleDay(${i},'${d}')"
-              style="width:100%;padding:5px 2px;border-radius:5px;border:1px solid ${st.border};background:${st.bg};color:${st.color};cursor:pointer;font-size:9px;font-weight:700;min-width:32px">${st.label}</button>
+      <!-- Day grid -->
+      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden">
+        ${days.map((d,di)=>{
+          const state=s.schedule[d]||'off';
+          const isOn=state==='on';
+          const isAlt=state==='alt';
+          const isOff=state==='off';
+          const bg=isOn?'#c4622d':isAlt?'#1971c2':'#f8f9fa';
+          const color=isOn||isAlt?'#fff':'#868e96';
+          const label=isOn?'ON':isAlt?'A/B':'—';
+          const fontSize=isOn||isAlt?'10px':'12px';
+          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 2px;background:${bg};cursor:pointer;border-right:${di<6?'1px solid rgba(0,0,0,.08)':''};user-select:none"
+            onclick="_bsCycleDay(${i},'${d}')">
+            <span style="font-size:9px;color:${isOn||isAlt?'rgba(255,255,255,.7)':'#aaa'}">${d.slice(0,2)}</span>
+            <span style="font-size:${fontSize};font-weight:700;color:${color};line-height:1.2">${label}</span>
           </div>`;
         }).join('')}
       </div>
-      ${Object.values(s.schedule||{}).some(v=>v==='alt')?`
-      <div style="margin-top:6px;font-size:11px;color:var(--text3)">
-        A/B alternates each week. <span style="color:#1971c2;font-weight:600">A weeks = on duty</span>
-        <span style="font-size:10px;color:var(--text3)"> (based on school week number)</span>
+      <!-- A/B anchor if alternating days exist -->
+      ${hasAlt?`<div style="margin-top:8px;display:flex;align-items:center;gap:8px;background:#e7f0fd;border-radius:6px;padding:6px 10px">
+        <span style="font-size:11px;color:#1971c2;flex:1">
+          A/B anchor: Week ${s.altAnchor||curWeek} is an <strong>A week</strong> (on duty).<br>
+          <span style="font-size:10px">This week (W${curWeek}) = <strong style="color:${isAWeekNow?'#1971c2':'#868e96'}">${isAWeekNow?'A — on duty':'B — off duty'}</strong></span>
+        </span>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <button onclick="_bsSetAltAnchor(${i},${curWeek},'a')" 
+            style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid #1971c2;background:${isAWeekNow?'#1971c2':'#fff'};color:${isAWeekNow?'#fff':'#1971c2'};cursor:pointer;white-space:nowrap">
+            This week = A</button>
+          <button onclick="_bsSetAltAnchor(${i},${curWeek},'b')"
+            style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid #868e96;background:${!isAWeekNow?'#868e96':'#fff'};color:${!isAWeekNow?'#fff':'#868e96'};cursor:pointer;white-space:nowrap">
+            This week = B</button>
+        </div>
       </div>`:''}
     </div>`;
   });
   el.innerHTML=html;
+}
+
+function _bsSetAltAnchor(i,curWeek,which){
+  const staff=_boardingSettings.staff[i];if(!staff)return;
+  // If 'a': anchor = curWeek (even offset = on duty)
+  // If 'b': anchor = curWeek+1 (so curWeek is odd offset = off duty)
+  staff.altAnchor=which==='a'?curWeek:curWeek+1;
+  renderBoardingStaffSettings();
 }
 
 function _bsUpdateStaffName(i,val){
