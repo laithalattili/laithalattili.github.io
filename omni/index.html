@@ -3357,6 +3357,7 @@ async function loadHabitsFor(dateStr){
     // Schedule feed for date (from Life Manager)
     const{data:feed}=await supaFrom('omni_schedule_feed')
       .select('*').eq('date',dateStr);
+    console.log('schedule_feed for',dateStr,':',feed?.length,'rows',feed?.map(r=>r.type));
     if(feed){
       feed.forEach(row=>{
         if(row.type==='book'||row.type==='reading')HAB_DATA.book=row;
@@ -3481,18 +3482,22 @@ async function renderHabits(dateStr,dayName){
 
   let h=`<div class="habit-sec-lbl"><span>Today's Habits</span><span id="hab-edit-lnk"></span></div>`;
 
-  // ── GYM ───────────────────────────────────────────────────────────────────
+  // ── GYM — only show on programme days ────────────────────────────────────
   const gymDone=!!HAB_DATA.gym;
   const gymSlot=_habSlotTime('gym',dateStr);
-  h+=`<div class="habit-row${gymDone?' done':(typeof GPROG!=='undefined'&&GPROG)?'':' skipped'}">
+  const _gymViewDay=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'][new Date(dateStr+'T12:00:00').getDay()];
+  const _gymTypeForDay=typeof GPROG!=='undefined'&&GPROG?(GPROG.days||{})[_gymViewDay]||null:null;
+  if(_gymTypeForDay||gymDone){
+  h+=`<div class="habit-row${gymDone?' done':''}">
     <span class="habit-icon">🏋️</span>
     <div class="habit-body">
-      <div class="habit-name">Gym${gymDone?' — '+HAB_DATA.gym.session_type:''}</div>
-      <div class="habit-sub">${gymDone?'Session logged ✓':'No session today'}${gymSlot?' · 📌'+gymSlot:''}</div>
+      <div class="habit-name">Gym${gymDone?' — '+HAB_DATA.gym.session_type:(_gymTypeForDay?' — '+_gymTypeForDay:'')}</div>
+      <div class="habit-sub">${gymDone?'Session logged ✓':'Not logged yet'}${gymSlot?' · 📌'+gymSlot:''}</div>
     </div>
     <button onclick="_habPickTime('gym','${dateStr}')" style="font-size:10px;background:none;border:none;padding:0 4px;color:${gymSlot?'var(--acc)':'var(--tx4)'}">📌</button>
     <div class="habit-tick${gymDone?' on':''}" onclick="${gymDone?'unlogGymQuick()':'logGymQuick()'}">${gymDone?'✓':''}</div>
   </div>`;
+  } // end gym
 
   // ── BOOK ──────────────────────────────────────────────────────────────────
   const bookDone=_habDone('book',dateStr);
