@@ -25906,13 +25906,16 @@ function toggleHwkGrade(gr){
 
 function renderHawkingList(){
   const el=document.getElementById('hawking-list-content');if(!el)return;
+  // Always sync active button to current filter state
+  document.querySelectorAll('.hwk-filter-btn').forEach(b=>b.classList.remove('active'));
+  const activeBtn=document.getElementById('hwk-f-'+_hwkFilter);
+  if(activeBtn)activeBtn.classList.add('active');
 
   if(_hwkFilter==='rooms'){
     renderHawkingByRoom(el);
     return;
   }
   if(_hwkFilter==='register'){
-    _brLoadToday();
     _brSubscribeRealtime();
     renderHawkingRegister(el);
     return;
@@ -29399,6 +29402,10 @@ function _brRefreshListsTab(){
   if(_hwkFilter==='register'){
     const el=document.getElementById('hawking-list-content');
     if(el)renderHawkingRegister(el);
+    // Ensure Register button shows as active
+    document.querySelectorAll('.hwk-filter-btn').forEach(b=>b.classList.remove('active'));
+    const rb=document.getElementById('hwk-f-register');
+    if(rb)rb.classList.add('active');
   }
 }
 
@@ -29519,11 +29526,18 @@ function _brTap(name,status,sessionType){
       }catch(e){
         if(attempt===2){
           console.warn('BR save failed after 3 attempts',e);
-          // Show error toast
+          // Verify by re-reading — write may have gone through despite error
+          try{
+            const {data}=await supa.from('boarding_registrations')
+              .select('status').eq('student_name',name).eq('register_date',_brToday()).single();
+            if(data&&data.status===status) return; // actually saved fine
+          }catch(_){}
+          // Only show toast if truly not saved
           const t=document.createElement('div');
-          t.textContent='⚠ Save failed — check connection';
-          t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#dc2626;color:#fff;padding:8px 16px;border-radius:16px;font-size:12px;font-weight:600;z-index:9999;pointer-events:none';
-          document.body.appendChild(t);setTimeout(()=>t.remove(),3000);
+          t.textContent='⚠ Save failed — tap to retry';
+          t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#dc2626;color:#fff;padding:8px 16px;border-radius:16px;font-size:12px;font-weight:600;z-index:9999;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.3)';
+          t.onclick=()=>{t.remove();_brTap(name,status,sessionType);};
+          document.body.appendChild(t);setTimeout(()=>t.remove(),5000);
         }
         await new Promise(r=>setTimeout(r,800*(attempt+1))); // backoff
       }
