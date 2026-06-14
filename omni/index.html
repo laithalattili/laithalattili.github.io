@@ -3130,12 +3130,27 @@ function renderDash(){
     if(feed){
       const m=typeof feed.meta==='string'?JSON.parse(feed.meta||'{}'):feed.meta||{};
       const title=feed.title||'Book';
-      const from=m.fromPage||m.from_page||'';
-      const to=m.toPage||m.to_page||'';
+      const from=+(m.fromPage||m.from_page||0);
+      const to=+(m.toPage||m.to_page||0);
+      const total=+(m.totalPages||m.total_pages||0);
+      const cur=+(m.currentPage||m.current_page||from||0);
+      const reviewAt=+(m.reviewStart||m.review_start||0);
       const done=_habDone('book',dateStr);
-      rc.innerHTML=`<div style="font-size:13px;font-weight:600;color:var(--tx)">${title}</div>
-        ${from&&to?`<div style="font-family:var(--mono);font-size:11px;color:var(--tx4);margin-top:2px">pp. ${from}–${to}</div>`:''}
-        <div style="margin-top:.35rem;font-size:11px;font-weight:700;color:${done?'var(--ok)':'var(--acc)'}">${done?'✓ Done today':'Not logged yet'}</div>`;
+      const pct=total>0?Math.min(100,Math.round(cur/total*100)):0;
+      const rPct=total>0&&reviewAt>0?Math.round(reviewAt/total*100):0;
+      const barHtml=total>0?`<div style="margin:.45rem 0 .3rem">
+        <div style="height:6px;background:var(--bd);border-radius:3px;overflow:hidden;position:relative">
+          <div style="height:100%;width:${pct}%;background:var(--acc);border-radius:3px"></div>
+          ${rPct>0&&rPct<100?`<div style="position:absolute;top:0;left:${rPct}%;width:1.5px;height:100%;background:rgba(255,255,255,.7)"></div>`:''}
+        </div>
+        <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--tx4);margin-top:3px">
+          <span>p.${cur} / ${total}</span><span>${pct}%${rPct>0?' · review at p.'+reviewAt:''}</span>
+        </div>
+      </div>`:''; 
+      rc.innerHTML=`<div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:2px">${title}</div>
+        ${from&&to?`<div style="font-family:var(--mono);font-size:11px;color:var(--tx4)">Today: pp.${from}–${to}</div>`:''}
+        ${barHtml}
+        <div style="font-size:11px;font-weight:700;color:${done?'var(--ok)':'var(--acc)'}">${done?'✓ Done today':'Not logged yet'}</div>`;
     }else{
       rc.innerHTML='<span style="color:var(--tx4);font-size:12px">No reading scheduled today</span>';
     }
@@ -3489,7 +3504,7 @@ async function renderHabits(dateStr,dayName){
     <span class="habit-icon">📖</span>
     <div class="habit-body">
       <div class="habit-name">${bookTitle}</div>
-      <div class="habit-sub">${pages?'Today: '+pages+' pages':'Daily reading'}${bookDone?' ✓':''}</div>
+      <div class="habit-sub">${(()=>{const f=bookMeta.fromPage||bookMeta.from_page||'';const t=bookMeta.toPage||bookMeta.to_page||'';return f&&t?'pp.'+f+'–'+t:pages?pages+'p':'Daily reading';})()}${bookDone?' ✓':''}</div>
     </div>
     <button onclick="_habPickTime('book','${dateStr}')" style="font-size:10px;background:none;border:none;padding:0 4px;color:${_habSlotTime('book',dateStr)?'var(--acc)':'var(--tx4)'}">📌</button>
     <div class="habit-tick${bookDone?' on':''}" onclick="_tickHabit('book','${dateStr}',${JSON.stringify(JSON.stringify(bookMeta))})">${bookDone?'✓':''}</div>
