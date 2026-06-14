@@ -1111,6 +1111,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
         <button class="hwk-filter-btn active" id="hwk-f-all" onclick="setHwkFilter('all',this)">All</button>
         <button class="hwk-filter-btn" id="hwk-f-boarders" onclick="setHwkFilter('boarders',this)">Boarders</button>
         <button class="hwk-filter-btn" id="hwk-f-rooms" onclick="setHwkFilter('rooms',this)">By Room</button>
+        <button class="hwk-filter-btn" id="hwk-f-register" onclick="setHwkFilter('register',this)">Register</button>
       </div>
       <div id="hwk-count-badge" style="font-size:11px;color:var(--text3);padding:4px 6px;flex-shrink:0"></div>
       <button id="hwk-collapse-toggle-btn" onclick="hwkToggleAll()" style="font-size:10px;padding:4px 8px;border:1px solid var(--border);border-radius:var(--rsm);background:#fff;color:var(--text3);cursor:pointer;white-space:nowrap;flex-shrink:0">Expand All</button>
@@ -25720,6 +25721,96 @@ function chip(num, lbl, cls=''){
   return `<div class="totals-chip ${cls}"><span class="tc-num">${num}</span><span class="tc-lbl">${lbl}</span></div>`;
 }
 
+function renderHawkingRegister(el){
+  // Toggle: all house or boarders only
+  const allHouse=window._regAllHouse||false;
+  // Build people list
+  let people=[];
+  // Always include boarders
+  STUDENTS.forEach((s,i)=>{
+    const hw=HAWKING_STATUS[s.name]||{};
+    if(!hw.boarder&&!allHouse)return;
+    people.push({name:s.name,type:hw.boarder?'boarder':'day',tutor:s.tutor});
+  });
+  if(allHouse){
+    // Add tutors
+    TUTORS.forEach(t=>{
+      people.push({name:t.name,type:'tutor',tutor:'',room:t.room});
+    });
+  }
+
+  const statColor={present:'#16a34a',absent:'#dc2626',excused:'#d97706',left:'#2563eb',late:'#7c3aed',unregistered:'#9ca3af'};
+  const statBg={present:'#f0fdf4',absent:'#fef2f2',excused:'#fffbeb',left:'#eff6ff',late:'#f5f3ff',unregistered:'transparent'};
+  const statLabel={present:'Present',absent:'Absent',excused:'Excused',left:'Left',late:'Late',unregistered:'—'};
+
+  // Count summary
+  const counts={present:0,absent:0,excused:0,left:0,late:0,unregistered:0};
+  people.forEach(p=>{const st=(_brState[p.name]||{}).status||'unregistered';counts[st]=(counts[st]||0)+1;});
+  const total=people.length;
+  const registered=total-counts.unregistered;
+
+  let rows='';
+  people.forEach((p,i)=>{
+    const stObj=_brState[p.name]||{};
+    const st=stObj.status||'unregistered';
+    const col=statColor[st];
+    const bg=statBg[st];
+    const updatedAt=stObj.updatedAt?_brFormatTime(stObj.updatedAt):'';
+    const updatedBy=stObj.updatedBy||'';
+    const typeTag=p.type==='boarder'
+      ?`<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#e0f2fe;color:#0369a1;border:1px solid #7dd3fc">Boarder</span>`
+      :p.type==='tutor'
+      ?`<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#f3e8ff;color:#6b21a8;border:1px solid #d8b4fe">Tutor</span>`
+      :`<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1">Day</span>`;
+    const statusBadge=`<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:8px;background:${bg};color:${col};border:1px solid ${col};white-space:nowrap">${statLabel[st]}</span>`;
+    const timeStr=updatedAt?`<span style="font-size:9px;color:#9ca3af;display:block;margin-top:1px">${updatedAt}${updatedBy?' · '+updatedBy:''}</span>`:'';
+    rows+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #f1f5f9;background:${st!=='unregistered'?bg:'#fff'}">
+      <span style="font-size:10px;color:#d1d5db;min-width:18px;text-align:right;font-variant-numeric:tabular-nums">${i+1}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500;color:#111">${p.name}</div>
+        ${timeStr}
+      </div>
+      ${typeTag}
+      ${statusBadge}
+    </div>`;
+  });
+
+  el.innerHTML=`<div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#f8fafc;border-bottom:1px solid #e2e8f0;position:sticky;top:0;z-index:2">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:12px;font-weight:600;color:#374151">${registered}/${total} registered</span>
+        <span style="font-size:11px;color:#16a34a">${counts.present}✓</span>
+        <span style="font-size:11px;color:#dc2626">${counts.absent}✗</span>
+        <span style="font-size:11px;color:#d97706">${counts.excused}~</span>
+        <span style="font-size:11px;color:#2563eb">${counts.left}↑</span>
+      </div>
+      <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#6b7280;cursor:pointer;flex-shrink:0">
+        <input type="checkbox" ${allHouse?'checked':''} onchange="_regToggleAllHouse(this.checked)" style="accent-color:#c4622d">
+        All house
+      </label>
+    </div>
+    <div>${rows||'<div style="padding:2rem;text-align:center;color:#9ca3af;font-size:13px">No students found.</div>'}</div>
+  </div>`;
+}
+
+function _regToggleAllHouse(val){
+  window._regAllHouse=val;
+  const el=document.getElementById('hawking-list-content');
+  if(el)renderHawkingRegister(el);
+}
+
+function _brFormatTime(iso){
+  try{
+    const d=new Date(iso);
+    const now=new Date();
+    const isToday=d.toDateString()===now.toDateString();
+    const hhmm=d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    if(isToday)return hhmm+' today';
+    const dd=d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+    return hhmm+' · '+dd;
+  }catch(e){return'';}
+}
+
 function renderHawkingTotals(){
   const badge=document.getElementById('hwk-count-badge');if(!badge)return;
   const total=STUDENTS.length;
@@ -25740,7 +25831,7 @@ function renderTeachingTotals(){
   // No longer a row — count is shown inline in class header. Noop kept for compat.
 }
 
-let _hwkFilter='all'; // 'all' | 'boarders' | 'rooms' 
+let _hwkFilter='all'; // 'all' | 'boarders' | 'rooms' | 'register'
 
 function setHwkFilter(f,btn){
   _hwkFilter=f;
@@ -25794,6 +25885,10 @@ function renderHawkingList(){
 
   if(_hwkFilter==='rooms'){
     renderHawkingByRoom(el);
+    return;
+  }
+  if(_hwkFilter==='register'){
+    renderHawkingRegister(el);
     return;
   }
 
@@ -29235,53 +29330,114 @@ function _amVisHandler(){if(!document.hidden&&_amOpen){_amLastCtxKey='';amRender
 // ── BOARDING REGISTER (inline Live mode) ──────────────────────────────────
 let _brState={};  // {studentName: 'present'|'absent'|'excused'|'left'|''}
 
+let _brCollapsed=false;
 function _amBoardingRegisterHtml(type){
-  // Get boarders from HAWKING_STATUS + STUDENTS
-  const allBoarders=STUDENTS.filter(s=>(HAWKING_STATUS[s.name]||{}).boarder);
-  if(!allBoarders.length){
-    return '<div style="padding:24px;text-align:center;color:#666;font-size:13px">No boarders found.<br><span style="font-size:11px;color:#444">Add students in Settings → Boarders.</span></div>';
-  }
-  const statColor={'present':'#22c55e','absent':'#ef4444','excused':'#f59e0b','left':'#60a5fa','':'#444'};
-  const statBg={'present':'rgba(34,197,94,.18)','absent':'rgba(239,68,68,.18)','excused':'rgba(245,158,11,.18)','left':'rgba(96,165,250,.18)','':'transparent'};
-  const statLabel={'present':'✓ Present','absent':'✗ Absent','excused':'~ Excused','left':'↑ Left','':'— ?'};
-  const counts={present:0,absent:0,excused:0,left:0,unset:0};
-  allBoarders.forEach(s=>{const st=_brState[s.name]||'';if(st)counts[st]=(counts[st]||0)+1;else counts.unset++;});
-  const total=allBoarders.length;
+  const statColor={'present':'#22c55e','absent':'#ef4444','excused':'#f59e0b','left':'#60a5fa','late':'#a78bfa','':'#555'};
+  const statBg={'present':'rgba(34,197,94,.13)','absent':'rgba(239,68,68,.13)','excused':'rgba(245,158,11,.13)','left':'rgba(96,165,250,.13)','late':'rgba(167,139,250,.13)','':'transparent'};
+  const chevron=_brCollapsed?'▶':'▼';
 
-  let rows='';
-  allBoarders.forEach(s=>{
-    const st=_brState[s.name]||'';
-    const col=statColor[st];const bg=statBg[st];
-    rows+=`<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.06);background:${bg}">
-      <div style="flex:1;font-size:14px;color:#e0e0e0;font-weight:500">${s.name}</div>
-      <div style="display:flex;gap:6px">
-        ${['present','absent','excused','left'].map(opt=>`<button onclick="_brTap('${s.name}','${opt}')" style="font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid ${opt===st?statColor[opt]:'rgba(255,255,255,.15)'};background:${opt===st?'rgba(255,255,255,.12)':'transparent'};color:${opt===st?statColor[opt]:'#888'};cursor:pointer;font-weight:${opt===st?'700':'400'}">${opt==='present'?'✓':opt==='absent'?'✗':opt==='excused'?'~':'↑'}</button>`).join('')}
-      </div>
-    </div>`;
+  // Build sections based on type
+  const sections=[];
+  const allBoarders=STUDENTS.filter(s=>(HAWKING_STATUS[s.name]||{}).boarder);
+  if(allBoarders.length) sections.push({label:'Boarders',people:allBoarders.map(s=>({name:s.name}))});
+  if(type==='house'){
+    const dayStudents=STUDENTS.filter(s=>!(HAWKING_STATUS[s.name]||{}).boarder);
+    if(dayStudents.length) sections.push({label:'Day Students',people:dayStudents.map(s=>({name:s.name}))});
+    if(TUTORS.length) sections.push({label:'Tutors',people:TUTORS.map(t=>({name:t.name}))});
+  }
+
+  if(!sections.length){
+    return '<div style="padding:24px;text-align:center;color:#666;font-size:13px">No students found.</div>';
+  }
+
+  // Overall counts
+  const allPeople=sections.flatMap(s=>s.people);
+  const counts={present:0,absent:0,excused:0,left:0,late:0,unset:0};
+  allPeople.forEach(p=>{const st=(_brState[p.name]||{}).status||'';if(st)counts[st]=(counts[st]||0)+1;else counts.unset++;});
+  const total=allPeople.length;
+
+  // Build section HTML — each section collapsible, state keyed by label
+  let sectionsHtml='';
+  let globalIdx=0;
+  sections.forEach(sec=>{
+    const key='_brSec_'+sec.label;
+    const isOpen=window[key]!==false; // default open
+    const secCounts={present:0,absent:0,excused:0,left:0,late:0,unset:0};
+    sec.people.forEach(p=>{const st=(_brState[p.name]||{}).status||'';if(st)secCounts[st]=(secCounts[st]||0)+1;else secCounts.unset++;});
+    const secTotal=sec.people.length;
+    const secReg=secTotal-secCounts.unset;
+
+    let rows='';
+    sec.people.forEach(p=>{
+      const st=(_brState[p.name]||{}).status||'';
+      const bg=statBg[st];
+      globalIdx++;
+      rows+=`<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.05);background:${bg}">
+        <span style="font-size:10px;color:#555;min-width:22px;text-align:right;font-variant-numeric:tabular-nums">${globalIdx}.</span>
+        <div style="flex:1;font-size:13px;color:#e0e0e0;font-weight:500">${p.name}</div>
+        <div style="display:flex;gap:4px">
+          ${['present','absent','excused','left'].map(opt=>`<button onclick="_brTap('${p.name}','${opt}')" style="font-size:11px;padding:4px 7px;border-radius:6px;border:1px solid ${opt===st?statColor[opt]:'rgba(255,255,255,.12)'};background:${opt===st?'rgba(255,255,255,.1)':'transparent'};color:${opt===st?statColor[opt]:'#666'};cursor:pointer;font-weight:${opt===st?'700':'400'}">${opt==='present'?'✓':opt==='absent'?'✗':opt==='excused'?'~':'↑'}</button>`).join('')}
+        </div>
+      </div>`;
+    });
+
+    sectionsHtml+=`
+      <div style="border-bottom:1px solid rgba(255,255,255,.08)">
+        <div onclick="_brSecToggle('${sec.label}')" style="display:flex;align-items:center;justify-content:space-between;padding:7px 14px;background:rgba(255,255,255,.04);cursor:pointer;user-select:none">
+          <span style="font-size:11px;font-weight:600;color:#9ca3af;letter-spacing:.06em;text-transform:uppercase">${sec.label}</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:10px;color:#aaa">${secReg}/${secTotal} · <span style="color:#22c55e">${secCounts.present||0}✓</span> <span style="color:#ef4444">${secCounts.absent||0}✗</span></span>
+            <span style="font-size:12px;color:#666">${isOpen?'▾':'▸'}</span>
+          </div>
+        </div>
+        ${isOpen?'<div>'+rows+'</div>':''}
+      </div>`;
   });
 
-  return `<div id="am-br-section" style="margin-top:12px;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,.1)">
-    <div style="padding:10px 16px;background:rgba(124,58,237,.25);display:flex;align-items:center;justify-content:space-between">
-      <span style="font-size:12px;font-weight:700;color:#c4b5fd;letter-spacing:.08em">${type==='boarding'?'BOARDING REGISTER':'HOUSE REGISTER'}</span>
-      <span style="font-size:11px;color:#aaa">${total-counts.unset}/${total} registered · <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444">${counts.absent||0}✗</span> <span style="color:#f59e0b">${counts.excused||0}~</span></span>
+  return `<div id="am-br-section" style="margin-top:12px;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,.12)">
+    <div onclick="_brToggleCollapse()" style="padding:10px 14px;background:rgba(124,58,237,.25);display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:12px;color:#a78bfa">${chevron}</span>
+        <span style="font-size:12px;font-weight:700;color:#c4b5fd;letter-spacing:.08em">${type==='boarding'?'BOARDING REGISTER':'HOUSE REGISTER'} <span style="font-weight:400;color:#888">(${total})</span></span>
+      </div>
+      <span style="font-size:11px;color:#aaa">${total-counts.unset}/${total} · <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444">${counts.absent||0}✗</span> <span style="color:#f59e0b">${counts.excused||0}~</span> <span style="color:#60a5fa">${counts.left||0}↑</span></span>
     </div>
-    <div style="max-height:45vh;overflow-y:auto">${rows}</div>
+    ${_brCollapsed?'':('<div>'+sectionsHtml+'</div>')}
   </div>`;
 }
 
+function _brSecToggle(label){
+  const key='_brSec_'+label;
+  window[key]=window[key]===false?true:false; // default open, toggle
+  _brRerender();
+}
+
+function _brGetType(){
+  const ctx=amGetCtx();if(!ctx)return'boarding';
+  const cust=getCustomForWeek(ctx.offset,ctx.slotIdx,ctx.dayName);
+  return cust&&cust.boarding_register?'boarding':'house';
+}
+function _brRerender(){
+  const sec=document.getElementById('am-br-section');if(!sec)return;
+  const tmp=document.createElement('div');
+  tmp.innerHTML=_amBoardingRegisterHtml(_brGetType());
+  const newSec=tmp.querySelector('#am-br-section');
+  if(newSec)sec.parentNode.replaceChild(newSec,sec);
+}
 function _brTap(name,status){
-  if(_brState[name]===status){delete _brState[name];}else{_brState[name]=status;}
-  // Re-render just the boarding section
-  const sec=document.getElementById('am-br-section');
-  if(sec){
-    const ctx=amGetCtx();if(!ctx)return;
-    const cust=getCustomForWeek(ctx.offset,ctx.slotIdx,ctx.dayName);
-    const type=cust&&cust.boarding_register?'boarding':'house';
-    const tmp=document.createElement('div');
-    tmp.innerHTML=_amBoardingRegisterHtml(type);
-    const newSec=tmp.querySelector('#am-br-section');
-    if(newSec)sec.parentNode.replaceChild(newSec,sec);
+  const cur=(_brState[name]||{}).status;
+  if(cur===status){delete _brState[name];}
+  else{_brState[name]={status,updatedAt:new Date().toISOString(),updatedBy:'HM'};}
+  _brRerender();
+  // Also refresh Lists register tab if it's visible
+  if(_hwkFilter==='register'){
+    const el=document.getElementById('hawking-list-content');
+    if(el)renderHawkingRegister(el);
   }
+}
+function _brToggleCollapse(){
+  _brCollapsed=!_brCollapsed;
+  _brRerender();
 }
 
 function amRender(){
