@@ -25778,7 +25778,7 @@ function renderHawkingRegister(el){
     </div>`;
   });
 
-  const hasFireData=Object.values(_brState).some(s=>s.sessionType==='fire')||Object.keys(_fireState).length>0;
+  const hasFireData=_fireSubmitted;
   const revertBtn=hasFireData?`<button onclick="revertFromFire()" style="font-size:10px;padding:3px 8px;border-radius:5px;border:1px solid #f97316;background:#fff7ed;color:#c2410c;cursor:pointer;font-weight:600;white-space:nowrap">🔥 Revert</button>`:'';
   el.innerHTML=`<div>
     <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#f8fafc;border-bottom:1px solid #e2e8f0;position:sticky;top:0;z-index:2;flex-wrap:wrap;gap:4px">
@@ -29501,14 +29501,19 @@ function _brToggleCollapse(){
 
 // ── FIRE REGISTER ─────────────────────────────────────────────
 let _fireOpen=false;
-let _fireState={};      // separate from _brState — fire drill only
-let _firePreSnapshot={}; // snapshot of _brState before fire drill started
+let _fireSubmitted=false; // true only after fire register is submitted
+let _fireState={};        // separate from _brState — fire drill only
+let _firePreSnapshot={};  // snapshot of _brState before fire drill started
+let _fireScopeAllHouse=false; // false = boarders only, true = all house
+let _fireBoarderGrouping='grade'; // 'grade' | 'room'
 
 function openFireRegister(){
   _fireOpen=true;
-  // Snapshot current state so we can revert
+  _fireSubmitted=false;
   _firePreSnapshot=JSON.parse(JSON.stringify(_brState));
   _fireState={};
+  _fireScopeAllHouse=false;
+  _fireBoarderGrouping='grade';
   _brLoadToday();
   _brSubscribeRealtime();
   _renderFireRegister();
@@ -29516,8 +29521,14 @@ function openFireRegister(){
 
 function closeFireRegister(){
   _fireOpen=false;
-  // Use setTimeout to break out of any event handler context
   setTimeout(()=>amRender(), 0);
+}
+
+function submitFireRegister(){
+  _fireSubmitted=true;
+  _fireOpen=false;
+  setTimeout(()=>amRender(), 0);
+  _brRefreshListsTab();
 }
 
 function _fireTap(name, status){
@@ -29575,84 +29586,150 @@ async function revertFromFire(){
   _brRefreshListsTab();
 }
 
-function _renderFireRegister(){
-  const body=document.getElementById('am-body');if(!body)return;
-  const gradeMap={};
+function _fireAllExpanded(){return Object.keys(_fireGradeMap()||{}).every(gr=>window['_fireSec_'+gr]!==false);}
+function _fireGradeMap(){
+  const gm={};
+  const useBoardersOnly=!_fireScopeAllHouse;
   STUDENTS.forEach(s=>{
     const hw=HAWKING_STATUS[s.name]||{};
-    const gr=hw.grade||hw.year_group||'Unknown';
-    if(!gradeMap[gr])gradeMap[gr]=[];
-    gradeMap[gr].push({name:s.name,type:hw.boarder?'boarder':'day'});
+    if(useBoardersOnly&&!hw.boarder)return;
+    const gr=getTutorGrade(s.name)||'Unknown';
+    if(!gm[gr])gm[gr]=[];
+    gm[gr].push({name:s.name,type:hw.boarder?'boarder':'day'});
   });
-  if(TUTORS&&TUTORS.length) gradeMap['Staff']=TUTORS.map(t=>({name:t.name,type:'tutor'}));
-  const gradeOrder=['G7','G8','G9','G10','G11','G12','Staff','Unknown'];
+  return gm;
+}
+function _fireRoomMap(){
+  const rm={};
+  BOARDER_ROOMS.forEach(r=>{
+    rm[r.name||r.id]=r.boarders||[];
+  });
+  const unassigned=STUDENTS.filter(s=>(HAWKING_STATUS[s.name]||{}).boarder&&!BOARDER_ROOMS.some(r=>(r.boarders||[]).includes(s.name)));
+  if(unassigned.length) rm['Unassigned']=unassigned.map(s=>s.name);
+  return rm;
+}
+function _fireToggleAllSections(){
+  const gm=_fireGradeMap();
+  const allOpen=_fireAllExpanded();
+  Object.keys(gm).forEach(gr=>window['_fireSec_'+gr]=allOpen?false:true);
+  if(_fireScopeAllHouse&&TUTORS.length) window['_fireSec_Staff']=allOpen?false:true;
+  _renderFireRegister();
+}
+
+function _renderFireRegister(){
+  const body=document.getElementById('am-body');if(!body)return;
   const statColor={present:'#22c55e',absent:'#ef4444',excused:'#f59e0b',left:'#60a5fa','':'#555'};
   const statBg={present:'rgba(34,197,94,.13)',absent:'rgba(239,68,68,.13)',excused:'rgba(245,158,11,.13)',left:'rgba(96,165,250,.13)','':'transparent'};
 
-  const allPeople=Object.values(gradeMap).flat();
-  const counts={present:0,absent:0,excused:0,left:0,unset:0};
-  allPeople.forEach(p=>{const st=(_fireState[p.name]||{}).status||'';if(st)counts[st]=(counts[st]||0)+1;else counts.unset++;});
-  const total=allPeople.length;
+  function makeRow(p,idx){
+    const st=(_fireState[p.name]||{}).status||'';
+    const bg=statBg[st];
+    const typeTag=p.type==='tutor'
+      ?'<span style="font-size:9px;padding:1px 4px;border-radius:4px;background:rgba(167,139,250,.2);color:#a78bfa">Staff</span>'
+      :p.type==='boarder'
+      ?'<span style="font-size:9px;padding:1px 4px;border-radius:4px;background:rgba(96,165,250,.2);color:#60a5fa">B</span>'
+      :'<span style="font-size:9px;padding:1px 4px;border-radius:4px;background:rgba(255,255,255,.08);color:#999">D</span>';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.05);background:${bg}">
+      <span style="font-size:10px;color:#555;min-width:22px;text-align:right">${idx}.</span>
+      <div style="flex:1;font-size:13px;color:#e0e0e0;font-weight:500">${p.name} ${typeTag}</div>
+      <div style="display:flex;gap:4px">
+        ${['present','absent','excused','left'].map(opt=>`<button onclick="_fireTap('${p.name}','${opt}')" style="font-size:11px;padding:4px 7px;border-radius:6px;border:1px solid ${opt===st?statColor[opt]:'rgba(255,255,255,.12)'};background:${opt===st?'rgba(255,255,255,.1)':'transparent'};color:${opt===st?statColor[opt]:'#666'};cursor:pointer;font-weight:${opt===st?'700':'400'}">${opt==='present'?'✓':opt==='absent'?'✗':opt==='excused'?'~':'↑'}</button>`).join('')}
+      </div>
+    </div>`;
+  }
 
-  let globalIdx=0;
-  let sectionsHtml='';
-  gradeOrder.forEach(gr=>{
-    const people=gradeMap[gr];
-    if(!people||!people.length)return;
-    const key='_fireSec_'+gr;
+  function makeSection(label,people,key,accentColor){
     const isOpen=window[key]!==false;
-    const secCounts={present:0,absent:0,excused:0,left:0,unset:0};
-    people.forEach(p=>{const st=(_fireState[p.name]||{}).status||'';if(st)secCounts[st]=(secCounts[st]||0)+1;else secCounts.unset++;});
-    const secReg=people.length-secCounts.unset;
-    let rows='';
-    people.forEach(p=>{
-      const st=(_fireState[p.name]||{}).status||'';
-      const bg=statBg[st];
-      globalIdx++;
-      const typeTag=p.type==='tutor'
-        ?'<span style="font-size:9px;padding:1px 4px;border-radius:4px;background:rgba(167,139,250,.2);color:#a78bfa">Staff</span>'
-        :p.type==='boarder'
-        ?'<span style="font-size:9px;padding:1px 4px;border-radius:4px;background:rgba(96,165,250,.2);color:#60a5fa">B</span>'
-        :'<span style="font-size:9px;padding:1px 4px;border-radius:4px;background:rgba(255,255,255,.08);color:#666">D</span>';
-      rows+=`<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.05);background:${bg}">
-        <span style="font-size:10px;color:#555;min-width:22px;text-align:right">${globalIdx}.</span>
-        <div style="flex:1;font-size:13px;color:#e0e0e0;font-weight:500">${p.name} ${typeTag}</div>
-        <div style="display:flex;gap:4px">
-          ${['present','absent','excused','left'].map(opt=>`<button onclick="_fireTap('${p.name}','${opt}')" style="font-size:11px;padding:4px 7px;border-radius:6px;border:1px solid ${opt===st?statColor[opt]:'rgba(255,255,255,.12)'};background:${opt===st?'rgba(255,255,255,.1)':'transparent'};color:${opt===st?statColor[opt]:'#666'};cursor:pointer;font-weight:${opt===st?'700':'400'}">${opt==='present'?'✓':opt==='absent'?'✗':opt==='excused'?'~':'↑'}</button>`).join('')}
-        </div>
-      </div>`;
-    });
-    sectionsHtml+=`<div style="border-bottom:1px solid rgba(255,255,255,.08)">
-      <div onclick="_fireSecToggle('${gr}')" style="display:flex;align-items:center;justify-content:space-between;padding:7px 14px;background:rgba(220,38,38,.12);cursor:pointer;user-select:none">
-        <span style="font-size:11px;font-weight:700;color:#fca5a5;letter-spacing:.06em">${gr==='Staff'?'STAFF / TUTORS':gr}</span>
+    const sc={present:0,absent:0,excused:0,left:0,unset:0};
+    people.forEach(p=>{const st=(_fireState[p.name]||{}).status||'';if(st)sc[st]=(sc[st]||0)+1;else sc.unset++;});
+    const reg=people.length-sc.unset;
+    let rows='';let idx=0;
+    people.forEach(p=>{idx++;rows+=makeRow(p,idx);});
+    return `<div style="border-bottom:1px solid rgba(255,255,255,.08)">
+      <div onclick="window['${key}']=window['${key}']===false?true:false;_renderFireRegister()" style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:${accentColor};cursor:pointer;user-select:none">
+        <span style="font-size:11px;font-weight:700;color:#fca5a5;letter-spacing:.05em">${label}</span>
         <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:10px;color:#aaa">${secReg}/${people.length} · <span style="color:#22c55e">${secCounts.present||0}✓</span> <span style="color:#ef4444">${secCounts.absent||0}✗</span></span>
-          <span style="font-size:12px;color:#666">${isOpen?'▾':'▸'}</span>
+          <span style="font-size:10px;color:#aaa">${reg}/${people.length} · <span style="color:#22c55e">${sc.present||0}✓</span> <span style="color:#ef4444">${sc.absent||0}✗</span></span>
+          <span style="font-size:12px;color:#888">${isOpen?'▾':'▸'}</span>
         </div>
       </div>
       ${isOpen?'<div>'+rows+'</div>':''}
     </div>`;
-  });
+  }
+
+  // Build sections
+  let sectionsHtml='';
+  let allPeople=[];
+  const gradeOrder=['G7','G8','G9','G10','G11','G12'];
+
+  if(!_fireScopeAllHouse&&_fireBoarderGrouping==='room'){
+    // Boarders by room
+    const rm=_fireRoomMap();
+    Object.entries(rm).forEach(([roomName,names])=>{
+      const people=names.map(n=>({name:n,type:'boarder'})).filter(p=>STUDENTS.find(s=>s.name===p.name));
+      if(people.length){
+        allPeople.push(...people);
+        sectionsHtml+=makeSection(roomName,people,'_fireSec_room_'+roomName,'rgba(220,38,38,.12)');
+      }
+    });
+  } else {
+    // Grade grouping (boarders only or all house)
+    const gm=_fireGradeMap();
+    gradeOrder.forEach(gr=>{
+      const people=gm[gr]||[];
+      if(people.length){
+        allPeople.push(...people);
+        sectionsHtml+=makeSection(gr,people,'_fireSec_'+gr,'rgba(220,38,38,.12)');
+      }
+    });
+    // Unknowns
+    if(gm['Unknown']&&gm['Unknown'].length){
+      allPeople.push(...gm['Unknown']);
+      sectionsHtml+=makeSection('Unknown Grade',gm['Unknown'],'_fireSec_Unknown','rgba(220,38,38,.08)');
+    }
+    // Staff — all house only
+    if(_fireScopeAllHouse&&TUTORS&&TUTORS.length){
+      const staff=TUTORS.map(t=>({name:t.name,type:'tutor'}));
+      allPeople.push(...staff);
+      sectionsHtml+=makeSection('STAFF / TUTORS',staff,'_fireSec_Staff','rgba(124,58,237,.2)');
+    }
+  }
+
+  const counts={present:0,absent:0,excused:0,left:0,unset:0};
+  allPeople.forEach(p=>{const st=(_fireState[p.name]||{}).status||'';if(st)counts[st]=(counts[st]||0)+1;else counts.unset++;});
+  const total=allPeople.length;
+  const allExp=_fireAllExpanded();
+
+  // Controls row
+  const scopeCtrl=`<div style="display:flex;gap:4px">
+    <button onclick="_fireScopeAllHouse=false;_renderFireRegister()" style="font-size:10px;padding:3px 8px;border-radius:5px;border:1px solid rgba(255,255,255,.2);background:${!_fireScopeAllHouse?'rgba(255,255,255,.2)':'transparent'};color:${!_fireScopeAllHouse?'#fff':'#aaa'};cursor:pointer">Boarders</button>
+    <button onclick="_fireScopeAllHouse=true;_renderFireRegister()" style="font-size:10px;padding:3px 8px;border-radius:5px;border:1px solid rgba(255,255,255,.2);background:${_fireScopeAllHouse?'rgba(255,255,255,.2)':'transparent'};color:${_fireScopeAllHouse?'#fff':'#aaa'};cursor:pointer">All House</button>
+  </div>`;
+  const groupCtrl=!_fireScopeAllHouse?`<div style="display:flex;gap:4px">
+    <button onclick="_fireBoarderGrouping='grade';_renderFireRegister()" style="font-size:10px;padding:3px 8px;border-radius:5px;border:1px solid rgba(255,255,255,.2);background:${_fireBoarderGrouping==='grade'?'rgba(255,255,255,.2)':'transparent'};color:${_fireBoarderGrouping==='grade'?'#fff':'#aaa'};cursor:pointer">By Grade</button>
+    <button onclick="_fireBoarderGrouping='room';_renderFireRegister()" style="font-size:10px;padding:3px 8px;border-radius:5px;border:1px solid rgba(255,255,255,.2);background:${_fireBoarderGrouping==='room'?'rgba(255,255,255,.2)':'transparent'};color:${_fireBoarderGrouping==='room'?'#fff':'#aaa'};cursor:pointer">By Room</button>
+  </div>`:'';
 
   body.innerHTML=`<div id="am-fire-section" style="display:flex;flex-direction:column;min-height:100%">
-    <div style="padding:10px 14px;background:rgba(220,38,38,.3);display:flex;align-items:center;justify-content:space-between;gap:8px">
-      <div>
+    <div style="padding:8px 14px;background:rgba(220,38,38,.3)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <span style="font-size:12px;font-weight:700;color:#fca5a5;letter-spacing:.08em">🔥 FIRE REGISTER</span>
-        <span style="font-size:11px;color:#aaa;margin-left:8px">${total-counts.unset}/${total} · <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444">${counts.absent||0}✗</span> <span style="color:#f59e0b">${counts.excused||0}~</span></span>
+        <span style="font-size:11px;color:#aaa">${total-counts.unset}/${total} · <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444">${counts.absent||0}✗</span> <span style="color:#f59e0b">${counts.excused||0}~</span></span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+        <div style="display:flex;gap:8px;align-items:center">${scopeCtrl}${groupCtrl}</div>
+        <button onclick="_fireToggleAllSections()" style="font-size:10px;padding:3px 10px;border-radius:5px;border:1px solid rgba(255,255,255,.25);background:transparent;color:#ddd;cursor:pointer">${allExp?'Collapse All':'Expand All'}</button>
       </div>
     </div>
-    <div style="flex:1">${sectionsHtml}</div>
-    <div style="padding:12px 14px;border-top:1px solid rgba(255,255,255,.1)">
-      <button onclick="closeFireRegister()" style="width:100%;font-size:13px;padding:10px;border-radius:8px;border:none;background:#22c55e;color:#fff;cursor:pointer;font-weight:700;letter-spacing:.02em">✓ Done — Exit Fire Register</button>
+    <div style="flex:1">${sectionsHtml||'<div style="padding:2rem;text-align:center;color:#666">No students found.</div>'}</div>
+    <div style="padding:10px 14px;display:flex;gap:8px;border-top:1px solid rgba(255,255,255,.08)">
+      <button onclick="closeFireRegister()" style="flex:1;font-size:12px;padding:9px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#aaa;cursor:pointer;font-weight:600">✕ Cancel</button>
+      <button onclick="submitFireRegister()" style="flex:2;font-size:13px;padding:9px;border-radius:8px;border:none;background:#22c55e;color:#fff;cursor:pointer;font-weight:700">✓ Submit Fire Register</button>
     </div>
   </div>`;
 }
 
-function _fireSecToggle(gr){
-  const key='_fireSec_'+gr;
-  window[key]=window[key]===false?true:false;
-  if(_fireOpen)_renderFireRegister();
-}
+// _fireSecToggle replaced by inline onclick in makeSection
 
 function amRender(){
   const ctx=amGetCtx();_updateLiveBtn();_amAutoCheck();
