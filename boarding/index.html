@@ -63,7 +63,7 @@
   .clock-time{font-size:36px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:.02em;line-height:1}
   .clock-secs{font-size:20px;font-weight:400;color:#666;font-variant-numeric:tabular-nums}
   .clock-date{font-size:11px;color:#888;margin-top:2px}
-  .fire-big-btn{background:#dc2626;color:#fff;border:none;border-radius:12px;padding:12px 20px;font-size:16px;font-weight:800;cursor:pointer;flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;box-shadow:0 2px 12px rgba(220,38,38,.4);line-height:1}
+  .fire-big-btn{background:#dc2626;color:#fff;border:none;border-radius:12px;padding:10px 32px;font-size:16px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 2px 16px rgba(220,38,38,.5);letter-spacing:.04em}
   .fire-big-btn span{font-size:9px;font-weight:600;letter-spacing:.06em;opacity:.8}
 
   /* DUTY BANNER */
@@ -212,18 +212,17 @@
       <div class="hdr-user" id="hdr-user" onclick="showPinScreen()">—</div>
     </div>
 
-    <!-- CLOCK BAR: time + fire button -->
+    <!-- CLOCK BAR: centered time + fire button -->
     <div class="clock-bar">
-      <div>
-        <div>
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+        <div style="display:flex;align-items:baseline;gap:0">
           <span class="clock-time" id="clock-hm">00:00</span><span class="clock-secs" id="clock-s">:00</span>
         </div>
         <div class="clock-date" id="clock-date">—</div>
+        <button class="fire-big-btn" onclick="openFireRegister()" style="margin-top:6px">
+          🔥 FIRE REGISTER
+        </button>
       </div>
-      <button class="fire-big-btn" onclick="openFireRegister()">
-        🔥 FIRE
-        <span>REGISTER</span>
-      </button>
     </div>
 
     <!-- DUTY BANNER -->
@@ -436,53 +435,60 @@ async function loadSettings(){
 
 // ── PEOPLE ────────────────────────────────────────────────────
 async function loadPeople(){
-  // Load from same localStorage keys the Work app uses
+  let archived=[];
+
+  // Load from Supabase work_app_data (authoritative cross-device source)
   try{
-    const s=localStorage.getItem('students');
-    if(s)STUDENTS=JSON.parse(s);
-  }catch(e){}
-  try{
-    const t=localStorage.getItem('tutors');
-    if(t)TUTORS=JSON.parse(t);
-  }catch(e){}
-  try{
-    const ws=localStorage.getItem('hawkingStatus');
-    if(ws)BOARDER_STATUS=JSON.parse(ws);
-  }catch(e){}
-  try{
-    const wr=localStorage.getItem('boarderRooms');
-    if(wr)BOARDER_ROOMS=JSON.parse(wr);
-  }catch(e){}
-  // Filter out archived students
-  try{
-    const ar=localStorage.getItem('archived');
-    if(ar){
-      const archived=JSON.parse(ar).map(s=>s.name||s);
-      STUDENTS=STUDENTS.filter(s=>!archived.includes(s.name));
-      // Also remove from BOARDER_STATUS
-      archived.forEach(n=>{delete BOARDER_STATUS[n];});
-    }
-  }catch(e){}
-  // Also load from Supabase work_app_data for cross-device sync
-  try{
-    const {data}=await supa.from('work_app_data').select('key,value').in('key',['students','tutors','hawkingStatus','boarderRooms','archived']);
-    if(data){
+    const {data,error}=await supa.from('work_app_data')
+      .select('key,value')
+      .in('key',['students','tutors','hawkingStatus','boarderRooms','archived']);
+    if(!error&&data){
       data.forEach(r=>{
         try{
-          const val=JSON.parse(r.value);
-          if(r.key==='students')STUDENTS=val;
-          if(r.key==='tutors')TUTORS=val;
-          if(r.key==='hawkingStatus'||r.key==='hawking_status')BOARDER_STATUS=val;
-          if(r.key==='boarderRooms')BOARDER_ROOMS=val;
-          if(r.key==='archived'){
-            const archived=val.map(s=>s.name||s);
-            STUDENTS=STUDENTS.filter(s=>!archived.includes(s.name));
-            archived.forEach(n=>{delete BOARDER_STATUS[n];});
+          // Values may be double-stringified
+          let val=r.value;
+          if(typeof val==='string')val=JSON.parse(val);
+          if(typeof val==='string')val=JSON.parse(val); // double parse if needed
+          if(r.key==='students'&&Array.isArray(val))STUDENTS=val;
+          if(r.key==='tutors'&&Array.isArray(val))TUTORS=val;
+          if(r.key==='hawkingStatus'&&typeof val==='object'){
+            // hawkingStatus = {name:{boarder:bool,cn:string}}
+            // Convert to our BOARDER_STATUS = {name:bool}
+            BOARDER_STATUS={};
+            Object.entries(val).forEach(([name,info])=>{
+              BOARDER_STATUS[name]=!!(info&&info.boarder);
+            });
           }
-        }catch(e){}
+          if(r.key==='boarderRooms'&&Array.isArray(val))BOARDER_ROOMS=val;
+          if(r.key==='archived'&&Array.isArray(val)){
+            archived=val.map(s=>typeof s==='string'?s:(s.name||''));
+          }
+        }catch(e){console.warn('Parse error for key',r.key,e);}
       });
     }
-  }catch(e){console.warn('Supabase people load error',e);}
+    console.log('People loaded — students:',STUDENTS.length,'boarders:',Object.values(BOARDER_STATUS).filter(Boolean).length,'rooms:',BOARDER_ROOMS.length);
+  }catch(e){
+    console.warn('Supabase people load error',e);
+    // Fallback to localStorage
+    try{const s=localStorage.getItem('students');if(s)STUDENTS=JSON.parse(s);}catch(e){}
+    try{const t=localStorage.getItem('tutors');if(t)TUTORS=JSON.parse(t);}catch(e){}
+    try{
+      const ws=localStorage.getItem('hawkingStatus');
+      if(ws){
+        const raw=JSON.parse(ws);
+        BOARDER_STATUS={};
+        Object.entries(raw).forEach(([name,info])=>{BOARDER_STATUS[name]=!!(info&&info.boarder);});
+      }
+    }catch(e){}
+    try{const wr=localStorage.getItem('boarderRooms');if(wr)BOARDER_ROOMS=JSON.parse(wr);}catch(e){}
+    try{const ar=localStorage.getItem('archived');if(ar)archived=JSON.parse(ar).map(s=>s.name||s);}catch(e){}
+  }
+
+  // Filter archived
+  if(archived.length){
+    STUDENTS=STUDENTS.filter(s=>!archived.includes(s.name));
+    archived.forEach(n=>{delete BOARDER_STATUS[n];});
+  }
 }
 
 function getBoarders(){
