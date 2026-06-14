@@ -25722,7 +25722,9 @@ function chip(num, lbl, cls=''){
   return `<div class="totals-chip ${cls}"><span class="tc-num">${num}</span><span class="tc-lbl">${lbl}</span></div>`;
 }
 
-function renderHawkingRegister(el){
+async function renderHawkingRegister(el){
+  // Always fetch fresh data from Supabase first
+  await _brLoadToday();
   // Toggle: all house or boarders only
   const allHouse=window._regAllHouse||false;
   // Build people list
@@ -25792,6 +25794,7 @@ function renderHawkingRegister(el){
 
   const hasFireData=_fireSubmitted;
   const revertBtn=hasFireData?`<button onclick="revertFromFire()" style="font-size:10px;padding:3px 8px;border-radius:5px;border:1px solid #f97316;background:#fff7ed;color:#c2410c;cursor:pointer;font-weight:600;white-space:nowrap">🔥 Revert</button>`:'';
+  const fetchedAt=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   el.innerHTML=`<div>
     <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#f8fafc;border-bottom:1px solid #e2e8f0;position:sticky;top:0;z-index:2;flex-wrap:wrap;gap:4px">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -25802,10 +25805,13 @@ function renderHawkingRegister(el){
         <span style="font-size:11px;color:#2563eb">${counts.left}↑</span>
         ${revertBtn}
       </div>
-      <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#6b7280;cursor:pointer;flex-shrink:0">
-        <input type="checkbox" ${allHouse?'checked':''} onchange="_regToggleAllHouse(this.checked)" style="accent-color:#c4622d">
-        All house
-      </label>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <span style="font-size:9px;color:#d1d5db">fetched ${fetchedAt}</span>
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#6b7280;cursor:pointer">
+          <input type="checkbox" ${allHouse?'checked':''} onchange="_regToggleAllHouse(this.checked)" style="accent-color:#c4622d">
+          All house
+        </label>
+      </div>
     </div>
     <div>${rows||'<div style="padding:2rem;text-align:center;color:#9ca3af;font-size:13px">No students found.</div>'}</div>
   </div>`;
@@ -29497,14 +29503,33 @@ function _brTap(name,status,sessionType){
   else { _brState[name]={status,updatedAt:new Date().toISOString(),updatedBy:'HSM',sessionType:sType}; }
   _brRerender();
   _brRefreshListsTab();
-  // Async Supabase sync in background
-  if(cur===status){
-    supa.from('boarding_registrations').delete().eq('student_name',name).eq('register_date',_brToday()).then(()=>{}).catch(e=>console.warn(e));
-  } else {
-    const rec={student_name:name,register_date:_brToday(),status,updated_by:'HSM',session_type:sType};
-    supa.from('boarding_registrations').upsert(rec,{onConflict:'student_name,register_date'}).then(()=>{}).catch(e=>console.warn(e));
-    supa.from('boarding_registration_history').insert({student_name:name,register_date:_brToday(),previous_status:cur||null,new_status:status,changed_by:'HSM',session_type:sType}).then(()=>{}).catch(()=>{});
+  // Async Supabase sync with retry
+  async function _syncBrTap(){
+    const today=_brToday();
+    for(let attempt=0;attempt<3;attempt++){
+      try{
+        if(cur===status){
+          await supa.from('boarding_registrations').delete().eq('student_name',name).eq('register_date',today);
+        } else {
+          const rec={student_name:name,register_date:today,status,updated_by:'HSM',session_type:sType};
+          await supa.from('boarding_registrations').upsert(rec,{onConflict:'student_name,register_date'});
+          supa.from('boarding_registration_history').insert({student_name:name,register_date:today,previous_status:cur||null,new_status:status,changed_by:'HSM',session_type:sType}).catch(()=>{});
+        }
+        return; // success
+      }catch(e){
+        if(attempt===2){
+          console.warn('BR save failed after 3 attempts',e);
+          // Show error toast
+          const t=document.createElement('div');
+          t.textContent='⚠ Save failed — check connection';
+          t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#dc2626;color:#fff;padding:8px 16px;border-radius:16px;font-size:12px;font-weight:600;z-index:9999;pointer-events:none';
+          document.body.appendChild(t);setTimeout(()=>t.remove(),3000);
+        }
+        await new Promise(r=>setTimeout(r,800*(attempt+1))); // backoff
+      }
+    }
   }
+  _syncBrTap();
 }
 function _brToggleCollapse(){
   _brCollapsed=!_brCollapsed;
