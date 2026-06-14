@@ -1,3 +1,4 @@
+<!-- © 2026 Laith Al-Attili. All rights reserved. Unauthorised copying or reproduction of this software, in whole or in part, is strictly prohibited. -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -31,16 +32,20 @@
   .pin-logo{font-size:48px;margin-bottom:8px}
   .pin-title{font-size:20px;font-weight:700;color:#fff;margin-bottom:4px}
   .pin-sub{font-size:13px;color:#888;margin-bottom:32px}
-  .pin-cards{display:flex;flex-direction:column;gap:10px;width:100%;max-width:320px;padding:0 24px}
+  .pin-cards{display:flex;flex-direction:column;gap:10px}
   .pin-card{background:#2a2a2a;border:2px solid #333;border-radius:12px;padding:16px 20px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:14px}
   .pin-card:active{background:#333;transform:scale(.97)}
-  .pin-card.selected{border-color:var(--accent);background:#2d1f17}
   .pin-role{font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em}
   .pin-name{font-size:16px;font-weight:600;color:#fff;margin-top:2px}
   .pin-avatar{width:40px;height:40px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff;flex-shrink:0}
-  .pin-confirm{margin-top:16px;width:100%;max-width:320px;padding:0 24px}
-  .pin-confirm button{width:100%;padding:14px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer}
-  .pin-switch{font-size:12px;color:#666;text-align:center;margin-top:16px;cursor:pointer;padding:8px}
+  .pin-dots{display:flex;gap:14px;margin-bottom:32px}
+  .pin-dot{width:16px;height:16px;border-radius:50%;border:2px solid #555;background:transparent;transition:all .15s}
+  .pin-dot.filled{background:#fff;border-color:#fff;transform:scale(1.1)}
+  .pin-pad{display:grid;grid-template-columns:repeat(3,76px);gap:12px}
+  .pin-btn{width:76px;height:76px;border-radius:50%;background:#1c1c1e;border:none;color:#fff;font-size:24px;font-weight:400;cursor:pointer;transition:background .1s}
+  .pin-btn:active{background:#48484a}
+  .pin-switch{font-size:12px;color:#666;text-align:center;margin-top:20px;cursor:pointer;padding:8px}
+  @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
 
   /* MAIN APP */
   #app{display:none;flex-direction:column;min-height:100vh}
@@ -148,18 +153,35 @@
 </head>
 <body>
 
-<!-- PIN / IDENTITY SCREEN -->
+<!-- PIN SCREEN -->
 <div id="pin-screen">
   <div class="pin-logo">🏠</div>
   <div class="pin-title">Hawking House</div>
-  <div class="pin-sub">Who are you?</div>
-  <div class="pin-cards" id="pin-cards">
-    <div style="text-align:center;color:#666;font-size:13px;padding:20px">Loading staff...</div>
+  <div class="pin-sub" id="pin-sub">Enter your PIN</div>
+
+  <!-- Step 1: Pick identity (shown when no identity selected) -->
+  <div id="pin-step-pick" style="display:none;width:100%;max-width:320px;padding:0 24px;flex-direction:column;gap:10px">
+    <div id="pin-cards"></div>
   </div>
-  <div class="pin-confirm" id="pin-confirm" style="display:none">
-    <button onclick="confirmIdentity()">Continue as <span id="pin-confirm-name"></span></button>
+
+  <!-- Step 2: Enter PIN -->
+  <div id="pin-step-pin" style="display:none;width:100%;max-width:320px;padding:0 24px;flex-direction:column;align-items:center;gap:0">
+    <div id="pin-who" style="font-size:13px;color:#888;margin-bottom:20px"></div>
+    <div class="pin-dots" id="pin-dots">
+      <div class="pin-dot" id="pd0"></div>
+      <div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div>
+      <div class="pin-dot" id="pd3"></div>
+      <div class="pin-dot" id="pd4"></div>
+      <div class="pin-dot" id="pd5"></div>
+    </div>
+    <div class="pin-pad">
+      ${[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map(n=>`
+        <button class="pin-btn" onclick="pinKey('${n}')">${n}</button>`).join('')}
+    </div>
+    <div id="pin-error" style="color:#ef4444;font-size:13px;margin-top:16px;min-height:20px"></div>
+    <div class="pin-switch" onclick="showPickStep()">← Back</div>
   </div>
-  <div class="pin-switch" onclick="showPinScreen()">Switch user</div>
 </div>
 
 <!-- MAIN APP -->
@@ -319,11 +341,8 @@ async function init(){
   await loadSettings();
   await loadPeople();
 
-  if(_identity){
-    showApp();
-  } else {
-    showPinScreen();
-  }
+  // Always require PIN on fresh load
+  showPinScreen();
 }
 
 function updateDate(){
@@ -352,15 +371,53 @@ async function loadSettings(){
 
 // ── PEOPLE ────────────────────────────────────────────────────
 async function loadPeople(){
-  // For now use defaults — future: load from Supabase students table
+  // Load from same localStorage keys the Work app uses
   try{
-    const ws=localStorage.getItem('hawkingStatus_shared');
+    const s=localStorage.getItem('students');
+    if(s)STUDENTS=JSON.parse(s);
+  }catch(e){}
+  try{
+    const t=localStorage.getItem('tutors');
+    if(t)TUTORS=JSON.parse(t);
+  }catch(e){}
+  try{
+    const ws=localStorage.getItem('hawkingStatus');
     if(ws)BOARDER_STATUS=JSON.parse(ws);
   }catch(e){}
   try{
-    const wr=localStorage.getItem('boarderRooms_shared');
+    const wr=localStorage.getItem('boarderRooms');
     if(wr)BOARDER_ROOMS=JSON.parse(wr);
   }catch(e){}
+  // Filter out archived students
+  try{
+    const ar=localStorage.getItem('archived');
+    if(ar){
+      const archived=JSON.parse(ar).map(s=>s.name||s);
+      STUDENTS=STUDENTS.filter(s=>!archived.includes(s.name));
+      // Also remove from BOARDER_STATUS
+      archived.forEach(n=>{delete BOARDER_STATUS[n];});
+    }
+  }catch(e){}
+  // Also load from Supabase work_app_data for cross-device sync
+  try{
+    const {data}=await supa.from('work_app_data').select('key,value').in('key',['students','tutors','hawkingStatus','boarderRooms','archived']);
+    if(data){
+      data.forEach(r=>{
+        try{
+          const val=JSON.parse(r.value);
+          if(r.key==='students')STUDENTS=val;
+          if(r.key==='tutors')TUTORS=val;
+          if(r.key==='hawkingStatus'||r.key==='hawking_status')BOARDER_STATUS=val;
+          if(r.key==='boarderRooms')BOARDER_ROOMS=val;
+          if(r.key==='archived'){
+            const archived=val.map(s=>s.name||s);
+            STUDENTS=STUDENTS.filter(s=>!archived.includes(s.name));
+            archived.forEach(n=>{delete BOARDER_STATUS[n];});
+          }
+        }catch(e){}
+      });
+    }
+  }catch(e){console.warn('Supabase people load error',e);}
 }
 
 function getBoarders(){
@@ -368,62 +425,119 @@ function getBoarders(){
 }
 
 function getStudentGrade(name){
-  const s=STUDENTS.find(s=>s.name===name);
+  const s=STUDENTS.find(st=>st.name===name);
   if(!s)return'Unknown';
+  if(!s.tutor)return'Unknown';
   const t=TUTORS.find(t=>t.name===s.tutor);
-  return t?t.grade:'Unknown';
+  if(t&&t.grade)return t.grade;
+  // Fallback: try to infer grade from tutor name pattern
+  // e.g. if tutor grade not found, look for partial match
+  const partialT=TUTORS.find(t=>t.name&&s.tutor&&t.name.toLowerCase().includes(s.tutor.toLowerCase().split(' ')[0]));
+  if(partialT&&partialT.grade)return partialT.grade;
+  return'Unknown';
 }
 
 // ── IDENTITY / PIN SCREEN ─────────────────────────────────────
 let _selectedStaff=null;
+let _pinEntry='';
 
 function showPinScreen(){
   document.getElementById('pin-screen').style.display='flex';
   document.getElementById('app').style.display='none';
   _selectedStaff=null;
+  _pinEntry='';
+  // If we have a stored identity, go straight to PIN entry
+  if(_identity){
+    showPinStep(_identity);
+  } else {
+    showPickStep();
+  }
+}
+
+function showPickStep(){
+  _selectedStaff=null;
+  _pinEntry='';
+  document.getElementById('pin-step-pick').style.display='flex';
+  document.getElementById('pin-step-pin').style.display='none';
+  document.getElementById('pin-sub').textContent='Who are you?';
   renderPinCards();
+}
+
+function showPinStep(staff){
+  _selectedStaff=staff;
+  _pinEntry='';
+  document.getElementById('pin-step-pick').style.display='none';
+  document.getElementById('pin-step-pin').style.display='flex';
+  document.getElementById('pin-sub').textContent='Enter your PIN';
+  document.getElementById('pin-who').textContent=staff.name+' · '+staff.role;
+  document.getElementById('pin-error').textContent='';
+  updatePinDots();
 }
 
 function renderPinCards(){
   const el=document.getElementById('pin-cards');
-  // Include all staff including HSM so anyone can use the app if needed
-  const allStaff=(BS.staff||[]).filter(s=>s.name&&s.name.trim());
-  // Prefer non-HSM first, but show all
-  const staff=allStaff.filter(s=>s.role!=='HSM');
+  const staff=(BS.staff||[]).filter(s=>s.name&&s.name.trim()&&s.role!=='HSM');
   if(!staff.length){
-    // Show debug info
-    const raw=JSON.stringify(BS.staff||'(none)');
     el.innerHTML=`<div style="text-align:center;color:#666;font-size:13px;padding:20px">
-      No staff found.<br>
-      <span style="font-size:11px;color:#888;display:block;margin-top:8px">Make sure the Housemaster has:<br>1. Added staff names in Settings → Boarding Configuration<br>2. Tapped "Save All Boarding Settings"</span>
-      <details style="margin-top:12px;text-align:left">
-        <summary style="font-size:10px;color:#aaa;cursor:pointer">Debug info</summary>
-        <pre style="font-size:9px;color:#aaa;white-space:pre-wrap;margin-top:4px">${raw.slice(0,200)}</pre>
-      </details>
+      No staff configured.<br>
+      <span style="font-size:11px;color:#888;display:block;margin-top:6px">Ask the Housemaster to add staff in Settings.</span>
       <button onclick="loadSettings().then(renderPinCards)" style="margin-top:12px;padding:8px 16px;border-radius:8px;border:1px solid #555;background:transparent;color:#aaa;cursor:pointer;font-size:12px">Retry</button>
     </div>`;
     return;
   }
-  const roleColors={AHSM:'#7c3aed',RT:'#0d9488',HSM:'#c4622d'};
+  const roleColors={AHSM:'#7c3aed',RT:'#0d9488'};
   el.innerHTML=staff.map((s,i)=>`
-    <div class="pin-card" id="pin-card-${i}" onclick="selectStaff(${i})">
+    <div class="pin-card" onclick="showPinStep(${JSON.stringify(JSON.stringify(s))}_PARSE_)">
       <div class="pin-avatar" style="background:${roleColors[s.role]||'#c4622d'}">${s.name.charAt(0)}</div>
       <div>
         <div class="pin-role">${s.role}</div>
         <div class="pin-name">${s.name}</div>
       </div>
     </div>`).join('');
-  document.getElementById('pin-confirm').style.display='none';
+  // Fix: use data attributes instead of inline JSON to avoid quote issues
+  el.querySelectorAll('.pin-card').forEach((card,i)=>{
+    card.onclick=()=>showPinStep(staff[i]);
+  });
 }
 
-function selectStaff(i){
-  _selectedStaff=(BS.staff||[]).filter(s=>s.name&&s.name.trim()&&s.role!=='HSM')[i];
-  document.querySelectorAll('.pin-card').forEach((c,ci)=>c.classList.toggle('selected',ci===i));
-  const confirmEl=document.getElementById('pin-confirm');
-  const nameEl=document.getElementById('pin-confirm-name');
-  if(_selectedStaff){
-    confirmEl.style.display='block';
-    nameEl.textContent=_selectedStaff.name;
+function pinKey(k){
+  if(k==='⌫'){
+    _pinEntry=_pinEntry.slice(0,-1);
+    updatePinDots();
+    return;
+  }
+  if(k===''||_pinEntry.length>=6)return;
+  _pinEntry+=String(k);
+  updatePinDots();
+  if(_pinEntry.length===6) setTimeout(checkPin,120);
+}
+
+function updatePinDots(){
+  for(let i=0;i<6;i++){
+    const dot=document.getElementById('pd'+i);
+    if(dot)dot.classList.toggle('filled',i<_pinEntry.length);
+  }
+}
+
+function checkPin(){
+  if(!_selectedStaff)return;
+  const correctPin=String(_selectedStaff.pin||'');
+  if(!correctPin){
+    // No PIN set — allow entry without PIN
+    confirmIdentity();
+    return;
+  }
+  if(_pinEntry===correctPin){
+    document.getElementById('pin-error').textContent='';
+    confirmIdentity();
+  } else {
+    document.getElementById('pin-error').textContent='Incorrect PIN. Try again.';
+    _pinEntry='';
+    updatePinDots();
+    // Shake animation
+    const dots=document.getElementById('pin-dots');
+    dots.style.animation='none';
+    setTimeout(()=>{dots.style.animation='shake .3s ease';},10);
   }
 }
 
@@ -442,7 +556,7 @@ function showApp(){
 
   // Update header
   const userEl=document.getElementById('hdr-user');
-  if(userEl)userEl.textContent=_identity?`${_identity.role} · ${_identity.name.split(' ')[0]}`:'—';
+  if(userEl){userEl.textContent=_identity?`${_identity.role} · ${_identity.name.split(' ')[0]}`:'—';userEl.onclick=()=>{showPinScreen();};}
 
   // Show duty banner
   updateDutyBanner();
@@ -862,5 +976,6 @@ if('serviceWorker' in navigator){
 // ── START ─────────────────────────────────────────────────────
 init();
 </script>
+<div style="text-align:center;padding:12px 16px 24px;font-size:10px;color:#555">© 2026 Laith Al-Attili · All rights reserved</div>
 </body>
 </html>
