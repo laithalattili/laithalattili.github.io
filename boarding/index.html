@@ -83,7 +83,6 @@
   .reg-c.present{color:#16a34a}
   .reg-c.absent{color:#dc2626}
   .reg-c.excused{color:#d97706}
-  .reg-c.left{color:#2563eb}
   .reg-fetched{font-size:10px;color:#ccc}
   .reg-section-hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;background:var(--bg2);border-bottom:1px solid var(--border);cursor:pointer;user-select:none}
   .reg-section-label{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em}
@@ -92,7 +91,7 @@
   .reg-row.present{background:#f0fdf4}
   .reg-row.absent{background:#fef2f2}
   .reg-row.excused{background:#fffbeb}
-  .reg-row.left{background:#eff6ff}
+
   .reg-num{font-size:10px;color:#ccc;min-width:20px;text-align:right;font-variant-numeric:tabular-nums;flex-shrink:0}
   .reg-name{flex:1;font-size:14px;font-weight:500;color:var(--text)}
   .reg-btns{display:flex;gap:4px}
@@ -100,7 +99,6 @@
   .reg-btn.active-present{border-color:#16a34a;background:#f0fdf4;color:#16a34a}
   .reg-btn.active-absent{border-color:#dc2626;background:#fef2f2;color:#dc2626}
   .reg-btn.active-excused{border-color:#d97706;background:#fffbeb;color:#d97706}
-  .reg-btn.active-left{border-color:#2563eb;background:#eff6ff;color:#2563eb}
 
   /* FIRE REGISTER */
   #fire-overlay{display:none;position:fixed;inset:0;background:#111;z-index:500;flex-direction:column}
@@ -122,7 +120,7 @@
   .fire-row.present{background:rgba(34,197,94,.13)}
   .fire-row.absent{background:rgba(239,68,68,.13)}
   .fire-row.excused{background:rgba(245,158,11,.13)}
-  .fire-row.left{background:rgba(96,165,250,.13)}
+
   .fire-num{font-size:10px;color:#555;min-width:22px;text-align:right}
   .fire-name{flex:1;font-size:13px;font-weight:500;color:#e0e0e0}
   .fire-type{font-size:9px;padding:1px 4px;border-radius:4px;flex-shrink:0}
@@ -134,7 +132,7 @@
   .fire-btn.active-present{border-color:#22c55e;background:rgba(34,197,94,.1);color:#22c55e}
   .fire-btn.active-absent{border-color:#ef4444;background:rgba(239,68,68,.1);color:#ef4444}
   .fire-btn.active-excused{border-color:#f59e0b;background:rgba(245,158,11,.1);color:#f59e0b}
-  .fire-btn.active-left{border-color:#60a5fa;background:rgba(96,165,250,.1);color:#60a5fa}
+
   .fire-footer{flex-shrink:0;padding:10px 14px;display:flex;gap:8px;background:#1a1a1a;border-top:1px solid rgba(255,255,255,.08)}
   .fire-cancel-btn{flex:1;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#aaa;cursor:pointer;font-size:12px;font-weight:600}
   .fire-submit-btn{flex:2;padding:10px;border-radius:8px;border:none;background:#22c55e;color:#fff;cursor:pointer;font-size:13px;font-weight:700}
@@ -228,7 +226,7 @@
         <span class="reg-c present" id="reg-present">0✓</span>
         <span class="reg-c absent" id="reg-absent">0✗</span>
         <span class="reg-c excused" id="reg-excused">0~</span>
-        <span class="reg-c left" id="reg-left">0↑</span>
+  
       </div>
       <span class="reg-fetched" id="reg-fetched"></span>
     </div>
@@ -705,7 +703,7 @@ function _regMakeRow(name, idx){
       <button class="reg-btn ${st==='present'?'active-present':''}" data-opt="present" onclick="regTap('${safe}','present')">✓</button>
       <button class="reg-btn ${st==='absent'?'active-absent':''}" data-opt="absent" onclick="regTap('${safe}','absent')">✗</button>
       <button class="reg-btn ${st==='excused'?'active-excused':''}" data-opt="excused" onclick="regTap('${safe}','excused')">~</button>
-      <button class="reg-btn ${st==='left'?'active-left':''}" data-opt="left" onclick="regTap('${safe}','left')">↑</button>
+
     </div>
   </div>`;
 }
@@ -751,7 +749,7 @@ function renderRegister(){
   document.getElementById('reg-present').textContent=`${counts.present}✓`;
   document.getElementById('reg-absent').textContent=`${counts.absent}✗`;
   document.getElementById('reg-excused').textContent=`${counts.excused}~`;
-  document.getElementById('reg-left').textContent=`${counts.left}↑`;
+
   document.getElementById('reg-fetched').textContent='fetched '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
 
   let html='';
@@ -805,10 +803,12 @@ function setRegGroup(group, btn){
 function setRegScope(scope, btn){
   _regScope=scope;
   document.querySelectorAll('#reg-scope-seg button').forEach(b=>{
-    b.style.background=b===btn?'var(--accent)':'transparent';
-    b.style.color=b===btn?'#fff':'var(--text3)';
-    b.style.fontWeight=b===btn?'700':'400';
+    const active=b===btn;
+    b.style.background=active?'var(--accent)':'transparent';
+    b.style.color=active?'#fff':'var(--text3)';
+    b.style.fontWeight=active?'700':'400';
   });
+  console.log('scope set to',scope,'STUDENTS:',STUDENTS.length,'boarders:',getBoarders().length);
   renderRegister();
 }
 
@@ -842,7 +842,7 @@ function regTap(name,status){
   document.getElementById('reg-present').textContent=`${counts.present}✓`;
   document.getElementById('reg-absent').textContent=`${counts.absent}✗`;
   document.getElementById('reg-excused').textContent=`${counts.excused}~`;
-  document.getElementById('reg-left').textContent=`${counts.left}↑`;
+
 
   // Sync to Supabase
   const role=_identity?_identity.role:'AHSM';
@@ -1003,7 +1003,7 @@ function renderFireRegister(){
             <button class="fire-btn ${st==='present'?'active-present':''}" data-fire-opt="present" onclick="fireTap('${safe}','present')">✓</button>
             <button class="fire-btn ${st==='absent'?'active-absent':''}" data-fire-opt="absent" onclick="fireTap('${safe}','absent')">✗</button>
             <button class="fire-btn ${st==='excused'?'active-excused':''}" data-fire-opt="excused" onclick="fireTap('${safe}','excused')">~</button>
-            <button class="fire-btn ${st==='left'?'active-left':''}" data-fire-opt="left" onclick="fireTap('${safe}','left')">↑</button>
+
           </div>
         </div>`;
       });
