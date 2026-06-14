@@ -335,9 +335,17 @@ function updateDate(){
 // ── SETTINGS ──────────────────────────────────────────────────
 async function loadSettings(){
   try{
-    const {data}=await supa.from('boarding_settings').select('key,value');
-    if(data) data.forEach(r=>{try{BS[r.key]=JSON.parse(r.value);}catch(e){BS[r.key]=r.value;}});
-  }catch(e){console.warn('Settings load error',e);}
+    const {data,error}=await supa.from('boarding_settings').select('key,value');
+    if(error)throw error;
+    if(data) data.forEach(r=>{
+      try{BS[r.key]=JSON.parse(r.value);}
+      catch(e){BS[r.key]=r.value;}
+    });
+    console.log('Boarding settings loaded:',Object.keys(BS));
+    if(BS.staff)console.log('Staff:',BS.staff.map(s=>s.name+'/'+s.role));
+  }catch(e){
+    console.warn('Settings load error',e);
+  }
 }
 
 // ── PEOPLE ────────────────────────────────────────────────────
@@ -376,12 +384,25 @@ function showPinScreen(){
 
 function renderPinCards(){
   const el=document.getElementById('pin-cards');
-  const staff=(BS.staff||[]).filter(s=>s.name&&s.role!=='HSM');
+  // Include all staff including HSM so anyone can use the app if needed
+  const allStaff=(BS.staff||[]).filter(s=>s.name&&s.name.trim());
+  // Prefer non-HSM first, but show all
+  const staff=allStaff.filter(s=>s.role!=='HSM');
   if(!staff.length){
-    el.innerHTML='<div style="text-align:center;color:#666;font-size:13px;padding:20px">No staff configured yet.<br><span style="font-size:11px;color:#444">Ask the Housemaster to set up staff names in Settings.</span></div>';
+    // Show debug info
+    const raw=JSON.stringify(BS.staff||'(none)');
+    el.innerHTML=`<div style="text-align:center;color:#666;font-size:13px;padding:20px">
+      No staff found.<br>
+      <span style="font-size:11px;color:#888;display:block;margin-top:8px">Make sure the Housemaster has:<br>1. Added staff names in Settings → Boarding Configuration<br>2. Tapped "Save All Boarding Settings"</span>
+      <details style="margin-top:12px;text-align:left">
+        <summary style="font-size:10px;color:#aaa;cursor:pointer">Debug info</summary>
+        <pre style="font-size:9px;color:#aaa;white-space:pre-wrap;margin-top:4px">${raw.slice(0,200)}</pre>
+      </details>
+      <button onclick="loadSettings().then(renderPinCards)" style="margin-top:12px;padding:8px 16px;border-radius:8px;border:1px solid #555;background:transparent;color:#aaa;cursor:pointer;font-size:12px">Retry</button>
+    </div>`;
     return;
   }
-  const roleColors={AHSM:'#7c3aed',RT:'#0d9488'};
+  const roleColors={AHSM:'#7c3aed',RT:'#0d9488',HSM:'#c4622d'};
   el.innerHTML=staff.map((s,i)=>`
     <div class="pin-card" id="pin-card-${i}" onclick="selectStaff(${i})">
       <div class="pin-avatar" style="background:${roleColors[s.role]||'#c4622d'}">${s.name.charAt(0)}</div>
@@ -394,7 +415,7 @@ function renderPinCards(){
 }
 
 function selectStaff(i){
-  _selectedStaff=(BS.staff||[]).filter(s=>s.name&&s.role!=='HSM')[i];
+  _selectedStaff=(BS.staff||[]).filter(s=>s.name&&s.name.trim()&&s.role!=='HSM')[i];
   document.querySelectorAll('.pin-card').forEach((c,ci)=>c.classList.toggle('selected',ci===i));
   const confirmEl=document.getElementById('pin-confirm');
   const nameEl=document.getElementById('pin-confirm-name');
