@@ -25758,7 +25758,7 @@ function renderHawkingRegister(el){
     const bg=statBg[st];
     const updatedAt=stObj.updatedAt?_brFormatTime(stObj.updatedAt):'';
     const updatedBy=stObj.updatedBy||'';
-    const isFire=stObj.sessionType==='fire';
+    const isFire=_fireSubmitted&&!!(_fireState[p.name]);
     const fireTag=isFire?' 🔥':'';
     const typeTag=p.type==='boarder'
       ?`<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#e0f2fe;color:#0369a1;border:1px solid #7dd3fc">Boarder</span>`
@@ -25766,7 +25766,9 @@ function renderHawkingRegister(el){
       ?`<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#f3e8ff;color:#6b21a8;border:1px solid #d8b4fe">Tutor</span>`
       :`<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1">Day</span>`;
     const statusBadge=`<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:8px;background:${bg};color:${col};border:1px solid ${col};white-space:nowrap">${statLabel[st]}</span>`;
-    const timeStr=updatedAt?`<span style="font-size:9px;color:${isFire?'#f97316':'#9ca3af'};display:block;margin-top:1px">${updatedAt}${updatedBy?' · '+updatedBy:''}${fireTag}</span>`:'';
+    const fireStatus=isFire?(_fireState[p.name]||{}).status:'';
+    const fireStatusBadge=isFire&&fireStatus?` <span style="font-size:9px;padding:1px 5px;border-radius:4px;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa">${fireStatus}</span>`:'';
+    const timeStr=updatedAt?`<span style="font-size:9px;color:${isFire?'#f97316':'#9ca3af'};display:block;margin-top:1px">${updatedAt}${updatedBy?' · '+updatedBy:''}${fireTag}${fireStatusBadge}</span>`:'';
     rows+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #f1f5f9;background:${st!=='unregistered'?bg:'#fff'}">
       <span style="font-size:10px;color:#d1d5db;min-width:18px;text-align:right;font-variant-numeric:tabular-nums">${i+1}</span>
       <div style="flex:1;min-width:0">
@@ -29502,6 +29504,8 @@ function _brToggleCollapse(){
 // ── FIRE REGISTER ─────────────────────────────────────────────
 let _fireOpen=false;
 let _fireSubmitted=false; // true only after fire register is submitted
+// Restore from localStorage if fire was submitted today
+try{if(localStorage.getItem('fireSubmittedDate')===new Date().toISOString().split('T')[0])_fireSubmitted=true;}catch(e){}
 let _fireState={};        // separate from _brState — fire drill only
 let _firePreSnapshot={};  // snapshot of _brState before fire drill started
 let _fireScopeAllHouse=false; // false = boarders only, true = all house
@@ -29532,8 +29536,9 @@ function closeFireRegister(){
 
 function submitFireRegister(){
   _fireSubmitted=true;
+  // Persist across reload — store today's date
+  try{localStorage.setItem('fireSubmittedDate',_brToday());}catch(e){}
   _fireOpen=false;
-  // Show toast
   const t=document.createElement('div');
   t.textContent='🔥 Fire register submitted';
   t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#22c55e;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:9999;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.3)';
@@ -29545,23 +29550,12 @@ function submitFireRegister(){
 
 function _fireTap(name, status){
   const cur=(_fireState[name]||{}).status;
-  // Optimistic update
-  if(cur===status){ delete _fireState[name]; delete _brState[name]; }
-  else {
-    _fireState[name]={status, updatedAt:new Date().toISOString()};
-    // Also update _brState with fire tag so Register tab shows it
-    _brState[name]={status, updatedAt:new Date().toISOString(), updatedBy:'HSM', sessionType:'fire'};
-  }
+  // Optimistic update — ONLY _fireState, never _brState
+  if(cur===status){ delete _fireState[name]; }
+  else { _fireState[name]={status, updatedAt:new Date().toISOString()}; }
   _renderFireRegister();
-  _brRefreshListsTab();
-  // Async DB sync
-  if(cur===status){
-    supa.from('boarding_registrations').delete().eq('student_name',name).eq('register_date',_brToday()).then(()=>{}).catch(()=>{});
-  } else {
-    supa.from('boarding_registrations').upsert(
-      {student_name:name, register_date:_brToday(), status, updated_by:'HSM', session_type:'fire'},
-      {onConflict:'student_name,register_date'}
-    ).then(()=>{}).catch(()=>{});
+  // Write audit history only — never touches boarding_registrations
+  if(cur!==status){
     supa.from('boarding_registration_history').insert({
       student_name:name, register_date:_brToday(),
       previous_status:cur||null, new_status:status,
@@ -29570,43 +29564,35 @@ function _fireTap(name, status){
   }
 }
 
-async function revertFromFire(){
-  if(!confirm('Revert all fire register changes and restore the previous state?'))return;
-  const today=_brToday();
-  const snapshot=JSON.parse(JSON.stringify(_firePreSnapshot));
-
-  // Delete all fire entries for today
-  const fireNames=Object.keys(_fireState);
-  for(const name of fireNames){
-    // If they had a pre-fire status, restore it; otherwise delete the row
-    if(snapshot[name]){
-      try{
-        await supa.from('boarding_registrations').upsert(
-          {student_name:name,register_date:today,status:snapshot[name].status,updated_by:snapshot[name].updatedBy||'HSM',session_type:snapshot[name].sessionType||'boarding'},
-          {onConflict:'student_name,register_date'}
-        );
-      }catch(e){}
-    } else {
-      try{
-        await supa.from('boarding_registrations').delete().eq('student_name',name).eq('register_date',today);
-      }catch(e){}
-    }
-  }
-  // Restore _brState to snapshot
-  _brState=snapshot;
+function revertFromFire(){
   _fireState={};
   _fireSubmitted=false;
+  try{localStorage.removeItem('fireSubmittedDate');}catch(e){}
   _brRefreshListsTab();
 }
 
 function _fireAllExpanded(){return Object.keys(_fireGradeMap()||{}).every(gr=>window['_fireSec_'+gr]!==false);}
+function _getStudentGrade(name){
+  // Primary: tutor grade
+  const tg=getTutorGrade(name);
+  if(tg)return tg;
+  // Fallback: scan CLASSES
+  for(const cls of CLASSES){
+    const grade=cls.grade||'';
+    if(cls.students&&cls.students.some(s=>(s.preferred||s.firstname)===name||(s.preferred+' '+s.surname)===name))return grade;
+  }
+  // Fallback: scan STUDENTS for tutor
+  const stu=STUDENTS.find(s=>s.name===name);
+  if(stu&&stu.tutor){const t=getTutorByName(stu.tutor);if(t&&t.grade)return t.grade;}
+  return 'Unknown';
+}
 function _fireGradeMap(){
   const gm={};
   const useBoardersOnly=!_fireScopeAllHouse;
   STUDENTS.forEach(s=>{
     const hw=HAWKING_STATUS[s.name]||{};
     if(useBoardersOnly&&!hw.boarder)return;
-    const gr=getTutorGrade(s.name)||'Unknown';
+    const gr=_getStudentGrade(s.name)||'Unknown';
     if(!gm[gr])gm[gr]=[];
     gm[gr].push({name:s.name,type:hw.boarder?'boarder':'day'});
   });
@@ -29773,7 +29759,7 @@ function _renderFireRegister(){
 function amRender(){
   const ctx=amGetCtx();_updateLiveBtn();_amAutoCheck();
   const body=document.getElementById('am-body');if(!body)return;
-  if(_fireOpen){_renderFireRegister();return;}
+  if(_fireOpen){if(!document.getElementById('am-fire-section'))_renderFireRegister();return;}
   const titleEl=document.getElementById('am-title'),subEl=document.getElementById('am-sub'),chip=document.getElementById('am-cat-chip');
   const now=new Date();
   const nowStr=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
