@@ -586,7 +586,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .seat-controls{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.5rem}
 .seat-ctrl-btn{font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:var(--rsm);background:#fff;color:var(--text2);cursor:pointer}
 .seat-ctrl-btn.active-ctrl{background:var(--inf-bg);border-color:var(--inf-bd);color:var(--inf-tx)}
-.hwk-filter-btn{flex:1;padding:5px 4px;font-size:11px;font-weight:500;border:none;border-radius:var(--rxs);background:none;color:var(--text2);cursor:pointer;text-align:center;white-space:nowrap}
+.hwk-filter-btn{flex:1;padding:4px 2px;font-size:10px;font-weight:500;border:none;border-radius:var(--rxs);background:none;color:var(--text2);cursor:pointer;text-align:center;white-space:nowrap;min-width:0}
 .hwk-filter-btn.active{background:#fff;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.1)}
 .totals-chip{display:inline-flex;align-items:baseline;gap:4px;padding:4px 10px;border-radius:20px;font-size:11px;border:1px solid var(--border);background:#fff;white-space:nowrap}
 .totals-chip .tc-num{font-size:16px;font-weight:700;line-height:1;color:var(--text)}
@@ -1108,10 +1108,10 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
     <!-- Toolbar: filter + collapse controls -->
     <div id="hwk-toolbar">
     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-      <div id="hwk-filter-btns" style="display:flex;gap:3px;background:var(--bg3);border-radius:var(--rsm);padding:3px;flex:1;min-width:0;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
+      <div id="hwk-filter-btns" style="display:flex;gap:3px;background:var(--bg3);border-radius:var(--rsm);padding:3px;flex:1;min-width:0">
         <button class="hwk-filter-btn active" id="hwk-f-all" onclick="setHwkFilter('all',this)">All</button>
         <button class="hwk-filter-btn" id="hwk-f-boarders" onclick="setHwkFilter('boarders',this)">Boarders</button>
-        <button class="hwk-filter-btn" id="hwk-f-rooms" onclick="setHwkFilter('rooms',this)">By Room</button>
+        <button class="hwk-filter-btn" id="hwk-f-rooms" onclick="setHwkFilter('rooms',this)">Rooms</button>
         <button class="hwk-filter-btn" id="hwk-f-register" onclick="setHwkFilter('register',this)">Register</button>
       </div>
       <div id="hwk-count-badge" style="font-size:11px;color:var(--text3);padding:4px 6px;flex-shrink:0"></div>
@@ -25758,13 +25758,15 @@ function renderHawkingRegister(el){
     const bg=statBg[st];
     const updatedAt=stObj.updatedAt?_brFormatTime(stObj.updatedAt):'';
     const updatedBy=stObj.updatedBy||'';
+    const isFire=stObj.sessionType==='fire';
+    const fireTag=isFire?' 🔥':'';
     const typeTag=p.type==='boarder'
       ?`<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#e0f2fe;color:#0369a1;border:1px solid #7dd3fc">Boarder</span>`
       :p.type==='tutor'
       ?`<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#f3e8ff;color:#6b21a8;border:1px solid #d8b4fe">Tutor</span>`
       :`<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1">Day</span>`;
     const statusBadge=`<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:8px;background:${bg};color:${col};border:1px solid ${col};white-space:nowrap">${statLabel[st]}</span>`;
-    const timeStr=updatedAt?`<span style="font-size:9px;color:#9ca3af;display:block;margin-top:1px">${updatedAt}${updatedBy?' · '+updatedBy:''}</span>`:'';
+    const timeStr=updatedAt?`<span style="font-size:9px;color:${isFire?'#f97316':'#9ca3af'};display:block;margin-top:1px">${updatedAt}${updatedBy?' · '+updatedBy:''}${fireTag}</span>`:'';
     rows+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #f1f5f9;background:${st!=='unregistered'?bg:'#fff'}">
       <span style="font-size:10px;color:#d1d5db;min-width:18px;text-align:right;font-variant-numeric:tabular-nums">${i+1}</span>
       <div style="flex:1;min-width:0">
@@ -25776,14 +25778,17 @@ function renderHawkingRegister(el){
     </div>`;
   });
 
+  const hasFireData=Object.values(_brState).some(s=>s.sessionType==='fire')||Object.keys(_fireState).length>0;
+  const revertBtn=hasFireData?`<button onclick="revertFromFire()" style="font-size:10px;padding:3px 8px;border-radius:5px;border:1px solid #f97316;background:#fff7ed;color:#c2410c;cursor:pointer;font-weight:600;white-space:nowrap">🔥 Revert</button>`:'';
   el.innerHTML=`<div>
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#f8fafc;border-bottom:1px solid #e2e8f0;position:sticky;top:0;z-index:2">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#f8fafc;border-bottom:1px solid #e2e8f0;position:sticky;top:0;z-index:2;flex-wrap:wrap;gap:4px">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <span style="font-size:12px;font-weight:600;color:#374151">${registered}/${total} registered</span>
         <span style="font-size:11px;color:#16a34a">${counts.present}✓</span>
         <span style="font-size:11px;color:#dc2626">${counts.absent}✗</span>
         <span style="font-size:11px;color:#d97706">${counts.excused}~</span>
         <span style="font-size:11px;color:#2563eb">${counts.left}↑</span>
+        ${revertBtn}
       </div>
       <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#6b7280;cursor:pointer;flex-shrink:0">
         <input type="checkbox" ${allHouse?'checked':''} onchange="_regToggleAllHouse(this.checked)" style="accent-color:#c4622d">
@@ -29496,37 +29501,80 @@ function _brToggleCollapse(){
 
 // ── FIRE REGISTER ─────────────────────────────────────────────
 let _fireOpen=false;
+let _fireState={};      // separate from _brState — fire drill only
+let _firePreSnapshot={}; // snapshot of _brState before fire drill started
 
 function openFireRegister(){
   _fireOpen=true;
+  // Snapshot current state so we can revert
+  _firePreSnapshot=JSON.parse(JSON.stringify(_brState));
+  _fireState={};
   _brLoadToday();
   _brSubscribeRealtime();
   _renderFireRegister();
 }
 
+function closeFireRegister(){
+  _fireOpen=false;
+  // Fire data stays in DB (session_type='fire') but _brState is NOT modified
+  // Rerender normal live view
+  amRender();
+}
+
+async function _fireTap(name, status){
+  const cur=(_fireState[name]||{}).status;
+  if(cur===status){ delete _fireState[name]; }
+  else { _fireState[name]={status, updatedAt:new Date().toISOString()}; }
+  // Write to DB with session_type='fire' — separate from regular boarding entries
+  // Use a different key: student_name + date + 'fire' so it doesn't conflict
+  try{
+    await supa.from('boarding_registration_history').insert({
+      student_name:name, register_date:_brToday(),
+      previous_status:cur||null, new_status:status,
+      changed_by:'HSM', session_type:'fire'
+    });
+  }catch(e){}
+  _renderFireRegister();
+  _brRefreshListsTab();
+}
+
+async function revertFromFire(){
+  // Restore _brState to pre-fire snapshot and update DB
+  _brState=JSON.parse(JSON.stringify(_firePreSnapshot));
+  const today=_brToday();
+  // Re-upsert all pre-fire statuses
+  const entries=Object.entries(_brState);
+  for(const [name,obj] of entries){
+    try{
+      await supa.from('boarding_registrations').upsert(
+        {student_name:name,register_date:today,status:obj.status,updated_by:obj.updatedBy||'HSM',session_type:obj.sessionType||'boarding'},
+        {onConflict:'student_name,register_date'}
+      );
+    }catch(e){}
+  }
+  // Clear fire state
+  _fireState={};
+  _brRefreshListsTab();
+  alert('Reverted to pre-fire register state.');
+}
+
 function _renderFireRegister(){
   const body=document.getElementById('am-body');if(!body)return;
-  // Build all people grouped by grade
-  // Grade map: try to get grade from TUTORS (each student has a tutor, each tutor has a grade)
   const gradeMap={};
   STUDENTS.forEach(s=>{
-    const tut=TUTORS.find(t=>t.name===s.tutor);
-    const gr=tut?tut.grade:'Unknown';
+    const hw=HAWKING_STATUS[s.name]||{};
+    const gr=hw.grade||hw.year_group||'Unknown';
     if(!gradeMap[gr])gradeMap[gr]=[];
-    gradeMap[gr].push({name:s.name,type:(HAWKING_STATUS[s.name]||{}).boarder?'boarder':'day'});
+    gradeMap[gr].push({name:s.name,type:hw.boarder?'boarder':'day'});
   });
-  // Add tutors to a Tutors group
-  if(TUTORS.length){
-    gradeMap['Staff']=TUTORS.map(t=>({name:t.name,type:'tutor'}));
-  }
+  if(TUTORS&&TUTORS.length) gradeMap['Staff']=TUTORS.map(t=>({name:t.name,type:'tutor'}));
   const gradeOrder=['G7','G8','G9','G10','G11','G12','Staff','Unknown'];
-  const statColor={present:'#22c55e',absent:'#ef4444',excused:'#f59e0b',left:'#60a5fa',late:'#a78bfa','':'#555'};
-  const statBg={present:'rgba(34,197,94,.13)',absent:'rgba(239,68,68,.13)',excused:'rgba(245,158,11,.13)',left:'rgba(96,165,250,.13)',late:'rgba(167,139,250,.13)','':'transparent'};
+  const statColor={present:'#22c55e',absent:'#ef4444',excused:'#f59e0b',left:'#60a5fa','':'#555'};
+  const statBg={present:'rgba(34,197,94,.13)',absent:'rgba(239,68,68,.13)',excused:'rgba(245,158,11,.13)',left:'rgba(96,165,250,.13)','':'transparent'};
 
-  // Overall counts
   const allPeople=Object.values(gradeMap).flat();
   const counts={present:0,absent:0,excused:0,left:0,unset:0};
-  allPeople.forEach(p=>{const st=(_brState[p.name]||{}).status||'';if(st)counts[st]=(counts[st]||0)+1;else counts.unset++;});
+  allPeople.forEach(p=>{const st=(_fireState[p.name]||{}).status||'';if(st)counts[st]=(counts[st]||0)+1;else counts.unset++;});
   const total=allPeople.length;
 
   let globalIdx=0;
@@ -29537,26 +29585,26 @@ function _renderFireRegister(){
     const key='_fireSec_'+gr;
     const isOpen=window[key]!==false;
     const secCounts={present:0,absent:0,excused:0,left:0,unset:0};
-    people.forEach(p=>{const st=(_brState[p.name]||{}).status||'';if(st)secCounts[st]=(secCounts[st]||0)+1;else secCounts.unset++;});
+    people.forEach(p=>{const st=(_fireState[p.name]||{}).status||'';if(st)secCounts[st]=(secCounts[st]||0)+1;else secCounts.unset++;});
     const secReg=people.length-secCounts.unset;
-
     let rows='';
     people.forEach(p=>{
-      const st=(_brState[p.name]||{}).status||'';
+      const st=(_fireState[p.name]||{}).status||'';
       const bg=statBg[st];
       globalIdx++;
-      const typeTag=p.type==='tutor'?'<span style="font-size:9px;padding:1px 4px;border-radius:4px;background:rgba(167,139,250,.2);color:#a78bfa">Staff</span>':
-        p.type==='boarder'?'<span style="font-size:9px;padding:1px 4px;border-radius:4px;background:rgba(96,165,250,.2);color:#60a5fa">B</span>':
-        '<span style="font-size:9px;padding:1px 4px;border-radius:4px;background:rgba(255,255,255,.08);color:#666">D</span>';
+      const typeTag=p.type==='tutor'
+        ?'<span style="font-size:9px;padding:1px 4px;border-radius:4px;background:rgba(167,139,250,.2);color:#a78bfa">Staff</span>'
+        :p.type==='boarder'
+        ?'<span style="font-size:9px;padding:1px 4px;border-radius:4px;background:rgba(96,165,250,.2);color:#60a5fa">B</span>'
+        :'<span style="font-size:9px;padding:1px 4px;border-radius:4px;background:rgba(255,255,255,.08);color:#666">D</span>';
       rows+=`<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.05);background:${bg}">
         <span style="font-size:10px;color:#555;min-width:22px;text-align:right">${globalIdx}.</span>
         <div style="flex:1;font-size:13px;color:#e0e0e0;font-weight:500">${p.name} ${typeTag}</div>
         <div style="display:flex;gap:4px">
-          ${['present','absent','excused','left'].map(opt=>`<button onclick="_brTap('${p.name}','${opt}','fire')" style="font-size:11px;padding:4px 7px;border-radius:6px;border:1px solid ${opt===st?statColor[opt]:'rgba(255,255,255,.12)'};background:${opt===st?'rgba(255,255,255,.1)':'transparent'};color:${opt===st?statColor[opt]:'#666'};cursor:pointer;font-weight:${opt===st?'700':'400'}">${opt==='present'?'✓':opt==='absent'?'✗':opt==='excused'?'~':'↑'}</button>`).join('')}
+          ${['present','absent','excused','left'].map(opt=>`<button onclick="_fireTap('${p.name}','${opt}')" style="font-size:11px;padding:4px 7px;border-radius:6px;border:1px solid ${opt===st?statColor[opt]:'rgba(255,255,255,.12)'};background:${opt===st?'rgba(255,255,255,.1)':'transparent'};color:${opt===st?statColor[opt]:'#666'};cursor:pointer;font-weight:${opt===st?'700':'400'}">${opt==='present'?'✓':opt==='absent'?'✗':opt==='excused'?'~':'↑'}</button>`).join('')}
         </div>
       </div>`;
     });
-
     sectionsHtml+=`<div style="border-bottom:1px solid rgba(255,255,255,.08)">
       <div onclick="_fireSecToggle('${gr}')" style="display:flex;align-items:center;justify-content:space-between;padding:7px 14px;background:rgba(220,38,38,.12);cursor:pointer;user-select:none">
         <span style="font-size:11px;font-weight:700;color:#fca5a5;letter-spacing:.06em">${gr==='Staff'?'STAFF / TUTORS':gr}</span>
@@ -29570,9 +29618,10 @@ function _renderFireRegister(){
   });
 
   body.innerHTML=`<div id="am-fire-section">
-    <div style="padding:10px 14px;background:rgba(220,38,38,.3);display:flex;align-items:center;justify-content:space-between">
+    <div style="padding:10px 14px;background:rgba(220,38,38,.3);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
       <span style="font-size:12px;font-weight:700;color:#fca5a5;letter-spacing:.08em">🔥 FIRE REGISTER</span>
       <span style="font-size:11px;color:#aaa">${total-counts.unset}/${total} · <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444">${counts.absent||0}✗</span> <span style="color:#f59e0b">${counts.excused||0}~</span></span>
+      <button onclick="closeFireRegister()" style="font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;cursor:pointer;font-weight:600">✓ Done</button>
     </div>
     <div>${sectionsHtml}</div>
   </div>`;
