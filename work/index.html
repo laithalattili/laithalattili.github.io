@@ -29518,7 +29518,7 @@ function _brTap(name,status,sessionType){
         if(cur===status){
           await supa.from('boarding_registrations').delete().eq('student_name',name).eq('register_date',today);
         } else {
-          const rec={student_name:name,register_date:today,status,updated_by:'HSM',session_type:sType};
+          const rec={student_name:name,register_date:today,status,updated_by:'HSM',session_type:sType,updated_at:new Date().toISOString()};
           await supa.from('boarding_registrations').upsert(rec,{onConflict:'student_name,register_date'});
           supa.from('boarding_registration_history').insert({student_name:name,register_date:today,previous_status:cur||null,new_status:status,changed_by:'HSM',session_type:sType}).catch(()=>{});
         }
