@@ -29914,13 +29914,23 @@ function selectLeaveType(btn){
   if(returnWrap)returnWrap.style.display=type==='longterm'?'none':'flex';
 }
 
+let _savingLeave=false;
 async function saveLeave(){
+  if(_savingLeave)return;
+  _savingLeave=true;
+  const btn=document.querySelector('#boarding-leave-modal button[onclick*="saveLeave"]');
+  if(btn){btn.disabled=true;btn.textContent='Saving...';}
   const student=document.getElementById('leave-student')?.value;
   const type=document.querySelector('.leave-type-btn.active')?.getAttribute('data-type');
   const dep=document.getElementById('leave-departure')?.value;
   const ret=document.getElementById('leave-return')?.value;
   const reason=document.getElementById('leave-reason')?.value||'';
-  if(!student||!type||!dep){alert('Please fill student, type, and departure.');return;}
+  if(!student||!type||!dep){
+    alert('Please fill student, type, and departure.');
+    _savingLeave=false;
+    if(btn){btn.disabled=false;btn.textContent='Save Leave';}
+    return;
+  }
   try{
     const rec={
       student_name:student,
@@ -29933,14 +29943,20 @@ async function saveLeave(){
     };
     await supa.from('boarding_leaves').insert(rec);
     closeBoardingLeaveModal();
+    showToastMsg('Leave saved','#16a34a');
     await loadActiveLeaves();
-    // Refresh register if open
+    // Refresh register
+    window._lastExcusedMap=await getTodayExcusedMap();
     if(_hwkFilter==='register'){
       const el=document.getElementById('hawking-list-content');
-      if(el)renderHawkingRegister(el);
+      if(el)renderHawkingRegister(el,window._lastExcusedMap);
     }
-    showToastMsg('Leave saved','#16a34a');
-  }catch(e){alert('Error: '+e.message);}
+  }catch(e){
+    showToastMsg('Error: '+e.message,'#dc2626');
+    if(btn){btn.disabled=false;btn.textContent='Save Leave';}
+  }finally{
+    _savingLeave=false;
+  }
 }
 
 async function _undoDeparture(id){
@@ -31056,10 +31072,12 @@ function amRender(){
       if(subEl)subEl.textContent=`${st}–${et} · ${dayName}`;
       if(chip){chip.style.cssText='background:#7c3aed;color:#fff;display:inline-flex';chip.textContent=_custForBR.boarding_register?'Boarding':'House';}
       const _bType=_custForBR.boarding_register?'boarding':'house';
+      // Use cached map instantly, refresh in background
+      body.innerHTML=_amBoardingRegisterHtml(_bType,window._lastExcusedMap||{});
       getTodayExcusedMap().then(excMap=>{
+        window._lastExcusedMap=excMap;
         body.innerHTML=_amBoardingRegisterHtml(_bType,excMap);
       });
-      body.innerHTML=_amBoardingRegisterHtml(_bType,{});
       return;
     }
     // Preserve live input value across rebuild
