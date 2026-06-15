@@ -29764,23 +29764,41 @@ async function loadActiveLeaves(){
       return;
     }
     const leaveEmoji={weekend:'🏠',extended:'📅',daytime:'🌅',longterm:'🏥'};
+    const _fmt=dt=>dt?new Date(dt).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
     el.innerHTML=active.map(l=>{
-      const dep=l.departure_planned?new Date(l.departure_planned).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
-      const ret=l.return_planned?new Date(l.return_planned).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
-      const depActual=l.departure_actual?'<span style="color:#16a34a;font-size:10px"> ✓ departed</span>':'';
-      const retActual=l.return_actual?'<span style="color:#16a34a;font-size:10px"> ✓ returned</span>':'';
-      return `<div style="padding:8px 0;border-bottom:1px solid var(--border3)">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
-          <span style="font-size:13px;font-weight:600;color:var(--text)">${leaveEmoji[l.leave_type]||'📋'} ${l.student_name}</span>
-          <div style="display:flex;gap:6px">
-            ${!l.departure_actual?`<button onclick="confirmDeparture('${l.id}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #d97706;background:#fffbeb;color:#d97706;cursor:pointer">Confirm Dep.</button>`:''}
-            ${l.departure_actual&&!l.return_actual&&l.leave_type!=='longterm'?`<button onclick="confirmReturn('${l.id}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #16a34a;background:#f0fdf4;color:#16a34a;cursor:pointer">Confirm Return</button>`:''}
-            <button onclick="cancelLeave('${l.id}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:#fff;color:var(--text3);cursor:pointer">Cancel</button>
-          </div>
-        </div>
-        <div style="font-size:11px;color:var(--text3)">${l.leave_type} · Dep: ${dep}${depActual} · Return: ${ret}${retActual}</div>
-        ${l.reason?`<div style="font-size:11px;color:var(--text3);margin-top:2px">${l.reason}</div>`:''}
-      </div>`;
+      const depPlan=_fmt(l.departure_planned);
+      const retPlan=_fmt(l.return_planned);
+      const depAct=l.departure_actual?_fmt(l.departure_actual):null;
+      const retAct=l.return_actual?_fmt(l.return_actual):null;
+      const depBy=l.departure_confirmed_by?' · '+l.departure_confirmed_by:'';
+      const retBy=l.return_confirmed_by?' · '+l.return_confirmed_by:'';
+      const typeLabel=l.leave_type==='longterm'?'Long-term':l.leave_type.charAt(0).toUpperCase()+l.leave_type.slice(1);
+      return '<div style="padding:10px 0;border-bottom:1px solid #e9ecef">'+
+        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px">'+
+          '<span style="font-size:13px;font-weight:600;color:#212529">'+(leaveEmoji[l.leave_type]||'📋')+' '+l.student_name+'</span>'+
+          '<button onclick="cancelLeave(''+l.id+'')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #dee2e6;background:#fff;color:#868e96;cursor:pointer;flex-shrink:0">Cancel</button>'+
+        '</div>'+
+        '<div style="font-size:11px;color:#868e96;margin-bottom:6px">'+typeLabel+(l.reason?' · '+l.reason:'')+'</div>'+
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'+
+          '<span style="font-size:10px;font-weight:700;color:#868e96;width:36px">DEP</span>'+
+          '<span style="font-size:11px;color:#495057">'+depPlan+'</span>'+
+          (depAct
+            ?'<span style="font-size:10px;color:#16a34a;font-weight:600">✓ '+depAct+depBy+'</span>'+
+              '<button onclick="_undoDeparture(''+l.id+'')" style="font-size:10px;padding:1px 6px;border-radius:4px;border:1px solid #dee2e6;background:#fff;color:#868e96;cursor:pointer">↩</button>'
+            :'<button onclick="confirmDeparture(''+l.id+'')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #d97706;background:#fffbeb;color:#d97706;cursor:pointer;font-weight:600">↑ Confirm</button>'
+          )+
+        '</div>'+
+        (l.leave_type!=='longterm'
+          ?'<div style="display:flex;align-items:center;gap:6px">'+
+              '<span style="font-size:10px;font-weight:700;color:#868e96;width:36px">RET</span>'+
+              '<span style="font-size:11px;color:#495057">'+retPlan+'</span>'+
+              (retAct
+                ?'<span style="font-size:10px;color:#16a34a;font-weight:600">✓ '+retAct+retBy+'</span>'
+                :depAct?'<button onclick="confirmReturn(''+l.id+'')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #16a34a;background:#f0fdf4;color:#16a34a;cursor:pointer;font-weight:600">✓ Confirm Return</button>':''
+              )+
+            '</div>'
+          :'')+
+      '</div>';
     }).join('');
   }catch(e){
     console.warn('loadActiveLeaves error:',e);
