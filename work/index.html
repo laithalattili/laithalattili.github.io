@@ -1826,7 +1826,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
           <div style="display:flex;gap:6px;align-items:center">
             <input type="text" id="new-activity-emoji" placeholder="🎵" style="width:44px;font-size:14px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;text-align:center">
             <input type="text" id="new-activity-name" placeholder="Activity name..." style="flex:1;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px" onkeydown="if(event.key==='Enter')addActivityType()">
-            <button onclick="addActivityType()" style="font-size:12px;padding:5px 12px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600">+ Add</button>
+            <button onclick="addActivityType()" style="font-size:12px;padding:5px 12px;border-radius:6px;background:#c4622d;color:#fff;border:none;cursor:pointer;font-weight:600">+ Add</button>
           </div>
         </div>
 
@@ -1839,21 +1839,21 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
           <button onclick="loadStudentSchedule()" style="width:100%;font-size:12px;padding:7px;border-radius:6px;background:var(--bg3);color:var(--text);border:1px solid var(--border);cursor:pointer;margin-bottom:8px">View Schedule</button>
           <div id="student-schedule-list" style="display:none">
             <div id="student-schedule-entries" style="margin-bottom:8px"></div>
-            <button onclick="openAddScheduleEntry()" style="width:100%;font-size:12px;padding:8px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600">+ Add Schedule Entry</button>
+            <button onclick="openAddScheduleEntry()" style="width:100%;font-size:12px;padding:8px;border-radius:6px;background:#c4622d;color:#fff;border:none;cursor:pointer;font-weight:600">+ Add Schedule Entry</button>
           </div>
         </div>
 
         <!-- ACTIVE LEAVES -->
         <div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3)">Active Leaves</div>
         <div style="padding:.75rem 1rem">
-          <button onclick="openAddLeave()" style="width:100%;font-size:13px;padding:9px;border-radius:8px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:700;margin-bottom:10px">+ Add Leave</button>
+          <button onclick="openAddLeave()" style="width:100%;font-size:13px;padding:9px;border-radius:8px;background:#c4622d;color:#fff;border:none;cursor:pointer;font-weight:700;margin-bottom:10px">+ Add Leave</button>
           <div id="active-leaves-list"></div>
         </div>
 
         <!-- ONE-OFF ACTIVITIES -->
         <div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3)">One-off Activities Today</div>
         <div style="padding:.75rem 1rem">
-          <button onclick="openAddOneOff()" style="width:100%;font-size:13px;padding:9px;border-radius:8px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:700;margin-bottom:10px">+ Add One-off Activity</button>
+          <button onclick="openAddOneOff()" style="width:100%;font-size:13px;padding:9px;border-radius:8px;background:#c4622d;color:#fff;border:none;cursor:pointer;font-weight:700;margin-bottom:10px">+ Add One-off Activity</button>
           <div id="oneoff-list"></div>
         </div>
 
