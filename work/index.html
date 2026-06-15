@@ -25914,10 +25914,12 @@ async function renderHawkingRegister(el){
     const stObj=_brState[p.name]||{};
     let st=stObj.status||'unregistered';
     const excuseInfo=excusedMap[p.name]||null;
-    // Auto-excused if on leave/activity and not yet registered
-    if(st==='unregistered'&&excuseInfo) st='excused';
-    const col=statColor[st];
-    const bg=statBg[st];
+    const leaveState=excuseInfo?.state||null; // 'pending_departure'|'excused'|null
+    // Only auto-excused if departure confirmed OR it's an activity (not pending leave)
+    const autoExcused=excuseInfo&&(leaveState==='excused'||(excuseInfo.type==='activity'));
+    const effectiveSt=(st==='unregistered'&&autoExcused)?'excused':st;
+    const col=statColor[effectiveSt];
+    const bg=statBg[effectiveSt];
     const updatedAt=stObj.updatedAt?_brFormatTime(stObj.updatedAt):'';
     const updatedBy=stObj.updatedBy||'';
     const fireObj=_fireSubmitted?(_fireState[p.name]||null):null;
@@ -25927,25 +25929,28 @@ async function renderHawkingRegister(el){
       :p.type==='tutor'
       ?`<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#f3e8ff;color:#6b21a8;border:1px solid #d8b4fe">Tutor</span>`
       :`<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1">Day</span>`;
-    const statusBadge=`<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:8px;background:${bg};color:${col};border:1px solid ${col};white-space:nowrap">${statLabel[st]}</span>`;
+    const statusBadge=`<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:8px;background:${bg};color:${col};border:1px solid ${col};white-space:nowrap">${statLabel[effectiveSt]}</span>`;
     const fireStatus=fireObj?fireObj.status:'';
     const fireColor={present:'#16a34a',absent:'#dc2626',excused:'#d97706'};
     const fireStatBg={present:'#f0fdf4',absent:'#fef2f2',excused:'#fffbeb'};
     const displayBadge=isFire&&fireStatus
       ?`<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
           <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:${fireStatBg[fireStatus]||'#fff7ed'};color:${fireColor[fireStatus]||'#c2410c'};border:1px solid ${fireColor[fireStatus]||'#f97316'};white-space:nowrap">🔥 ${fireStatus}</span>
-          ${st!=='unregistered'?`<span style="font-size:9px;color:#9ca3af">${statLabel[st]}</span>`:''}
+          ${effectiveSt!=='unregistered'?`<span style="font-size:9px;color:#9ca3af">${statLabel[effectiveSt]}</span>`:''}
         </div>`
       :statusBadge;
-    const rowBg=isFire&&fireStatus?(fireStatBg[fireStatus]||'#fff7ed'):(st!=='unregistered'?bg:'#fff');
-    // Excuse reason tag
+    const rowBg=isFire&&fireStatus?(fireStatBg[fireStatus]||'#fff7ed'):(effectiveSt!=='unregistered'?bg:'#fff');
+    // Leave/activity note
     const excuseTag=excuseInfo?`<span style="font-size:10px;color:#d97706;display:block;margin-top:1px">${excuseInfo.emoji} ${excuseInfo.reason}</span>`:'';
+    // Confirm departure button for pending leaves
+    const depBtn=leaveState==='pending_departure'
+      ?`<button onclick="confirmDeparture('${excuseInfo.leaveId}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #d97706;background:#fffbeb;color:#d97706;cursor:pointer;margin-top:3px;display:block">↑ Confirm Departure</button>`:'';
     const timeStr=updatedAt?`<span style="font-size:9px;color:#9ca3af;display:block;margin-top:1px">${updatedAt}${updatedBy?' · '+updatedBy:''}</span>`:'';
     rows+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #f1f5f9;background:${rowBg}">
       <span style="font-size:10px;color:#d1d5db;min-width:18px;text-align:right;font-variant-numeric:tabular-nums">${i+1}</span>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:500;color:#111">${p.name}</div>
-        ${excuseTag}
+        ${excuseTag}${depBtn}
         ${timeStr}
       </div>
       ${typeTag}
@@ -29988,28 +29993,41 @@ async function getTodayExcusedMap(){
   const toMins=t=>parseInt(t.split(':')[0])*60+parseInt(t.split(':')[1]);
   const dayName=new Date().toLocaleDateString('en-US',{weekday:'short'}); // Mon,Tue etc
 
-  // 1. Active leaves
+  // 1. Active leaves — three states:
+  //   pending_departure: approved but not yet departed
+  //   excused: departed confirmed, currently away
+  //   (returned: ignore — student is back)
   try{
     const {data}=await supa.from('boarding_leaves')
-      .select('student_name,leave_type,departure_planned,return_planned,departure_actual,return_actual')
-      .eq('active',true);
+      .select('*').eq('active',true);
     const leaveLabel={weekend:'Weekend Leave',extended:'Extended Leave',daytime:'Daytime Departure',longterm:'Long-term Leave'};
     const leaveEmoji={weekend:'🏠',extended:'📅',daytime:'🌅',longterm:'🏥'};
     (data||[]).forEach(l=>{
-      const dep=l.departure_actual||l.departure_planned;
-      const ret=l.return_actual||l.return_planned;
-      const depDate=dep?dep.split('T')[0]:null;
-      const retDate=ret?ret.split('T')[0]:null;
-      const onLeave=(depDate&&depDate<=today)&&(!retDate||retDate>=today);
-      if(onLeave){
+      // If already returned — skip
+      if(l.return_actual)return;
+      const depPlannedDate=l.departure_planned?l.departure_planned.split('T')[0]:null;
+      const retPlannedDate=l.return_planned?l.return_planned.split('T')[0]:null;
+      // Is this leave relevant today?
+      const leaveStartsOnOrBeforeToday=depPlannedDate&&depPlannedDate<=today;
+      const leaveEndsOnOrAfterToday=!retPlannedDate||retPlannedDate>=today;
+      if(!leaveStartsOnOrBeforeToday||!leaveEndsOnOrAfterToday)return;
+      const label=leaveLabel[l.leave_type]||'Leave';
+      const emoji=leaveEmoji[l.leave_type]||'🏠';
+      if(l.departure_actual){
+        // Departure confirmed — student is away
         excused[l.student_name]={
-          reason:leaveLabel[l.leave_type]||'Leave',
-          emoji:leaveEmoji[l.leave_type]||'🏠',
-          type:'leave'
+          reason:label,emoji,type:'leave',
+          leaveId:l.id,state:'excused'
+        };
+      } else {
+        // Approved but not yet departed
+        excused[l.student_name]={
+          reason:label,emoji,type:'leave',
+          leaveId:l.id,state:'pending_departure'
         };
       }
     });
-  }catch(e){}
+  }catch(e){console.warn('Excused leaves:',e);}
 
   // 2. Routine schedules active now
   try{
