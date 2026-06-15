@@ -290,6 +290,10 @@
       </div>
     </div>
     <div class="info-card">
+      <div class="info-card-title">Active Leaves</div>
+      <div id="info-leaves-list" style="padding:8px 14px;font-size:12px;color:var(--text2)">Loading...</div>
+    </div>
+    <div class="info-card">
       <div class="info-card-title">Duty Schedule This Week</div>
       <div id="info-duty-schedule" style="padding:10px 14px;font-size:12px;color:var(--text2)">Loading...</div>
     </div>
@@ -670,6 +674,32 @@ function getCurrentWeekNum(){
   return Math.max(1,diff+1);
 }
 
+async function loadInfoLeaves(){
+  const el=document.getElementById('info-leaves-list');if(!el)return;
+  const today=new Date().toISOString().split('T')[0];
+  try{
+    const {data}=await supa.from('boarding_leaves').select('*').eq('active',true).order('departure_planned');
+    const active=(data||[]).filter(l=>!l.return_actual&&(!l.return_planned||l.return_planned.split('T')[0]>=today));
+    if(!active.length){el.innerHTML='<span style="color:#aaa">No active leaves.</span>';return;}
+    const leaveEmoji={weekend:'🏠',extended:'📅',daytime:'🌅',longterm:'🏥'};
+    const fmt=dt=>dt?new Date(dt).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
+    el.innerHTML=active.map(l=>{
+      const depAct=l.departure_actual;
+      const retAct=l.return_actual;
+      const typeLabel=l.leave_type==='longterm'?'Long-term':l.leave_type.charAt(0).toUpperCase()+l.leave_type.slice(1);
+      let status,statusColor;
+      if(depAct){status='↑ Departed '+fmt(depAct);statusColor='#d97706';}
+      else{status='Approved · not yet departed';statusColor='#6b7280';}
+      return `<div style="padding:8px 0;border-bottom:1px solid rgba(0,0,0,.06)">
+        <div style="font-weight:600;color:#1a1a1a">${leaveEmoji[l.leave_type]||'📋'} ${l.student_name}</div>
+        <div style="font-size:11px;color:#868e96;margin-top:2px">${typeLabel}${l.reason?' · '+l.reason:''}</div>
+        <div style="font-size:11px;color:${statusColor};margin-top:2px">${status}</div>
+        ${depAct&&!retAct&&l.leave_type!=='longterm'?`<div style="font-size:11px;color:#6b7280;margin-top:1px">Return planned: ${fmt(l.return_planned)}</div>`:''}
+      </div>`;
+    }).join('');
+  }catch(e){el.innerHTML='<span style="color:#dc2626">Error loading leaves</span>';}
+}
+
 function saveTZ(tz){
   BS.timezone=tz;
   try{localStorage.setItem('boarding_timezone',tz);}catch(e){}
@@ -677,6 +707,7 @@ function saveTZ(tz){
 }
 
 function updateInfoTab(){
+  loadInfoLeaves();
   // Set timezone select
   const tzSel=document.getElementById('tz-select');
   if(tzSel&&BS.timezone)tzSel.value=BS.timezone;
@@ -721,9 +752,10 @@ function switchTab(id,btn){
   document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('tab-'+id).classList.add('active');
-  // Show register header only on register tab
   const sub=document.getElementById('reg-sticky-sub');
   if(sub)sub.style.display=id==='register'?'block':'none';
+  if(id==='register'){loadExcusedMap().then(()=>renderRegister());}
+  if(id==='info'){loadInfoLeaves();}
 }
 
 // ── EXCUSED MAP ───────────────────────────────────────────────
@@ -749,9 +781,14 @@ async function loadExcusedMap(){
       if(retDate&&retDate<today)return;
       const label=leaveLabel[l.leave_type]||'Leave';
       const emoji=leaveEmoji[l.leave_type]||'🏠';
-      excused[l.student_name]={
+      excused[l.student_name]=l.departure_actual?{
         reason:label,emoji,type:'leave',leaveId:l.id,
-        state:l.departure_actual?'excused':'pending_departure'
+        state:'excused',
+        departedAt:l.departure_actual,
+        departedBy:l.departure_confirmed_by||''
+      }:{
+        reason:label,emoji,type:'leave',leaveId:l.id,
+        state:'pending_departure'
       };
     });
   }catch(e){console.warn('Excused leaves error:',e);}
@@ -794,7 +831,7 @@ async function loadRegister(){
     });
   }catch(e){console.warn('Register load error',e);}
   await loadExcusedMap();
-  renderRegister();
+  renderRegister(); // sync now, uses cached _excusedMap
 }
 
 function subscribeRealtime(){
@@ -818,6 +855,9 @@ function _regMakeRow(name, idx){
   const st=(!rawSt&&autoExcused)?'excused':rawSt;
   const safe=name.replace(/"/g,'&quot;');
   const excTag=exc?`<span style="font-size:10px;color:#d97706;display:block">${exc.emoji} ${exc.reason}</span>`:'';
+  const depTimeStr=leaveState==='excused'&&exc.departedAt
+    ?`<span style="font-size:9px;color:#16a34a;display:block;margin-top:1px">↑ ${new Date(exc.departedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}${exc.departedBy?' · '+exc.departedBy:''}</span>`
+    :'';
   const depBtn=leaveState==='pending_departure'
     ?`<button onclick="confirmBoardingDeparture('${exc.leaveId}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #d97706;background:#fffbeb;color:#d97706;cursor:pointer;margin-top:3px;display:block">↑ Confirm Departure</button>`
     :leaveState==='excused'
@@ -827,7 +867,7 @@ function _regMakeRow(name, idx){
     <span class="reg-num">${idx}.</span>
     <div style="flex:1;min-width:0">
       <span class="reg-name" style="display:block">${name}</span>
-      ${excTag}${depBtn}
+      ${excTag}${depTimeStr}${depBtn}
     </div>
     <div class="reg-btns">
       <button class="reg-btn ${st==='present'?'active-present':''}" data-opt="present" onclick="regTap('${safe}','present')">✓</button>
@@ -858,9 +898,9 @@ function _regMakeSection(label, names){
   </div>`, count:names.length};
 }
 
-async function renderRegister(){
+function renderRegister(){
   renderRegControls();
-  await loadExcusedMap();
+  // Use cached excused map (refreshed on load and periodically)
   // Build people list based on scope
   let people=[];
   if(_regScope==='boarders'){
