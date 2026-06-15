@@ -25998,13 +25998,14 @@ async function renderHawkingRegister(el){
     const excuseTag=excuseInfo?`<span style="font-size:10px;color:#d97706;display:block;margin-top:1px">${excuseInfo.emoji} ${excuseInfo.reason}</span>`:'';
     // Departure timestamp (when confirmed)
     const depTimeStr=leaveState==='excused'&&excuseInfo.departedAt
-      ?`<span style="font-size:9px;color:#16a34a;display:block;margin-top:1px">↑ Departed ${_brFormatTime(excuseInfo.departedAt)}${excuseInfo.departedBy?' · '+excuseInfo.departedBy:''}</span>`
+      ?`<span style="font-size:9px;color:#16a34a;display:block;margin-top:1px">↑ ${_brFormatTime(excuseInfo.departedAt)}${excuseInfo.departedBy?' · '+excuseInfo.departedBy:''}</span>`
       :'';
-    // Departure confirmation buttons
+    // Departure + return buttons
     const depBtn=leaveState==='pending_departure'
-      ?`<button onclick="confirmDeparture('${excuseInfo.leaveId}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #d97706;background:#fffbeb;color:#d97706;cursor:pointer;margin-top:3px;display:block">↑ Confirm Departure</button>`
+      ?`<button onclick="confirmDeparture('${excuseInfo.leaveId}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #d97706;background:#fffbeb;color:#d97706;cursor:pointer;margin-top:3px;display:inline-block;margin-right:4px">↑ Confirm Departure</button>`
       :leaveState==='excused'
-      ?`<button onclick="_undoDeparture('${excuseInfo.leaveId}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #d1d5db;background:#f9fafb;color:#6b7280;cursor:pointer;margin-top:2px;display:block">↩ Undo Departure</button>`
+      ?`<button onclick="_undoDeparture('${excuseInfo.leaveId}')" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid #d1d5db;background:#f9fafb;color:#6b7280;cursor:pointer;margin-top:2px;display:inline-block;margin-right:4px">↩ Undo</button>`+
+       (excuseInfo.leave_type!=='longterm'?`<button onclick="confirmReturn('${excuseInfo.leaveId}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #16a34a;background:#f0fdf4;color:#16a34a;cursor:pointer;margin-top:2px;display:inline-block">✓ Confirm Return</button>`:'')
       :'';
     const timeStr=updatedAt?`<span style="font-size:9px;color:#9ca3af;display:block;margin-top:1px">${updatedAt}${updatedBy?' · '+updatedBy:''}</span>`:'';
     rows+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #f1f5f9;background:${rowBg}">
@@ -29996,12 +29997,20 @@ async function confirmReturn(id){
   try{
     await supa.from('boarding_leaves').update({
       return_actual:new Date().toISOString(),
-      return_confirmed_by:'HSM',
+      return_confirmed_by:'HSM'
     }).eq('id',id);
+    showToastMsg('✓ Return confirmed','#16a34a');
+    window._lastExcusedMap=await getTodayExcusedMap();
+    if(_hwkFilter==='register'){
+      const el=document.getElementById('hawking-list-content');
+      if(el)renderHawkingRegister(el);
+    }
+    if(_hwkFilter==='away'){
+      const el=document.getElementById('hawking-list-content');
+      if(el)renderAwayList(el);
+    }
     await loadActiveLeaves();
-    // Check for pending penalties
     await _applyPendingPenalties(id);
-    showToastMsg('Return confirmed','#16a34a');
   }catch(e){alert('Error: '+e.message);}
 }
 
@@ -30154,12 +30163,14 @@ async function getTodayExcusedMap(){
           reason:label,emoji,type:'leave',
           leaveId:l.id,state:'excused',
           departedAt:l.departure_actual,
-          departedBy:l.departure_confirmed_by||''
+          departedBy:l.departure_confirmed_by||'',
+          leave_type:l.leave_type
         };
       } else {
         excused[l.student_name]={
           reason:label,emoji,type:'leave',
-          leaveId:l.id,state:'pending_departure'
+          leaveId:l.id,state:'pending_departure',
+          leave_type:l.leave_type
         };
       }
     });
