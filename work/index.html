@@ -29606,8 +29606,21 @@ async function deleteActivityType(id){
 
 // ── STUDENT SELECTS ───────────────────────────────────────────
 function populateLeaveStudentSelects(){
-  const boarders=STUDENTS.filter(s=>(HAWKING_STATUS[s.name]||{}).boarder);
-  const opts='<option value="">Select student...</option>'+boarders.map(s=>`<option value="${s.name}">${s.name}</option>`).join('');
+  // HAWKING_STATUS can be {name:true} or {name:{boarder:true,cn:'...'}}
+  const boarders=STUDENTS.filter(s=>{
+    const hw=HAWKING_STATUS[s.name];
+    if(!hw)return false;
+    if(typeof hw==='boolean')return hw;
+    if(typeof hw==='object')return!!hw.boarder;
+    return false;
+  });
+  const list=boarders.length?boarders:STUDENTS;
+  if(!list.length){
+    // STUDENTS not loaded yet — retry after short delay
+    setTimeout(populateLeaveStudentSelects,500);
+    return;
+  }
+  const opts='<option value="">Select student...</option>'+list.map(s=>`<option value="${s.name}">${s.name}</option>`).join('');
   ['leave-student','oneoff-student','sched-student'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.innerHTML=opts;
@@ -29700,16 +29713,21 @@ async function loadActiveLeaves(){
   const el=document.getElementById('active-leaves-list');if(!el)return;
   try{
     const today=new Date().toISOString().split('T')[0];
-    const {data}=await supa.from('boarding_leaves')
+    const {data,error}=await supa.from('boarding_leaves')
       .select('*').eq('active',true)
-      .or(`return_planned.gte.${today},leave_type.eq.longterm`)
       .order('departure_planned');
-    if(!data||!data.length){
-      el.innerHTML='<div style="font-size:12px;color:var(--text3);padding:4px 0">No active leaves.</div>';
+    if(error)throw error;
+    const active=(data||[]).filter(l=>
+      l.leave_type==='longterm'||
+      !l.return_planned||
+      l.return_planned.split('T')[0]>=today
+    );
+    if(!active.length){
+      el.innerHTML='<div style="font-size:12px;color:var(--text3);padding:4px 0">No active leaves. Use "+ Add Leave" to add one.</div>';
       return;
     }
     const leaveEmoji={weekend:'🏠',extended:'📅',daytime:'🌅',longterm:'🏥'};
-    el.innerHTML=data.map(l=>{
+    el.innerHTML=active.map(l=>{
       const dep=l.departure_planned?new Date(l.departure_planned).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
       const ret=l.return_planned?new Date(l.return_planned).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
       const depActual=l.departure_actual?'<span style="color:#16a34a;font-size:10px"> ✓ departed</span>':'';
@@ -29727,7 +29745,11 @@ async function loadActiveLeaves(){
         ${l.reason?`<div style="font-size:11px;color:var(--text3);margin-top:2px">${l.reason}</div>`:''}
       </div>`;
     }).join('');
-  }catch(e){console.warn(e);}
+  }catch(e){
+    console.warn('loadActiveLeaves error:',e);
+    const elErr=document.getElementById('active-leaves-list');
+    if(elErr)elErr.innerHTML='<div style="font-size:12px;color:#dc2626;padding:4px 0">Error: '+e.message+'</div>';
+  }
 }
 
 function openAddLeave(){
@@ -29843,8 +29865,9 @@ async function loadOneOffToday(){
   const el=document.getElementById('oneoff-list');if(!el)return;
   const today=new Date().toISOString().split('T')[0];
   try{
-    const {data}=await supa.from('boarding_activity_instances')
+    const {data,error}=await supa.from('boarding_activity_instances')
       .select('*').eq('date',today).order('start_time');
+    if(error)throw error;
     if(!data||!data.length){
       el.innerHTML='<div style="font-size:12px;color:var(--text3);padding:4px 0">No one-off activities today.</div>';
       return;
