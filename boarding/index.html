@@ -819,7 +819,10 @@ function _regMakeRow(name, idx){
   const safe=name.replace(/"/g,'&quot;');
   const excTag=exc?`<span style="font-size:10px;color:#d97706;display:block">${exc.emoji} ${exc.reason}</span>`:'';
   const depBtn=leaveState==='pending_departure'
-    ?`<button onclick="confirmBoardingDeparture('${exc.leaveId}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #d97706;background:#fffbeb;color:#d97706;cursor:pointer;margin-top:3px;display:block">↑ Confirm Departure</button>`:'';
+    ?`<button onclick="confirmBoardingDeparture('${exc.leaveId}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #d97706;background:#fffbeb;color:#d97706;cursor:pointer;margin-top:3px;display:block">↑ Confirm Departure</button>`
+    :leaveState==='excused'
+    ?`<button onclick="undoBoardingDeparture('${exc.leaveId}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #d1d5db;background:#f9fafb;color:#6b7280;cursor:pointer;margin-top:3px;display:block">↩ Undo Departure</button>`
+    :'';
   return `<div class="reg-row ${st}" data-name="${safe}">
     <span class="reg-num">${idx}.</span>
     <div style="flex:1;min-width:0">
@@ -990,6 +993,15 @@ function regTap(name,status){
 }
 
 // ── DEPARTURE/RETURN CONFIRMATION ─────────────────────────────
+async function undoBoardingDeparture(leaveId){
+  try{
+    await supa.from('boarding_leaves').update({departure_actual:null,departure_confirmed_by:null}).eq('id',leaveId);
+    showToast('↩ Departure unconfirmed','#d97706');
+    await loadExcusedMap();
+    renderRegister();
+  }catch(e){showToast('Error: '+e.message,'#dc2626');}
+}
+
 async function confirmBoardingDeparture(leaveId){
   const role=_identity?_identity.role:'AHSM';
   try{
