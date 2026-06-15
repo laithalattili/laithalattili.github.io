@@ -26003,13 +26003,13 @@ async function renderHawkingRegister(el, preloadedMap){
     // Departure + return buttons
     let depBtn='';
     if(excuseInfo&&excuseInfo.type==='leave'){
+      const _lid=excuseInfo.leaveId;
       if(leaveState==='pending_departure'){
-        depBtn=`<div style="margin-top:4px"><button onclick="confirmDeparture('${excuseInfo.leaveId}')" style="font-size:10px;padding:3px 10px;border-radius:4px;border:1px solid #d97706;background:#fffbeb;color:#d97706;cursor:pointer;font-weight:600">↑ Confirm Departure</button></div>`;
+        depBtn=`<div style="margin-top:4px"><button onclick="confirmDeparture('${_lid}')" style="font-size:10px;padding:3px 10px;border-radius:4px;border:1px solid #d97706;background:#fffbeb;color:#d97706;cursor:pointer;font-weight:600">↑ Confirm Departure</button></div>`;
       } else if(leaveState==='excused'){
-        depBtn=`<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">
-          <button onclick="_undoDeparture('${excuseInfo.leaveId}')" style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid #d1d5db;background:#f9fafb;color:#6b7280;cursor:pointer">↩ Undo</button>`+
-          (excuseInfo.leave_type!=='longterm'?`<button onclick="confirmReturn('${excuseInfo.leaveId}')" style="font-size:10px;padding:3px 10px;border-radius:4px;border:1px solid #16a34a;background:#f0fdf4;color:#16a34a;cursor:pointer;font-weight:600">✓ Confirm Return</button>`:'')+
-        '</div>';
+        const _isLongterm=excuseInfo.leave_type==='longterm';
+        const _retBtnL=_isLongterm?'':(`<button onclick="confirmReturn('${_lid}')" style="font-size:10px;padding:3px 10px;border-radius:4px;border:1px solid #16a34a;background:#f0fdf4;color:#16a34a;cursor:pointer;font-weight:600">✓ Confirm Return</button>`);
+        depBtn=`<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap"><button onclick="_undoDeparture('${_lid}')" style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid #d1d5db;background:#f9fafb;color:#6b7280;cursor:pointer">↩ Undo</button>${_retBtnL}</div>`;
       }
     }
     const timeStr=updatedAt?`<span style="font-size:9px;color:#9ca3af;display:block;margin-top:1px">${updatedAt}${updatedBy?' · '+updatedBy:''}</span>`:'';
@@ -29857,7 +29857,10 @@ async function loadActiveLeaves(){
       return `<div style="padding:10px 0;border-bottom:1px solid #e9ecef">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px">
           <span style="font-size:13px;font-weight:600;color:#212529">${leaveEmoji[l.leave_type]||'📋'} ${l.student_name}</span>
-          <button onclick="cancelLeave('${lid}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #dee2e6;background:#fff;color:#868e96;cursor:pointer;flex-shrink:0">Cancel</button>
+          <div style="display:flex;gap:4px">
+            <button onclick="openEditLeave('${lid}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #c4622d;background:#fff7f5;color:#c4622d;cursor:pointer;flex-shrink:0">Edit</button>
+            <button onclick="cancelLeave('${lid}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #dee2e6;background:#fff;color:#868e96;cursor:pointer;flex-shrink:0">Cancel</button>
+          </div>
         </div>
         <div style="font-size:11px;color:#868e96;margin-bottom:6px">${typeLabel}${l.reason?' · '+l.reason:''}</div>
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
@@ -29877,6 +29880,7 @@ async function loadActiveLeaves(){
 
 function openAddLeave(){
   _editingLeaveId=null;
+  _editingLeaveIdW=null;
   document.getElementById('boarding-leave-modal-title').textContent='Add Leave';
   document.getElementById('leave-student').value='';
   document.getElementById('leave-departure').value='';
@@ -29906,6 +29910,38 @@ function selectLeaveType(btn){
 }
 
 let _savingLeave=false;
+let _editingLeaveIdW=null; // track which leave is being edited in Work app
+
+async function openEditLeave(id){
+  // Find the leave in active leaves
+  try{
+    const {data}=await supa.from('boarding_leaves').select('*').eq('id',id).single();
+    if(!data)return;
+    _editingLeaveIdW=id;
+    document.getElementById('boarding-leave-modal-title').textContent='Edit Leave';
+    // Populate student
+    const stuEl=document.getElementById('leave-student');
+    if(stuEl)stuEl.value=data.student_name;
+    // Populate type
+    document.querySelectorAll('.leave-type-btn').forEach(btn=>{
+      btn.classList.toggle('active',btn.getAttribute('data-type')===data.leave_type);
+    });
+    // Populate times
+    const toLocal=dt=>dt?new Date(dt).toISOString().slice(0,16):'';
+    const depEl=document.getElementById('leave-departure');
+    const retEl=document.getElementById('leave-return');
+    if(depEl)depEl.value=toLocal(data.departure_planned);
+    if(retEl)retEl.value=toLocal(data.return_planned);
+    const reasonEl=document.getElementById('leave-reason');
+    if(reasonEl)reasonEl.value=data.reason||'';
+    // Show/hide return based on type
+    const retWrap=document.getElementById('leave-return-wrap');
+    if(retWrap)retWrap.style.display=data.leave_type==='longterm'?'none':'flex';
+    // Show modal
+    const lm=document.getElementById('boarding-leave-modal');
+    if(lm){lm.style.display='flex';lm.style.alignItems='center';lm.style.justifyContent='center';}
+  }catch(e){showToastMsg('Error loading leave: '+e.message,'#dc2626');}
+}
 async function saveLeave(){
   if(_savingLeave)return;
   _savingLeave=true;
@@ -29932,9 +29968,15 @@ async function saveLeave(){
       created_by:'HSM',
       active:true
     };
-    await supa.from('boarding_leaves').insert(rec);
+    if(_editingLeaveIdW){
+      await supa.from('boarding_leaves').update(rec).eq('id',_editingLeaveIdW);
+      _editingLeaveIdW=null;
+      showToastMsg('Leave updated','#16a34a');
+    } else {
+      await supa.from('boarding_leaves').insert(rec);
+      showToastMsg('Leave saved','#16a34a');
+    }
     closeBoardingLeaveModal();
-    showToastMsg('Leave saved','#16a34a');
     await loadActiveLeaves();
     // Refresh register
     window._lastExcusedMap=await getTodayExcusedMap();
@@ -30550,11 +30592,17 @@ function _amBoardingRegisterHtml(type,excusedMap){
       globalIdx++;
       const _safeBrN=p.name.replace(/"/g,"&quot;");
       const _excTag=_exc?`<span style="font-size:10px;color:#f59e0b;display:block">${_exc.emoji} ${_exc.reason}</span>`:'';
-      const _depBtn=_leaveState==='pending_departure'
-        ?`<button onclick="confirmDeparture('${_exc.leaveId}')" style="font-size:10px;padding:2px 8px;margin-top:3px;border-radius:4px;border:1px solid #f59e0b;background:rgba(245,158,11,.1);color:#f59e0b;cursor:pointer;display:block">↑ Confirm Departure</button>`
-        :_leaveState==='excused'
-        ?`<button onclick="_undoDeparture('${_exc.leaveId}')" style="font-size:10px;padding:2px 8px;margin-top:3px;border-radius:4px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#888;cursor:pointer;display:block">↩ Undo Departure</button>`
-        :'';
+      let _depBtn='';
+      if(_exc&&_exc.type==='leave'){
+        const _lid2=_exc.leaveId;
+        if(_leaveState==='pending_departure'){
+          _depBtn=`<div style="margin-top:3px"><button onclick="confirmDeparture('${_lid2}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #f59e0b;background:rgba(245,158,11,.1);color:#f59e0b;cursor:pointer">↑ Confirm Departure</button></div>`;
+        } else if(_leaveState==='excused'){
+          const _isLT=_exc.leave_type==='longterm';
+          const _retBtn2=_isLT?'':(`<button onclick="confirmReturn('${_lid2}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #22c55e;background:rgba(34,197,94,.1);color:#22c55e;cursor:pointer;font-weight:600">✓ Return</button>`);
+          _depBtn=`<div style="margin-top:3px;display:flex;gap:4px;flex-wrap:wrap"><button onclick="_undoDeparture('${_lid2}')" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:transparent;color:#888;cursor:pointer">↩ Undo</button>${_retBtn2}</div>`;
+        }
+      }
       rows+=`<div data-br-name="${_safeBrN}" style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.05);background:${bg}">
         <span style="font-size:10px;color:#555;min-width:22px;text-align:right;font-variant-numeric:tabular-nums">${globalIdx}.</span>
         <div style="flex:1;font-size:13px;color:#e0e0e0;font-weight:500">${p.name}${_excTag}${_depBtn}</div>
