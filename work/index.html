@@ -30060,23 +30060,64 @@ async function confirmDeparture(id){
 
 async function confirmReturn(id){
   try{
+    // Get student name from leave record
+    const {data:leaveData}=await supa.from('boarding_leaves').select('student_name').eq('id',id).single();
+    const studentName=leaveData?.student_name;
+
+    // Update leave record
     await supa.from('boarding_leaves').update({
       return_actual:new Date().toISOString(),
       return_confirmed_by:'HSM'
     }).eq('id',id);
-    showToastMsg('✓ Return confirmed','#16a34a');
+
+    // Auto-mark student as Present in today's register
+    if(studentName){
+      const today=new Date().toISOString().split('T')[0];
+      await supa.from('boarding_registrations').upsert({
+        student_name:studentName,
+        register_date:today,
+        status:'present',
+        updated_by:'HSM',
+        session_type:'boarding',
+        updated_at:new Date().toISOString()
+      },{onConflict:'student_name,register_date'});
+      // Update local state
+      _brState[studentName]={status:'present',updatedAt:new Date().toISOString(),updatedBy:'HSM'};
+      // Log to history
+      supa.from('boarding_registration_history').insert({
+        student_name:studentName,
+        register_date:today,
+        previous_status:'excused',
+        new_status:'present',
+        changed_by:'HSM',
+        session_type:'boarding'
+      }).then(()=>{}).catch(()=>{});
+    }
+
+    showToastMsg('✓ '+studentName+' returned & marked Present','#16a34a');
     window._lastExcusedMap=await getTodayExcusedMap();
     if(_hwkFilter==='register'){
       const el=document.getElementById('hawking-list-content');
-      if(el)renderHawkingRegister(el);
+      if(el)renderHawkingRegister(el,window._lastExcusedMap);
     }
     if(_hwkFilter==='away'){
       const el=document.getElementById('hawking-list-content');
       if(el)renderAwayList(el);
     }
+    // Re-render live mode
+    const body=document.getElementById('am-body');
+    if(body&&_amOpen){
+      const ctx=amGetCtx();
+      if(ctx){
+        const cust=getCustomForWeek(ctx.offset,ctx.slotIdx,ctx.dayName);
+        if(cust&&(cust.boarding_register||cust.house_register)){
+          body.innerHTML=_amBoardingRegisterHtml(cust.boarding_register?'boarding':'house',window._lastExcusedMap||{});
+        }
+      }
+    }
     await loadActiveLeaves();
     await _applyPendingPenalties(id);
-  }catch(e){alert('Error: '+e.message);}
+  }catch(e){showToastMsg('Error: '+e.message,'#dc2626');}
 }
 
 async function cancelLeave(id){
