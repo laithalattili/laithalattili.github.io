@@ -363,6 +363,10 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .settings-section{background:#fff;border:1px solid var(--border3);border-radius:var(--r);margin-bottom:.75rem;overflow:hidden}
 .settings-section-title{font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;padding:.75rem 1rem .5rem;border-bottom:1px solid var(--border3);background:var(--bg2);cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none}
 .settings-section-title:active{background:var(--bg3)}
+.leave-type-btn{font-size:11px;padding:5px 10px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font-weight:500;transition:all .15s}
+.leave-type-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700}
+.sched-day-btn{flex:1;padding:6px 2px;font-size:10px;border-radius:5px;border:1px solid var(--border);background:transparent;cursor:pointer;transition:all .15s}
+.sched-day-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700}
 .settings-section-body{}
 .settings-section-body.collapsed{display:none}
 .settings-item{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border-bottom:1px solid var(--border3);cursor:pointer}
@@ -1804,6 +1808,57 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
 
       </div><!-- end ss-body-boarding_config -->
     </div><!-- end settings-section boarding_config -->
+
+    <!-- LEAVE & ACTIVITY MANAGEMENT -->
+    <div class="settings-section">
+      <div class="settings-section-title" onclick="toggleSettingsSection('leave_activity',this)">
+        🗓 Leave & Activity Management
+        <span id="ss-chev-leave_activity" style="font-size:12px;transition:transform .2s;display:inline-block">▼</span>
+      </div>
+      <div class="settings-section-body collapsed" id="ss-body-leave_activity">
+
+        <!-- ACTIVITY TYPES -->
+        <div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3)">Activity Types</div>
+        <div style="padding:.5rem 1rem">
+          <div id="activity-types-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="text" id="new-activity-emoji" placeholder="🎵" style="width:44px;font-size:14px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;text-align:center">
+            <input type="text" id="new-activity-name" placeholder="Activity name..." style="flex:1;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px" onkeydown="if(event.key==='Enter')addActivityType()">
+            <button onclick="addActivityType()" style="font-size:12px;padding:5px 12px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600;white-space:nowrap">+ Add</button>
+          </div>
+        </div>
+
+        <!-- STUDENT ACTIVITY SCHEDULES -->
+        <div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3);margin-top:.5rem">Activity Schedules</div>
+        <div style="padding:.5rem 1rem">
+          <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+            <select id="sched-student" style="flex:1;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;min-width:120px">
+              <option value="">Select student...</option>
+            </select>
+            <button onclick="loadStudentSchedule()" style="font-size:12px;padding:5px 12px;border-radius:6px;background:var(--bg3);color:var(--text);border:1px solid var(--border);cursor:pointer">View</button>
+          </div>
+          <div id="student-schedule-list" style="display:none">
+            <div id="student-schedule-entries" style="margin-bottom:8px"></div>
+            <button onclick="openAddScheduleEntry()" style="font-size:12px;padding:6px 12px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600">+ Add Schedule Entry</button>
+          </div>
+        </div>
+
+        <!-- ACTIVE LEAVES -->
+        <div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3);margin-top:.5rem">
+          Active Leaves
+          <button onclick="openAddLeave()" style="float:right;font-size:11px;padding:2px 10px;border-radius:5px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600;margin-top:-2px">+ Add Leave</button>
+        </div>
+        <div id="active-leaves-list" style="padding:.5rem 1rem"></div>
+
+        <!-- ONE-OFF ACTIVITIES -->
+        <div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3);margin-top:.5rem">
+          One-off Activities Today
+          <button onclick="openAddOneOff()" style="float:right;font-size:11px;padding:2px 10px;border-radius:5px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600;margin-top:-2px">+ Add</button>
+        </div>
+        <div id="oneoff-list" style="padding:.5rem 1rem"></div>
+
+      </div>
+    </div>
 
   </div><!-- end settings-content -->
 </div><!-- end tab-settings -->
@@ -25844,7 +25899,7 @@ function renderHawkingRegister(el){
   const statLabel={present:'Present',absent:'Absent',excused:'Excused',unregistered:'—'};
 
   // Count summary
-  const counts={present:0,absent:0,excused:0,left:0,late:0,unregistered:0};
+  const counts={present:0,absent:0,excused:0,late:0,unregistered:0};
   people.forEach(p=>{const st=(_brState[p.name]||{}).status||'unregistered';counts[st]=(counts[st]||0)+1;});
   const total=people.length;
   const registered=total-counts.unregistered;
@@ -27580,8 +27635,10 @@ let _settingsSectionState={}; // sectionId -> true (collapsed) | false (open)
 
 function toggleSettingsSection(id,titleEl){
   if(id==='boarding_config'){
-    // Small delay to let section open first
     setTimeout(()=>loadBoardingSettings(),50);
+  }
+  if(id==='leave_activity'){
+    setTimeout(()=>loadLeaveActivity(),50);
   }
   // Load saved state
   try{const s=localStorage.getItem('settingsSections');if(s)_settingsSectionState=JSON.parse(s);}catch(e){}
@@ -29476,6 +29533,457 @@ function amHandleLockTap(e){
 function _amVisHandler(){if(!document.hidden&&_amOpen){_amLastCtxKey='';amRender();}}
 // ── BOARDING REGISTER (inline Live mode) ──────────────────────────────────
 
+// ── LEAVE & ACTIVITY MANAGEMENT ──────────────────────────────
+let _activityTypes=[]; // loaded from Supabase
+let _selectedSchedDays=[];
+let _currentSchedStudent='';
+let _editingLeaveId=null;
+
+// ── INIT ──────────────────────────────────────────────────────
+async function loadLeaveActivity(){
+  await loadActivityTypes();
+  await loadActiveLeaves();
+  await loadOneOffToday();
+  populateLeaveStudentSelects();
+}
+
+// ── ACTIVITY TYPES ────────────────────────────────────────────
+async function loadActivityTypes(){
+  try{
+    const {data}=await supa.from('boarding_activity_types').select('*').order('name');
+    _activityTypes=data||[];
+  }catch(e){console.warn(e);}
+  renderActivityTypesList();
+  populateActivityTypeSelects();
+}
+
+function renderActivityTypesList(){
+  const el=document.getElementById('activity-types-list');if(!el)return;
+  if(!_activityTypes.length){
+    el.innerHTML='<span style="font-size:12px;color:var(--text3)">No activity types yet.</span>';
+    return;
+  }
+  el.innerHTML=_activityTypes.map(t=>`
+    <span style="display:inline-flex;align-items:center;gap:5px;background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:3px 10px;font-size:12px">
+      ${t.emoji||'📌'} ${t.name}
+      <button onclick="deleteActivityType('${t.id}')" style="border:none;background:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 0 0 2px;line-height:1">×</button>
+    </span>`).join('');
+}
+
+function populateActivityTypeSelects(){
+  const opts=_activityTypes.map(t=>`<option value="${t.name}">${t.emoji||'📌'} ${t.name}</option>`).join('');
+  ['sched-activity-type','oneoff-activity-type'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.innerHTML=opts||'<option value="">No types yet</option>';
+  });
+}
+
+async function addActivityType(){
+  const nameEl=document.getElementById('new-activity-name');
+  const emojiEl=document.getElementById('new-activity-emoji');
+  const name=(nameEl?.value||'').trim();
+  const emoji=(emojiEl?.value||'📌').trim();
+  if(!name)return;
+  try{
+    await supa.from('boarding_activity_types').insert({name,emoji});
+    if(nameEl)nameEl.value='';
+    if(emojiEl)emojiEl.value='';
+    await loadActivityTypes();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function deleteActivityType(id){
+  if(!confirm('Delete this activity type?'))return;
+  try{
+    await supa.from('boarding_activity_types').delete().eq('id',id);
+    await loadActivityTypes();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ── STUDENT SELECTS ───────────────────────────────────────────
+function populateLeaveStudentSelects(){
+  const boarders=STUDENTS.filter(s=>(HAWKING_STATUS[s.name]||{}).boarder);
+  const opts='<option value="">Select student...</option>'+boarders.map(s=>`<option value="${s.name}">${s.name}</option>`).join('');
+  ['leave-student','oneoff-student','sched-student'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.innerHTML=opts;
+  });
+}
+
+// ── ACTIVITY SCHEDULES ────────────────────────────────────────
+async function loadStudentSchedule(){
+  const name=document.getElementById('sched-student')?.value;
+  if(!name)return;
+  _currentSchedStudent=name;
+  const listEl=document.getElementById('student-schedule-list');
+  const entriesEl=document.getElementById('student-schedule-entries');
+  if(!listEl||!entriesEl)return;
+  listEl.style.display='block';
+  try{
+    const {data}=await supa.from('boarding_activity_schedules')
+      .select('*').eq('student_name',name).eq('active',true).order('day_of_week');
+    if(!data||!data.length){
+      entriesEl.innerHTML='<div style="font-size:12px;color:var(--text3);padding:4px 0">No schedule entries yet.</div>';
+      return;
+    }
+    const dayOrder=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const sorted=[...data].sort((a,b)=>dayOrder.indexOf(a.day_of_week)-dayOrder.indexOf(b.day_of_week));
+    entriesEl.innerHTML=sorted.map(e=>`
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border3)">
+        <span style="font-size:11px;font-weight:700;color:var(--accent);width:28px">${e.day_of_week}</span>
+        <span style="font-size:12px;flex:1">${e.activity_type}</span>
+        <span style="font-size:11px;color:var(--text3)">${e.start_time}–${e.end_time}</span>
+        <button onclick="deleteScheduleEntry('${e.id}')" style="border:none;background:none;color:#dc2626;cursor:pointer;font-size:13px">×</button>
+      </div>`).join('');
+  }catch(e){console.warn(e);}
+}
+
+function openAddScheduleEntry(){
+  if(!_currentSchedStudent){alert('Select a student first.');return;}
+  _selectedSchedDays=[];
+  document.querySelectorAll('.sched-day-btn').forEach(b=>b.classList.remove('active'));
+  const el=document.getElementById('schedule-modal');if(el)el.style.display='flex';
+  populateActivityTypeSelects();
+}
+
+function closeScheduleModal(){
+  const el=document.getElementById('schedule-modal');if(el)el.style.display='none';
+}
+
+function toggleSchedDay(btn){
+  const day=btn.getAttribute('data-day');
+  if(_selectedSchedDays.includes(day)){
+    _selectedSchedDays=_selectedSchedDays.filter(d=>d!==day);
+    btn.classList.remove('active');
+  } else {
+    _selectedSchedDays.push(day);
+    btn.classList.add('active');
+  }
+}
+
+async function saveScheduleEntry(){
+  if(!_selectedSchedDays.length){alert('Select at least one day.');return;}
+  const actType=document.getElementById('sched-activity-type')?.value;
+  const start=document.getElementById('sched-start')?.value;
+  const end=document.getElementById('sched-end')?.value;
+  if(!actType||!start||!end){alert('Please fill all fields.');return;}
+  try{
+    const entries=_selectedSchedDays.map(day=>({
+      student_name:_currentSchedStudent,
+      activity_type:actType,
+      day_of_week:day,
+      start_time:start,
+      end_time:end,
+      active:true
+    }));
+    await supa.from('boarding_activity_schedules').insert(entries);
+    closeScheduleModal();
+    await loadStudentSchedule();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function deleteScheduleEntry(id){
+  if(!confirm('Remove this schedule entry?'))return;
+  try{
+    await supa.from('boarding_activity_schedules').update({active:false}).eq('id',id);
+    await loadStudentSchedule();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ── LEAVES ────────────────────────────────────────────────────
+async function loadActiveLeaves(){
+  const el=document.getElementById('active-leaves-list');if(!el)return;
+  try{
+    const today=new Date().toISOString().split('T')[0];
+    const {data}=await supa.from('boarding_leaves')
+      .select('*').eq('active',true)
+      .or(`return_planned.gte.${today},leave_type.eq.longterm`)
+      .order('departure_planned');
+    if(!data||!data.length){
+      el.innerHTML='<div style="font-size:12px;color:var(--text3);padding:4px 0">No active leaves.</div>';
+      return;
+    }
+    const leaveEmoji={weekend:'🏠',extended:'📅',daytime:'🌅',longterm:'🏥'};
+    el.innerHTML=data.map(l=>{
+      const dep=l.departure_planned?new Date(l.departure_planned).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
+      const ret=l.return_planned?new Date(l.return_planned).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
+      const depActual=l.departure_actual?'<span style="color:#16a34a;font-size:10px"> ✓ departed</span>':'';
+      const retActual=l.return_actual?'<span style="color:#16a34a;font-size:10px"> ✓ returned</span>':'';
+      return `<div style="padding:8px 0;border-bottom:1px solid var(--border3)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
+          <span style="font-size:13px;font-weight:600;color:var(--text)">${leaveEmoji[l.leave_type]||'📋'} ${l.student_name}</span>
+          <div style="display:flex;gap:6px">
+            ${!l.departure_actual?`<button onclick="confirmDeparture('${l.id}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #d97706;background:#fffbeb;color:#d97706;cursor:pointer">Confirm Dep.</button>`:''}
+            ${l.departure_actual&&!l.return_actual&&l.leave_type!=='longterm'?`<button onclick="confirmReturn('${l.id}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #16a34a;background:#f0fdf4;color:#16a34a;cursor:pointer">Confirm Return</button>`:''}
+            <button onclick="cancelLeave('${l.id}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:#fff;color:var(--text3);cursor:pointer">Cancel</button>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text3)">${l.leave_type} · Dep: ${dep}${depActual} · Return: ${ret}${retActual}</div>
+        ${l.reason?`<div style="font-size:11px;color:var(--text3);margin-top:2px">${l.reason}</div>`:''}
+      </div>`;
+    }).join('');
+  }catch(e){console.warn(e);}
+}
+
+function openAddLeave(){
+  _editingLeaveId=null;
+  document.getElementById('leave-modal-title').textContent='Add Leave';
+  document.getElementById('leave-student').value='';
+  document.getElementById('leave-departure').value='';
+  document.getElementById('leave-return').value='';
+  document.getElementById('leave-reason').value='';
+  // Default departure to now
+  const now=new Date();
+  now.setMinutes(now.getMinutes()-now.getTimezoneOffset());
+  document.getElementById('leave-departure').value=now.toISOString().slice(0,16);
+  selectLeaveType(document.querySelector('.leave-type-btn[data-type="weekend"]'));
+  populateLeaveStudentSelects();
+  document.getElementById('leave-modal').style.display='flex';
+}
+
+function closeLeaveModal(){
+  document.getElementById('leave-modal').style.display='none';
+}
+
+function selectLeaveType(btn){
+  document.querySelectorAll('.leave-type-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const type=btn.getAttribute('data-type');
+  const returnWrap=document.getElementById('leave-return-wrap');
+  if(returnWrap)returnWrap.style.display=type==='longterm'?'none':'flex';
+}
+
+async function saveLeave(){
+  const student=document.getElementById('leave-student')?.value;
+  const type=document.querySelector('.leave-type-btn.active')?.getAttribute('data-type');
+  const dep=document.getElementById('leave-departure')?.value;
+  const ret=document.getElementById('leave-return')?.value;
+  const reason=document.getElementById('leave-reason')?.value||'';
+  if(!student||!type||!dep){alert('Please fill student, type, and departure.');return;}
+  try{
+    const rec={
+      student_name:student,
+      leave_type:type,
+      departure_planned:dep?new Date(dep).toISOString():null,
+      return_planned:ret&&type!=='longterm'?new Date(ret).toISOString():null,
+      reason,
+      created_by:'HSM',
+      active:true
+    };
+    await supa.from('boarding_leaves').insert(rec);
+    closeLeaveModal();
+    await loadActiveLeaves();
+    // Refresh register if open
+    if(_hwkFilter==='register'){
+      const el=document.getElementById('hawking-list-content');
+      if(el)renderHawkingRegister(el);
+    }
+    showToastMsg('Leave saved','#16a34a');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function confirmDeparture(id){
+  try{
+    await supa.from('boarding_leaves').update({
+      departure_actual:new Date().toISOString(),
+      departure_confirmed_by:'HSM'
+    }).eq('id',id);
+    await loadActiveLeaves();
+    showToastMsg('Departure confirmed','#16a34a');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function confirmReturn(id){
+  try{
+    await supa.from('boarding_leaves').update({
+      return_actual:new Date().toISOString(),
+      return_confirmed_by:'HSM',
+    }).eq('id',id);
+    await loadActiveLeaves();
+    // Check for pending penalties
+    await _applyPendingPenalties(id);
+    showToastMsg('Return confirmed','#16a34a');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function cancelLeave(id){
+  if(!confirm('Cancel this leave?'))return;
+  try{
+    await supa.from('boarding_leaves').update({active:false}).eq('id',id);
+    await loadActiveLeaves();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function _applyPendingPenalties(leaveId){
+  // Find pending penalties linked to this leave and activate them
+  try{
+    const today=new Date().toISOString().split('T')[0];
+    const {data}=await supa.from('boarding_penalties')
+      .select('id,student_name,infraction_type,penalty_type')
+      .eq('leave_id',leaveId).eq('status','pending');
+    if(data&&data.length){
+      for(const p of data){
+        await supa.from('boarding_penalties').update({
+          status:'active',
+          penalty_date:today
+        }).eq('id',p.id);
+      }
+      showToastMsg(`${data.length} pending ${data.length===1?'penalty':'penalties'} now active`,'#d97706');
+    }
+  }catch(e){console.warn(e);}
+}
+
+// ── ONE-OFF ACTIVITIES ────────────────────────────────────────
+async function loadOneOffToday(){
+  const el=document.getElementById('oneoff-list');if(!el)return;
+  const today=new Date().toISOString().split('T')[0];
+  try{
+    const {data}=await supa.from('boarding_activity_instances')
+      .select('*').eq('date',today).order('start_time');
+    if(!data||!data.length){
+      el.innerHTML='<div style="font-size:12px;color:var(--text3);padding:4px 0">No one-off activities today.</div>';
+      return;
+    }
+    el.innerHTML=data.map(a=>{
+      const at=_activityTypes.find(t=>t.name===a.activity_type);
+      const emoji=at?.emoji||'📌';
+      const dep=a.departed_at?'<span style="color:#16a34a;font-size:10px"> ✓ departed</span>':'';
+      const ret=a.returned_at?'<span style="color:#16a34a;font-size:10px"> ✓ returned</span>':'';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border3)">
+        <span style="font-size:13px">${emoji}</span>
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:600">${a.student_name} <span style="font-weight:400;color:var(--text3)">${a.activity_type}</span></div>
+          <div style="font-size:11px;color:var(--text3)">${a.start_time}–${a.end_time}${a.note?' · '+a.note:''}</div>
+        </div>
+        ${!a.departed_at?`<button onclick="confirmActivityDep('${a.id}')" style="font-size:10px;padding:2px 7px;border-radius:4px;border:1px solid #d97706;background:#fffbeb;color:#d97706;cursor:pointer">Dep${dep}</button>`:''}
+        ${a.departed_at&&!a.returned_at?`<button onclick="confirmActivityRet('${a.id}')" style="font-size:10px;padding:2px 7px;border-radius:4px;border:1px solid #16a34a;background:#f0fdf4;color:#16a34a;cursor:pointer">Return${ret}</button>`:''}
+        ${a.returned_at?`<span style="font-size:10px;color:#16a34a">✓ back${ret}</span>`:''}
+      </div>`;
+    }).join('');
+  }catch(e){console.warn(e);}
+}
+
+function openAddOneOff(){
+  populateLeaveStudentSelects();
+  populateActivityTypeSelects();
+  const today=new Date().toISOString().split('T')[0];
+  const el=document.getElementById('oneoff-date');if(el)el.value=today;
+  document.getElementById('oneoff-modal').style.display='flex';
+}
+
+function closeOneOffModal(){
+  document.getElementById('oneoff-modal').style.display='none';
+}
+
+async function saveOneOff(){
+  const student=document.getElementById('oneoff-student')?.value;
+  const actType=document.getElementById('oneoff-activity-type')?.value;
+  const date=document.getElementById('oneoff-date')?.value;
+  const start=document.getElementById('oneoff-start')?.value;
+  const end=document.getElementById('oneoff-end')?.value;
+  const note=document.getElementById('oneoff-note')?.value||'';
+  if(!student||!actType||!date||!start||!end){alert('Please fill all required fields.');return;}
+  try{
+    await supa.from('boarding_activity_instances').insert({
+      student_name:student,activity_type:actType,date,start_time:start,end_time:end,note
+    });
+    closeOneOffModal();
+    await loadOneOffToday();
+    showToastMsg('Activity added','#16a34a');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function confirmActivityDep(id){
+  try{
+    await supa.from('boarding_activity_instances').update({
+      departed_at:new Date().toISOString(),confirmed_by:'HSM'
+    }).eq('id',id);
+    await loadOneOffToday();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function confirmActivityRet(id){
+  try{
+    await supa.from('boarding_activity_instances').update({
+      returned_at:new Date().toISOString()
+    }).eq('id',id);
+    await loadOneOffToday();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ── TOAST ─────────────────────────────────────────────────────
+function showToastMsg(msg,color){
+  const t=document.createElement('div');
+  t.textContent=msg;
+  t.style.cssText=`position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:${color||'#333'};color:#fff;padding:8px 18px;border-radius:20px;font-size:13px;font-weight:600;z-index:9999;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.2)`;
+  document.body.appendChild(t);setTimeout(()=>t.remove(),2500);
+}
+
+// ── REGISTER: get today's excused status ──────────────────────
+async function getTodayExcusedMap(){
+  // Returns {studentName: {reason, emoji, type}} for today
+  const excused={};
+  const today=new Date().toISOString().split('T')[0];
+  const nowMins=new Date().getHours()*60+new Date().getMinutes();
+  const toMins=t=>parseInt(t.split(':')[0])*60+parseInt(t.split(':')[1]);
+  const dayName=new Date().toLocaleDateString('en-US',{weekday:'short'}); // Mon,Tue etc
+
+  // 1. Active leaves
+  try{
+    const {data}=await supa.from('boarding_leaves')
+      .select('student_name,leave_type,departure_planned,return_planned,departure_actual,return_actual')
+      .eq('active',true);
+    const leaveLabel={weekend:'Weekend Leave',extended:'Extended Leave',daytime:'Daytime Departure',longterm:'Long-term Leave'};
+    const leaveEmoji={weekend:'🏠',extended:'📅',daytime:'🌅',longterm:'🏥'};
+    (data||[]).forEach(l=>{
+      const dep=l.departure_actual||l.departure_planned;
+      const ret=l.return_actual||l.return_planned;
+      const depDate=dep?dep.split('T')[0]:null;
+      const retDate=ret?ret.split('T')[0]:null;
+      const onLeave=(depDate&&depDate<=today)&&(!retDate||retDate>=today);
+      if(onLeave){
+        excused[l.student_name]={
+          reason:leaveLabel[l.leave_type]||'Leave',
+          emoji:leaveEmoji[l.leave_type]||'🏠',
+          type:'leave'
+        };
+      }
+    });
+  }catch(e){}
+
+  // 2. Routine schedules active now
+  try{
+    const {data}=await supa.from('boarding_activity_schedules')
+      .select('student_name,activity_type,start_time,end_time')
+      .eq('day_of_week',dayName).eq('active',true);
+    (data||[]).forEach(s=>{
+      if(nowMins>=toMins(s.start_time)&&nowMins<=toMins(s.end_time)){
+        if(!excused[s.student_name]){
+          const at=_activityTypes.find(t=>t.name===s.activity_type);
+          excused[s.student_name]={reason:s.activity_type,emoji:at?.emoji||'📌',type:'activity'};
+        }
+      }
+    });
+  }catch(e){}
+
+  // 3. One-off instances today active now
+  try{
+    const {data}=await supa.from('boarding_activity_instances')
+      .select('student_name,activity_type,start_time,end_time')
+      .eq('date',today);
+    (data||[]).forEach(a=>{
+      if(nowMins>=toMins(a.start_time)&&nowMins<=toMins(a.end_time)){
+        if(!excused[a.student_name]){
+          const at=_activityTypes.find(t=>t.name===a.activity_type);
+          excused[a.student_name]={reason:a.activity_type,emoji:at?.emoji||'📌',type:'activity'};
+        }
+      }
+    });
+  }catch(e){}
+
+  return excused;
+}
+
 // ── BOARDING SETTINGS ─────────────────────────────────────────
 let _boardingSettings={
   staff:[
@@ -29767,7 +30275,7 @@ function _amBoardingRegisterHtml(type){
 
   // Overall counts
   const allPeople=sections.flatMap(s=>s.people);
-  const counts={present:0,absent:0,excused:0,left:0,late:0,unset:0};
+  const counts={present:0,absent:0,excused:0,late:0,unset:0};
   allPeople.forEach(p=>{const st=(_brState[p.name]||{}).status||'';if(st)counts[st]=(counts[st]||0)+1;else counts.unset++;});
   const total=allPeople.length;
 
@@ -29777,7 +30285,7 @@ function _amBoardingRegisterHtml(type){
   sections.forEach(sec=>{
     const key='_brSec_'+sec.label;
     const isOpen=window[key]!==false; // default open
-    const secCounts={present:0,absent:0,excused:0,left:0,late:0,unset:0};
+    const secCounts={present:0,absent:0,excused:0,late:0,unset:0};
     sec.people.forEach(p=>{const st=(_brState[p.name]||{}).status||'';if(st)secCounts[st]=(secCounts[st]||0)+1;else secCounts.unset++;});
     const secTotal=sec.people.length;
     const secReg=secTotal-secCounts.unset;
@@ -29867,7 +30375,7 @@ function _brTap(name,status,sessionType){
       const countEl=sec.querySelector('[data-br-sec-count]');
       if(countEl){
         const names=[...sec.querySelectorAll('[data-br-name]')].map(r=>r.getAttribute('data-br-name'));
-        const sc={present:0,absent:0,excused:0,left:0,unset:0};
+        const sc={present:0,absent:0,excused:0,unset:0};
         names.forEach(n=>{const st=(_brState[n]||{}).status||'';if(st)sc[st]=(sc[st]||0)+1;else sc.unset++;});
         const reg=names.length-sc.unset;
         countEl.innerHTML=`${reg}/${names.length} · <span style="color:#22c55e">${sc.present||0}✓</span> <span style="color:#ef4444">${sc.absent||0}✗</span>`;
@@ -29875,10 +30383,10 @@ function _brTap(name,status,sessionType){
     }
     // Update overall header counts
     const allNames=[...document.querySelectorAll('[data-br-name]')].map(r=>r.getAttribute('data-br-name'));
-    const tot={present:0,absent:0,excused:0,left:0,unset:0};
+    const tot={present:0,absent:0,excused:0,unset:0};
     allNames.forEach(n=>{const st=(_brState[n]||{}).status||'';if(st)tot[st]=(tot[st]||0)+1;else tot.unset++;});
     const hdr=document.getElementById('br-overall-count');
-    if(hdr)hdr.innerHTML=`${allNames.length-tot.unset}/${allNames.length} · <span style="color:#22c55e">${tot.present||0}✓</span> <span style="color:#ef4444">${tot.absent||0}✗</span> <span style="color:#f59e0b">${tot.excused||0}~</span> <span style="color:#60a5fa">${tot.left||0}↑</span>`;
+    if(hdr)hdr.innerHTML=`${allNames.length-tot.unset}/${allNames.length} · <span style="color:#22c55e">${tot.present||0}✓</span> <span style="color:#ef4444">${tot.absent||0}✗</span> <span style="color:#f59e0b">${tot.excused||0}~</span>`;
   } else {
     _brRerender(); // fallback
   }
@@ -29978,8 +30486,8 @@ function _fireTap(name, status){
 
   // Surgical DOM update — only update the row that changed, no scroll reset
   const newSt=(_fireState[name]||{}).status||'';
-  const statColor={present:'#22c55e',absent:'#ef4444',excused:'#f59e0b',left:'#60a5fa','':'#555'};
-  const statBg={present:'rgba(34,197,94,.13)',absent:'rgba(239,68,68,.13)',excused:'rgba(245,158,11,.13)',left:'rgba(96,165,250,.13)','':'transparent'};
+  const statColor={present:'#22c55e',absent:'#ef4444',excused:'#f59e0b','':'#555'};
+  const statBg={present:'rgba(34,197,94,.13)',absent:'rgba(239,68,68,.13)',excused:'rgba(245,158,11,.13)','':'transparent'};
   // Find the row by data attribute and update it
   const rowEl=document.querySelector(`[data-fire-name="${CSS.escape(name)}"]`);
   if(rowEl){
@@ -30019,7 +30527,7 @@ function _fireUpdateSectionCount(rowEl){
   const countEl=section.querySelector('[data-fire-sec-count]');
   if(!countEl)return;
   const rows=section.querySelectorAll('[data-fire-name]');
-  const sc={present:0,absent:0,excused:0,left:0,unset:0};
+  const sc={present:0,absent:0,excused:0,unset:0};
   rows.forEach(r=>{
     const n=r.getAttribute('data-fire-name');
     const st=(_fireState[n]||{}).status||'';
@@ -30033,14 +30541,14 @@ function _fireUpdateOverallCount(){
   const el=document.getElementById('fire-overall-count');
   if(!el)return;
   const allRows=document.querySelectorAll('[data-fire-name]');
-  const counts={present:0,absent:0,excused:0,left:0,unset:0};
+  const counts={present:0,absent:0,excused:0,unset:0};
   allRows.forEach(r=>{
     const n=r.getAttribute('data-fire-name');
     const st=(_fireState[n]||{}).status||'';
     if(st)counts[st]=(counts[st]||0)+1;else counts.unset++;
   });
   const total=allRows.length;
-  el.innerHTML=`${total-counts.unset}/${total} &nbsp;·&nbsp; <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444"> ${counts.absent||0}✗</span> <span style="color:#f59e0b"> ${counts.excused||0}~</span> <span style="color:#60a5fa"> ${counts.left||0}↑</span>`;
+  el.innerHTML=`${total-counts.unset}/${total} &nbsp;·&nbsp; <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444"> ${counts.absent||0}✗</span> <span style="color:#f59e0b"> ${counts.excused||0}~</span> `;
 }
 
 function revertFromFire(){
@@ -30096,8 +30604,8 @@ function _fireToggleAllSections(){
 
 function _renderFireRegister(){
   const body=document.getElementById('am-body');if(!body)return;
-  const statColor={present:'#22c55e',absent:'#ef4444',excused:'#f59e0b',left:'#60a5fa','':'#555'};
-  const statBg={present:'rgba(34,197,94,.13)',absent:'rgba(239,68,68,.13)',excused:'rgba(245,158,11,.13)',left:'rgba(96,165,250,.13)','':'transparent'};
+  const statColor={present:'#22c55e',absent:'#ef4444',excused:'#f59e0b','':'#555'};
+  const statBg={present:'rgba(34,197,94,.13)',absent:'rgba(239,68,68,.13)',excused:'rgba(245,158,11,.13)','':'transparent'};
 
   function makeRow(p,idx){
     const st=(_fireState[p.name]||{}).status||'';
@@ -30112,14 +30620,14 @@ function _renderFireRegister(){
       <span style="font-size:10px;color:#555;min-width:22px;text-align:right">${idx}.</span>
       <div style="flex:1;font-size:13px;color:#e0e0e0;font-weight:500">${p.name} ${typeTag}</div>
       <div style="display:flex;gap:4px">
-        ${['present','absent','excused','left'].map(opt=>`<button data-fire-opt="${opt}" onclick="_fireTap('${safeName}','${opt}')" style="font-size:11px;padding:4px 7px;border-radius:6px;border:1px solid ${opt===st?statColor[opt]:'rgba(255,255,255,.12)'};background:${opt===st?'rgba(255,255,255,.1)':'transparent'};color:${opt===st?statColor[opt]:'#666'};cursor:pointer;font-weight:${opt===st?'700':'400'}">${opt==='present'?'✓':opt==='absent'?'✗':opt==='excused'?'~':'↑'}</button>`).join('')}
+        ${['present','absent','excused'].map(opt=>`<button data-fire-opt="${opt}" onclick="_fireTap('${safeName}','${opt}')" style="font-size:11px;padding:4px 7px;border-radius:6px;border:1px solid ${opt===st?statColor[opt]:'rgba(255,255,255,.12)'};background:${opt===st?'rgba(255,255,255,.1)':'transparent'};color:${opt===st?statColor[opt]:'#666'};cursor:pointer;font-weight:${opt===st?'700':'400'}">${opt==='present'?'✓':opt==='absent'?'✗':'~'}</button>`).join('')}
       </div>
     </div>`;
   }
 
   function makeSection(label,people,key,accentColor){
     const isOpen=window[key]!==false;
-    const sc={present:0,absent:0,excused:0,left:0,unset:0};
+    const sc={present:0,absent:0,excused:0,unset:0};
     people.forEach(p=>{const st=(_fireState[p.name]||{}).status||'';if(st)sc[st]=(sc[st]||0)+1;else sc.unset++;});
     const reg=people.length-sc.unset;
     let rows='';let idx=0;
@@ -30174,7 +30682,7 @@ function _renderFireRegister(){
     }
   }
 
-  const counts={present:0,absent:0,excused:0,left:0,unset:0};
+  const counts={present:0,absent:0,excused:0,unset:0};
   allPeople.forEach(p=>{const st=(_fireState[p.name]||{}).status||'';if(st)counts[st]=(counts[st]||0)+1;else counts.unset++;});
   const total=allPeople.length;
   const allExp=_fireAllExpanded();
@@ -30201,7 +30709,7 @@ function _renderFireRegister(){
       <!-- Title row -->
       <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px">
         <span style="font-size:13px;font-weight:700;color:#fca5a5;letter-spacing:.06em">🔥 FIRE REGISTER</span>
-        <span id="fire-overall-count" style="font-size:11px;color:#aaa">${total-counts.unset}/${total} &nbsp;·&nbsp; <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444"> ${counts.absent||0}✗</span> <span style="color:#f59e0b"> ${counts.excused||0}~</span> <span style="color:#60a5fa"> ${counts.left||0}↑</span></span>
+        <span id="fire-overall-count" style="font-size:11px;color:#aaa">${total-counts.unset}/${total} &nbsp;·&nbsp; <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444"> ${counts.absent||0}✗</span> <span style="color:#f59e0b"> ${counts.excused||0}~</span> </span>
       </div>
       <!-- Controls row -->
       <div style="padding:0 14px 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -30633,5 +31141,140 @@ function initActiveMode(){
   }
 </script>
 <div style="text-align:center;padding:12px;font-size:10px;color:#aaa;border-top:1px solid var(--border3);margin-top:8px">© 2026 Laith Al-Attili · All rights reserved</div>
+
+<!-- ADD LEAVE MODAL -->
+<div class="modal-overlay" id="leave-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+  <div class="modal" style="max-width:440px;width:92%;background:#fff;border-radius:12px;padding:0;overflow:hidden">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:14px;font-weight:700;color:var(--text)" id="leave-modal-title">Add Leave</span>
+      <button onclick="closeLeaveModal()" style="border:none;background:none;font-size:18px;cursor:pointer;color:var(--text3)">×</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:12px;max-height:70vh;overflow-y:auto">
+
+      <!-- Student -->
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">Student</label>
+        <select id="leave-student" style="width:100%;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:7px">
+          <option value="">Select student...</option>
+        </select>
+      </div>
+
+      <!-- Leave type -->
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">Type</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap" id="leave-type-btns">
+          <button class="leave-type-btn active" data-type="weekend" onclick="selectLeaveType(this)">🏠 Weekend</button>
+          <button class="leave-type-btn" data-type="extended" onclick="selectLeaveType(this)">📅 Extended</button>
+          <button class="leave-type-btn" data-type="daytime" onclick="selectLeaveType(this)">🌅 Daytime</button>
+          <button class="leave-type-btn" data-type="longterm" onclick="selectLeaveType(this)">🏥 Long-term</button>
+        </div>
+      </div>
+
+      <!-- Departure -->
+      <div style="display:flex;gap:8px">
+        <div style="flex:1">
+          <label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">Departure</label>
+          <input type="datetime-local" id="leave-departure" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:7px">
+        </div>
+        <div style="flex:1" id="leave-return-wrap">
+          <label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">Expected Return</label>
+          <input type="datetime-local" id="leave-return" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:7px">
+        </div>
+      </div>
+
+      <!-- Reason -->
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">Reason / Notes</label>
+        <textarea id="leave-reason" rows="2" placeholder="Optional..." style="width:100%;font-size:12px;padding:7px 8px;border:1px solid var(--border);border-radius:7px;resize:none;font-family:inherit"></textarea>
+      </div>
+
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px">
+      <button onclick="closeLeaveModal()" style="flex:1;padding:9px;border-radius:8px;border:1px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;font-size:13px">Cancel</button>
+      <button onclick="saveLeave()" style="flex:2;padding:9px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:13px;font-weight:700">Save Leave</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD SCHEDULE ENTRY MODAL -->
+<div class="modal-overlay" id="schedule-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+  <div class="modal" style="max-width:380px;width:92%;background:#fff;border-radius:12px;padding:0;overflow:hidden">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:14px;font-weight:700;color:var(--text)">Add Activity Schedule</span>
+      <button onclick="closeScheduleModal()" style="border:none;background:none;font-size:18px;cursor:pointer;color:var(--text3)">×</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">Activity</label>
+        <select id="sched-activity-type" style="width:100%;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:7px"></select>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">Day</label>
+        <div style="display:flex;gap:4px" id="sched-days">
+          ${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>`<button class="sched-day-btn" data-day="${d}" onclick="toggleSchedDay(this)" style="flex:1;padding:6px 2px;font-size:10px;border-radius:5px;border:1px solid var(--border);background:transparent;cursor:pointer">${d}</button>`).join('')}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1">
+          <label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">Start</label>
+          <input type="time" id="sched-start" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:7px">
+        </div>
+        <div style="flex:1">
+          <label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">End</label>
+          <input type="time" id="sched-end" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:7px">
+        </div>
+      </div>
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px">
+      <button onclick="closeScheduleModal()" style="flex:1;padding:9px;border-radius:8px;border:1px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;font-size:13px">Cancel</button>
+      <button onclick="saveScheduleEntry()" style="flex:2;padding:9px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:13px;font-weight:700">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD ONE-OFF MODAL -->
+<div class="modal-overlay" id="oneoff-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+  <div class="modal" style="max-width:380px;width:92%;background:#fff;border-radius:12px;padding:0;overflow:hidden">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:14px;font-weight:700;color:var(--text)">Add One-off Activity</span>
+      <button onclick="closeOneOffModal()" style="border:none;background:none;font-size:18px;cursor:pointer;color:var(--text3)">×</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">Student</label>
+        <select id="oneoff-student" style="width:100%;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:7px">
+          <option value="">Select student...</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">Activity</label>
+        <select id="oneoff-activity-type" style="width:100%;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:7px"></select>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">Date</label>
+        <input type="date" id="oneoff-date" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:7px">
+      </div>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1">
+          <label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">Start</label>
+          <input type="time" id="oneoff-start" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:7px">
+        </div>
+        <div style="flex:1">
+          <label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">End</label>
+          <input type="time" id="oneoff-end" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:7px">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">Note</label>
+        <input type="text" id="oneoff-note" placeholder="Optional..." style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:7px">
+      </div>
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px">
+      <button onclick="closeOneOffModal()" style="flex:1;padding:9px;border-radius:8px;border:1px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;font-size:13px">Cancel</button>
+      <button onclick="saveOneOff()" style="flex:2;padding:9px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:13px;font-weight:700">Save</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
