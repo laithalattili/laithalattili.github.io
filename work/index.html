@@ -27642,7 +27642,11 @@ function toggleSettingsSection(id,titleEl){
     setTimeout(()=>loadBoardingSettings(),50);
   }
   if(id==='leave_activity'){
-    setTimeout(()=>loadLeaveActivity(),50);
+    // Only load when expanding, not collapsing
+    setTimeout(()=>{
+      const body=document.getElementById('ss-body-leave_activity');
+      if(body&&!body.classList.contains('collapsed'))loadLeaveActivity();
+    },150);
   }
   // Load saved state
   try{const s=localStorage.getItem('settingsSections');if(s)_settingsSectionState=JSON.parse(s);}catch(e){}
@@ -29545,9 +29549,18 @@ let _editingLeaveId=null;
 
 // ── INIT ──────────────────────────────────────────────────────
 async function loadLeaveActivity(){
-  await loadActivityTypes();
-  await loadActiveLeaves();
-  await loadOneOffToday();
+  console.log('loadLeaveActivity start, STUDENTS=',STUDENTS.length);
+  try{await loadActivityTypes();}catch(e){console.error('actTypes:',e);}
+  try{await loadActiveLeaves();}catch(e){
+    console.error('activeLeaves:',e);
+    const el2=document.getElementById('active-leaves-list');
+    if(el2)el2.innerHTML='<div style="color:#dc2626;font-size:12px">Error: '+e.message+'</div>';
+  }
+  try{await loadOneOffToday();}catch(e){
+    console.error('oneOff:',e);
+    const el3=document.getElementById('oneoff-list');
+    if(el3)el3.innerHTML='<div style="color:#dc2626;font-size:12px">Error: '+e.message+'</div>';
+  }
   populateLeaveStudentSelects();
 }
 
@@ -29710,7 +29723,8 @@ async function deleteScheduleEntry(id){
 
 // ── LEAVES ────────────────────────────────────────────────────
 async function loadActiveLeaves(){
-  const el=document.getElementById('active-leaves-list');if(!el)return;
+  const el=document.getElementById('active-leaves-list');
+  if(!el){console.warn('active-leaves-list not found in DOM');return;}
   try{
     const today=new Date().toISOString().split('T')[0];
     const {data,error}=await supa.from('boarding_leaves')
@@ -29862,7 +29876,8 @@ async function _applyPendingPenalties(leaveId){
 
 // ── ONE-OFF ACTIVITIES ────────────────────────────────────────
 async function loadOneOffToday(){
-  const el=document.getElementById('oneoff-list');if(!el)return;
+  const el=document.getElementById('oneoff-list');
+  if(!el){console.warn('oneoff-list not found in DOM');return;}
   const today=new Date().toISOString().split('T')[0];
   try{
     const {data,error}=await supa.from('boarding_activity_instances')
