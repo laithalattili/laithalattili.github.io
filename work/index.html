@@ -1840,24 +1840,24 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
             <button onclick="loadStudentSchedule()" style="font-size:12px;padding:5px 12px;border-radius:6px;background:var(--bg3);color:var(--text);border:1px solid var(--border);cursor:pointer">View</button>
           </div>
           <div id="student-schedule-list" style="display:none;margin-top:6px">
-            <div id="student-schedule-entries" style="margin-bottom:10px"></div>
-            <button onclick="openAddScheduleEntry()" style="width:100%;font-size:12px;padding:8px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600">+ Add Schedule Entry</button>
+            <div id="student-schedule-entries" style="margin-bottom:8px"></div>
           </div>
+          <button id="add-sched-btn" onclick="openAddScheduleEntry()" style="display:none;width:100%;font-size:12px;padding:8px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600;margin-top:8px">+ Add Schedule Entry</button>
         </div>
 
         <!-- ACTIVE LEAVES -->
-        <div style="padding:.5rem 1rem .3rem;display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border-bottom:1px solid var(--border3);margin-top:.5rem">
-          <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Active Leaves</span>
-          <button onclick="openAddLeave()" style="font-size:11px;padding:4px 12px;border-radius:5px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600">+ Add Leave</button>
+        <div style="padding:.5rem 1rem .3rem;display:flex;align-items:center;gap:8px;background:var(--bg2);border-bottom:1px solid var(--border3);margin-top:.5rem">
+          <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;flex:1">Active Leaves</span>
+          <button onclick="openAddLeave()" style="font-size:11px;padding:4px 12px;border-radius:5px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600;flex-shrink:0">+ Add Leave</button>
         </div>
         <div id="active-leaves-list" style="padding:.5rem 1rem">
           <div style="font-size:12px;color:var(--text3)">Loading...</div>
         </div>
 
         <!-- ONE-OFF ACTIVITIES -->
-        <div style="padding:.5rem 1rem .3rem;display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border-bottom:1px solid var(--border3);margin-top:.5rem">
-          <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">One-off Activities Today</span>
-          <button onclick="openAddOneOff()" style="font-size:11px;padding:4px 12px;border-radius:5px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600">+ Add</button>
+        <div style="padding:.5rem 1rem .3rem;display:flex;align-items:center;gap:8px;background:var(--bg2);border-bottom:1px solid var(--border3);margin-top:.5rem">
+          <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;flex:1">One-off Activities Today</span>
+          <button onclick="openAddOneOff()" style="font-size:11px;padding:4px 12px;border-radius:5px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600;flex-shrink:0">+ Add</button>
         </div>
         <div id="oneoff-list" style="padding:.5rem 1rem">
           <div style="font-size:12px;color:var(--text3)">Loading...</div>
@@ -29652,8 +29652,10 @@ async function loadStudentSchedule(){
   _currentSchedStudent=name;
   const listEl=document.getElementById('student-schedule-list');
   const entriesEl=document.getElementById('student-schedule-entries');
+  const addBtn=document.getElementById('add-sched-btn');
   if(!listEl||!entriesEl){console.warn('Schedule list elements not found');return;}
   listEl.style.display='block';
+  if(addBtn)addBtn.style.display='block';
   entriesEl.innerHTML='<div style="font-size:12px;color:var(--text3)">Loading...</div>';
   try{
     const {data}=await supa.from('boarding_activity_schedules')
