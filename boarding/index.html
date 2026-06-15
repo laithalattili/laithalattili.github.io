@@ -1255,8 +1255,11 @@ async function confirmBoardingReturn(leaveId){
     }
 
     showToast('✓ '+(studentName||'Student')+' returned & marked Present','#16a34a');
-    await loadExcusedMap();
+    // Remove from excused map immediately
+    if(studentName&&_excusedMap){delete _excusedMap[studentName];}
     renderRegister();
+    // Refresh in background
+    loadExcusedMap().then(()=>renderRegister());
     loadInfoLeaves();
   }catch(e){showToast('Error: '+e.message,'#dc2626');}
 }
