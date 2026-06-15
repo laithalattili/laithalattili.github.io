@@ -29773,32 +29773,44 @@ async function loadActiveLeaves(){
       const depBy=l.departure_confirmed_by?' · '+l.departure_confirmed_by:'';
       const retBy=l.return_confirmed_by?' · '+l.return_confirmed_by:'';
       const typeLabel=l.leave_type==='longterm'?'Long-term':l.leave_type.charAt(0).toUpperCase()+l.leave_type.slice(1);
-      return '<div style="padding:10px 0;border-bottom:1px solid #e9ecef">'+
-        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px">'+
-          '<span style="font-size:13px;font-weight:600;color:#212529">'+(leaveEmoji[l.leave_type]||'📋')+' '+l.student_name+'</span>'+
-          '<button onclick="cancelLeave(''+l.id+'')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #dee2e6;background:#fff;color:#868e96;cursor:pointer;flex-shrink:0">Cancel</button>'+
-        '</div>'+
-        '<div style="font-size:11px;color:#868e96;margin-bottom:6px">'+typeLabel+(l.reason?' · '+l.reason:'')+'</div>'+
-        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'+
-          '<span style="font-size:10px;font-weight:700;color:#868e96;width:36px">DEP</span>'+
-          '<span style="font-size:11px;color:#495057">'+depPlan+'</span>'+
-          (depAct
-            ?'<span style="font-size:10px;color:#16a34a;font-weight:600">✓ '+depAct+depBy+'</span>'+
-              '<button onclick="_undoDeparture(''+l.id+'')" style="font-size:10px;padding:1px 6px;border-radius:4px;border:1px solid #dee2e6;background:#fff;color:#868e96;cursor:pointer">↩</button>'
-            :'<button onclick="confirmDeparture(''+l.id+'')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #d97706;background:#fffbeb;color:#d97706;cursor:pointer;font-weight:600">↑ Confirm</button>'
-          )+
-        '</div>'+
-        (l.leave_type!=='longterm'
-          ?'<div style="display:flex;align-items:center;gap:6px">'+
-              '<span style="font-size:10px;font-weight:700;color:#868e96;width:36px">RET</span>'+
-              '<span style="font-size:11px;color:#495057">'+retPlan+'</span>'+
-              (retAct
-                ?'<span style="font-size:10px;color:#16a34a;font-weight:600">✓ '+retAct+retBy+'</span>'
-                :depAct?'<button onclick="confirmReturn(''+l.id+'')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #16a34a;background:#f0fdf4;color:#16a34a;cursor:pointer;font-weight:600">✓ Confirm Return</button>':''
-              )+
-            '</div>'
-          :'')+
-      '</div>';
+      // Use data attributes to avoid quote escaping issues
+      const lid=l.id;
+      const row=document.createElement('div');
+      row.style.cssText='padding:10px 0;border-bottom:1px solid #e9ecef';
+      row.innerHTML=
+        `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px">
+          <span style="font-size:13px;font-weight:600;color:#212529">${leaveEmoji[l.leave_type]||'📋'} ${l.student_name}</span>
+          <button data-lid="${lid}" data-action="cancel" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #dee2e6;background:#fff;color:#868e96;cursor:pointer;flex-shrink:0">Cancel</button>
+        </div>
+        <div style="font-size:11px;color:#868e96;margin-bottom:6px">${typeLabel}${l.reason?' · '+l.reason:''}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          <span style="font-size:10px;font-weight:700;color:#868e96;width:36px">DEP</span>
+          <span style="font-size:11px;color:#495057">${depPlan}</span>
+          ${depAct
+            ?`<span style="font-size:10px;color:#16a34a;font-weight:600">✓ ${depAct}${depBy}</span>
+               <button data-lid="${lid}" data-action="undodep" style="font-size:10px;padding:1px 6px;border-radius:4px;border:1px solid #dee2e6;background:#fff;color:#868e96;cursor:pointer">↩</button>`
+            :`<button data-lid="${lid}" data-action="dep" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #d97706;background:#fffbeb;color:#d97706;cursor:pointer;font-weight:600">↑ Confirm</button>`
+          }
+        </div>
+        ${l.leave_type!=='longterm'?`<div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:10px;font-weight:700;color:#868e96;width:36px">RET</span>
+          <span style="font-size:11px;color:#495057">${retPlan}</span>
+          ${retAct
+            ?`<span style="font-size:10px;color:#16a34a;font-weight:600">✓ ${retAct}${retBy}</span>`
+            :depAct?`<button data-lid="${lid}" data-action="ret" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #16a34a;background:#f0fdf4;color:#16a34a;cursor:pointer;font-weight:600">✓ Confirm Return</button>`:''
+          }
+        </div>`:''}`; 
+      row.querySelectorAll('[data-action]').forEach(btn=>{
+        btn.onclick=()=>{
+          const a=btn.getAttribute('data-action');
+          const id=btn.getAttribute('data-lid');
+          if(a==='cancel')cancelLeave(id);
+          else if(a==='dep')confirmDeparture(id);
+          else if(a==='undodep')_undoDeparture(id);
+          else if(a==='ret')confirmReturn(id);
+        };
+      });
+      return row.outerHTML;
     }).join('');
   }catch(e){
     console.warn('loadActiveLeaves error:',e);
