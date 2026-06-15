@@ -29974,6 +29974,8 @@ async function confirmDeparture(id){
       departure_confirmed_by:'HSM'
     }).eq('id',id);
     showToastMsg('↑ Departure confirmed','#d97706');
+    // Small delay to ensure Supabase write propagates before re-fetch
+    await new Promise(r=>setTimeout(r,400));
     window._lastExcusedMap=await getTodayExcusedMap();
     if(_hwkFilter==='register'){
       const el=document.getElementById('hawking-list-content');
