@@ -163,7 +163,7 @@
 <div id="pin-screen">
   <div class="pin-logo">🏠</div>
   <div class="pin-title">Hawking House</div>
-  <div class="pin-sub" id="pin-sub">Enter your PIN</div>
+  <div class="pin-sub" id="pin-sub">Who are you?</div>
 
   <!-- Step 1: Pick identity (shown when no identity selected) -->
   <div id="pin-step-pick" style="display:none;width:100%;max-width:320px;padding:0 24px;flex-direction:column;gap:10px">
@@ -573,16 +573,25 @@ function showPinStep(staff){
 }
 
 function renderPinCards(){
-  const el=document.getElementById('pin-cards');
+  const el=document.getElementById('pin-cards');if(!el)return;
   const staff=(BS.staff||[]).filter(s=>s.name&&s.name.trim()&&s.role!=='HSM');
+  console.log('renderPinCards: BS.staff=',BS.staff,'filtered=',staff.length);
   if(!staff.length){
+    // Auto-retry once after 1.5s in case settings still loading
+    if(!window._pinRetried){
+      window._pinRetried=true;
+      el.innerHTML='<div style="text-align:center;color:#666;font-size:12px;padding:20px">Loading staff...</div>';
+      setTimeout(()=>{loadSettings().then(()=>{window._pinRetried=false;renderPinCards();});},1500);
+      return;
+    }
     el.innerHTML=`<div style="text-align:center;color:#666;font-size:13px;padding:20px">
       No staff configured.<br>
-      <span style="font-size:11px;color:#888;display:block;margin-top:6px">Ask the Housemaster to add staff in Settings.</span>
-      <button onclick="loadSettings().then(renderPinCards)" style="margin-top:12px;padding:8px 16px;border-radius:8px;border:1px solid #555;background:transparent;color:#aaa;cursor:pointer;font-size:12px">Retry</button>
+      <span style="font-size:11px;color:#888;display:block;margin-top:6px">Ask the Housemaster to add staff names and save in Settings → Boarding Configuration.</span>
+      <button onclick="window._pinRetried=false;loadSettings().then(renderPinCards)" style="margin-top:12px;padding:8px 16px;border-radius:8px;border:1px solid #555;background:transparent;color:#aaa;cursor:pointer;font-size:12px">Retry</button>
     </div>`;
     return;
   }
+  window._pinRetried=false;
   const roleColors={AHSM:'#7c3aed',RT:'#0d9488'};
   el.innerHTML=staff.map((s,i)=>`
     <div class="pin-card" onclick="showPinStep(${JSON.stringify(JSON.stringify(s))}_PARSE_)">
