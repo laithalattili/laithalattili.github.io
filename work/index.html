@@ -1804,6 +1804,32 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
           </div>
         </div>
 
+        <!-- PHONE TIME & PENALTIES -->
+        <div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3);margin-top:.5rem">Phone Time & Penalties</div>
+        <div style="padding:.75rem 1rem;display:flex;flex-direction:column;gap:.5rem">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:var(--text2);width:160px;flex-shrink:0">Phone time window</span>
+            <input type="time" id="bs-phone-start" value="18:40" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;width:90px">
+            <span style="font-size:11px;color:var(--text3)">to</span>
+            <input type="time" id="bs-phone-end" value="19:00" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;width:90px">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:var(--text2);width:160px;flex-shrink:0">Late wake penalty</span>
+            <input type="number" id="bs-penalty-wake" value="5" min="1" max="20" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;width:60px">
+            <span style="font-size:11px;color:var(--text3)">min · same day</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:var(--text2);width:160px;flex-shrink:0">Late floor penalty</span>
+            <input type="number" id="bs-penalty-floor" value="5" min="1" max="20" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;width:60px">
+            <span style="font-size:11px;color:var(--text3)">min · same day</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:var(--text2);width:160px;flex-shrink:0">Late sleep penalty</span>
+            <input type="number" id="bs-penalty-sleep" value="2" min="1" max="20" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;width:60px">
+            <span style="font-size:11px;color:var(--text3)">min · next day</span>
+          </div>
+        </div>
+
         <!-- SAVE ALL -->
         <div style="padding:.75rem 1rem;border-top:1px solid var(--border3)">
           <button onclick="saveBoardingSettings()" style="width:100%;font-size:13px;padding:9px;border-radius:8px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:700">Save All Boarding Settings</button>
@@ -24347,6 +24373,9 @@ function renderTimetable(){
       const hasOutline=snHasContent(idx,d,offset);
       const outlineDot=hasOutline?`<div style="width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,.5);margin-top:1px;align-self:center"></div>`:'';
       const cb=isCC?'border:2px solid #f59f00;box-shadow:0 0 6px rgba(245,159,0,.4)':'';
+      // For custom categories (ucat_...) add inline color since CSS class won't exist
+      const _cellCatW=getCat(cell.cat||cell.tp);
+      const _catStyle=(cell.cat&&cell.cat.startsWith('ucat_'))?`background:${_cellCatW.color};color:${_cellCatW.text};`:'';
       // Sub-slot: split cell into event + free remainder
       if(cell&&cell.isSubSlot&&cell.subStartTime&&cell.subEndTime){
         const _bg2=bgMap[cell.tp]||'#d97706',_tx2=textMap[cell.tp]||'#fff';
@@ -24358,7 +24387,7 @@ function renderTimetable(){
       const _pSlots=getPersonalSlotsForDay(d,dayDateStrs[activeDays.indexOf(d)]).filter(function(ps){const ss=t2m(ps.start_time),se=t2m(ps.end_time),cs=t2m(getSlotTime(idx));const ce=idx+1<SLOTS.length?t2m(getSlotTime(idx+1)):cs+30;return ss<ce&&se>cs;});
       const _pHtml=_pSlots.length?_pSlots.map(function(ps){return '<span class="personal-pill" onclick="openOmni(event)">👤 '+ps.start_time+'–'+ps.end_time+'</span>';}).join(''):'';
       const _spanCls=isCleanSpan?' span-cell':'';
-      h+=`${tdOpen}<div class="tt-inner${_spanCls} c-${cell.tp}${half}${customClass}${ttEditMode?' editable':''}" style="${cb}" onclick="${_cellClick}" ontouchstart="${_longPress}" ontouchend="${_longPressEnd}" ontouchmove="${_longPressEnd}">${label}${noteHtml}${outlineDot}</div>`+_pHtml+`</td>`;
+      h+=`${tdOpen}<div class="tt-inner${_spanCls} c-${cell.tp}${half}${customClass}${ttEditMode?' editable':''}" style="${cb}${_catStyle}" onclick="${_cellClick}" ontouchstart="${_longPress}" ontouchend="${_longPressEnd}" ontouchmove="${_longPressEnd}">${label}${noteHtml}${outlineDot}</div>`+_pHtml+`</td>`;
       }
     });
     h+=timeCellR+'</tr>';
@@ -30349,6 +30378,11 @@ let _boardingSettings={
   hoobTime:'21:30',
   morningTime:'07:15',
   floorTime:'07:30',
+  phoneTimeStart:'18:40',
+  phoneTimeEnd:'19:00',
+  penaltyWakeMins:5,
+  penaltyFloorMins:5,
+  penaltySleepMins:2,
   lightsOutJnrWd:'22:00',
   lightsOutSnrWd:'22:30',
   lightsOutJnrWe:'22:30',
@@ -30381,7 +30415,10 @@ function _populateBSTimes(){
     'bs-morning-time':'morningTime','bs-floor-time':'floorTime',
     'bs-lo-jnr-wd':'lightsOutJnrWd','bs-lo-snr-wd':'lightsOutSnrWd',
     'bs-lo-jnr-we':'lightsOutJnrWe','bs-lo-snr-we':'lightsOutSnrWe',
-    'bs-window-start':'windowStart','bs-window-end':'windowEnd'
+    'bs-window-start':'windowStart','bs-window-end':'windowEnd',
+    'bs-phone-start':'phoneTimeStart','bs-phone-end':'phoneTimeEnd',
+    'bs-penalty-wake':'penaltyWakeMins','bs-penalty-floor':'penaltyFloorMins',
+    'bs-penalty-sleep':'penaltySleepMins'
   };
   Object.entries(fields).forEach(([id,key])=>{
     const el=document.getElementById(id);
@@ -30539,7 +30576,10 @@ async function saveBoardingSettings(){
     'bs-morning-time':'morningTime','bs-floor-time':'floorTime',
     'bs-lo-jnr-wd':'lightsOutJnrWd','bs-lo-snr-wd':'lightsOutSnrWd',
     'bs-lo-jnr-we':'lightsOutJnrWe','bs-lo-snr-we':'lightsOutSnrWe',
-    'bs-window-start':'windowStart','bs-window-end':'windowEnd'
+    'bs-window-start':'windowStart','bs-window-end':'windowEnd',
+    'bs-phone-start':'phoneTimeStart','bs-phone-end':'phoneTimeEnd',
+    'bs-penalty-wake':'penaltyWakeMins','bs-penalty-floor':'penaltyFloorMins',
+    'bs-penalty-sleep':'penaltySleepMins'
   };
   Object.entries(fields).forEach(([id,key])=>{
     const el=document.getElementById(id);
@@ -30559,22 +30599,58 @@ async function saveBoardingSettings(){
   }
 }
 
+// ── BOARDING SESSION LOGIC ───────────────────────────────────
+function getCurrentSession(){
+  // Returns 'morning'|'prep'|'hoob' based on current time and settings
+  const now=new Date();
+  const mins=now.getHours()*60+now.getMinutes();
+  const toM=t=>{if(!t)return 0;const[h,m]=t.split(':');return parseInt(h)*60+parseInt(m);};
+  const bs=_boardingSettings||{};
+  const morning=toM(bs.morningTime||'07:15');
+  const prep=toM(bs.prepTime||'19:00');
+  const hoob=toM(bs.hoobTime||'21:30');
+  const floorTime=toM(bs.floorTime||'07:30');
+  // morning session: from morningTime until prepTime
+  if(mins>=morning&&mins<prep)return'morning';
+  // prep session: from prepTime until hoobTime
+  if(mins>=prep&&mins<hoob)return'prep';
+  // hoob session: from hoobTime until next morning (wraps midnight)
+  return'hoob';
+}
+
+function getSessionLabel(s){
+  return s==='morning'?'Morning Clearance':s==='prep'?'Evening Prep':'Heads on Beds';
+}
+
+function getSessionEmoji(s){
+  return s==='morning'?'🌅':s==='prep'?'📋':'🌙';
+}
+
 // ── BOARDING REGISTER STATE (Supabase-synced) ────────────────
-let _brState={};  // {name: {status,updatedAt,updatedBy,sessionType}}
+let _brState={}; // current session {name:{status,updatedAt,updatedBy}}
+let _brStates={}; // all sessions {session:{name:{status,...}}}
+let _brCurrentSession='prep';
 let _brCollapsed=false;
 let _brRealtimeSub=null;
 let _brToday=()=>new Date().toISOString().split('T')[0];
 
 async function _brLoadToday(){
   try{
+    _brCurrentSession=getCurrentSession();
     const {data,error}=await supa.from('boarding_registrations')
-      .select('student_name,status,updated_at,updated_by,session_type')
+      .select('student_name,status,updated_at,updated_by,session_type,late_wake,late_floor,late_sleep')
       .eq('register_date',_brToday());
     if(error)throw error;
-    _brState={};
+    _brStates={morning:{},prep:{},hoob:{}};
     (data||[]).forEach(r=>{
-      _brState[r.student_name]={status:r.status,updatedAt:r.updated_at,updatedBy:r.updated_by,sessionType:r.session_type};
+      const s=r.session_type||'prep';
+      if(!_brStates[s])_brStates[s]={};
+      _brStates[s][r.student_name]={
+        status:r.status,updatedAt:r.updated_at,updatedBy:r.updated_by,
+        lateWake:r.late_wake,lateFloor:r.late_floor,lateSleep:r.late_sleep
+      };
     });
+    _brState=_brStates[_brCurrentSession]||{};
     _brRerender();
     _brRefreshListsTab();
   }catch(e){console.warn('BR load error',e);}
@@ -30587,9 +30663,16 @@ function _brSubscribeRealtime(){
       payload=>{
         const r=payload.new||{};
         if(payload.eventType==='DELETE'){
-          delete _brState[payload.old.student_name];
+          const s=payload.old.session_type||'prep';
+          if(_brStates[s])delete _brStates[s][payload.old.student_name];
+          if(s===_brCurrentSession)delete _brState[payload.old.student_name];
         } else {
-          _brState[r.student_name]={status:r.status,updatedAt:r.updated_at,updatedBy:r.updated_by,sessionType:r.session_type};
+          const s=r.session_type||'prep';
+          if(!_brStates[s])_brStates[s]={};
+          const entry={status:r.status,updatedAt:r.updated_at,updatedBy:r.updated_by,
+            lateWake:r.late_wake,lateFloor:r.late_floor,lateSleep:r.late_sleep};
+          _brStates[s][r.student_name]=entry;
+          if(s===_brCurrentSession)_brState[r.student_name]=entry;
         }
         _brRerender();
         _brRefreshListsTab();
@@ -30634,6 +30717,13 @@ function _amBoardingRegisterHtml(type,excusedMap){
   allPeople.forEach(p=>{const st=(_brState[p.name]||{}).status||'';if(st)counts[st]=(counts[st]||0)+1;else counts.unset++;});
   const total=allPeople.length;
 
+  // Session header
+  const _sess=getCurrentSession();
+  const _sessLabel=getSessionLabel(_sess);
+  const _sessEmoji=getSessionEmoji(_sess);
+  const _isMorning=_sess==='morning';
+  const _isHoob=_sess==='hoob';
+
   // Build section HTML — each section collapsible, state keyed by label
   let sectionsHtml='';
   let globalIdx=0;
@@ -30647,7 +30737,8 @@ function _amBoardingRegisterHtml(type,excusedMap){
 
     let rows='';
     sec.people.forEach(p=>{
-      const _rawSt=(_brState[p.name]||{}).status||'';
+      const stObj=(_brStates[_sess]||{})[p.name]||(_brState[p.name]||{});
+      const _rawSt=stObj.status||'';
       const _exc=excusedMap[p.name]||null;
       const _leaveState=_exc?.state||null;
       const _autoExcused=_exc&&(_leaveState==='excused'||_exc.type==='activity');
@@ -30670,8 +30761,15 @@ function _amBoardingRegisterHtml(type,excusedMap){
       rows+=`<div data-br-name="${_safeBrN}" style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.05);background:${bg}">
         <span style="font-size:10px;color:#555;min-width:22px;text-align:right;font-variant-numeric:tabular-nums">${globalIdx}.</span>
         <div style="flex:1;font-size:13px;color:#e0e0e0;font-weight:500">${p.name}${_excTag}${_depBtn}</div>
-        <div style="display:flex;gap:4px">
-          ${['present','absent','excused'].map(opt=>`<button data-br-opt="${opt}" onclick="_brTap('${_safeBrN}','${opt}')" style="font-size:11px;padding:4px 7px;border-radius:6px;border:1px solid ${opt===st?statColor[opt]:'rgba(255,255,255,.12)'};background:${opt===st?'rgba(255,255,255,.1)':'transparent'};color:${opt===st?statColor[opt]:'#666'};cursor:pointer;font-weight:${opt===st?'700':'400'}">${opt==='present'?'✓':opt==='absent'?'✗':'~'}</button>`).join('')}
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+          <div style="display:flex;gap:4px">
+            ${['present','absent','excused'].map(opt=>`<button data-br-opt="${opt}" onclick="_brTap('${_safeBrN}','${opt}')" style="font-size:11px;padding:4px 7px;border-radius:6px;border:1px solid ${opt===st?statColor[opt]:'rgba(255,255,255,.12)'};background:${opt===st?'rgba(255,255,255,.1)':'transparent'};color:${opt===st?statColor[opt]:'#666'};cursor:pointer;font-weight:${opt===st?'700':'400'}">${opt==='present'?'✓':opt==='absent'?'✗':'~'}</button>`).join('')}
+          </div>
+          ${(_isMorning||_isHoob)?`<div style="display:flex;gap:3px">
+            ${_isMorning?`<button onclick="_brTogglePenalty('${_safeBrN}','lateWake')" style="font-size:9px;padding:2px 5px;border-radius:4px;border:1px solid ${stObj.lateWake?'#f59e0b':'rgba(255,255,255,.1)'};background:${stObj.lateWake?'rgba(245,158,11,.2)':'transparent'};color:${stObj.lateWake?'#f59e0b':'#555'};cursor:pointer">🛏 Wake</button>`:''}
+            ${_isMorning?`<button onclick="_brTogglePenalty('${_safeBrN}','lateFloor')" style="font-size:9px;padding:2px 5px;border-radius:4px;border:1px solid ${stObj.lateFloor?'#f59e0b':'rgba(255,255,255,.1)'};background:${stObj.lateFloor?'rgba(245,158,11,.2)':'transparent'};color:${stObj.lateFloor?'#f59e0b':'#555'};cursor:pointer">🚶 Floor</button>`:''}
+            ${_isHoob?`<button onclick="_brTogglePenalty('${_safeBrN}','lateSleep')" style="font-size:9px;padding:2px 5px;border-radius:4px;border:1px solid ${stObj.lateSleep?'#ef4444':'rgba(255,255,255,.1)'};background:${stObj.lateSleep?'rgba(239,68,68,.2)':'transparent'};color:${stObj.lateSleep?'#ef4444':'#555'};cursor:pointer">😴 Sleep</button>`:''}
+          </div>`:''}
         </div>
       </div>`;
     });
@@ -30693,7 +30791,7 @@ function _amBoardingRegisterHtml(type,excusedMap){
     <div onclick="_brToggleCollapse()" style="padding:10px 14px;background:rgba(124,58,237,.25);display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none">
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:12px;color:#a78bfa">${chevron}</span>
-        <span style="font-size:12px;font-weight:700;color:#c4b5fd;letter-spacing:.08em">${type==='boarding'?'BOARDING REGISTER':'HOUSE REGISTER'} <span style="font-weight:400;color:#888">(${total})</span></span>
+        <span style="font-size:12px;font-weight:700;color:#c4b5fd;letter-spacing:.08em">${_sessEmoji} ${_sessLabel} <span style="font-weight:400;color:#888;font-size:10px">${type==='boarding'?'Boarders':'All House'} · ${total}</span></span>
       </div>
       <span id="br-overall-count" style="font-size:11px;color:#aaa">${total-counts.unset}/${total} · <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444">${counts.absent||0}✗</span> <span style="color:#f59e0b">${counts.excused||0}~</span></span>
     </div>
@@ -30712,6 +30810,46 @@ function _brGetType(){
   const cust=getCustomForWeek(ctx.offset,ctx.slotIdx,ctx.dayName);
   return cust&&cust.boarding_register?'boarding':'house';
 }
+// ── PENALTY LOGGING ──────────────────────────────────────────
+async function _brTogglePenalty(name, field){
+  // field: 'lateWake'|'lateFloor'|'lateSleep'
+  const today=_brToday();
+  const session=_brCurrentSession||'prep';
+  if(!_brStates[session])_brStates[session]={};
+  if(!_brStates[session][name])_brStates[session][name]={};
+  const cur=_brStates[session][name][field]||false;
+  _brStates[session][name][field]=!cur;
+  _brState[name]=_brStates[session][name];
+  // Determine penalty details
+  const bs=_boardingSettings||{};
+  const penaltyMins=field==='lateSleep'?(parseInt(bs.penaltySleepMins)||2):(parseInt(bs.penaltyWakeMins)||5);
+  const penaltyDay=field==='lateSleep'?'next':'same';
+  const infraction=field==='lateWake'?'late_wake':field==='lateFloor'?'late_floor':'late_sleep';
+  const penaltyDate=field==='lateSleep'?new Date(new Date().getTime()+86400000).toISOString().split('T')[0]:today;
+  if(!cur){
+    // Log penalty
+    await supa.from('boarding_penalties').insert({
+      student_name:name,infraction_type:infraction,infraction_date:today,
+      penalty_type:'phone_'+penaltyMins+'min',penalty_date:penaltyDate,
+      status:'active',logged_by:'HSM',notes:getSessionLabel(session)
+    });
+  } else {
+    // Remove penalty (undo)
+    await supa.from('boarding_penalties')
+      .delete().eq('student_name',name).eq('infraction_date',today).eq('infraction_type',infraction);
+  }
+  // Update DB row
+  const colMap={lateWake:'late_wake',lateFloor:'late_floor',lateSleep:'late_sleep'};
+  const existing=_brStates[session][name];
+  await supa.from('boarding_registrations').upsert({
+    student_name:name,register_date:today,session_type:session,
+    status:existing.status||'',updated_by:'HSM',updated_at:new Date().toISOString(),
+    late_wake:existing.lateWake||false,late_floor:existing.lateFloor||false,late_sleep:existing.lateSleep||false
+  },{onConflict:'student_name,register_date,session_type'});
+  _brRerender();
+  _brRefreshListsTab();
+}
+
 function _brRerender(){
   const sec=document.getElementById('am-br-section');if(!sec)return;
   const tmp=document.createElement('div');
@@ -30721,10 +30859,17 @@ function _brRerender(){
 }
 function _brTap(name,status,sessionType){
   const cur=(_brState[name]||{}).status;
-  const sType=sessionType||_brGetType();
+  const sType=sessionType||_brCurrentSession||'prep';
   // Optimistic update — instant UI response
-  if(cur===status){ delete _brState[name]; }
-  else { _brState[name]={status,updatedAt:new Date().toISOString(),updatedBy:'HSM',sessionType:sType}; }
+  if(cur===status){
+    delete _brState[name];
+    if(_brStates[sType])delete _brStates[sType][name];
+  } else {
+    const entry={status,updatedAt:new Date().toISOString(),updatedBy:'HSM'};
+    _brState[name]=entry;
+    if(!_brStates[sType])_brStates[sType]={};
+    _brStates[sType][name]=entry;
+  }
   // Surgical DOM update — find row by data-br-name, update buttons only
   const newSt=(_brState[name]||{}).status||'';
   const statColor={'present':'#22c55e','absent':'#ef4444','excused':'#f59e0b','':'#555'};
@@ -30770,8 +30915,10 @@ function _brTap(name,status,sessionType){
         if(cur===status){
           await supa.from('boarding_registrations').delete().eq('student_name',name).eq('register_date',today);
         } else {
-          const rec={student_name:name,register_date:today,status,updated_by:'HSM',session_type:sType,updated_at:new Date().toISOString()};
-          await supa.from('boarding_registrations').upsert(rec,{onConflict:'student_name,register_date'});
+          const existing=(_brStates[sType]||{})[name]||{};
+          const rec={student_name:name,register_date:today,status,updated_by:'HSM',session_type:sType,updated_at:new Date().toISOString(),
+            late_wake:existing.lateWake||false,late_floor:existing.lateFloor||false,late_sleep:existing.lateSleep||false};
+          await supa.from('boarding_registrations').upsert(rec,{onConflict:'student_name,register_date,session_type'});
           supa.from('boarding_registration_history').insert({student_name:name,register_date:today,previous_status:cur||null,new_status:status,changed_by:'HSM',session_type:sType}).catch(()=>{});
         }
         return; // success
