@@ -30353,12 +30353,12 @@ function _amBoardingRegisterHtml(type,excusedMap){
 
     let rows='';
     sec.people.forEach(p=>{
-      const st=(_brState[p.name]||{}).status||'';
+      const _rawSt=(_brState[p.name]||{}).status||'';
+      const _exc=excusedMap[p.name]||null;
+      const st=(!_rawSt&&_exc)?'excused':_rawSt;
       const bg=statBg[st];
       globalIdx++;
       const _safeBrN=p.name.replace(/"/g,"&quot;");
-      const _exc=excusedMap[p.name]||null;
-      if(_exc&&!st)st='excused';
       const _excTag=_exc?`<span style="font-size:10px;color:#f59e0b;display:block">${_exc.emoji} ${_exc.reason}</span>`:'';
       rows+=`<div data-br-name="${_safeBrN}" style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.05);background:${bg}">
         <span style="font-size:10px;color:#555;min-width:22px;text-align:right;font-variant-numeric:tabular-nums">${globalIdx}.</span>
