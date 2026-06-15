@@ -25932,9 +25932,9 @@ async function renderAwayList(el){
   el.innerHTML=html;
 }
 
-async function renderHawkingRegister(el){
-  // Load excused map from leaves + activities
-  const excusedMap=await getTodayExcusedMap();
+async function renderHawkingRegister(el, preloadedMap){
+  // Use preloaded map if provided (for instant re-render), otherwise fetch fresh
+  const excusedMap=preloadedMap||await getTodayExcusedMap();
 
   const allHouse=window._regAllHouse||false;
   let people=[];
@@ -29956,7 +29956,7 @@ async function _undoDeparture(id){
     window._lastExcusedMap=await getTodayExcusedMap();
     if(_hwkFilter==='register'){
       const el=document.getElementById('hawking-list-content');
-      if(el)renderHawkingRegister(el);
+      if(el)renderHawkingRegister(el,window._lastExcusedMap);
     }
     // Re-render live mode register with fresh excused map
     const body=document.getElementById('am-body');
@@ -29979,21 +29979,22 @@ async function confirmDeparture(id){
       departure_confirmed_by:'HSM'
     }).eq('id',id);
     showToastMsg('↑ Departure confirmed','#d97706');
-    // Update cache optimistically then fetch fresh
-    if(window._lastExcusedMap){
-      Object.keys(window._lastExcusedMap).forEach(name=>{
-        const e=window._lastExcusedMap[name];
-        if(e&&e.leaveId===id){
-          e.state='excused';
-          e.departedAt=new Date().toISOString();
-          e.departedBy='HSM';
-        }
-      });
-    }
+    // Optimistic update: immediately update cached map and re-render
+    if(!window._lastExcusedMap)window._lastExcusedMap={};
+    Object.keys(window._lastExcusedMap).forEach(name=>{
+      const e=window._lastExcusedMap[name];
+      if(e&&e.leaveId===id){
+        e.state='excused';
+        e.departedAt=new Date().toISOString();
+        e.departedBy='HSM';
+      }
+    });
     if(_hwkFilter==='register'){
       const el=document.getElementById('hawking-list-content');
-      if(el)renderHawkingRegister(el);
+      if(el)renderHawkingRegister(el,window._lastExcusedMap); // pass optimistic map
     }
+    // Then refresh from Supabase in background
+    getTodayExcusedMap().then(m=>{window._lastExcusedMap=m;});
     const body=document.getElementById('am-body');
     if(body&&_amOpen){
       const ctx=amGetCtx();
