@@ -594,15 +594,15 @@ function renderPinCards(){
   window._pinRetried=false;
   const roleColors={AHSM:'#7c3aed',RT:'#0d9488'};
   el.innerHTML=staff.map((s,i)=>`
-    <div class="pin-card" onclick="showPinStep(${JSON.stringify(JSON.stringify(s))}_PARSE_)">
+    <div class="pin-card" data-staff-idx="${i}">
       <div class="pin-avatar" style="background:${roleColors[s.role]||'#c4622d'}">${s.name.charAt(0)}</div>
       <div>
         <div class="pin-role">${s.role}</div>
         <div class="pin-name">${s.name}</div>
       </div>
     </div>`).join('');
-  // Fix: use data attributes instead of inline JSON to avoid quote issues
-  el.querySelectorAll('.pin-card').forEach((card,i)=>{
+  el.querySelectorAll('.pin-card').forEach(card=>{
+    const i=parseInt(card.getAttribute('data-staff-idx'));
     card.onclick=()=>showPinStep(staff[i]);
   });
 }
@@ -950,9 +950,9 @@ function _regMakeRow(name, idx){
       ${excTag}${depTimeStr}${depBtn}
     </div>
     <div class="reg-btns">
-      <button class="reg-btn ${st==='present'?'active-present':''}" data-opt="present" ${_boardingWindowOpen?'onclick="regTap(''+safe+'','present')"':''} style="${_boardingWindowOpen?'':'opacity:.35;cursor:not-allowed'}" ${_boardingWindowOpen?'':'disabled'}>✓</button>
-      <button class="reg-btn ${st==='absent'?'active-absent':''}" data-opt="absent" ${_boardingWindowOpen?'onclick="regTap(''+safe+'','absent')"':''} style="${_boardingWindowOpen?'':'opacity:.35;cursor:not-allowed'}" ${_boardingWindowOpen?'':'disabled'}>✗</button>
-      <button class="reg-btn ${st==='excused'?'active-excused':''}" data-opt="excused" ${_boardingWindowOpen?'onclick="regTap(''+safe+'','excused')"':''} style="${_boardingWindowOpen?'':'opacity:.35;cursor:not-allowed'}" ${_boardingWindowOpen?'':'disabled'}>~</button>
+      <button class="reg-btn ${st==='present'?'active-present':''}" data-opt="present" onclick="${_boardingWindowOpen?'regTap(\''+safe+'\',\'present\')':''}" style="${_boardingWindowOpen?'':'opacity:.35;cursor:not-allowed'}" ${_boardingWindowOpen?'':'disabled'}>✓</button>
+      <button class="reg-btn ${st==='absent'?'active-absent':''}" data-opt="absent" onclick="${_boardingWindowOpen?'regTap(\''+safe+'\',\'absent\')':''}" style="${_boardingWindowOpen?'':'opacity:.35;cursor:not-allowed'}" ${_boardingWindowOpen?'':'disabled'}>✗</button>
+      <button class="reg-btn ${st==='excused'?'active-excused':''}" data-opt="excused" onclick="${_boardingWindowOpen?'regTap(\''+safe+'\',\'excused\')':''}" style="${_boardingWindowOpen?'':'opacity:.35;cursor:not-allowed'}" ${_boardingWindowOpen?'':'disabled'}>~</button>
     </div>
   </div>`;
 }
