@@ -29850,17 +29850,30 @@ async function saveLeave(){
 
 async function _undoDeparture(id){
   try{
-    await supa.from('boarding_leaves').update({
+    // Supabase needs explicit null handling - use raw SQL approach
+    const {error}=await supa.from('boarding_leaves').update({
       departure_actual:null,
       departure_confirmed_by:null
     }).eq('id',id);
+    if(error)throw error;
     showToastMsg('Departure unconfirmed','#d97706');
-    // Refresh register
+    // Reload excused map then re-render
+    window._lastExcusedMap=await getTodayExcusedMap();
     if(_hwkFilter==='register'){
       const el=document.getElementById('hawking-list-content');
       if(el)renderHawkingRegister(el);
     }
-    _brRerender();
+    // Re-render live mode register with fresh excused map
+    const body=document.getElementById('am-body');
+    if(body&&_amOpen){
+      const ctx=amGetCtx();
+      if(ctx){
+        const cust=getCustomForWeek(ctx.offset,ctx.slotIdx,ctx.dayName);
+        if(cust&&(cust.boarding_register||cust.house_register)){
+          body.innerHTML=_amBoardingRegisterHtml(cust.boarding_register?'boarding':'house',window._lastExcusedMap||{});
+        }
+      }
+    }
   }catch(e){showToastMsg('Error: '+e.message,'#dc2626');}
 }
 
@@ -29870,9 +29883,24 @@ async function confirmDeparture(id){
       departure_actual:new Date().toISOString(),
       departure_confirmed_by:'HSM'
     }).eq('id',id);
+    showToastMsg('↑ Departure confirmed','#d97706');
+    window._lastExcusedMap=await getTodayExcusedMap();
+    if(_hwkFilter==='register'){
+      const el=document.getElementById('hawking-list-content');
+      if(el)renderHawkingRegister(el);
+    }
+    const body=document.getElementById('am-body');
+    if(body&&_amOpen){
+      const ctx=amGetCtx();
+      if(ctx){
+        const cust=getCustomForWeek(ctx.offset,ctx.slotIdx,ctx.dayName);
+        if(cust&&(cust.boarding_register||cust.house_register)){
+          body.innerHTML=_amBoardingRegisterHtml(cust.boarding_register?'boarding':'house',window._lastExcusedMap||{});
+        }
+      }
+    }
     await loadActiveLeaves();
-    showToastMsg('Departure confirmed','#16a34a');
-  }catch(e){alert('Error: '+e.message);}
+  }catch(e){showToastMsg('Error: '+e.message,'#dc2626');}
 }
 
 async function confirmReturn(id){
