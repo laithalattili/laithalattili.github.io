@@ -1952,7 +1952,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
     <div style="margin-bottom:.75rem">
       <div style="font-size:11px;font-weight:600;color:#495057;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Recurrence</div>
       <div class="recur-toggle">
-        <button class="recur-btn active" id="rb-once" onclick="setRecur('once',this)">Once</button>
+        <button class="recur-btn active" id="rb-once" onclick="setRecur('once',this)" title="Only on this specific week">Once</button>
         <button class="recur-btn" id="rb-weekly" onclick="setRecur('weekly',this)">Weekly</button>
         <button class="recur-btn" id="rb-biweekly" onclick="setRecur('biweekly',this)">Biweekly</button>
       </div>
@@ -23276,6 +23276,18 @@ function lockEditMode(){
 
 let editSlotInfo=null;
 let _lpTimer=null;
+// Day view long press
+let _tdLpTimer=null;
+function _tdLpStart(e,idx,day){
+  _tdLpTimer=setTimeout(()=>{
+    _tdLpTimer=null;
+    openEditModal(idx,day,true);
+  },500);
+}
+function _tdLpEnd(){
+  if(_tdLpTimer){clearTimeout(_tdLpTimer);_tdLpTimer=null;}
+}
+
 function _lpStart(e,idx,day){
   _lpTimer=setTimeout(()=>{
     _lpTimer=null;
@@ -23940,8 +23952,9 @@ function renderTodayView(){
     const isExtSlot=(idx<EARLY_SLOT_COUNT||idx>=LATE_SLOT_START);
     if(isPastSlot&&ttCollapsePast&&!isExtSlot&&!isCur)return;
     const note=getNote(idx,dayName);
-    const bg=bgMap[cell.tp]||'#ddd';
-    const tx=textMap[cell.tp]||'#333';
+    const _cellCat=getCat(cell.cat||cell.tp);
+    const bg=_cellCat.color||(bgMap[cell.tp]||'#ddd');
+    const tx=_cellCat.text||(textMap[cell.tp]||'#333');
     const slotClass=`today-slot${isCur?' current':''}${isPastSlot?' past':''}`;
     const curGlow=isCur?'box-shadow:inset 0 0 0 2px #f59f00;':'';
     const notePreview=note?`<span style="font-size:11px;color:${tx};opacity:.75;font-style:italic">${note}</span>`:'';
@@ -23964,7 +23977,12 @@ function renderTodayView(){
     const pHtml=pSlots.length?'<div style="padding:3px 10px 4px;background:#f5f3ff;border-top:1px solid #e9d5ff">'+pSlots.map(function(p){return '<span class="personal-pill" onclick="openOmni(event)">👤 '+p.start_time+'–'+p.end_time+'</span>';}).join('')+'</div>':'';
 
     html+=`<div class="${slotClass}" id="tslot-${idx}" style="border:none;margin-bottom:3px;border-radius:6px;overflow:hidden">
-      <div onclick="toggleTodayNote(${idx},'${dayName}')" style="background:${bg};padding:.6rem .85rem;${curGlow}cursor:pointer">
+      <div onclick="toggleTodayNote(${idx},'${dayName}')"
+           oncontextmenu="openEditModal(${idx},'${dayName}',true);event.preventDefault();"
+           ontouchstart="_tdLpStart(event,${idx},'${dayName}')"
+           ontouchend="_tdLpEnd()"
+           ontouchmove="_tdLpEnd()"
+           style="background:${bg};padding:.6rem .85rem;${curGlow}cursor:pointer">
         <div style="display:flex;align-items:center;gap:10px;width:100%">
           <div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px;min-width:68px;flex-shrink:0">${timeDisplay}${endDisplay}</div>
           <div style="font-size:13px;font-weight:600;color:${tx};flex:1">${cell.l||''}</div>
