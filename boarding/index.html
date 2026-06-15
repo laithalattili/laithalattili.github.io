@@ -726,6 +726,60 @@ function switchTab(id,btn){
   if(sub)sub.style.display=id==='register'?'block':'none';
 }
 
+// ── EXCUSED MAP ───────────────────────────────────────────────
+let _excusedMap={}; // cached for current render cycle
+
+async function loadExcusedMap(){
+  const excused={};
+  const today=new Date().toISOString().split('T')[0];
+  const nowMins=new Date().getHours()*60+new Date().getMinutes();
+  const toMins=t=>{const[h,m]=t.split(':');return parseInt(h)*60+parseInt(m);};
+  const dayName=new Date().toLocaleDateString('en-US',{weekday:'short'}).slice(0,3);
+  const leaveLabel={weekend:'Weekend Leave',extended:'Extended Leave',daytime:'Daytime Departure',longterm:'Long-term Leave'};
+  const leaveEmoji={weekend:'🏠',extended:'📅',daytime:'🌅',longterm:'🏥'};
+
+  // 1. Active leaves — pending_departure or excused
+  try{
+    const {data}=await supa.from('boarding_leaves').select('*').eq('active',true);
+    (data||[]).forEach(l=>{
+      if(l.return_actual)return; // already returned
+      const depDate=l.departure_planned?l.departure_planned.split('T')[0]:null;
+      const retDate=l.return_planned?l.return_planned.split('T')[0]:null;
+      if(!depDate||depDate>today)return;
+      if(retDate&&retDate<today)return;
+      const label=leaveLabel[l.leave_type]||'Leave';
+      const emoji=leaveEmoji[l.leave_type]||'🏠';
+      excused[l.student_name]={
+        reason:label,emoji,type:'leave',leaveId:l.id,
+        state:l.departure_actual?'excused':'pending_departure'
+      };
+    });
+  }catch(e){console.warn('Excused leaves error:',e);}
+
+  // 2. Routine activity schedules active now
+  try{
+    const {data}=await supa.from('boarding_activity_schedules').select('student_name,activity_type,start_time,end_time').eq('day_of_week',dayName).eq('active',true);
+    (data||[]).forEach(s=>{
+      if(nowMins>=toMins(s.start_time)&&nowMins<=toMins(s.end_time)&&!excused[s.student_name]){
+        excused[s.student_name]={reason:s.activity_type,emoji:'📌',type:'activity'};
+      }
+    });
+  }catch(e){console.warn('Excused schedules error:',e);}
+
+  // 3. One-off activities today active now
+  try{
+    const {data}=await supa.from('boarding_activity_instances').select('student_name,activity_type,start_time,end_time').eq('date',today);
+    (data||[]).forEach(a=>{
+      if(nowMins>=toMins(a.start_time)&&nowMins<=toMins(a.end_time)&&!excused[a.student_name]){
+        excused[a.student_name]={reason:a.activity_type,emoji:'📌',type:'activity'};
+      }
+    });
+  }catch(e){console.warn('Excused oneoff error:',e);}
+
+  _excusedMap=excused;
+  return excused;
+}
+
 // ── REGISTER ──────────────────────────────────────────────────
 function today(){return new Date().toISOString().split('T')[0];}
 
@@ -739,6 +793,7 @@ async function loadRegister(){
       _brState[r.student_name]={status:r.status,updatedAt:r.updated_at,updatedBy:r.updated_by};
     });
   }catch(e){console.warn('Register load error',e);}
+  await loadExcusedMap();
   renderRegister();
 }
 
@@ -756,16 +811,25 @@ function subscribeRealtime(){
 }
 
 function _regMakeRow(name, idx){
-  const st=(_brState[name]||{}).status||'';
+  const rawSt=(_brState[name]||{}).status||'';
+  const exc=_excusedMap[name]||null;
+  const leaveState=exc?.state||null;
+  const autoExcused=exc&&(leaveState==='excused'||(exc.type==='activity'));
+  const st=(!rawSt&&autoExcused)?'excused':rawSt;
   const safe=name.replace(/"/g,'&quot;');
+  const excTag=exc?`<span style="font-size:10px;color:#d97706;display:block">${exc.emoji} ${exc.reason}</span>`:'';
+  const depBtn=leaveState==='pending_departure'
+    ?`<button onclick="confirmBoardingDeparture('${exc.leaveId}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #d97706;background:#fffbeb;color:#d97706;cursor:pointer;margin-top:3px;display:block">↑ Confirm Departure</button>`:'';
   return `<div class="reg-row ${st}" data-name="${safe}">
     <span class="reg-num">${idx}.</span>
-    <span class="reg-name">${name}</span>
+    <div style="flex:1;min-width:0">
+      <span class="reg-name" style="display:block">${name}</span>
+      ${excTag}${depBtn}
+    </div>
     <div class="reg-btns">
       <button class="reg-btn ${st==='present'?'active-present':''}" data-opt="present" onclick="regTap('${safe}','present')">✓</button>
       <button class="reg-btn ${st==='absent'?'active-absent':''}" data-opt="absent" onclick="regTap('${safe}','absent')">✗</button>
       <button class="reg-btn ${st==='excused'?'active-excused':''}" data-opt="excused" onclick="regTap('${safe}','excused')">~</button>
-
     </div>
   </div>`;
 }
@@ -791,8 +855,9 @@ function _regMakeSection(label, names){
   </div>`, count:names.length};
 }
 
-function renderRegister(){
+async function renderRegister(){
   renderRegControls();
+  await loadExcusedMap();
   // Build people list based on scope
   let people=[];
   if(_regScope==='boarders'){
@@ -802,9 +867,13 @@ function renderRegister(){
     people=STUDENTS.map(s=>s.name);
   }
 
-  // Count
-  const counts={present:0,absent:0,excused:0,left:0,unset:0};
-  people.forEach(n=>{const st=(_brState[n]||{}).status||'';if(st)counts[st]=(counts[st]||0)+1;else counts.unset++;});
+  // Count — include auto-excused from leave map
+  const counts={present:0,absent:0,excused:0,unset:0};
+  people.forEach(n=>{
+    const rawSt=(_brState[n]||{}).status||'';
+    const st=(!rawSt&&_excusedMap[n])?'excused':rawSt;
+    if(st)counts[st]=(counts[st]||0)+1;else counts.unset++;
+  });
   const total=people.length;
   const registered=total-counts.unset;
 
@@ -918,6 +987,33 @@ function regTap(name,status){
       {student_name:name,register_date:today(),previous_status:cur||null,new_status:status,changed_by:role,session_type:'boarding'}
     ).then(()=>{}).catch(()=>{});
   }
+}
+
+// ── DEPARTURE/RETURN CONFIRMATION ─────────────────────────────
+async function confirmBoardingDeparture(leaveId){
+  const role=_identity?_identity.role:'AHSM';
+  try{
+    await supa.from('boarding_leaves').update({
+      departure_actual:new Date().toISOString(),
+      departure_confirmed_by:role
+    }).eq('id',leaveId);
+    showToast('↑ Departure confirmed','#d97706');
+    await loadExcusedMap();
+    renderRegister();
+  }catch(e){showToast('Error: '+e.message,'#dc2626');}
+}
+
+async function confirmBoardingReturn(leaveId){
+  const role=_identity?_identity.role:'AHSM';
+  try{
+    await supa.from('boarding_leaves').update({
+      return_actual:new Date().toISOString(),
+      return_confirmed_by:role
+    }).eq('id',leaveId);
+    showToast('✓ Return confirmed','#16a34a');
+    await loadExcusedMap();
+    renderRegister();
+  }catch(e){showToast('Error: '+e.message,'#dc2626');}
 }
 
 // ── FIRE REGISTER ──────────────────────────────────────────────
