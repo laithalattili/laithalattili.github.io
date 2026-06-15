@@ -25942,9 +25942,12 @@ async function renderHawkingRegister(el){
     const rowBg=isFire&&fireStatus?(fireStatBg[fireStatus]||'#fff7ed'):(effectiveSt!=='unregistered'?bg:'#fff');
     // Leave/activity note
     const excuseTag=excuseInfo?`<span style="font-size:10px;color:#d97706;display:block;margin-top:1px">${excuseInfo.emoji} ${excuseInfo.reason}</span>`:'';
-    // Confirm departure button for pending leaves
+    // Departure confirmation buttons
     const depBtn=leaveState==='pending_departure'
-      ?`<button onclick="confirmDeparture('${excuseInfo.leaveId}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #d97706;background:#fffbeb;color:#d97706;cursor:pointer;margin-top:3px;display:block">↑ Confirm Departure</button>`:'';
+      ?`<button onclick="confirmDeparture('${excuseInfo.leaveId}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #d97706;background:#fffbeb;color:#d97706;cursor:pointer;margin-top:3px;display:block">↑ Confirm Departure</button>`
+      :leaveState==='excused'
+      ?`<button onclick="_undoDeparture('${excuseInfo.leaveId}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #d1d5db;background:#f9fafb;color:#6b7280;cursor:pointer;margin-top:3px;display:block">↩ Undo Departure</button>`
+      :'';
     const timeStr=updatedAt?`<span style="font-size:9px;color:#9ca3af;display:block;margin-top:1px">${updatedAt}${updatedBy?' · '+updatedBy:''}</span>`:'';
     rows+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #f1f5f9;background:${rowBg}">
       <span style="font-size:10px;color:#d1d5db;min-width:18px;text-align:right;font-variant-numeric:tabular-nums">${i+1}</span>
@@ -29845,6 +29848,22 @@ async function saveLeave(){
   }catch(e){alert('Error: '+e.message);}
 }
 
+async function _undoDeparture(id){
+  try{
+    await supa.from('boarding_leaves').update({
+      departure_actual:null,
+      departure_confirmed_by:null
+    }).eq('id',id);
+    showToastMsg('Departure unconfirmed','#d97706');
+    // Refresh register
+    if(_hwkFilter==='register'){
+      const el=document.getElementById('hawking-list-content');
+      if(el)renderHawkingRegister(el);
+    }
+    _brRerender();
+  }catch(e){showToastMsg('Error: '+e.message,'#dc2626');}
+}
+
 async function confirmDeparture(id){
   try{
     await supa.from('boarding_leaves').update({
@@ -30373,14 +30392,21 @@ function _amBoardingRegisterHtml(type,excusedMap){
     sec.people.forEach(p=>{
       const _rawSt=(_brState[p.name]||{}).status||'';
       const _exc=excusedMap[p.name]||null;
-      const st=(!_rawSt&&_exc)?'excused':_rawSt;
+      const _leaveState=_exc?.state||null;
+      const _autoExcused=_exc&&(_leaveState==='excused'||_exc.type==='activity');
+      const st=(!_rawSt&&_autoExcused)?'excused':_rawSt;
       const bg=statBg[st];
       globalIdx++;
       const _safeBrN=p.name.replace(/"/g,"&quot;");
       const _excTag=_exc?`<span style="font-size:10px;color:#f59e0b;display:block">${_exc.emoji} ${_exc.reason}</span>`:'';
+      const _depBtn=_leaveState==='pending_departure'
+        ?`<button onclick="confirmDeparture('${_exc.leaveId}')" style="font-size:10px;padding:2px 8px;margin-top:3px;border-radius:4px;border:1px solid #f59e0b;background:rgba(245,158,11,.1);color:#f59e0b;cursor:pointer;display:block">↑ Confirm Departure</button>`
+        :_leaveState==='excused'
+        ?`<button onclick="_undoDeparture('${_exc.leaveId}')" style="font-size:10px;padding:2px 8px;margin-top:3px;border-radius:4px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#888;cursor:pointer;display:block">↩ Undo Departure</button>`
+        :'';
       rows+=`<div data-br-name="${_safeBrN}" style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.05);background:${bg}">
         <span style="font-size:10px;color:#555;min-width:22px;text-align:right;font-variant-numeric:tabular-nums">${globalIdx}.</span>
-        <div style="flex:1;font-size:13px;color:#e0e0e0;font-weight:500">${p.name}${_excTag}</div>
+        <div style="flex:1;font-size:13px;color:#e0e0e0;font-weight:500">${p.name}${_excTag}${_depBtn}</div>
         <div style="display:flex;gap:4px">
           ${['present','absent','excused'].map(opt=>`<button data-br-opt="${opt}" onclick="_brTap('${_safeBrN}','${opt}')" style="font-size:11px;padding:4px 7px;border-radius:6px;border:1px solid ${opt===st?statColor[opt]:'rgba(255,255,255,.12)'};background:${opt===st?'rgba(255,255,255,.1)':'transparent'};color:${opt===st?statColor[opt]:'#666'};cursor:pointer;font-weight:${opt===st?'700':'400'}">${opt==='present'?'✓':opt==='absent'?'✗':'~'}</button>`).join('')}
         </div>
