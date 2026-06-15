@@ -1837,25 +1837,29 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
             </select>
             <button onclick="loadStudentSchedule()" style="font-size:12px;padding:5px 12px;border-radius:6px;background:var(--bg3);color:var(--text);border:1px solid var(--border);cursor:pointer">View</button>
           </div>
-          <div id="student-schedule-list" style="display:none">
-            <div id="student-schedule-entries" style="margin-bottom:8px"></div>
-            <button onclick="openAddScheduleEntry()" style="font-size:12px;padding:6px 12px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600">+ Add Schedule Entry</button>
+          <div id="student-schedule-list" style="display:none;margin-top:6px">
+            <div id="student-schedule-entries" style="margin-bottom:10px"></div>
+            <button onclick="openAddScheduleEntry()" style="width:100%;font-size:12px;padding:8px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600">+ Add Schedule Entry</button>
           </div>
         </div>
 
         <!-- ACTIVE LEAVES -->
-        <div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3);margin-top:.5rem">
-          Active Leaves
-          <button onclick="openAddLeave()" style="float:right;font-size:11px;padding:2px 10px;border-radius:5px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600;margin-top:-2px">+ Add Leave</button>
+        <div style="padding:.5rem 1rem .3rem;display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border-bottom:1px solid var(--border3);margin-top:.5rem">
+          <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Active Leaves</span>
+          <button onclick="openAddLeave()" style="font-size:11px;padding:4px 12px;border-radius:5px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600">+ Add Leave</button>
         </div>
-        <div id="active-leaves-list" style="padding:.5rem 1rem"></div>
+        <div id="active-leaves-list" style="padding:.5rem 1rem">
+          <div style="font-size:12px;color:var(--text3)">Loading...</div>
+        </div>
 
         <!-- ONE-OFF ACTIVITIES -->
-        <div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3);margin-top:.5rem">
-          One-off Activities Today
-          <button onclick="openAddOneOff()" style="float:right;font-size:11px;padding:2px 10px;border-radius:5px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600;margin-top:-2px">+ Add</button>
+        <div style="padding:.5rem 1rem .3rem;display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border-bottom:1px solid var(--border3);margin-top:.5rem">
+          <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">One-off Activities Today</span>
+          <button onclick="openAddOneOff()" style="font-size:11px;padding:4px 12px;border-radius:5px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:600">+ Add</button>
         </div>
-        <div id="oneoff-list" style="padding:.5rem 1rem"></div>
+        <div id="oneoff-list" style="padding:.5rem 1rem">
+          <div style="font-size:12px;color:var(--text3)">Loading...</div>
+        </div>
 
       </div>
     </div>
@@ -29617,8 +29621,9 @@ async function loadStudentSchedule(){
   _currentSchedStudent=name;
   const listEl=document.getElementById('student-schedule-list');
   const entriesEl=document.getElementById('student-schedule-entries');
-  if(!listEl||!entriesEl)return;
+  if(!listEl||!entriesEl){console.warn('Schedule list elements not found');return;}
   listEl.style.display='block';
+  entriesEl.innerHTML='<div style="font-size:12px;color:var(--text3)">Loading...</div>';
   try{
     const {data}=await supa.from('boarding_activity_schedules')
       .select('*').eq('student_name',name).eq('active',true).order('day_of_week');
@@ -31211,7 +31216,13 @@ function initActiveMode(){
       <div>
         <label style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">Day</label>
         <div style="display:flex;gap:4px" id="sched-days">
-          ${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>`<button class="sched-day-btn" data-day="${d}" onclick="toggleSchedDay(this)" style="flex:1;padding:6px 2px;font-size:10px;border-radius:5px;border:1px solid var(--border);background:transparent;cursor:pointer">${d}</button>`).join('')}
+          <button class="sched-day-btn" data-day="Mon" onclick="toggleSchedDay(this)">Mon</button>
+          <button class="sched-day-btn" data-day="Tue" onclick="toggleSchedDay(this)">Tue</button>
+          <button class="sched-day-btn" data-day="Wed" onclick="toggleSchedDay(this)">Wed</button>
+          <button class="sched-day-btn" data-day="Thu" onclick="toggleSchedDay(this)">Thu</button>
+          <button class="sched-day-btn" data-day="Fri" onclick="toggleSchedDay(this)">Fri</button>
+          <button class="sched-day-btn" data-day="Sat" onclick="toggleSchedDay(this)">Sat</button>
+          <button class="sched-day-btn" data-day="Sun" onclick="toggleSchedDay(this)">Sun</button>
         </div>
       </div>
       <div style="display:flex;gap:8px">
