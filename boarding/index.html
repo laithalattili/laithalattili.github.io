@@ -647,24 +647,64 @@ function confirmIdentity(){
 }
 
 // ── MAIN APP ──────────────────────────────────────────────────
+function isWithinBoardingWindow(){
+  const start=BS.windowStart||'18:00';
+  const end=BS.windowEnd||'08:00';
+  const now=new Date();
+  const nowMins=now.getHours()*60+now.getMinutes();
+  const startMins=parseInt(start.split(':')[0])*60+parseInt(start.split(':')[1]);
+  const endMins=parseInt(end.split(':')[0])*60+parseInt(end.split(':')[1]);
+  // Window crosses midnight (e.g. 18:00–08:00)
+  if(startMins>endMins){return nowMins>=startMins||nowMins<=endMins;}
+  return nowMins>=startMins&&nowMins<=endMins;
+}
+
+function getNextRegistrationPoint(){
+  const now=new Date();
+  const nowMins=now.getHours()*60+now.getMinutes();
+  const toMins=t=>parseInt(t.split(':')[0])*60+parseInt(t.split(':')[1]);
+  const points=[
+    {label:'Morning Clearance',key:'morningTime',default:'07:15'},
+    {label:'Evening Prep',key:'prepTime',default:'19:00'},
+    {label:'Heads on Beds',key:'hoobTime',default:'21:30'}
+  ];
+  // Find next point today
+  let next=null;
+  for(const p of points){
+    const t=BS[p.key]||p.default;
+    const mins=toMins(t);
+    if(mins>nowMins&&(!next||mins<toMins(BS[next.key]||next.default))){next=p;}
+  }
+  if(!next)next=points[0]; // wrap to next day
+  return next;
+}
+
 function showApp(){
   document.getElementById('pin-screen').style.display='none';
   const app=document.getElementById('app');
   app.style.display='flex';
 
-  // Update header
   const userEl=document.getElementById('hdr-user');
   if(userEl){userEl.textContent=_identity?`${_identity.role} · ${_identity.name.split(' ')[0]}`:'—';userEl.onclick=()=>{showPinScreen();};}
 
-  // Show duty banner
   updateDutyBanner();
-
-  // Load register
   loadRegister();
   subscribeRealtime();
-
-  // Info tab
   updateInfoTab();
+  // Update boarding tab label based on window
+  updateBoardingTabState();
+  // Recheck every minute
+  setInterval(updateBoardingTabState,60000);
+}
+
+function updateBoardingTabState(){
+  const inWindow=isWithinBoardingWindow();
+  const tab=document.querySelector('.tab[onclick*="register"]');
+  if(tab){
+    tab.textContent=inWindow?'📋 Register':'📋 Register';
+    tab.style.opacity=inWindow?'1':'0.6';
+    tab.title=inWindow?'':'Outside boarding hours';
+  }
 }
 
 function updateDutyBanner(){
@@ -781,7 +821,7 @@ function switchTab(id,btn){
   document.getElementById('tab-'+id).classList.add('active');
   const sub=document.getElementById('reg-sticky-sub');
   if(sub)sub.style.display=id==='register'?'block':'none';
-  if(id==='register'){loadExcusedMap().then(()=>renderRegister());}
+  if(id==='register'){loadExcusedMap().then(()=>{renderRegister();});}
   if(id==='info'){loadInfoLeaves();}
 }
 
@@ -812,10 +852,12 @@ async function loadExcusedMap(){
         reason:label,emoji,type:'leave',leaveId:l.id,
         state:'excused',
         departedAt:l.departure_actual,
-        departedBy:l.departure_confirmed_by||''
+        departedBy:l.departure_confirmed_by||'',
+        leave_type:l.leave_type
       }:{
         reason:label,emoji,type:'leave',leaveId:l.id,
-        state:'pending_departure'
+        state:'pending_departure',
+        leave_type:l.leave_type
       };
     });
   }catch(e){console.warn('Excused leaves error:',e);}
@@ -875,6 +917,7 @@ function subscribeRealtime(){
 }
 
 function _regMakeRow(name, idx){
+  const _boardingWindowOpen=isWithinBoardingWindow();
   const rawSt=(_brState[name]||{}).status||'';
   const exc=_excusedMap[name]||null;
   const leaveState=exc?.state||null;
@@ -886,9 +929,10 @@ function _regMakeRow(name, idx){
     ?`<span style="font-size:9px;color:#16a34a;display:block;margin-top:1px">↑ ${new Date(exc.departedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}${exc.departedBy?' · '+exc.departedBy:''}</span>`
     :'';
   const depBtn=leaveState==='pending_departure'
-    ?`<button onclick="confirmBoardingDeparture('${exc.leaveId}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #d97706;background:#fffbeb;color:#d97706;cursor:pointer;margin-top:3px;display:block">↑ Confirm Departure</button>`
+    ?`<button onclick="confirmBoardingDeparture('${exc.leaveId}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #d97706;background:#fffbeb;color:#d97706;cursor:pointer;margin-top:3px;display:inline-block;margin-right:4px">↑ Confirm Dep.</button>`
     :leaveState==='excused'
-    ?`<button onclick="undoBoardingDeparture('${exc.leaveId}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #d1d5db;background:#f9fafb;color:#6b7280;cursor:pointer;margin-top:3px;display:block">↩ Undo Departure</button>`
+    ?`<button onclick="undoBoardingDeparture('${exc.leaveId}')" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid #d1d5db;background:#f9fafb;color:#6b7280;cursor:pointer;margin-top:2px;display:inline-block;margin-right:4px">↩ Undo</button>`+
+     (exc.leave_type!=='longterm'?`<button onclick="confirmBoardingReturn('${exc.leaveId}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #16a34a;background:#f0fdf4;color:#16a34a;cursor:pointer;margin-top:2px;display:inline-block">✓ Return</button>`:'')
     :'';
   return `<div class="reg-row ${st}" data-name="${safe}">
     <span class="reg-num">${idx}.</span>
@@ -897,9 +941,9 @@ function _regMakeRow(name, idx){
       ${excTag}${depTimeStr}${depBtn}
     </div>
     <div class="reg-btns">
-      <button class="reg-btn ${st==='present'?'active-present':''}" data-opt="present" onclick="regTap('${safe}','present')">✓</button>
-      <button class="reg-btn ${st==='absent'?'active-absent':''}" data-opt="absent" onclick="regTap('${safe}','absent')">✗</button>
-      <button class="reg-btn ${st==='excused'?'active-excused':''}" data-opt="excused" onclick="regTap('${safe}','excused')">~</button>
+      <button class="reg-btn ${st==='present'?'active-present':''}" data-opt="present" ${_boardingWindowOpen?'onclick="regTap(''+safe+'','present')"':''} style="${_boardingWindowOpen?'':'opacity:.35;cursor:not-allowed'}" ${_boardingWindowOpen?'':'disabled'}>✓</button>
+      <button class="reg-btn ${st==='absent'?'active-absent':''}" data-opt="absent" ${_boardingWindowOpen?'onclick="regTap(''+safe+'','absent')"':''} style="${_boardingWindowOpen?'':'opacity:.35;cursor:not-allowed'}" ${_boardingWindowOpen?'':'disabled'}>✗</button>
+      <button class="reg-btn ${st==='excused'?'active-excused':''}" data-opt="excused" ${_boardingWindowOpen?'onclick="regTap(''+safe+'','excused')"':''} style="${_boardingWindowOpen?'':'opacity:.35;cursor:not-allowed'}" ${_boardingWindowOpen?'':'disabled'}>~</button>
     </div>
   </div>`;
 }
@@ -927,6 +971,7 @@ function _regMakeSection(label, names){
 
 function renderRegister(){
   renderRegControls();
+  const inWindow=isWithinBoardingWindow();
   // Use cached excused map (refreshed on load and periodically)
   // Build people list based on scope
   let people=[];
@@ -989,7 +1034,48 @@ function renderRegister(){
     if(unassigned.length) html+=_regMakeSection('No Room Assigned',unassigned).html;
   }
 
-  document.getElementById('reg-list').innerHTML=html||'<div style="padding:2rem;text-align:center;color:var(--text3);font-size:13px">No students found.</div>';
+  const windowBanner=!inWindow?`<div style="background:#1a1a1a;color:#888;padding:8px 16px;font-size:11px;text-align:center;border-bottom:1px solid #333">
+    Outside boarding hours · register is read-only
+    <span style="color:#c4622d;margin-left:8px">Departure/return confirmation always available</span>
+  </div>`:'';
+  document.getElementById('reg-list').innerHTML=windowBanner+(html||'<div style="padding:2rem;text-align:center;color:var(--text3);font-size:13px">No students found.</div>');
+}
+
+function renderPendingActions(){
+  const list=document.getElementById('reg-list');if(!list)return;
+  const next=getNextRegistrationPoint();
+  const nextTime=BS[next.key]||next.default;
+  // Find students with pending departure or return
+  const pending=[];
+  Object.entries(_excusedMap).forEach(([name,info])=>{
+    if(info.type==='leave'){
+      pending.push({name,info});
+    }
+  });
+  let html=`<div style="background:#fff;border-bottom:1px solid var(--border);padding:12px 16px;text-align:center">
+    <div style="font-size:12px;color:var(--text3)">Outside boarding hours</div>
+    <div style="font-size:13px;font-weight:600;color:var(--text);margin-top:2px">Next: ${next.label} at ${nextTime}</div>
+  </div>`;
+  if(pending.length){
+    html+=`<div style="padding:.5rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border)">Pending Actions</div>`;
+    pending.forEach(({name,info})=>{
+      const depBtn=info.state==='pending_departure'
+        ?`<button onclick="confirmBoardingDeparture('${info.leaveId}')" style="font-size:11px;padding:4px 10px;border-radius:5px;border:1px solid #d97706;background:#fffbeb;color:#d97706;cursor:pointer;font-weight:600">↑ Confirm Departure</button>`
+        :info.state==='excused'&&info.leave_type!=='longterm'
+        ?`<button onclick="confirmBoardingReturn('${info.leaveId}')" style="font-size:11px;padding:4px 10px;border-radius:5px;border:1px solid #16a34a;background:#f0fdf4;color:#16a34a;cursor:pointer;font-weight:600">✓ Confirm Return</button>`
+        :'';
+      const depTime=info.departedAt?`<span style="font-size:10px;color:#16a34a;display:block;margin-top:2px">↑ ${new Date(info.departedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}${info.departedBy?' · '+info.departedBy:''}</span>`:'';
+      html+=`<div style="padding:10px 16px;border-bottom:1px solid var(--bg3);background:#fff">
+        <div style="font-size:13px;font-weight:600;color:var(--text)">${info.emoji} ${name}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">${info.reason}</div>
+        ${depTime}
+        <div style="margin-top:6px">${depBtn}</div>
+      </div>`;
+    });
+  } else {
+    html+=`<div style="padding:2rem;text-align:center;color:var(--text3);font-size:13px">No pending departure or return confirmations.</div>`;
+  }
+  list.innerHTML=html;
 }
 
 function setRegGroup(g){_regGroup=g;renderRegister();}
@@ -1060,6 +1146,19 @@ function regTap(name,status){
 }
 
 // ── DEPARTURE/RETURN CONFIRMATION ─────────────────────────────
+async function confirmBoardingReturn(leaveId){
+  const role=_identity?_identity.role:'AHSM';
+  try{
+    await supa.from('boarding_leaves').update({
+      return_actual:new Date().toISOString(),
+      return_confirmed_by:role
+    }).eq('id',leaveId);
+    showToast('✓ Return confirmed','#16a34a');
+    await loadExcusedMap();
+    renderRegister();
+  }catch(e){showToast('Error: '+e.message,'#dc2626');}
+}
+
 async function undoBoardingDeparture(leaveId){
   try{
     await supa.from('boarding_leaves').update({departure_actual:null,departure_confirmed_by:null}).eq('id',leaveId);
