@@ -30094,12 +30094,17 @@ async function confirmReturn(id){
       }).then(()=>{}).catch(()=>{});
     }
 
-    showToastMsg('✓ '+studentName+' returned & marked Present','#16a34a');
-    window._lastExcusedMap=await getTodayExcusedMap();
+    showToastMsg('✓ '+(studentName||'Student')+' returned & marked Present','#16a34a');
+    // Remove student from excused map immediately so register shows Present
+    if(studentName&&window._lastExcusedMap){
+      delete window._lastExcusedMap[studentName];
+    }
     if(_hwkFilter==='register'){
       const el=document.getElementById('hawking-list-content');
-      if(el)renderHawkingRegister(el,window._lastExcusedMap);
+      if(el)renderHawkingRegister(el,window._lastExcusedMap||{});
     }
+    // Refresh excused map in background
+    getTodayExcusedMap().then(m=>{window._lastExcusedMap=m;});
     if(_hwkFilter==='away'){
       const el=document.getElementById('hawking-list-content');
       if(el)renderAwayList(el);
