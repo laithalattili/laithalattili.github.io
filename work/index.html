@@ -1124,6 +1124,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
         <button class="hwk-filter-btn" id="hwk-f-sanctions" onclick="setHwkFilter('sanctions',this)">⚠️ Sanctions</button>
         <button id="export-report-btn" onclick="exportWeekReport()" style="margin-left:auto;font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid #00205B;background:#00205B;color:#fff;cursor:pointer;font-weight:600;flex-shrink:0">📄 Export Report</button>
         <button onclick="exportRegistrationCSV()" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid #16a34a;background:#f0fdf4;color:#15803d;cursor:pointer;font-weight:600;flex-shrink:0">📊 CSV</button>
+        <button onclick="openGateMsg()" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid #f59e0b;background:#fffbeb;color:#d97706;cursor:pointer;font-weight:600;flex-shrink:0">📨 Gate Msg</button>
       </div>
       <div id="hwk-count-badge" style="font-size:11px;color:var(--text3);padding:4px 6px;flex-shrink:0"></div>
       <button id="hwk-collapse-toggle-btn" onclick="hwkToggleAll()" style="font-size:10px;padding:4px 8px;border:1px solid var(--border);border-radius:var(--rsm);background:#fff;color:var(--text3);cursor:pointer;white-space:nowrap;flex-shrink:0">Expand All</button>
@@ -26255,6 +26256,7 @@ async function renderHawkingRegister(el, preloadedMap){
         ${penBadges}${timeStr}
       </div>
       <button onclick="logNurseVisit('${p.name}')" style="font-size:12px;padding:3px 6px;border-radius:5px;border:1px solid ${(_nurseMap[p.name]||[]).length?'#a855f7':'#e5e7eb'};background:${(_nurseMap[p.name]||[]).length?'#f3e8ff':'#fff'};color:${(_nurseMap[p.name]||[]).length?'#7c3aed':'#aaa'};cursor:pointer" title="Log nurse visit">🏥</button>
+      <button onclick="openGateMsg({name:'${p.name.replace(/'/g,"\'")}',leaveType:'${(excInfo&&excInfo.type)||''}'})" style="font-size:12px;padding:3px 6px;border-radius:5px;border:1px solid #f59e0b;background:#fffbeb;color:#d97706;cursor:pointer" title="Gate pass message">📨</button>
       ${typeTag}
       ${displayBadge}
     </div>`;
@@ -31437,6 +31439,268 @@ function _populatePinSettings(){
   if(ahsmSel&&bs.ahsmSessionPolicy) ahsmSel.value=bs.ahsmSessionPolicy;
   if(liaisonSel&&bs.liaisonSessionPolicy) liaisonSel.value=bs.liaisonSessionPolicy;
 }
+
+// ── GATE MESSAGE GENERATOR ────────────────────────────────────────────────────
+// Works in Work app, Boarding mini-app, and Liaison app
+
+function openGateMsg(opts={}) {
+  // opts: { name, grade, house, leaveType, preFill }
+  // leaveType: 'parents'|'relative'|'didi'|'activity'|null
+
+  const existing = document.getElementById('gate-msg-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'gate-msg-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px';
+
+  // Build student options
+  const studentOptions = buildGateStudentOptions(opts.name);
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+  const timeStr = now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+
+  // Preselect reason from leave type
+  const reasonMap = {weekend:'parents',medical:'parents',family:'relative',activity:'activity',longterm:'parents'};
+  const preReason = opts.leaveType ? (reasonMap[opts.leaveType]||'parents') : 'parents';
+
+  modal.innerHTML = `
+    <div style="background:#1c1c1e;border-radius:16px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;color:#fff">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid #333">
+        <div style="font-size:15px;font-weight:700">📨 Gate Pass Message</div>
+        <button onclick="document.getElementById('gate-msg-modal').remove()" style="background:none;border:none;color:#aaa;font-size:20px;cursor:pointer;line-height:1">✕</button>
+      </div>
+
+      <div style="padding:16px 18px;display:flex;flex-direction:column;gap:12px">
+
+        <!-- STUDENT -->
+        <div>
+          <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">STUDENT</label>
+          <input id="gm-student" list="gm-student-list" value="${opts.name||''}" placeholder="Type name..." 
+            oninput="updateGateMsg()" autocomplete="off"
+            style="width:100%;background:#2c2c2e;border:1px solid #444;border-radius:8px;color:#fff;font-size:14px;padding:8px 10px">
+          <datalist id="gm-student-list">${studentOptions}</datalist>
+        </div>
+
+        <!-- DATE & TIME -->
+        <div style="display:flex;gap:8px">
+          <div style="flex:1">
+            <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">DATE</label>
+            <input id="gm-date" type="date" value="${now.toISOString().split('T')[0]}" oninput="updateGateMsg()"
+              style="width:100%;background:#2c2c2e;border:1px solid #444;border-radius:8px;color:#fff;font-size:13px;padding:8px 10px">
+          </div>
+          <div style="flex:1">
+            <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">TIME</label>
+            <input id="gm-time" type="time" value="${timeStr.replace(':',':')}" oninput="updateGateMsg()"
+              style="width:100%;background:#2c2c2e;border:1px solid #444;border-radius:8px;color:#fff;font-size:13px;padding:8px 10px">
+          </div>
+        </div>
+
+        <!-- REASON -->
+        <div>
+          <label style="font-size:11px;color:#888;display:block;margin-bottom:6px">REASON</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px" id="gm-reason-btns">
+            ${[
+              ['parents','👨‍👩‍👧 Parents','家长接送'],
+              ['relative','👤 Relative','亲属接送'],
+              ['didi','🚗 Didi / Taxi','滴滴/出租车'],
+              ['activity','🏃 School Activity','学校活动'],
+            ].map(([v,label,sub])=>`
+              <button onclick="selectGmReason('${v}')" id="gm-r-${v}" 
+                style="background:${v===preReason?'#c4622d':'#2c2c2e'};border:1px solid ${v===preReason?'#c4622d':'#444'};border-radius:8px;color:#fff;padding:8px 10px;cursor:pointer;text-align:left;transition:.15s">
+                <div style="font-size:13px;font-weight:600">${label}</div>
+                <div style="font-size:10px;color:#aaa">${sub}</div>
+              </button>`).join('')}
+          </div>
+        </div>
+
+        <!-- EXTRA FIELDS (conditional) -->
+        <div id="gm-extra"></div>
+
+        <!-- PREVIEW -->
+        <div>
+          <label style="font-size:11px;color:#888;display:block;margin-bottom:6px">MESSAGE PREVIEW</label>
+          <div id="gm-preview" style="background:#2c2c2e;border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.7;white-space:pre-wrap;word-break:break-word;border:1px solid #444;min-height:80px;color:#e0e0e0"></div>
+        </div>
+
+        <!-- COPY BUTTON -->
+        <button onclick="copyGateMsg()" id="gm-copy-btn"
+          style="background:#c4622d;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;padding:13px;cursor:pointer;width:100%">
+          📋 Copy Message
+        </button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+
+  // Set initial reason
+  window._gmReason = preReason;
+  updateGateExtraFields();
+  updateGateMsg();
+
+  // Close on backdrop click
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+}
+
+function buildGateStudentOptions(selected) {
+  // Try to get student list from whatever globals are available
+  let students = [];
+  if (typeof STUDENTS !== 'undefined') {
+    students = STUDENTS.map(s => s.name);
+  } else if (typeof BS !== 'undefined' && BS.students) {
+    students = BS.students;
+  }
+  return students.map(n => `<option value="${n}">`).join('');
+}
+
+function selectGmReason(reason) {
+  window._gmReason = reason;
+  document.querySelectorAll('#gm-reason-btns button').forEach(b => {
+    const isActive = b.id === 'gm-r-'+reason;
+    b.style.background = isActive ? '#c4622d' : '#2c2c2e';
+    b.style.borderColor = isActive ? '#c4622d' : '#444';
+  });
+  updateGateExtraFields();
+  updateGateMsg();
+}
+
+function updateGateExtraFields() {
+  const el = document.getElementById('gm-extra');
+  if (!el) return;
+  const r = window._gmReason;
+
+  if (r === 'relative') {
+    el.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div>
+          <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">RELATIVE NAME (optional)</label>
+          <input id="gm-rel-name" placeholder="e.g. Zhang Wei" oninput="updateGateMsg()"
+            style="width:100%;background:#2c2c2e;border:1px solid #444;border-radius:8px;color:#fff;font-size:13px;padding:7px 10px">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">ID NUMBER (optional)</label>
+          <input id="gm-rel-id" placeholder="e.g. 320123..." oninput="updateGateMsg()"
+            style="width:100%;background:#2c2c2e;border:1px solid #444;border-radius:8px;color:#fff;font-size:13px;padding:7px 10px">
+        </div>
+      </div>`;
+  } else if (r === 'didi') {
+    el.innerHTML = `
+      <div>
+        <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">PLATE NUMBER (optional)</label>
+        <input id="gm-plate" placeholder="e.g. 苏EK1234" oninput="updateGateMsg()" autocapitalize="characters"
+          style="width:100%;background:#2c2c2e;border:1px solid #444;border-radius:8px;color:#fff;font-size:14px;padding:7px 10px;letter-spacing:2px">
+      </div>`;
+  } else {
+    el.innerHTML = '';
+  }
+}
+
+function updateGateMsg() {
+  const name   = (document.getElementById('gm-student')?.value||'').trim();
+  const date   = document.getElementById('gm-date')?.value||'';
+  const time   = document.getElementById('gm-time')?.value||'';
+  const reason = window._gmReason || 'parents';
+
+  // Get grade from student list
+  let grade = '';
+  if (typeof STUDENTS !== 'undefined') {
+    const s = STUDENTS.find(st=>st.name===name);
+    if (s) {
+      const t = typeof TUTORS !== 'undefined' ? TUTORS.find(t=>t.name===s.tutor) : null;
+      grade = t?.grade || '';
+    }
+  } else if (typeof BS !== 'undefined' && BS.studentGrades) {
+    grade = BS.studentGrades[name] || '';
+  }
+
+  // Format date
+  let dateLabel = date;
+  let dateLabelZh = date;
+  try {
+    const d = new Date(date + 'T12:00:00');
+    const days = ['周日','周一','周二','周三','周四','周五','周六'];
+    const daysEn = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    dateLabel = daysEn[d.getDay()] + ' ' + d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+    dateLabelZh = days[d.getDay()] + ' ' + (d.getMonth()+1) + '月' + d.getDate() + '日';
+  } catch{}
+
+  // Reason strings
+  const reasonZh = {
+    parents:  '家长接送',
+    relative: '亲属接送（需查验证件）',
+    didi:     '滴滴/出租车接送',
+    activity: '学校活动外出',
+  }[reason] || '家长接送';
+
+  const reasonEn = {
+    parents:  'Parents picking up',
+    relative: 'Relative pick-up (ID required)',
+    didi:     'Didi / Taxi pick-up',
+    activity: 'School activity',
+  }[reason] || 'Parents picking up';
+
+  // Extra details
+  let extraZh = '', extraEn = '';
+  if (reason === 'relative') {
+    const relName = document.getElementById('gm-rel-name')?.value?.trim()||'';
+    const relId   = document.getElementById('gm-rel-id')?.value?.trim()||'';
+    if (relName) { extraZh += `\n亲属姓名：${relName}`; extraEn += `\nRelative: ${relName}`; }
+    if (relId)   { extraZh += `\n证件号码：${relId}`;   extraEn += `\nID number: ${relId}`; }
+  } else if (reason === 'didi') {
+    const plate = document.getElementById('gm-plate')?.value?.trim()||'';
+    if (plate) { extraZh += `\n车牌号：${plate}`; extraEn += `\nPlate: ${plate}`; }
+  }
+
+  const gradeStr = grade ? `（${grade}）` : '';
+  const gradeStrEn = grade ? ` (${grade})` : '';
+
+  const zh = `【霍金宿舍 Hawking House】
+${dateLabelZh} ${time}
+
+学生：${name}${gradeStr}
+离开原因：${reasonZh}${extraZh}
+
+请允许该学生出门，谢谢 ✅`;
+
+  const en = `Hawking House | ${dateLabel} ${time}
+Student: ${name}${gradeStrEn}
+Reason: ${reasonEn}${extraEn}
+Please allow student through the gate ✅`;
+
+  const preview = document.getElementById('gm-preview');
+  if (preview) {
+    window._gmText = zh + '\n\n' + en;
+    preview.textContent = window._gmText;
+  }
+}
+
+async function copyGateMsg() {
+  const text = window._gmText || '';
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    const btn = document.getElementById('gm-copy-btn');
+    if (btn) {
+      const orig = btn.textContent;
+      btn.textContent = '✓ Copied!';
+      btn.style.background = '#16a34a';
+      setTimeout(() => { btn.textContent = orig; btn.style.background = '#c4622d'; }, 2000);
+    }
+  } catch {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+    const btn = document.getElementById('gm-copy-btn');
+    if (btn) { btn.textContent = '✓ Copied!'; setTimeout(()=>btn.textContent='📋 Copy Message',2000); }
+  }
+}
+
 
 async function exportWeekReport(){
   const btn=document.getElementById('export-report-btn');
