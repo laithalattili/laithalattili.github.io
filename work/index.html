@@ -1119,7 +1119,6 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       <div id="hwk-filter-btns" style="display:flex;gap:2px;background:var(--bg3);border-radius:var(--rsm);padding:3px;flex-wrap:wrap">
         <button class="hwk-filter-btn active" id="hwk-f-all" onclick="setHwkFilter('all',this)">All</button>
         <button class="hwk-filter-btn" id="hwk-f-boarders" onclick="setHwkFilter('boarders',this)">Boarders</button>
-        <button class="hwk-filter-btn" id="hwk-f-rooms" onclick="setHwkFilter('rooms',this)">Rooms</button>
         <button class="hwk-filter-btn" id="hwk-f-register" onclick="setHwkFilter('register',this)">Register</button>
         <button class="hwk-filter-btn" id="hwk-f-away" onclick="setHwkFilter('away',this)">Away</button>
         <button class="hwk-filter-btn" id="hwk-f-sanctions" onclick="setHwkFilter('sanctions',this)">⚠️ Sanctions</button>
@@ -1809,6 +1808,11 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
         <div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3);margin-top:.5rem">Phone Time & Penalties</div>
         <div style="padding:.75rem 1rem;display:flex;flex-direction:column;gap:.5rem">
           <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:var(--text2);width:160px;flex-shrink:0">Normal phone time</span>
+            <input type="number" id="bs-normal-phone" value="20" min="5" max="60" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;width:60px">
+            <span style="font-size:11px;color:var(--text3)">min per day</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
             <span style="font-size:12px;color:var(--text2);width:160px;flex-shrink:0">Phone time window</span>
             <input type="time" id="bs-phone-start" value="18:40" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;width:90px">
             <span style="font-size:11px;color:var(--text3)">to</span>
@@ -1820,9 +1824,8 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
             <span style="font-size:11px;color:var(--text3)">min · same day</span>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:12px;color:var(--text2);width:160px;flex-shrink:0">Late floor penalty</span>
-            <input type="number" id="bs-penalty-floor" value="5" min="1" max="20" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;width:60px">
-            <span style="font-size:11px;color:var(--text3)">min · same day</span>
+            <span style="font-size:12px;color:var(--text2);width:160px;flex-shrink:0">Late floor</span>
+            <span style="font-size:12px;color:var(--text3);font-style:italic">Logged only — no phone time penalty</span>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
             <span style="font-size:12px;color:var(--text2);width:160px;flex-shrink:0">Late sleep penalty</span>
@@ -25945,7 +25948,12 @@ async function renderSanctionsList(el){
     }
     const data2=filtered;
     const infraLabel={late_wake:'🛏 Late Wake',late_floor:'🚶 Late Floor',late_sleep:'😴 Late Sleep'};
-    const penLabel=p=>{const m=parseInt((p.penalty_type||'').replace('phone_','').replace('min',''))||0;return m+' min phone time';};
+    const bs=_boardingSettings||{};
+    const normalMins=parseInt(bs.normalPhoneMins)||20;
+    const penLabel=p=>{
+      const m=parseInt((p.penalty_type||'').replace('phone_','').replace('min',''))||0;
+      return m+' min phone time (normally '+normalMins+' min)';
+    };
     // Group by penalty_date
     const byDate={};
     data2.forEach(p=>{
@@ -26215,6 +26223,55 @@ function _brFormatTime(iso){
   }catch(e){return'';}
 }
 
+function _renderBoardersWithGroup(groupBy, existingHtml, el){
+  // Render boarders grouped by room
+  if(!el)el=document.getElementById('hawking-list-content');
+  if(!el)return;
+  let html=existingHtml||'';
+  if(!existingHtml){
+    html+=`<div style="display:flex;gap:6px;padding:8px 12px;background:#fff;border-bottom:1px solid var(--border);align-items:center">
+      <span style="font-size:11px;color:var(--text3)">Group by:</span>
+      <button onclick="toggleBoarderGrouping('grade')" style="font-size:11px;padding:3px 10px;border-radius:5px;border:1px solid var(--border);background:${_boarderGrouping==='grade'?'var(--accent)':'#fff'};color:${_boarderGrouping==='grade'?'#fff':'var(--text2)'};cursor:pointer;font-weight:${_boarderGrouping==='grade'?'700':'400'}">Grade</button>
+      <button onclick="toggleBoarderGrouping('room')" style="font-size:11px;padding:3px 10px;border-radius:5px;border:1px solid var(--border);background:${_boarderGrouping==='room'?'var(--accent)':'#fff'};color:${_boarderGrouping==='room'?'#fff':'var(--text2)'};cursor:pointer;font-weight:${_boarderGrouping==='room'?'700':'400'}">Room</button>
+    </div>`;
+  }
+  const boarders=STUDENTS.filter(s=>(HAWKING_STATUS[s.name]||{}).boarder);
+  BOARDER_ROOMS.forEach(room=>{
+    const members=(room.boarders||[]).filter(n=>boarders.some(b=>b.name===n));
+    if(!members.length)return;
+    html+=`<div style="padding:.5rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3)">${room.name||room.id} (${members.length})</div>`;
+    members.forEach((name,i)=>{
+      const tutor=STUDENTS.find(s=>s.name===name)?.tutor||'';
+      const tutorObj=TUTORS.find(t=>t.name===tutor);
+      const grade=tutorObj?.grade||'';
+      html+=`<div class="hwk-row" onclick="openStudentCard('${name.replace(/'/g,"\'")}')">
+        <div class="hwk-row-main">
+          <span class="hwk-num">${i+1}</span>
+          <div class="hwk-info">
+            <div class="hwk-name">${name}</div>
+            <div class="hwk-meta">${grade}${tutor?' · '+tutor:''}</div>
+          </div>
+        </div>
+      </div>`;
+    });
+  });
+  // Unassigned boarders
+  const assigned=new Set(BOARDER_ROOMS.flatMap(r=>r.boarders||[]));
+  const unassigned=boarders.filter(s=>!assigned.has(s.name));
+  if(unassigned.length){
+    html+=`<div style="padding:.5rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3)">No Room Assigned (${unassigned.length})</div>`;
+    unassigned.forEach((s,i)=>{
+      html+=`<div class="hwk-row" onclick="openStudentCard('${s.name.replace(/'/g,"\'")}')">
+        <div class="hwk-row-main">
+          <span class="hwk-num">${i+1}</span>
+          <div class="hwk-info"><div class="hwk-name">${s.name}</div></div>
+        </div>
+      </div>`;
+    });
+  }
+  el.innerHTML=html;
+}
+
 function renderHawkingTotals(){
   const badge=document.getElementById('hwk-count-badge');if(!badge)return;
   const total=STUDENTS.length;
@@ -26222,6 +26279,10 @@ function renderHawkingTotals(){
   const day=total-boarders;
   if(_hwkFilter==='all')
     badge.innerHTML=`<strong style="color:var(--text)">${total}</strong> tutees · <strong style="color:#0369a1">${boarders}</strong> B · <strong style="color:var(--text2)">${day}</strong> D`;
+  else if(_hwkFilter==='rooms'){
+    _renderBoardersWithGroup('room');
+    return;
+  }
   else if(_hwkFilter==='boarders')
     badge.innerHTML=`<strong style="color:#0369a1">${boarders}</strong> boarders`;
   else if(_hwkFilter==='rooms'){
@@ -26235,27 +26296,36 @@ function renderTeachingTotals(){
   // No longer a row — count is shown inline in class header. Noop kept for compat.
 }
 
-let _hwkFilter='all'; // 'all' | 'boarders' | 'rooms' | 'register'
+let _hwkFilter='all';
+let _boarderGrouping='grade'; // 'grade' | 'room'
+
+function toggleBoarderGrouping(g){
+  _boarderGrouping=g;
+  renderHawkingList();
+}
 
 function setHwkFilter(f,btn){
   _hwkFilter=f;
   document.querySelectorAll('.hwk-filter-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
+  const el=document.getElementById('hawking-list-content');
   if(f==='register'){
-    // Fetch fresh data first, then render
     _brSubscribeRealtime();
-    _brLoadToday().then(()=>{
-      const el=document.getElementById('hawking-list-content');
-      if(el&&_hwkFilter==='register')renderHawkingRegister(el);
-      if(el&&_hwkFilter==='away')renderAwayList(el);
-      if(el&&_hwkFilter==='sanctions')renderSanctionsList(el);
-    });
-    // Show loading state immediately
-    const el=document.getElementById('hawking-list-content');
     if(el)el.innerHTML='<div style="padding:2rem;text-align:center;color:#9ca3af;font-size:13px">Loading...</div>';
+    _brLoadToday().then(()=>{
+      const el2=document.getElementById('hawking-list-content');
+      if(el2&&_hwkFilter==='register')renderHawkingRegister(el2);
+    });
+  } else if(f==='away'){
+    if(el)el.innerHTML='<div style="padding:2rem;text-align:center;color:#9ca3af;font-size:13px">Loading...</div>';
+    renderAwayList(el);
+  } else if(f==='sanctions'){
+    if(el)el.innerHTML='<div style="padding:2rem;text-align:center;color:#9ca3af;font-size:13px">Loading...</div>';
+    renderSanctionsList(el);
   } else {
     renderHawkingList();
   }
+  renderHawkingTotals();
 }
 
 function hwkCollapseAll(collapse){
@@ -26300,13 +26370,13 @@ function toggleHwkGrade(gr){
 
 function renderHawkingList(){
   const el=document.getElementById('hawking-list-content');if(!el)return;
-  // Sync active button
   document.querySelectorAll('.hwk-filter-btn').forEach(b=>b.classList.remove('active'));
   const activeBtn=document.getElementById('hwk-f-'+_hwkFilter);
   if(activeBtn)activeBtn.classList.add('active');
-  // Hide count badge for register (has its own header)
   const badge=document.getElementById('hwk-count-badge');
   if(badge)badge.style.display=_hwkFilter==='register'?'none':'';
+  if(_hwkFilter==='away'){renderAwayList(el);return;}
+  if(_hwkFilter==='sanctions'){renderSanctionsList(el);return;}
 
   if(_hwkFilter==='rooms'){
     renderHawkingByRoom(el);
@@ -26318,6 +26388,23 @@ function renderHawkingList(){
   }
 
   const boardersOnly=_hwkFilter==='boarders';
+
+  // Grouping toggle + room view for boarders
+  if(boardersOnly){
+    const _gradeActive=_boarderGrouping==='grade';
+    const _roomActive=_boarderGrouping==='room';
+    const _grpToggle='<div style="display:flex;gap:6px;padding:8px 12px;background:#fff;border-bottom:1px solid var(--border);align-items:center">'+
+      '<span style="font-size:11px;color:var(--text3)">Group by:</span>'+
+      '<button onclick="toggleBoarderGrouping(&quot;grade&quot;)" style="font-size:11px;padding:3px 10px;border-radius:5px;border:1px solid var(--border);background:'+(_gradeActive?'var(--accent)':'#fff')+';color:'+(_gradeActive?'#fff':'var(--text2)')+';cursor:pointer;font-weight:'+(_gradeActive?'700':'400')+'">Grade</button>'+
+      '<button onclick="toggleBoarderGrouping(&quot;room&quot;)" style="font-size:11px;padding:3px 10px;border-radius:5px;border:1px solid var(--border);background:'+(_roomActive?'var(--accent)':'#fff')+';color:'+(_roomActive?'#fff':'var(--text2)')+';cursor:pointer;font-weight:'+(_roomActive?'700':'400')+'">Room</button>'+
+    '</div>';
+    if(_boarderGrouping==='room'){
+      _renderBoardersWithGroup('room',_grpToggle,el);
+      return;
+    }
+    if(el)el.innerHTML=_grpToggle;
+  }
+
   const grades=['G7','G8','G9','G10','G11','G12'];
   let html='';
 
@@ -30481,8 +30568,8 @@ let _boardingSettings={
   floorTime:'07:30',
   phoneTimeStart:'18:40',
   phoneTimeEnd:'19:00',
+  normalPhoneMins:20,
   penaltyWakeMins:5,
-  penaltyFloorMins:5,
   penaltySleepMins:2,
   lightsOutJnrWd:'22:00',
   lightsOutSnrWd:'22:30',
@@ -30940,21 +31027,37 @@ async function _brTogglePenalty(name, field){
   _brState[name]={...(_brState[name]||{}),[field]:!cur};
   // Determine penalty details
   const bs=_boardingSettings||{};
-  const penaltyMins=field==='lateSleep'?(parseInt(bs.penaltySleepMins)||2):(parseInt(bs.penaltyWakeMins)||5);
-  const penaltyDay=field==='lateSleep'?'next':'same';
   const infraction=field==='lateWake'?'late_wake':field==='lateFloor'?'late_floor':'late_sleep';
-  const penaltyDate=field==='lateSleep'?new Date(new Date().getTime()+86400000).toISOString().split('T')[0]:today;
+  // Floor = log only, no phone time penalty
+  const hasPhonePenalty=field!=='lateFloor';
   if(!cur){
-    // Log penalty
-    await supa.from('boarding_penalties').insert({
-      student_name:name,infraction_type:infraction,infraction_date:today,
-      penalty_type:'phone_'+penaltyMins+'min',penalty_date:penaltyDate,
-      status:'active',logged_by:'HSM',notes:getSessionLabel(session)
-    });
+    if(hasPhonePenalty){
+      const penaltyMins=field==='lateSleep'?(parseInt(bs.penaltySleepMins)||2):(parseInt(bs.penaltyWakeMins)||5);
+      // Base penalty date: same day for wake, next day for sleep
+      let penaltyDate=field==='lateSleep'
+        ?new Date(new Date().getTime()+86400000).toISOString().split('T')[0]
+        :today;
+      // Check if student already has a penalty on that date — if so bump to next day
+      const {data:existing}=await supa.from('boarding_penalties')
+        .select('penalty_date').eq('student_name',name).eq('penalty_date',penaltyDate).in('status',['active','pending']);
+      if(existing&&existing.length){
+        // Bump to next available day
+        const d=new Date(penaltyDate);d.setDate(d.getDate()+1);
+        penaltyDate=d.toISOString().split('T')[0];
+      }
+      await supa.from('boarding_penalties').insert({
+        student_name:name,infraction_type:infraction,infraction_date:today,
+        penalty_type:'phone_'+penaltyMins+'min',penalty_date:penaltyDate,
+        status:'active',logged_by:'HSM',notes:getSessionLabel(session)
+      });
+    }
+    // Floor infraction: log to history only (no boarding_penalties row)
+    // The late_floor flag on boarding_registrations is the record
   } else {
-    // Remove penalty (undo)
-    await supa.from('boarding_penalties')
-      .delete().eq('student_name',name).eq('infraction_date',today).eq('infraction_type',infraction);
+    if(hasPhonePenalty){
+      await supa.from('boarding_penalties')
+        .delete().eq('student_name',name).eq('infraction_date',today).eq('infraction_type',infraction);
+    }
   }
   // Update DB row in background — don't await to keep UI snappy
   const existing=_brStates[session][name]||{};
