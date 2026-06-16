@@ -976,40 +976,57 @@ async function loadStudentPenalties(studentName){
 }
 
 async function loadInfoPenalties(){
-  // Show penalties summary in info tab
-  const boarders=getBoarders();
+  const el=document.getElementById('info-penalties-list');if(!el)return;
   const today=new Date().toISOString().split('T')[0];
+  const tomorrow=new Date(Date.now()+86400000).toISOString().split('T')[0];
   try{
     const {data}=await supa.from('boarding_penalties')
-      .select('*').in('status',['active','pending']).gte('penalty_date',today);
-    const byStudent={};
-    (data||[]).forEach(p=>{
-      if(!byStudent[p.student_name])byStudent[p.student_name]=[];
-      byStudent[p.student_name].push(p);
-    });
-    const el=document.getElementById('info-penalties-list');
-    if(!el)return;
-    const students=Object.keys(byStudent);
-    if(!students.length){el.innerHTML='<span style="color:#aaa">No active penalties.</span>';return;}
-    const infraLabel={late_wake:'Late Wake',late_floor:'Late Floor',late_sleep:'Late Sleep'};
-    el.innerHTML=students.map(name=>{
-      const penalties=byStudent[name];
-      const totalMins=penalties.reduce((sum,p)=>{
-        const m=parseInt((p.penalty_type||'').replace('phone_','').replace('min',''))||0;
-        return sum+m;
-      },0);
-      return `<div style="padding:6px 0;border-bottom:1px solid rgba(0,0,0,.06)">
-        <div style="font-weight:600;color:#1a1a1a;display:flex;align-items:center;justify-content:space-between">
-          <span>${name}</span>
-          <span style="font-size:11px;color:#ef4444;font-weight:700">⏱ ${totalMins} min phone time</span>
+      .select('*').in('status',['active','pending']).order('penalty_date').order('student_name');
+    if(!data||!data.length){el.innerHTML='<div style="padding:8px 0;color:#aaa;font-size:12px">No active sanctions.</div>';return;}
+    const infraLabel={late_wake:'🛏 Late Wake',late_floor:'🚶 Late Floor',late_sleep:'😴 Late Sleep'};
+    const penLabel=p=>{const m=parseInt((p.penalty_type||'').replace('phone_','').replace('min',''))||0;return m+' min phone';};
+    el.innerHTML=data.map(p=>{
+      const isPast=p.penalty_date<today;
+      const isToday=p.penalty_date===today;
+      const dateLabel=isToday?'Today':isPast?'Overdue':p.penalty_date;
+      const dateColor=isPast?'#dc2626':isToday?'#d97706':'#475569';
+      const lid=p.id;
+      return `<div style="padding:8px 0;border-bottom:1px solid rgba(0,0,0,.06)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+          <div>
+            <span style="font-size:12px;font-weight:600;color:#1a1a1a">${p.student_name}</span>
+            <span style="font-size:10px;color:${dateColor};margin-left:6px;font-weight:600">${isPast?'⚠️ ':''}${dateLabel}</span>
+          </div>
+          <div style="display:flex;gap:3px">
+            <button onclick="boardingMarkDone('${lid}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #16a34a;background:#f0fdf4;color:#16a34a;cursor:pointer;font-weight:600">✓ Done</button>
+            ${isPast?`<button onclick="boardingRollSanction('${lid}')" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid #dee2e6;background:#fff;color:#6b7280;cursor:pointer">→</button>`:''}
+          </div>
         </div>
-        ${penalties.map(p=>`<div style="font-size:10px;color:#868e96;margin-top:2px">
-          ${infraLabel[p.infraction_type]||p.infraction_type} · ${p.infraction_date}
-          ${p.status==='pending'?'<span style="color:#d97706"> · pending (on leave)</span>':''}
-        </div>`).join('')}
+        <div style="font-size:10px;color:#868e96;margin-top:2px">${infraLabel[p.infraction_type]||p.infraction_type} · ${penLabel(p)}</div>
+        ${p.status==='pending'?'<div style="font-size:10px;color:#d97706">⏳ On leave — will activate on return</div>':''}
       </div>`;
     }).join('');
-  }catch(e){}
+  }catch(e){el.innerHTML='<div style="color:#dc2626;font-size:12px">Error loading</div>';}
+}
+
+async function boardingMarkDone(id){
+  try{
+    await supa.from('boarding_penalties').update({status:'applied'}).eq('id',id);
+    showToast('✓ Sanction marked done','#16a34a');
+    loadInfoPenalties();
+    // Refresh register badges
+    await loadExcusedMap();
+    renderRegister();
+  }catch(e){showToast('Error: '+e.message,'#dc2626');}
+}
+
+async function boardingRollSanction(id){
+  try{
+    const tomorrow=new Date(Date.now()+86400000).toISOString().split('T')[0];
+    await supa.from('boarding_penalties').update({penalty_date:tomorrow}).eq('id',id);
+    showToast('→ Moved to tomorrow','#6b7280');
+    loadInfoPenalties();
+  }catch(e){showToast('Error: '+e.message,'#dc2626');}
 }
 
 async function loadInfoLeaves(){
@@ -1168,6 +1185,22 @@ async function loadExcusedMap(){
 // ── REGISTER ──────────────────────────────────────────────────
 function today(){return new Date().toISOString().split('T')[0];}
 
+let _boardingPenaltyMap={};
+
+async function loadBoardingPenalties(){
+  const today=new Date().toISOString().split('T')[0];
+  try{
+    const {data}=await supa.from('boarding_penalties')
+      .select('student_name,infraction_type,status')
+      .in('status',['active','pending']).eq('infraction_date',today);
+    _boardingPenaltyMap={};
+    (data||[]).forEach(p=>{
+      if(!_boardingPenaltyMap[p.student_name])_boardingPenaltyMap[p.student_name]=[];
+      _boardingPenaltyMap[p.student_name].push(p);
+    });
+  }catch(e){}
+}
+
 async function loadRegister(){
   const session=getBoardingCurrentSession();
   try{
@@ -1180,7 +1213,7 @@ async function loadRegister(){
         lateWake:r.late_wake,lateFloor:r.late_floor,lateSleep:r.late_sleep};
     });
   }catch(e){console.warn('Register load error',e);}
-  await loadExcusedMap();
+  await Promise.all([loadExcusedMap(), loadBoardingPenalties()]);
   renderRegister();
 }
 
@@ -1220,6 +1253,14 @@ function _regMakeRow(name, idx){
   const isMorning=sess==='morning';
   const isHoob=sess==='hoob';
   const stObj=_brState[name]||{};
+  // Penalty badges
+  const _bPens=_boardingPenaltyMap[name]||[];
+  const _hasWake=_bPens.some(x=>x.infraction_type==='late_wake');
+  const _hasFloor=_bPens.some(x=>x.infraction_type==='late_floor');
+  const _penBadges=_bPens.length?`<span style="display:inline-flex;gap:3px;margin-top:3px">
+    ${_hasWake?'<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#fffbeb;border:1px solid #d97706;color:#d97706">🛏 Wake</span>':''}
+    ${_hasFloor?'<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#fffbeb;border:1px solid #d97706;color:#d97706">🚶 Floor</span>':''}
+  </span>`:'';
   const penaltyBtns=(isMorning||isHoob)&&_boardingWindowOpen?`
     <div style="display:flex;gap:3px;margin-top:4px">
       ${isMorning?`<button onclick="toggleBoardingPenalty('${safe}','lateWake')" style="font-size:9px;padding:2px 6px;border-radius:4px;border:1px solid ${stObj.lateWake?'#d97706':'#e5e7eb'};background:${stObj.lateWake?'#fffbeb':'transparent'};color:${stObj.lateWake?'#d97706':'#9ca3af'};cursor:pointer">🛏 Wake</button>`:''}
@@ -1230,7 +1271,7 @@ function _regMakeRow(name, idx){
     <span class="reg-num">${idx}.</span>
     <div style="flex:1;min-width:0">
       <span class="reg-name" style="display:block">${name}</span>
-      ${excTag}${depTimeStr}${depBtn}${penaltyBtns}
+      ${excTag}${depTimeStr}${depBtn}${_penBadges}${penaltyBtns}
     </div>
     <div class="reg-btns">
       <button class="reg-btn ${st==='present'?'active-present':''}" data-opt="present" data-regname="${safe}" style="${_boardingWindowOpen?'':'opacity:.35;cursor:not-allowed'}" ${_boardingWindowOpen?'':'disabled'}>✓</button>
