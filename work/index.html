@@ -30811,30 +30811,21 @@ async function saveBoardingSettings(){
 
 // ── BOARDING SESSION LOGIC ───────────────────────────────────
 function getCurrentSession(slotStartTime){
-  // Returns 'morning'|'prep'|'hoob' based on slot time or current time
   const toM=t=>{if(!t)return 0;const[h,m]=t.split(':');return parseInt(h)*60+parseInt(m);};
   const bs=_boardingSettings||{};
   const morning=toM(bs.morningTime||'07:15');
   const prep=toM(bs.prepTime||'19:00');
   const hoob=toM(bs.hoobTime||'21:30');
-  // If slot time provided, determine session from slot's start time window
-  // morning slots: 05:00-12:00
-  // prep slots: 15:00-21:00
-  // hoob slots: 21:00-05:00 (next day)
+  // Use slot start time or current clock time — same logic either way
+  let mins;
   if(slotStartTime){
-    const sm=toM(slotStartTime);
-    if(sm>=300&&sm<720)return'morning';  // 05:00-12:00
-    if(sm>=900&&sm<1260)return'prep';    // 15:00-21:00
-    return'hoob';
+    mins=toM(slotStartTime);
+  } else {
+    const now=new Date();
+    mins=now.getHours()*60+now.getMinutes();
   }
-  // Otherwise use current clock time
-  const now=new Date();
-  const mins=now.getHours()*60+now.getMinutes();
-  // morning session: morningTime until prepTime
   if(mins>=morning&&mins<prep)return'morning';
-  // prep session: prepTime until hoobTime
   if(mins>=prep&&mins<hoob)return'prep';
-  // hoob: hoobTime until next morning (includes midnight and early morning before morningTime)
   return'hoob';
 }
 
