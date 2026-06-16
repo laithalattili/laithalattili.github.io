@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hawking House — Liaison</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Hawking">
+<meta name="theme-color" content="#00205B">
 <style>
 :root{
   --navy:#00205B;--white:#fff;--bg:#f2ede8;--card:#fff;
@@ -89,6 +95,7 @@ body{background:var(--bg);min-height:100vh;}
   <div class="pin-dots" id="pin-dots">
     <div class="pin-dot" id="d0"></div><div class="pin-dot" id="d1"></div>
     <div class="pin-dot" id="d2"></div><div class="pin-dot" id="d3"></div>
+    <div class="pin-dot" id="d4"></div><div class="pin-dot" id="d5"></div>
   </div>
   <div class="pin-grid">
     <button class="pin-key" onclick="pinKey('1')">1</button>
@@ -133,7 +140,35 @@ body{background:var(--bg);min-height:100vh;}
 <script>
 const SUPA_URL='https://mkvfggacecgltscdrfqv.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rdmZnZ2FjZWNnbHRzY2RyZnF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTA4MzYzNDcsImV4cCI6MjAyNjQxMjM0N30.oS1ByNhNJtAkxTGqLz7-pMqHTwGUCFobHPnpXYhCDTU';
-const LIAISON_PIN='1234'; // Change this
+let LIAISON_PIN='000000'; // Loaded from Supabase
+let _liaison_session_ms = 7*24*60*60*1000; // default 1 week
+
+async function loadLiaisonPin(){
+  try{
+    const res = await fetch(
+      `${SUPA_URL}/rest/v1/boarding_settings?key=in.(liaisonPin,liaisonSessionPolicy)&apikey=${SUPA_KEY}`,
+      {headers:{Authorization:`Bearer ${SUPA_KEY}`,apikey:SUPA_KEY}}
+    );
+    const data = await res.json();
+    (data||[]).forEach(r=>{
+      try{
+        if(r.key==='liaisonPin') LIAISON_PIN=JSON.parse(r.value);
+        if(r.key==='liaisonSessionPolicy') _liaison_session_ms=sessionPolicyToMs(JSON.parse(r.value));
+      }catch{}
+    });
+  }catch(e){console.warn('PIN load failed:',e);}
+}
+
+function sessionPolicyToMs(policy){
+  if(policy==='always') return 0;
+  if(policy==='daily')  return 24*36e5;
+  if(policy==='weekly') return 7*864e5;
+  if(policy==='2weeks') return 14*864e5;
+  if(policy==='inactivity_4')  return 4*36e5;
+  if(policy==='inactivity_8')  return 8*36e5;
+  if(policy==='inactivity_24') return 24*36e5;
+  return 7*864e5;
+}
 
 async function supa(table){
   const base=`${SUPA_URL}/rest/v1/${table}`;
@@ -154,15 +189,23 @@ let _pin='';
 function pinKey(k){
   if(k==='back'){_pin=_pin.slice(0,-1);}
   else if(k==='ok'){checkPin();}
-  else if(_pin.length<4){_pin+=k;}
+  else if(_pin.length<6){_pin+=k;}
   updatePinDots();
   if(_pin.length===4)setTimeout(checkPin,100);
 }
 function updatePinDots(){
-  for(let i=0;i<4;i++) document.getElementById('d'+i).className='pin-dot'+(_pin.length>i?' filled':'');
+  const total=LIAISON_PIN.length||6;
+  for(let i=0;i<6;i++){
+    const dot=document.getElementById('d'+i);
+    if(!dot)return;
+    dot.style.display=i<total?'block':'none';
+    dot.className='pin-dot'+(_pin.length>i?' filled':'');
+  }
 }
 function checkPin(){
   if(_pin===LIAISON_PIN){
+    // Save auth timestamp for session persistence
+    try{ localStorage.setItem('liaison_auth_ts', Date.now().toString()); }catch{}
     document.getElementById('pin-screen').style.display='none';
     document.getElementById('app').style.display='block';
     init();
@@ -173,8 +216,27 @@ function checkPin(){
   }
 }
 
+function checkSessionValid(){
+  if(_liaison_session_ms===0) return false; // always ask
+  try{
+    const ts=parseInt(localStorage.getItem('liaison_auth_ts')||'0');
+    return Date.now()-ts < _liaison_session_ms;
+  }catch{return false;}
+}
+
 // ── INIT ─────────────────────────────────────────────────────────────────────
 function today(){return new Date().toISOString().split('T')[0];}
+// Load PIN from Supabase, then check session
+window.addEventListener('DOMContentLoaded', async ()=>{
+  await loadLiaisonPin();
+  updatePinDots();
+  if(checkSessionValid()){
+    document.getElementById('pin-screen').style.display='none';
+    document.getElementById('app').style.display='block';
+    init();
+  }
+});
+
 async function init(){
   document.getElementById('header-date').textContent=
     new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
@@ -314,6 +376,15 @@ async function loadMedical(){
   });
   html+='</div>';
   el.innerHTML=html;
+}
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(r => console.log('Liaison SW registered'))
+      .catch(e => console.warn('SW failed:', e));
+  });
 }
 </script>
 </body>
