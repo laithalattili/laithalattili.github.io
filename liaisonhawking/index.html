@@ -145,23 +145,22 @@ let _liaison_session_ms = 7*24*60*60*1000; // default 1 week
 
 async function loadLiaisonPin(){
   try{
-    const res = await fetch(
-      `${SUPA_URL}/rest/v1/boarding_settings?key=in.(liaisonPin,liaisonSessionPolicy)&apikey=${SUPA_KEY}`,
-      {headers:{Authorization:`Bearer ${SUPA_KEY}`,apikey:SUPA_KEY}}
-    );
-    const data = await res.json();
-    (data||[]).forEach(r=>{
+    // Use the same supa() helper as the rest of the app
+    const data = await (await supa('boarding_settings')).get('key=in.(liaisonPin,liaisonSessionPolicy)');
+    (Array.isArray(data)?data:[]).forEach(r=>{
       try{
         if(r.key==='liaisonPin'){
           let v=r.value;
-          // Strip outer JSON quotes if double-stringified
           try{v=JSON.parse(v);}catch{}
-          if(typeof v==='object') try{v=JSON.parse(JSON.stringify(v));}catch{}
+          // Handle double-stringified values
+          if(typeof v==='string'&&(v.startsWith('"')||v.startsWith("'"))) try{v=JSON.parse(v);}catch{}
           LIAISON_PIN=String(v).trim();
           console.log('Liaison PIN loaded, length='+LIAISON_PIN.length);
           updatePinDots();
         }
-        if(r.key==='liaisonSessionPolicy') _liaison_session_ms=sessionPolicyToMs(JSON.parse(r.value));
+        if(r.key==='liaisonSessionPolicy'){
+          try{_liaison_session_ms=sessionPolicyToMs(JSON.parse(r.value));}catch{}
+        }
       }catch(e){console.warn('PIN parse error:',e);}
     });
   }catch(e){console.warn('PIN load failed:',e);}
