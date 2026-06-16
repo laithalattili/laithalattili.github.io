@@ -1122,6 +1122,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
         <button class="hwk-filter-btn" id="hwk-f-rooms" onclick="setHwkFilter('rooms',this)">Rooms</button>
         <button class="hwk-filter-btn" id="hwk-f-register" onclick="setHwkFilter('register',this)">Register</button>
         <button class="hwk-filter-btn" id="hwk-f-away" onclick="setHwkFilter('away',this)">Away</button>
+        <button class="hwk-filter-btn" id="hwk-f-sanctions" onclick="setHwkFilter('sanctions',this)">⚠️ Sanctions</button>
       </div>
       <div id="hwk-count-badge" style="font-size:11px;color:var(--text3);padding:4px 6px;flex-shrink:0"></div>
       <button id="hwk-collapse-toggle-btn" onclick="hwkToggleAll()" style="font-size:10px;padding:4px 8px;border:1px solid var(--border);border-radius:var(--rsm);background:#fff;color:var(--text3);cursor:pointer;white-space:nowrap;flex-shrink:0">Expand All</button>
@@ -25926,6 +25927,78 @@ function chip(num, lbl, cls=''){
   return `<div class="totals-chip ${cls}"><span class="tc-num">${num}</span><span class="tc-lbl">${lbl}</span></div>`;
 }
 
+async function renderSanctionsList(el){
+  if(!el)return;
+  el.innerHTML='<div style="padding:1rem;text-align:center;color:var(--text3);font-size:13px">Loading...</div>';
+  const today=new Date().toISOString().split('T')[0];
+  try{
+    const {data,error}=await supa.from('boarding_penalties')
+      .select('*').in('status',['active','pending']).order('penalty_date').order('student_name');
+    if(error)throw error;
+    if(!data||!data.length){
+      el.innerHTML='<div style="padding:2rem;text-align:center;color:var(--text3);font-size:13px">No active sanctions.</div>';
+      return;
+    }
+    const infraLabel={late_wake:'🛏 Late Wake',late_floor:'🚶 Late Floor',late_sleep:'😴 Late Sleep'};
+    const penLabel=p=>{const m=parseInt((p.penalty_type||'').replace('phone_','').replace('min',''))||0;return m+' min phone time';};
+    // Group by penalty_date
+    const byDate={};
+    data.forEach(p=>{
+      const d=p.penalty_date||today;
+      if(!byDate[d])byDate[d]=[];
+      byDate[d].push(p);
+    });
+    let html='';
+    Object.keys(byDate).sort().forEach(date=>{
+      const isPast=date<today;
+      const isToday=date===today;
+      const label=isToday?'Today':isPast?'Overdue — '+date:date;
+      const color=isPast?'#dc2626':isToday?'#d97706':'#475569';
+      html+=`<div style="padding:.5rem 1rem .3rem;font-size:11px;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:.06em;background:#f8fafc;border-bottom:1px solid #e2e8f0">
+        ${isPast?'⚠️ ':''}${label}
+      </div>`;
+      byDate[date].forEach(p=>{
+        html+=`<div style="display:flex;align-items:center;gap:8px;padding:10px 1rem;border-bottom:1px solid #f1f5f9;background:${isPast?'#fef2f2':'#fff'}">
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;color:#111">${p.student_name}</div>
+            <div style="font-size:11px;color:#6b7280;margin-top:2px">${infraLabel[p.infraction_type]||p.infraction_type} · ${penLabel(p)}</div>
+            <div style="font-size:10px;color:#9ca3af;margin-top:1px">Logged: ${p.infraction_date}${p.logged_by?' by '+p.logged_by:''}</div>
+            ${p.status==='pending'?'<div style="font-size:10px;color:#d97706;margin-top:1px">⏳ Pending — student on leave</div>':''}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+            <button onclick="markSanctionDone('${p.id}')" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid #16a34a;background:#f0fdf4;color:#16a34a;cursor:pointer;font-weight:600;white-space:nowrap">✓ Done</button>
+            ${isPast?`<button onclick="rollSanction('${p.id}')" style="font-size:10px;padding:3px 8px;border-radius:5px;border:1px solid #dee2e6;background:#fff;color:#6b7280;cursor:pointer;white-space:nowrap">→ Tomorrow</button>`:''}
+          </div>
+        </div>`;
+      });
+    });
+    el.innerHTML=html;
+  }catch(e){
+    el.innerHTML='<div style="padding:1rem;color:#dc2626;font-size:13px">Error loading sanctions: '+e.message+'</div>';
+  }
+}
+
+async function markSanctionDone(id){
+  try{
+    await supa.from('boarding_penalties').update({status:'applied'}).eq('id',id);
+    showToastMsg('✓ Sanction marked as done','#16a34a');
+    const el=document.getElementById('hawking-list-content');
+    if(el&&_hwkFilter==='sanctions')renderSanctionsList(el);
+    // Refresh penalty badges in register
+    if(_hwkFilter==='register'){if(el)renderHawkingRegister(el);}
+  }catch(e){showToastMsg('Error: '+e.message,'#dc2626');}
+}
+
+async function rollSanction(id){
+  try{
+    const tomorrow=new Date(Date.now()+86400000).toISOString().split('T')[0];
+    await supa.from('boarding_penalties').update({penalty_date:tomorrow}).eq('id',id);
+    showToastMsg('→ Moved to tomorrow','#6b7280');
+    const el=document.getElementById('hawking-list-content');
+    if(el&&_hwkFilter==='sanctions')renderSanctionsList(el);
+  }catch(e){showToastMsg('Error: '+e.message,'#dc2626');}
+}
+
 async function renderAwayList(el){
   if(!el)return;
   el.innerHTML='<div style="padding:1rem;text-align:center;color:var(--text3);font-size:13px">Loading...</div>';
@@ -25944,7 +26017,7 @@ async function renderAwayList(el){
     }
   });
   if(!awayStudents.length){
-    el.innerHTML='<div style="padding:2rem;text-align:center;color:var(--text3);font-size:13px">No students currently away or marked absent.</div>';
+    el.innerHTML='<div style="padding:2rem;text-align:center;color:var(--text3);font-size:13px">No students currently away, on leave, or marked absent.<br><span style="font-size:11px;color:#9ca3af">Unregistered students do not appear here.</span></div>';
     return;
   }
   // Group by type
@@ -25980,8 +26053,19 @@ async function renderAwayList(el){
 }
 
 async function renderHawkingRegister(el, preloadedMap){
-  // Use preloaded map if provided (for instant re-render), otherwise fetch fresh
   const excusedMap=preloadedMap||await getTodayExcusedMap();
+  // Load today's active penalties for badge display
+  const today=new Date().toISOString().split('T')[0];
+  let _penaltyMap={};
+  try{
+    const {data}=await supa.from('boarding_penalties')
+      .select('student_name,infraction_type,penalty_date,status')
+      .in('status',['active','pending']).eq('infraction_date',today);
+    (data||[]).forEach(p=>{
+      if(!_penaltyMap[p.student_name])_penaltyMap[p.student_name]=[];
+      _penaltyMap[p.student_name].push(p);
+    });
+  }catch(e){}
 
   const allHouse=window._regAllHouse||false;
   let people=[];
@@ -26060,12 +26144,20 @@ async function renderHawkingRegister(el, preloadedMap){
       }
     }
     const timeStr=updatedAt?`<span style="font-size:9px;color:#9ca3af;display:block;margin-top:1px">${updatedAt}${updatedBy?' · '+updatedBy:''}</span>`:'';
+    // Penalty badges
+    const penalties=_penaltyMap[p.name]||[];
+    const hasWake=penalties.some(x=>x.infraction_type==='late_wake');
+    const hasFloor=penalties.some(x=>x.infraction_type==='late_floor');
+    const penBadges=penalties.length?`<span style="display:inline-flex;gap:3px;margin-top:2px">
+      ${hasWake?'<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#fffbeb;border:1px solid #d97706;color:#d97706">🛏 Wake</span>':''}
+      ${hasFloor?'<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#fffbeb;border:1px solid #d97706;color:#d97706">🚶 Floor</span>':''}
+    </span>`:'';
     rows+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #f1f5f9;background:${rowBg}">
       <span style="font-size:10px;color:#d1d5db;min-width:18px;text-align:right;font-variant-numeric:tabular-nums">${i+1}</span>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:500;color:#111">${p.name}</div>
         ${excuseTag}${depTimeStr}${depBtn}
-        ${timeStr}
+        ${penBadges}${timeStr}
       </div>
       ${typeTag}
       ${displayBadge}
@@ -26148,6 +26240,7 @@ function setHwkFilter(f,btn){
       const el=document.getElementById('hawking-list-content');
       if(el&&_hwkFilter==='register')renderHawkingRegister(el);
       if(el&&_hwkFilter==='away')renderAwayList(el);
+      if(el&&_hwkFilter==='sanctions')renderSanctionsList(el);
     });
     // Show loading state immediately
     const el=document.getElementById('hawking-list-content');
