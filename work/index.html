@@ -30839,13 +30839,15 @@ function getSessionEmoji(s){
 
 // ── BOARDING PENALTIES REALTIME ──────────────────────────────
 let _penaltySub=null;
+let _penaltyOwnWrite=false; // suppress RT re-render for our own writes
 
 function _subscribePenaltiesRealtime(){
   if(_penaltySub)return;
   _penaltySub=supa.channel('boarding_penalties_rt')
     .on('postgres_changes',{event:'*',schema:'public',table:'boarding_penalties'},
       payload=>{
-        console.log('Penalty RT event:',payload.eventType);
+        // Ignore our own writes — UI already updated optimistically
+        if(_penaltyOwnWrite)return;
         const el=document.getElementById('hawking-list-content');
         if(_hwkFilter==='sanctions'&&el){
           setTimeout(()=>renderSanctionsList(el),100);
@@ -31081,6 +31083,7 @@ async function _brTogglePenalty(name, field){
     if(hasPhonePenalty){
       (async()=>{
         try{
+          _penaltyOwnWrite=true;
           const penaltyMins=field==='lateSleep'?(parseInt(bs.penaltySleepMins)||2):(parseInt(bs.penaltyWakeMins)||5);
           // Always delete first to prevent duplicates
           await supa.from('boarding_penalties')
@@ -31102,12 +31105,16 @@ async function _brTogglePenalty(name, field){
               status:'active',logged_by:'HSM',notes:getSessionLabel(session)
             });
           }
-          // Refresh sanctions if open (after DB settled)
+        }catch(e){console.warn('Penalty sync:',e);}
+        finally{
+          // Clear flag after a short delay to let RT event pass
+          setTimeout(()=>{_penaltyOwnWrite=false;},500);
+          // Refresh sanctions if open
           if(_hwkFilter==='sanctions'){
             const _el=document.getElementById('hawking-list-content');
             if(_el)renderSanctionsList(_el);
           }
-        }catch(e){console.warn('Penalty sync:',e);}
+        }
       })();
     }
   }finally{
