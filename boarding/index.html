@@ -1593,7 +1593,12 @@ async function confirmBoardingReturn(leaveId){
   }catch(e){showToast('Error: '+e.message,'#dc2626');}
 }
 
+const _bPenInFlight=new Set();
+
 async function toggleBoardingPenalty(name, field){
+  const guardKey=name+'|'+field;
+  if(_bPenInFlight.has(guardKey))return;
+  _bPenInFlight.add(guardKey);
   const role=_identity?_identity.role:'AHSM';
   const session=getBoardingCurrentSession();
   const td=today();
@@ -1605,12 +1610,15 @@ async function toggleBoardingPenalty(name, field){
   try{
     if(!cur){
       if(hasPhonePenalty){
+        // Delete any existing rows first to prevent duplicates
+        await supa.from('boarding_penalties')
+          .delete().eq('student_name',name).eq('infraction_date',td).eq('infraction_type',infraction);
         const penMins=field==='lateSleep'?(parseInt(BS.penaltySleepMins)||2):(parseInt(BS.penaltyWakeMins)||5);
         let penDate=field==='lateSleep'?new Date(Date.now()+86400000).toISOString().split('T')[0]:td;
-        // Check for conflict on same day
-        const {data:existing}=await supa.from('boarding_penalties')
-          .select('penalty_date').eq('student_name',name).eq('penalty_date',penDate).in('status',['active','pending']);
-        if(existing&&existing.length){
+        // Check for conflict on that day
+        const {data:conflict}=await supa.from('boarding_penalties')
+          .select('id').eq('student_name',name).eq('penalty_date',penDate).in('status',['active','pending']);
+        if(conflict&&conflict.length){
           const d=new Date(penDate);d.setDate(d.getDate()+1);
           penDate=d.toISOString().split('T')[0];
         }
@@ -1625,6 +1633,7 @@ async function toggleBoardingPenalty(name, field){
       }
     } else {
       if(hasPhonePenalty){
+        // Delete ALL matching rows (catches duplicates too)
         await supa.from('boarding_penalties')
           .delete().eq('student_name',name).eq('infraction_date',td).eq('infraction_type',infraction);
       }
@@ -1639,10 +1648,15 @@ async function toggleBoardingPenalty(name, field){
       late_sleep:_brState[name].lateSleep||false
     },{onConflict:'student_name,register_date,session_type'});
     renderRegister();
-    // Refresh penalties display
     await loadBoardingPenalties();
     loadInfoPenalties();
-  }catch(e){showToast('Error: '+e.message,'#dc2626');}
+  }catch(e){
+    showToast('Error: '+e.message,'#dc2626');
+    // Revert local state on error
+    _brState[name][field]=!_brState[name][field];
+  }finally{
+    _bPenInFlight.delete(name+'|'+field);
+  }
 }
 
 async function undoBoardingDeparture(leaveId){
