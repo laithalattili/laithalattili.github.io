@@ -152,9 +152,17 @@ async function loadLiaisonPin(){
     const data = await res.json();
     (data||[]).forEach(r=>{
       try{
-        if(r.key==='liaisonPin'){LIAISON_PIN=String(JSON.parse(r.value));updatePinDots();}
+        if(r.key==='liaisonPin'){
+          let v=r.value;
+          // Strip outer JSON quotes if double-stringified
+          try{v=JSON.parse(v);}catch{}
+          if(typeof v==='object') try{v=JSON.parse(JSON.stringify(v));}catch{}
+          LIAISON_PIN=String(v).trim();
+          console.log('Liaison PIN loaded, length='+LIAISON_PIN.length);
+          updatePinDots();
+        }
         if(r.key==='liaisonSessionPolicy') _liaison_session_ms=sessionPolicyToMs(JSON.parse(r.value));
-      }catch{}
+      }catch(e){console.warn('PIN parse error:',e);}
     });
   }catch(e){console.warn('PIN load failed:',e);}
 }
@@ -203,12 +211,20 @@ function updatePinDots(){
   }
 }
 function checkPin(){
-  if(_pin===LIAISON_PIN){
-    // Save auth timestamp for session persistence
+  // Normalise both to trimmed strings for safe comparison
+  const entered = String(_pin).trim();
+  const stored  = String(LIAISON_PIN).trim();
+  console.log('checkPin: entered='+JSON.stringify(entered)+' stored='+JSON.stringify(stored)+' match='+(entered===stored));
+  if(entered && stored && entered===stored){
     try{ localStorage.setItem('liaison_auth_ts', Date.now().toString()); }catch{}
     document.getElementById('pin-screen').style.display='none';
     document.getElementById('app').style.display='block';
     init();
+  } else if(!stored){
+    // PIN not yet loaded — wait and retry
+    document.getElementById('pin-error').textContent='Loading PIN, please try again…';
+    _pin=''; updatePinDots();
+    setTimeout(()=>document.getElementById('pin-error').textContent='',2000);
   } else {
     document.getElementById('pin-error').textContent='Incorrect PIN';
     _pin=''; updatePinDots();
