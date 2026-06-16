@@ -1038,18 +1038,27 @@ async function loadInfoPenalties(){
 async function boardingMarkDone(id){
   try{
     const today=new Date().toISOString().split('T')[0];
-    const {data:p}=await supa.from('boarding_penalties').select('penalty_date,infraction_date').eq('id',id).single();
-    if(p&&(p.penalty_date===today||p.infraction_date===today)){
-      await supa.from('boarding_penalties').delete().eq('id',id);
+    // Fetch penalty details
+    const {data:rows}=await supa.from('boarding_penalties').select('id,penalty_date,infraction_date').eq('id',id);
+    const p=rows&&rows[0];
+    console.log('boardingMarkDone: id=',id,'found=',p);
+    if(!p){showToast('Sanction not found','#dc2626');loadInfoPenalties();return;}
+    if(p.penalty_date===today||p.infraction_date===today){
+      const {error}=await supa.from('boarding_penalties').delete().eq('id',id);
+      if(error)throw error;
       showToast('✓ Sanction removed','#16a34a');
     } else {
-      await supa.from('boarding_penalties').update({status:'applied'}).eq('id',id);
+      const {error}=await supa.from('boarding_penalties').update({status:'applied'}).eq('id',id);
+      if(error)throw error;
       showToast('✓ Sanction marked done','#16a34a');
     }
     await loadBoardingPenalties();
     loadInfoPenalties();
     renderRegister();
-  }catch(e){showToast('Error: '+e.message,'#dc2626');}
+  }catch(e){
+    console.error('boardingMarkDone error:',e);
+    showToast('Error: '+e.message,'#dc2626');
+  }
 }
 
 async function boardingRollSanction(id){
