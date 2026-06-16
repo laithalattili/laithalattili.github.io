@@ -1215,11 +1215,22 @@ function _regMakeRow(name, idx){
     ?`<button onclick="undoBoardingDeparture('${exc.leaveId}')" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid #d1d5db;background:#f9fafb;color:#6b7280;cursor:pointer;margin-top:2px;display:inline-block;margin-right:4px">↩ Undo</button>`+
      (exc.leave_type!=='longterm'?`<button onclick="confirmBoardingReturn('${exc.leaveId}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #16a34a;background:#f0fdf4;color:#16a34a;cursor:pointer;margin-top:2px;display:inline-block">✓ Return</button>`:'')
     :'';
+  // Penalty toggles — only during boarding window
+  const sess=getBoardingCurrentSession();
+  const isMorning=sess==='morning';
+  const isHoob=sess==='hoob';
+  const stObj=_brState[name]||{};
+  const penaltyBtns=(isMorning||isHoob)&&_boardingWindowOpen?`
+    <div style="display:flex;gap:3px;margin-top:4px">
+      ${isMorning?`<button onclick="toggleBoardingPenalty('${safe}','lateWake')" style="font-size:9px;padding:2px 6px;border-radius:4px;border:1px solid ${stObj.lateWake?'#d97706':'#e5e7eb'};background:${stObj.lateWake?'#fffbeb':'transparent'};color:${stObj.lateWake?'#d97706':'#9ca3af'};cursor:pointer">🛏 Wake</button>`:''}
+      ${isMorning?`<button onclick="toggleBoardingPenalty('${safe}','lateFloor')" style="font-size:9px;padding:2px 6px;border-radius:4px;border:1px solid ${stObj.lateFloor?'#d97706':'#e5e7eb'};background:${stObj.lateFloor?'#fffbeb':'transparent'};color:${stObj.lateFloor?'#d97706':'#9ca3af'};cursor:pointer">🚶 Floor</button>`:''}
+      ${isHoob?`<button onclick="toggleBoardingPenalty('${safe}','lateSleep')" style="font-size:9px;padding:2px 6px;border-radius:4px;border:1px solid ${stObj.lateSleep?'#ef4444':'#e5e7eb'};background:${stObj.lateSleep?'#fef2f2':'transparent'};color:${stObj.lateSleep?'#ef4444':'#9ca3af'};cursor:pointer">😴 Sleep</button>`:''}
+    </div>`:'';
   return `<div class="reg-row ${st}" data-name="${safe}">
     <span class="reg-num">${idx}.</span>
     <div style="flex:1;min-width:0">
       <span class="reg-name" style="display:block">${name}</span>
-      ${excTag}${depTimeStr}${depBtn}
+      ${excTag}${depTimeStr}${depBtn}${penaltyBtns}
     </div>
     <div class="reg-btns">
       <button class="reg-btn ${st==='present'?'active-present':''}" data-opt="present" onclick="${_boardingWindowOpen?'regTap(\''+safe+'\',\'present\')':''}" style="${_boardingWindowOpen?'':'opacity:.35;cursor:not-allowed'}" ${_boardingWindowOpen?'':'disabled'}>✓</button>
@@ -1466,6 +1477,44 @@ async function confirmBoardingReturn(leaveId){
     // Refresh in background
     loadExcusedMap().then(()=>renderRegister());
     loadInfoLeaves();
+  }catch(e){showToast('Error: '+e.message,'#dc2626');}
+}
+
+async function toggleBoardingPenalty(name, field){
+  const role=_identity?_identity.role:'AHSM';
+  const session=getBoardingCurrentSession();
+  const td=today();
+  if(!_brState[name])_brState[name]={};
+  const cur=_brState[name][field]||false;
+  _brState[name][field]=!cur;
+  // Determine penalty
+  const penMins=field==='lateSleep'?(parseInt(BS.penaltySleepMins)||2):(parseInt(BS.penaltyWakeMins)||5);
+  const penDate=field==='lateSleep'?new Date(Date.now()+86400000).toISOString().split('T')[0]:td;
+  const infraction=field==='lateWake'?'late_wake':field==='lateFloor'?'late_floor':'late_sleep';
+  try{
+    if(!cur){
+      // Log penalty
+      await supa.from('boarding_penalties').insert({
+        student_name:name,infraction_type:infraction,infraction_date:td,
+        penalty_type:'phone_'+penMins+'min',penalty_date:penDate,
+        status:'active',logged_by:role
+      });
+      showToast('⚠️ Penalty logged: '+name,'#d97706');
+    } else {
+      // Remove penalty
+      await supa.from('boarding_penalties')
+        .delete().eq('student_name',name).eq('infraction_date',td).eq('infraction_type',infraction);
+      showToast('Penalty removed: '+name,'#6b7280');
+    }
+    // Update registration row
+    await supa.from('boarding_registrations').upsert({
+      student_name:name,register_date:td,session_type:session,
+      status:_brState[name].status||'',updated_by:role,updated_at:new Date().toISOString(),
+      late_wake:_brState[name].lateWake||false,
+      late_floor:_brState[name].lateFloor||false,
+      late_sleep:_brState[name].lateSleep||false
+    },{onConflict:'student_name,register_date,session_type'});
+    renderRegister();
   }catch(e){showToast('Error: '+e.message,'#dc2626');}
 }
 
