@@ -30138,7 +30138,7 @@ async function confirmReturn(id){
         new_status:'present',
         changed_by:'HSM',
         session_type:'boarding'
-      }).then(()=>{}).catch(()=>{});
+      }).then(()=>{},()=>{});
     }
 
     showToastMsg('✓ '+(studentName||'Student')+' returned & marked Present','#16a34a');
@@ -30936,7 +30936,7 @@ function _brTap(name,status,sessionType){
           const rec={student_name:name,register_date:today,status,updated_by:'HSM',session_type:sType,updated_at:new Date().toISOString(),
             late_wake:existing.lateWake||false,late_floor:existing.lateFloor||false,late_sleep:existing.lateSleep||false};
           await supa.from('boarding_registrations').upsert(rec,{onConflict:'student_name,register_date,session_type'});
-          supa.from('boarding_registration_history').insert({student_name:name,register_date:today,previous_status:cur||null,new_status:status,changed_by:'HSM',session_type:sType}).catch(()=>{});
+          supa.from('boarding_registration_history').insert({student_name:name,register_date:today,previous_status:cur||null,new_status:status,changed_by:'HSM',session_type:sType}).then(()=>{},()=>{});
         }
         return; // success
       }catch(e){
@@ -31051,7 +31051,7 @@ function _fireTap(name, status){
       student_name:name, register_date:_brToday(),
       previous_status:cur||null, new_status:status,
       changed_by:'HSM', session_type:'fire'
-    }).then(()=>{}).catch(()=>{});
+    }).then(()=>{},()=>{});
   }
 }
 
