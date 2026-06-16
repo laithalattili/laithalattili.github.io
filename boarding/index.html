@@ -984,7 +984,11 @@ async function loadInfoPenalties(){
       .select('*').in('status',['active','pending']).order('penalty_date').order('student_name');
     if(!data||!data.length){el.innerHTML='<div style="padding:8px 0;color:#aaa;font-size:12px">No active sanctions.</div>';return;}
     const infraLabel={late_wake:'🛏 Late Wake',late_floor:'🚶 Late Floor',late_sleep:'😴 Late Sleep'};
-    const penLabel=p=>{const m=parseInt((p.penalty_type||'').replace('phone_','').replace('min',''))||0;return m+' min phone';};
+    const normalMins=parseInt(BS.normalPhoneMins)||20;
+    const penLabel=p=>{
+      const m=parseInt((p.penalty_type||'').replace('phone_','').replace('min',''))||0;
+      return m+' min phone time (instead of '+normalMins+' min)';
+    };
     // Group by student so multiple penalties per student are visually together
     const byStudent={};
     const studentOrder=[];
@@ -1002,7 +1006,7 @@ async function loadInfoPenalties(){
       return `<div style="border:1px solid ${hasOverdue?'#fca5a5':'#e5e7eb'};border-radius:8px;margin-bottom:8px;overflow:hidden;background:${hasOverdue?'#fff5f5':'#fff'}">
         <div style="padding:8px 12px;background:${hasOverdue?'#fef2f2':'#f8fafc'};border-bottom:1px solid ${hasOverdue?'#fca5a5':'#e5e7eb'};display:flex;align-items:center;justify-content:space-between">
           <span style="font-size:13px;font-weight:700;color:#1a1a1a">${name}</span>
-          <span style="font-size:11px;font-weight:700;color:#ef4444">⏱ ${totalMins} min total</span>
+          <span style="font-size:11px;font-weight:700;color:#ef4444">⚠️ ${penalties.filter(p=>p.penalty_type).length} sanction${penalties.filter(p=>p.penalty_type).length!==1?'s':''}</span>
         </div>
         ${penalties.map(p=>{
           const isPast=p.penalty_date<today;
@@ -1012,7 +1016,8 @@ async function loadInfoPenalties(){
           const lid=p.id;
           return `<div style="padding:8px 12px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;gap:8px">
             <div>
-              <div style="font-size:11px;font-weight:600;color:#374151">${infraLabel[p.infraction_type]||p.infraction_type} · ${penLabel(p)}</div>
+              <div style="font-size:11px;font-weight:600;color:#374151">${infraLabel[p.infraction_type]||p.infraction_type}</div>
+              <div style="font-size:11px;color:#ef4444;font-weight:700">${penLabel(p)}</div>
               <div style="font-size:10px;color:${dateColor};margin-top:1px;font-weight:600">${isPast?'⚠️ ':''}${dateLabel}</div>
               ${p.status==='pending'?'<div style="font-size:10px;color:#d97706">⏳ Pending — on leave</div>':''}
             </div>
@@ -1561,24 +1566,35 @@ async function toggleBoardingPenalty(name, field){
   if(!_brState[name])_brState[name]={};
   const cur=_brState[name][field]||false;
   _brState[name][field]=!cur;
-  // Determine penalty
-  const penMins=field==='lateSleep'?(parseInt(BS.penaltySleepMins)||2):(parseInt(BS.penaltyWakeMins)||5);
-  const penDate=field==='lateSleep'?new Date(Date.now()+86400000).toISOString().split('T')[0]:td;
   const infraction=field==='lateWake'?'late_wake':field==='lateFloor'?'late_floor':'late_sleep';
+  const hasPhonePenalty=field!=='lateFloor';
   try{
     if(!cur){
-      // Log penalty
-      await supa.from('boarding_penalties').insert({
-        student_name:name,infraction_type:infraction,infraction_date:td,
-        penalty_type:'phone_'+penMins+'min',penalty_date:penDate,
-        status:'active',logged_by:role
-      });
-      showToast('⚠️ Penalty logged: '+name,'#d97706');
+      if(hasPhonePenalty){
+        const penMins=field==='lateSleep'?(parseInt(BS.penaltySleepMins)||2):(parseInt(BS.penaltyWakeMins)||5);
+        let penDate=field==='lateSleep'?new Date(Date.now()+86400000).toISOString().split('T')[0]:td;
+        // Check for conflict on same day
+        const {data:existing}=await supa.from('boarding_penalties')
+          .select('penalty_date').eq('student_name',name).eq('penalty_date',penDate).in('status',['active','pending']);
+        if(existing&&existing.length){
+          const d=new Date(penDate);d.setDate(d.getDate()+1);
+          penDate=d.toISOString().split('T')[0];
+        }
+        await supa.from('boarding_penalties').insert({
+          student_name:name,infraction_type:infraction,infraction_date:td,
+          penalty_type:'phone_'+penMins+'min',penalty_date:penDate,
+          status:'active',logged_by:role
+        });
+        showToast('⚠️ '+penMins+' min phone time on '+penDate,'#d97706');
+      } else {
+        showToast('🚶 Late floor logged for '+name,'#6b7280');
+      }
     } else {
-      // Remove penalty
-      await supa.from('boarding_penalties')
-        .delete().eq('student_name',name).eq('infraction_date',td).eq('infraction_type',infraction);
-      showToast('Penalty removed: '+name,'#6b7280');
+      if(hasPhonePenalty){
+        await supa.from('boarding_penalties')
+          .delete().eq('student_name',name).eq('infraction_date',td).eq('infraction_type',infraction);
+      }
+      showToast('Removed: '+name,'#6b7280');
     }
     // Update registration row
     await supa.from('boarding_registrations').upsert({
