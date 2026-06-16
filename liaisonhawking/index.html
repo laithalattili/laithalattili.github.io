@@ -137,48 +137,34 @@ body{background:var(--bg);min-height:100vh;}
   <div id="tab-medical" class="section" style="display:none"></div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
 const SUPA_URL='https://mkvfggacecgltscdrfqv.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rdmZnZ2FjZWNnbHRzY2RyZnF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTA4MzYzNDcsImV4cCI6MjAyNjQxMjM0N30.oS1ByNhNJtAkxTGqLz7-pMqHTwGUCFobHPnpXYhCDTU';
+const _supaClient = supabase.createClient(SUPA_URL, SUPA_KEY);
 let LIAISON_PIN=''; // Loaded from Supabase
 let _liaison_session_ms = 7*24*60*60*1000; // default 1 week
 
 async function loadLiaisonPin(){
-  // Try boarding_settings first, fall back to work_app_data
-  const tables = ['boarding_settings', 'work_app_data'];
-  for(const table of tables){
-    try{
-      const res = await fetch(
-        `${SUPA_URL}/rest/v1/${table}?key=in.(liaisonPin,liaisonSessionPolicy)&apikey=${SUPA_KEY}`,
-        {headers:{
-          'Authorization': `Bearer ${SUPA_KEY}`,
-          'apikey': SUPA_KEY,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation'
-        }}
-      );
-      if(!res.ok){console.warn('loadLiaisonPin: '+table+' returned '+res.status);continue;}
-      const data = await res.json();
-      if(!Array.isArray(data)||!data.length){continue;}
-      data.forEach(r=>{
-        try{
-          if(r.key==='liaisonPin'){
-            let v=r.value;
-            try{v=JSON.parse(v);}catch{}
-            if(typeof v==='string'&&v.startsWith('"')) try{v=JSON.parse(v);}catch{}
-            LIAISON_PIN=String(v).trim();
-            console.log('Liaison PIN loaded from '+table+', length='+LIAISON_PIN.length);
-            updatePinDots();
-          }
-          if(r.key==='liaisonSessionPolicy'){
-            try{_liaison_session_ms=sessionPolicyToMs(JSON.parse(r.value));}catch{}
-          }
-        }catch(e){console.warn('PIN parse error:',e);}
-      });
-      if(LIAISON_PIN) break; // got it, stop trying
-    }catch(e){console.warn('loadLiaisonPin error on '+table+':',e);}
-  }
-  if(!LIAISON_PIN) console.warn('Could not load liaison PIN from any source');
+  try{
+    const {data,error}=await _supaClient.from('boarding_settings')
+      .select('key,value').in('key',['liaisonPin','liaisonSessionPolicy']);
+    if(error)throw error;
+    (data||[]).forEach(r=>{
+      try{
+        if(r.key==='liaisonPin'){
+          let v=r.value;
+          try{v=JSON.parse(v);}catch{}
+          LIAISON_PIN=String(v).trim();
+          console.log('Liaison PIN loaded, length='+LIAISON_PIN.length);
+          updatePinDots();
+        }
+        if(r.key==='liaisonSessionPolicy'){
+          try{_liaison_session_ms=sessionPolicyToMs(JSON.parse(r.value));}catch{}
+        }
+      }catch(e){console.warn('PIN parse:',e);}
+    });
+  }catch(e){console.warn('loadLiaisonPin failed:',e);}
 }
 
 function sessionPolicyToMs(policy){
@@ -192,16 +178,30 @@ function sessionPolicyToMs(policy){
   return 7*864e5;
 }
 
+// supa() helper — wraps SDK for backwards compatibility with existing code
 async function supa(table){
-  const base=`${SUPA_URL}/rest/v1/${table}`;
   return {
     async get(params=''){
-      const res=await fetch(`${base}?${params}&apikey=${SUPA_KEY}`,{headers:{Authorization:`Bearer ${SUPA_KEY}`,apikey:SUPA_KEY}});
-      return res.json();
+      // Parse simple query string params into SDK filters
+      let q=_supaClient.from(table).select('*');
+      // Handle common param patterns
+      params.split('&').filter(Boolean).forEach(p=>{
+        const [k,v]=p.split('=');
+        if(!k||!v)return;
+        if(k==='order'){const [col,dir]=v.split('.');q=q.order(col,{ascending:dir!=='desc'});}
+        else if(k==='limit'){q=q.limit(parseInt(v));}
+        else if(v.startsWith('eq.')){q=q.eq(k,v.slice(3));}
+        else if(v.startsWith('gte.')){q=q.gte(k,v.slice(4));}
+        else if(v.startsWith('in.')){const vals=v.slice(4,-1).split(',').map(s=>s.replace(/^['"]|['"]$/g,''));q=q.in(k,vals);}
+        else if(v.startsWith('in.(')){const vals=v.slice(4,-1).split(',').map(s=>s.trim());q=q.in(k,vals);}
+      });
+      const {data,error}=await q;
+      if(error){console.warn('supa get error:',error);return[];}
+      return data||[];
     },
-    async patch(id,data){
-      const res=await fetch(`${base}?id=eq.${id}`,{method:'PATCH',headers:{Authorization:`Bearer ${SUPA_KEY}`,apikey:SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify(data)});
-      return res.ok;
+    async patch(id,body){
+      const {error}=await _supaClient.from(table).update(body).eq('id',id);
+      return !error;
     }
   };
 }
