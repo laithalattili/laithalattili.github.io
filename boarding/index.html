@@ -982,7 +982,9 @@ async function loadInfoPenalties(){
   const tomorrow=new Date(Date.now()+86400000).toISOString().split('T')[0];
   try{
     const {data}=await supa.from('boarding_penalties')
-      .select('*').in('status',['active','pending']).order('penalty_date').order('student_name');
+      .select('*').in('status',['active','pending'])
+      .neq('infraction_type','late_floor')
+      .order('penalty_date').order('student_name');
     if(!data||!data.length){el.innerHTML='<div style="padding:8px 0;color:#aaa;font-size:12px">No active sanctions.</div>';return;}
     const infraLabel={late_wake:'🛏 Late Wake',late_floor:'🚶 Late Floor',late_sleep:'😴 Late Sleep'};
     const normalMins=parseInt(BS.normalPhoneMins)||20;
@@ -1035,9 +1037,15 @@ async function loadInfoPenalties(){
 
 async function boardingMarkDone(id){
   try{
-    await supa.from('boarding_penalties').update({status:'applied'}).eq('id',id);
-    showToast('✓ Sanction marked done','#16a34a');
-    // Immediate local refresh
+    const today=new Date().toISOString().split('T')[0];
+    const {data:p}=await supa.from('boarding_penalties').select('penalty_date,infraction_date').eq('id',id).single();
+    if(p&&(p.penalty_date===today||p.infraction_date===today)){
+      await supa.from('boarding_penalties').delete().eq('id',id);
+      showToast('✓ Sanction removed','#16a34a');
+    } else {
+      await supa.from('boarding_penalties').update({status:'applied'}).eq('id',id);
+      showToast('✓ Sanction marked done','#16a34a');
+    }
     await loadBoardingPenalties();
     loadInfoPenalties();
     renderRegister();
@@ -1049,7 +1057,9 @@ async function boardingRollSanction(id){
     const tomorrow=new Date(Date.now()+86400000).toISOString().split('T')[0];
     await supa.from('boarding_penalties').update({penalty_date:tomorrow}).eq('id',id);
     showToast('→ Moved to tomorrow','#6b7280');
+    await loadBoardingPenalties();
     loadInfoPenalties();
+    renderRegister();
   }catch(e){showToast('Error: '+e.message,'#dc2626');}
 }
 
@@ -1216,7 +1226,9 @@ async function loadBoardingPenalties(){
   try{
     const {data}=await supa.from('boarding_penalties')
       .select('student_name,infraction_type,status')
-      .in('status',['active','pending']).eq('infraction_date',today);
+      .in('status',['active','pending'])
+      .neq('infraction_type','late_floor')
+      .eq('infraction_date',today);
     _boardingPenaltyMap={};
     (data||[]).forEach(p=>{
       if(!_boardingPenaltyMap[p.student_name])_boardingPenaltyMap[p.student_name]=[];
@@ -1618,6 +1630,9 @@ async function toggleBoardingPenalty(name, field){
       late_sleep:_brState[name].lateSleep||false
     },{onConflict:'student_name,register_date,session_type'});
     renderRegister();
+    // Refresh penalties display
+    await loadBoardingPenalties();
+    loadInfoPenalties();
   }catch(e){showToast('Error: '+e.message,'#dc2626');}
 }
 
