@@ -2406,7 +2406,7 @@ async function confirmBoardingReturn(leaveId){
 
 const _bPenInFlight=new Set();
 
-async function toggleBoardingPenalty(name, field){
+function toggleBoardingPenalty(name, field){
   const guardKey=name+'|'+field;
   if(_bPenInFlight.has(guardKey))return;
   _bPenInFlight.add(guardKey);
@@ -2415,58 +2415,55 @@ async function toggleBoardingPenalty(name, field){
   const td=today();
   if(!_brState[name])_brState[name]={};
   const cur=_brState[name][field]||false;
+  // ── INSTANT UI UPDATE ──
   _brState[name][field]=!cur;
+  renderRegister();
+  // ── BACKGROUND DB SYNC ──
   const infraction=field==='lateWake'?'late_wake':field==='lateFloor'?'late_floor':'late_sleep';
   const hasPhonePenalty=field!=='lateFloor';
-  try{
-    if(!cur){
-      if(hasPhonePenalty){
-        // Delete any existing rows first to prevent duplicates
-        await supa.from('boarding_penalties')
-          .delete().eq('student_name',name).eq('infraction_date',td).eq('infraction_type',infraction);
+  // Fire and forget
+  supa.from('boarding_registrations').upsert({
+    student_name:name,register_date:td,session_type:session,
+    status:_brState[name].status||'',updated_by:role,updated_at:new Date().toISOString(),
+    late_wake:_brState[name].lateWake||false,
+    late_floor:_brState[name].lateFloor||false,
+    late_sleep:_brState[name].lateSleep||false
+  },{onConflict:'student_name,register_date,session_type'}).then(()=>{},e=>console.warn('Reg save:',e));
+  if(hasPhonePenalty){
+    (async()=>{
+      try{
         const penMins=field==='lateSleep'?(parseInt(BS.penaltySleepMins)||2):(parseInt(BS.penaltyWakeMins)||5);
-        let penDate=field==='lateSleep'?new Date(Date.now()+86400000).toISOString().split('T')[0]:td;
-        // Check for conflict on that day
-        const {data:conflict}=await supa.from('boarding_penalties')
-          .select('id').eq('student_name',name).eq('penalty_date',penDate).in('status',['active','pending']);
-        if(conflict&&conflict.length){
-          const d=new Date(penDate);d.setDate(d.getDate()+1);
-          penDate=d.toISOString().split('T')[0];
-        }
-        await supa.from('boarding_penalties').insert({
-          student_name:name,infraction_type:infraction,infraction_date:td,
-          penalty_type:'phone_'+penMins+'min',penalty_date:penDate,
-          status:'active',logged_by:role
-        });
-        showToast('⚠️ '+penMins+' min phone time on '+penDate,'#d97706');
-      } else {
-        showToast('🚶 Late floor logged for '+name,'#6b7280');
-      }
-    } else {
-      if(hasPhonePenalty){
-        // Delete ALL matching rows (catches duplicates too)
+        // Always delete first (prevents duplicates)
         await supa.from('boarding_penalties')
           .delete().eq('student_name',name).eq('infraction_date',td).eq('infraction_type',infraction);
+        if(!cur){
+          let penDate=field==='lateSleep'?new Date(Date.now()+86400000).toISOString().split('T')[0]:td;
+          const {data:conflict}=await supa.from('boarding_penalties')
+            .select('id').eq('student_name',name).eq('penalty_date',penDate).in('status',['active','pending']);
+          if(conflict&&conflict.length){const d=new Date(penDate);d.setDate(d.getDate()+1);penDate=d.toISOString().split('T')[0];}
+          await supa.from('boarding_penalties').insert({
+            student_name:name,infraction_type:infraction,infraction_date:td,
+            penalty_type:'phone_'+penMins+'min',penalty_date:penDate,
+            status:'active',logged_by:role
+          });
+          showToast('⚠️ '+penMins+' min phone time on '+penDate,'#d97706');
+        } else {
+          showToast('Removed','#6b7280');
+        }
+        await loadBoardingPenalties();
+        loadInfoPenalties();
+      }catch(e){
+        console.warn('Penalty sync:',e);
+        // Revert on error
+        _brState[name][field]=cur;
+        renderRegister();
+      }finally{
+        _bPenInFlight.delete(guardKey);
       }
-      showToast('Removed: '+name,'#6b7280');
-    }
-    // Update registration row
-    await supa.from('boarding_registrations').upsert({
-      student_name:name,register_date:td,session_type:session,
-      status:_brState[name].status||'',updated_by:role,updated_at:new Date().toISOString(),
-      late_wake:_brState[name].lateWake||false,
-      late_floor:_brState[name].lateFloor||false,
-      late_sleep:_brState[name].lateSleep||false
-    },{onConflict:'student_name,register_date,session_type'});
-    renderRegister();
-    await loadBoardingPenalties();
-    loadInfoPenalties();
-  }catch(e){
-    showToast('Error: '+e.message,'#dc2626');
-    // Revert local state on error
-    _brState[name][field]=!_brState[name][field];
-  }finally{
-    _bPenInFlight.delete(name+'|'+field);
+    })();
+  } else {
+    showToast('🚶 Late floor logged','#6b7280');
+    _bPenInFlight.delete(guardKey);
   }
 }
 
