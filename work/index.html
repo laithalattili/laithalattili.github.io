@@ -25931,19 +25931,24 @@ async function renderSanctionsList(el){
   if(!el)return;
   el.innerHTML='<div style="padding:1rem;text-align:center;color:var(--text3);font-size:13px">Loading...</div>';
   const today=new Date().toISOString().split('T')[0];
+  // Get boarder names for filtering
+  const boarderNames=new Set(STUDENTS.filter(s=>(HAWKING_STATUS[s.name]||{}).boarder).map(s=>s.name));
   try{
     const {data,error}=await supa.from('boarding_penalties')
       .select('*').in('status',['active','pending']).order('penalty_date').order('student_name');
     if(error)throw error;
-    if(!data||!data.length){
-      el.innerHTML='<div style="padding:2rem;text-align:center;color:var(--text3);font-size:13px">No active sanctions.</div>';
+    // Filter to boarders only
+    const filtered=(data||[]).filter(p=>boarderNames.has(p.student_name));
+    if(!filtered.length){
+      el.innerHTML='<div style="padding:2rem;text-align:center;color:var(--text3);font-size:13px">No active sanctions for boarders.</div>';
       return;
     }
+    const data2=filtered;
     const infraLabel={late_wake:'🛏 Late Wake',late_floor:'🚶 Late Floor',late_sleep:'😴 Late Sleep'};
     const penLabel=p=>{const m=parseInt((p.penalty_type||'').replace('phone_','').replace('min',''))||0;return m+' min phone time';};
     // Group by penalty_date
     const byDate={};
-    data.forEach(p=>{
+    data2.forEach(p=>{
       const d=p.penalty_date||today;
       if(!byDate[d])byDate[d]=[];
       byDate[d].push(p);
@@ -26005,13 +26010,16 @@ async function renderAwayList(el){
   const excusedMap=await getTodayExcusedMap();
   const today=new Date().toISOString().split('T')[0];
   const fmt=dt=>dt?new Date(dt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'';
-  // Get all boarders
-  const boarders=STUDENTS.filter(s=>(HAWKING_STATUS[s.name]||{}).boarder);
-  // Also get any non-registered students from brState
+  // Get boarders only
+  const boarders=STUDENTS.filter(s=>{
+    const hw=HAWKING_STATUS[s.name];
+    return hw&&(hw===true||hw.boarder===true);
+  });
   const awayStudents=[];
   boarders.forEach(s=>{
     const excInfo=excusedMap[s.name]||null;
     const brSt=(_brState[s.name]||{}).status||'';
+    // Only include if actually on leave, excused or absent — NOT just unregistered
     if(excInfo||brSt==='excused'||brSt==='absent'){
       awayStudents.push({name:s.name,excInfo,brSt});
     }
@@ -30872,9 +30880,9 @@ function _amBoardingRegisterHtml(type,excusedMap){
             ${['present','absent','excused'].map(opt=>`<button data-br-opt="${opt}" onclick="_brTap('${_safeBrN}','${opt}')" style="font-size:11px;padding:4px 7px;border-radius:6px;border:1px solid ${opt===st?statColor[opt]:'rgba(255,255,255,.12)'};background:${opt===st?'rgba(255,255,255,.1)':'transparent'};color:${opt===st?statColor[opt]:'#666'};cursor:pointer;font-weight:${opt===st?'700':'400'}">${opt==='present'?'✓':opt==='absent'?'✗':'~'}</button>`).join('')}
           </div>
           ${(_isMorning||_isHoob)?`<div style="display:flex;gap:3px">
-            ${_isMorning?`<button onclick="_brTogglePenalty('${_safeBrN}','lateWake')" style="font-size:9px;padding:2px 5px;border-radius:4px;border:1px solid ${stObj.lateWake?'#f59e0b':'rgba(255,255,255,.1)'};background:${stObj.lateWake?'rgba(245,158,11,.2)':'transparent'};color:${stObj.lateWake?'#f59e0b':'#555'};cursor:pointer">🛏 Wake</button>`:''}
-            ${_isMorning?`<button onclick="_brTogglePenalty('${_safeBrN}','lateFloor')" style="font-size:9px;padding:2px 5px;border-radius:4px;border:1px solid ${stObj.lateFloor?'#f59e0b':'rgba(255,255,255,.1)'};background:${stObj.lateFloor?'rgba(245,158,11,.2)':'transparent'};color:${stObj.lateFloor?'#f59e0b':'#555'};cursor:pointer">🚶 Floor</button>`:''}
-            ${_isHoob?`<button onclick="_brTogglePenalty('${_safeBrN}','lateSleep')" style="font-size:9px;padding:2px 5px;border-radius:4px;border:1px solid ${stObj.lateSleep?'#ef4444':'rgba(255,255,255,.1)'};background:${stObj.lateSleep?'rgba(239,68,68,.2)':'transparent'};color:${stObj.lateSleep?'#ef4444':'#555'};cursor:pointer">😴 Sleep</button>`:''}
+            ${_isMorning?`<button data-penalty="lateWake" onclick="_brTogglePenalty('${_safeBrN}','lateWake')" style="font-size:9px;padding:2px 5px;border-radius:4px;border:1px solid ${stObj.lateWake?'#f59e0b':'rgba(255,255,255,.1)'};background:${stObj.lateWake?'rgba(245,158,11,.2)':'transparent'};color:${stObj.lateWake?'#f59e0b':'#555'};cursor:pointer">🛏 Wake</button>`:''}
+            ${_isMorning?`<button data-penalty="lateFloor" onclick="_brTogglePenalty('${_safeBrN}','lateFloor')" style="font-size:9px;padding:2px 5px;border-radius:4px;border:1px solid ${stObj.lateFloor?'#f59e0b':'rgba(255,255,255,.1)'};background:${stObj.lateFloor?'rgba(245,158,11,.2)':'transparent'};color:${stObj.lateFloor?'#f59e0b':'#555'};cursor:pointer">🚶 Floor</button>`:''}
+            ${_isHoob?`<button data-penalty="lateSleep" onclick="_brTogglePenalty('${_safeBrN}','lateSleep')" style="font-size:9px;padding:2px 5px;border-radius:4px;border:1px solid ${stObj.lateSleep?'#ef4444':'rgba(255,255,255,.1)'};background:${stObj.lateSleep?'rgba(239,68,68,.2)':'transparent'};color:${stObj.lateSleep?'#ef4444':'#555'};cursor:pointer">😴 Sleep</button>`:''}
           </div>`:''}
         </div>
       </div>`;
@@ -30948,16 +30956,43 @@ async function _brTogglePenalty(name, field){
     await supa.from('boarding_penalties')
       .delete().eq('student_name',name).eq('infraction_date',today).eq('infraction_type',infraction);
   }
-  // Update DB row
-  const colMap={lateWake:'late_wake',lateFloor:'late_floor',lateSleep:'late_sleep'};
-  const existing=_brStates[session][name];
-  await supa.from('boarding_registrations').upsert({
+  // Update DB row in background — don't await to keep UI snappy
+  const existing=_brStates[session][name]||{};
+  supa.from('boarding_registrations').upsert({
     student_name:name,register_date:today,session_type:session,
     status:existing.status||'',updated_by:'HSM',updated_at:new Date().toISOString(),
     late_wake:existing.lateWake||false,late_floor:existing.lateFloor||false,late_sleep:existing.lateSleep||false
-  },{onConflict:'student_name,register_date,session_type'});
-  _brRerender();
-  _brRefreshListsTab();
+  },{onConflict:'student_name,register_date,session_type'}).then(()=>{},e=>console.warn('Penalty save:',e));
+  // Surgical UI update — just re-render the affected row
+  _brRerenderRow(name,session);
+}
+
+function _brRerenderRow(name, session){
+  // Surgically update just the penalty buttons for one student row
+  const sType=session||_brCurrentSession||'prep';
+  const stObj=(_brStates[sType]||{})[name]||(_brState[name]||{});
+  const isMorning=sType==='morning';
+  const isHoob=sType==='hoob';
+  // Find the row in the live register
+  const rows=document.querySelectorAll('[data-br-name]');
+  rows.forEach(row=>{
+    const rowName=row.getAttribute('data-br-name');
+    if(rowName!==name)return;
+    // Update just the penalty button states
+    row.querySelectorAll('[data-penalty]').forEach(btn=>{
+      const field=btn.getAttribute('data-penalty');
+      const active=stObj[field]||false;
+      if(field==='lateWake'||field==='lateFloor'){
+        btn.style.border='1px solid '+(active?'#f59e0b':'rgba(255,255,255,.1)');
+        btn.style.background=active?'rgba(245,158,11,.2)':'transparent';
+        btn.style.color=active?'#f59e0b':'#555';
+      } else {
+        btn.style.border='1px solid '+(active?'#ef4444':'rgba(255,255,255,.1)');
+        btn.style.background=active?'rgba(239,68,68,.2)':'transparent';
+        btn.style.color=active?'#ef4444':'#555';
+      }
+    });
+  });
 }
 
 function _brRerender(){
