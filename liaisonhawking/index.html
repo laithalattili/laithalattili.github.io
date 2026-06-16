@@ -140,7 +140,7 @@ body{background:var(--bg);min-height:100vh;}
 <script>
 const SUPA_URL='https://mkvfggacecgltscdrfqv.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rdmZnZ2FjZWNnbHRzY2RyZnF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTA4MzYzNDcsImV4cCI6MjAyNjQxMjM0N30.oS1ByNhNJtAkxTGqLz7-pMqHTwGUCFobHPnpXYhCDTU';
-let LIAISON_PIN='000000'; // Loaded from Supabase
+let LIAISON_PIN=''; // Loaded from Supabase
 let _liaison_session_ms = 7*24*60*60*1000; // default 1 week
 
 async function loadLiaisonPin(){
@@ -152,7 +152,7 @@ async function loadLiaisonPin(){
     const data = await res.json();
     (data||[]).forEach(r=>{
       try{
-        if(r.key==='liaisonPin') LIAISON_PIN=JSON.parse(r.value);
+        if(r.key==='liaisonPin'){LIAISON_PIN=String(JSON.parse(r.value));updatePinDots();}
         if(r.key==='liaisonSessionPolicy') _liaison_session_ms=sessionPolicyToMs(JSON.parse(r.value));
       }catch{}
     });
@@ -189,9 +189,9 @@ let _pin='';
 function pinKey(k){
   if(k==='back'){_pin=_pin.slice(0,-1);}
   else if(k==='ok'){checkPin();}
-  else if(_pin.length<6){_pin+=k;}
+  else if(_pin.length<(LIAISON_PIN.length||6)){_pin+=k;}
   updatePinDots();
-  if(_pin.length===4)setTimeout(checkPin,100);
+  if(LIAISON_PIN&&_pin.length===LIAISON_PIN.length)setTimeout(checkPin,100);
 }
 function updatePinDots(){
   const total=LIAISON_PIN.length||6;
