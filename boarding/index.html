@@ -801,7 +801,7 @@ function getNextRegistrationPoint(){
   return next;
 }
 
-function showApp(){
+async function showApp(){
   document.getElementById('pin-screen').style.display='none';
   const app=document.getElementById('app');
   app.style.display='flex';
@@ -810,15 +810,14 @@ function showApp(){
   if(userEl){userEl.textContent=_identity?`${_identity.role} · ${_identity.name.split(' ')[0]}`:'—';userEl.onclick=()=>{showPinScreen();};}
 
   updateDutyBanner();
-  fetchPinSettings();
+  // Wait for settings + people before rendering register — prevents blank list on first load
+  await Promise.all([loadSettings(), loadPeople()]);
   loadRegister();
   subscribeRealtime();
   subscribePenaltiesRealtime();
   updateInfoTab();
   loadInfoPenalties();
-  // Update boarding tab label based on window
   updateBoardingTabState();
-  // Recheck every minute
   setInterval(updateBoardingTabState,60000);
 }
 
