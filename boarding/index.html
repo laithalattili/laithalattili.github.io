@@ -501,8 +501,12 @@ async function init(){
   await loadSettings();
   await loadPeople();
 
-  // Always require PIN on fresh load
-  showPinScreen();
+  // Check session validity — skip PIN if still valid
+  if(checkBoardingSession()){
+    showApp();
+  } else {
+    showPinScreen();
+  }
 }
 
 function updateClock(){
@@ -730,8 +734,38 @@ function checkPin(){
 function confirmIdentity(){
   if(!_selectedStaff)return;
   _identity=_selectedStaff;
-  try{localStorage.setItem('boarding_identity',JSON.stringify(_identity));}catch(e){}
+  try{
+    localStorage.setItem('boarding_identity',JSON.stringify(_identity));
+    localStorage.setItem('boarding_auth_ts',Date.now().toString());
+  }catch(e){}
   showApp();
+}
+
+function sessionPolicyToMs(policy){
+  if(policy==='always') return 0;
+  if(policy==='daily')  return 24*36e5;
+  if(policy==='weekly') return 7*864e5;
+  if(policy==='2weeks') return 14*864e5;
+  if(policy==='inactivity_4')  return 4*36e5;
+  if(policy==='inactivity_8')  return 8*36e5;
+  if(policy==='inactivity_24') return 24*36e5;
+  return 7*864e5;
+}
+
+function checkBoardingSession(){
+  // Returns true if still within valid session (skip PIN)
+  const policy=BS.ahsmSessionPolicy||'weekly';
+  const ms=sessionPolicyToMs(policy);
+  if(ms===0) return false;
+  try{
+    const ts=parseInt(localStorage.getItem('boarding_auth_ts')||'0');
+    const identity=JSON.parse(localStorage.getItem('boarding_identity')||'null');
+    if(identity&&Date.now()-ts<ms){
+      _identity=identity;
+      return true;
+    }
+  }catch{}
+  return false;
 }
 
 // ── MAIN APP ──────────────────────────────────────────────────
@@ -776,6 +810,7 @@ function showApp(){
   if(userEl){userEl.textContent=_identity?`${_identity.role} · ${_identity.name.split(' ')[0]}`:'—';userEl.onclick=()=>{showPinScreen();};}
 
   updateDutyBanner();
+  fetchPinSettings();
   loadRegister();
   subscribeRealtime();
   subscribePenaltiesRealtime();
