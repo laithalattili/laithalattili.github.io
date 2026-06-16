@@ -25995,10 +25995,13 @@ async function markSanctionDone(id){
   try{
     await supa.from('boarding_penalties').update({status:'applied'}).eq('id',id);
     showToastMsg('✓ Sanction marked as done','#16a34a');
+    // Force immediate refresh of both views
     const el=document.getElementById('hawking-list-content');
-    if(el&&_hwkFilter==='sanctions')renderSanctionsList(el);
-    // Refresh penalty badges in register
-    if(_hwkFilter==='register'){if(el)renderHawkingRegister(el);}
+    if(_hwkFilter==='sanctions'&&el)renderSanctionsList(el);
+    if(_hwkFilter==='register'&&el){
+      window._lastExcusedMap=await getTodayExcusedMap();
+      renderHawkingRegister(el,window._lastExcusedMap);
+    }
   }catch(e){showToastMsg('Error: '+e.message,'#dc2626');}
 }
 
@@ -28016,7 +28019,7 @@ function initApp(){
   settingsUnlocked=false;
   const sl=document.getElementById('settings-locked');if(sl)sl.style.display='flex';
   const sc=document.getElementById('settings-content');if(sc)sc.style.display='none';
-  loadSettings();loadPeople();loadState();loadSlotNotes();loadHolidays();applyHolidaysToCalendar();loadCalCustomEvents();loadListsData();loadLinks();loadDuties();loadTutorMeetings();dsLoad();loadBoardingSettings();
+  loadSettings();loadPeople();loadState();loadSlotNotes();loadHolidays();applyHolidaysToCalendar();loadCalCustomEvents();loadListsData();loadLinks();loadDuties();loadTutorMeetings();dsLoad();loadBoardingSettings();_subscribePenaltiesRealtime();
   buildMorningChecks();restoreMCState();
   initWeekTab();checkTaskReset();renderCustomFlowsList();
   // Apply global default (overrides individual defaults)
@@ -30822,6 +30825,28 @@ function getSessionLabel(s){
 
 function getSessionEmoji(s){
   return s==='morning'?'🌅':s==='prep'?'📋':'🌙';
+}
+
+// ── BOARDING PENALTIES REALTIME ──────────────────────────────
+let _penaltySub=null;
+
+function _subscribePenaltiesRealtime(){
+  if(_penaltySub)return;
+  _penaltySub=supa.channel('boarding_penalties_rt')
+    .on('postgres_changes',{event:'*',schema:'public',table:'boarding_penalties'},
+      ()=>{
+        // Refresh sanctions tab if open
+        if(_hwkFilter==='sanctions'){
+          const el=document.getElementById('hawking-list-content');
+          if(el)renderSanctionsList(el);
+        }
+        // Refresh register badges if register open
+        if(_hwkFilter==='register'){
+          const el=document.getElementById('hawking-list-content');
+          if(el)renderHawkingRegister(el,window._lastExcusedMap);
+        }
+      })
+    .subscribe();
 }
 
 // ── BOARDING REGISTER STATE (Supabase-synced) ────────────────
