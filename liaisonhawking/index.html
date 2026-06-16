@@ -7,6 +7,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Hawking">
 <meta name="theme-color" content="#00205B">
@@ -112,6 +113,9 @@ body{background:var(--bg);min-height:100vh;}
     <button class="pin-key" onclick="pinKey('ok')" style="background:var(--accent)">OK</button>
   </div>
   <div id="pin-error" style="color:#f87171;font-size:12px;margin-top:16px;min-height:18px;"></div>
+  <div style="margin-top:24px;font-size:11px;color:rgba(255,255,255,.3);cursor:pointer" onclick="clearCacheReload()">
+    Having trouble? Tap to clear cache &amp; reload
+  </div>
 </div>
 
 <!-- MAIN APP -->
@@ -207,6 +211,17 @@ async function supa(table){
 }
 
 // ── PIN ──────────────────────────────────────────────────────────────────────
+async function clearCacheReload(){
+  try{
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map(r=>r.unregister()));
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k=>caches.delete(k)));
+    console.log('Cache cleared');
+  }catch(e){console.warn(e);}
+  window.location.reload(true);
+}
+
 let _pin='';
 function pinKey(k){
   if(k==='back'){_pin=_pin.slice(0,-1);}
@@ -615,11 +630,25 @@ async function loadMedical(){
 </script>
 <script>
 if('serviceWorker' in navigator){
+  // Unregister old SWs that may be caching broken versions
+  navigator.serviceWorker.getRegistrations().then(regs=>{
+    regs.forEach(r=>{
+      r.active?.scriptURL && console.log('SW:',r.active.scriptURL);
+    });
+  });
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
-      .then(r => console.log('Liaison SW registered'))
+      .then(r => {
+        console.log('Liaison SW registered, scope:', r.scope);
+        // Force update check
+        r.update();
+      })
       .catch(e => console.warn('SW failed:', e));
   });
+  // If SW is controlling and might be serving stale content, check version
+  if(navigator.serviceWorker.controller){
+    console.log('SW controlling page');
+  }
 }
 </script>
 </body>
