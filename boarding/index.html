@@ -775,6 +775,7 @@ function showApp(){
   updateDutyBanner();
   loadRegister();
   subscribeRealtime();
+  subscribePenaltiesRealtime();
   updateInfoTab();
   loadInfoPenalties();
   // Update boarding tab label based on window
@@ -1036,9 +1037,9 @@ async function boardingMarkDone(id){
   try{
     await supa.from('boarding_penalties').update({status:'applied'}).eq('id',id);
     showToast('✓ Sanction marked done','#16a34a');
+    // Immediate local refresh
+    await loadBoardingPenalties();
     loadInfoPenalties();
-    // Refresh register badges
-    await loadExcusedMap();
     renderRegister();
   }catch(e){showToast('Error: '+e.message,'#dc2626');}
 }
@@ -1238,6 +1239,18 @@ async function loadRegister(){
   }catch(e){console.warn('Register load error',e);}
   await Promise.all([loadExcusedMap(), loadBoardingPenalties()]);
   renderRegister();
+}
+
+function subscribePenaltiesRealtime(){
+  supa.channel('boarding_penalties_mini')
+    .on('postgres_changes',{event:'*',schema:'public',table:'boarding_penalties'},
+      ()=>{
+        // Refresh penalties list if info tab is open
+        loadInfoPenalties();
+        // Refresh penalty badges in register
+        loadBoardingPenalties().then(()=>renderRegister());
+      })
+    .subscribe();
 }
 
 function subscribeRealtime(){
