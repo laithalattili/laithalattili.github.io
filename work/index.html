@@ -31062,51 +31062,53 @@ async function _brTogglePenalty(name, field){
     const cur=_brStates[session][name][field]||false;
     _brStates[session][name][field]=!cur;
     _brState[name]={...(_brState[name]||{}),[field]:!cur};
+
+    // ── INSTANT UI UPDATE ── do this before any async work
+    _brRerenderRow(name,session);
+
+    // ── BACKGROUND DB SYNC ── fire and forget
     const bs=_boardingSettings||{};
     const infraction=field==='lateWake'?'late_wake':field==='lateFloor'?'late_floor':'late_sleep';
     const hasPhonePenalty=field!=='lateFloor';
-    if(!cur){
-      if(hasPhonePenalty){
-        // First delete any existing rows for this student+infraction today (prevent duplicates)
-        await supa.from('boarding_penalties')
-          .delete().eq('student_name',name).eq('infraction_date',today).eq('infraction_type',infraction);
-        const penaltyMins=field==='lateSleep'?(parseInt(bs.penaltySleepMins)||2):(parseInt(bs.penaltyWakeMins)||5);
-        let penaltyDate=field==='lateSleep'
-          ?new Date(new Date().getTime()+86400000).toISOString().split('T')[0]
-          :today;
-        // Check if student already has a penalty on that date
-        const {data:conflict}=await supa.from('boarding_penalties')
-          .select('id').eq('student_name',name).eq('penalty_date',penaltyDate).in('status',['active','pending']);
-        if(conflict&&conflict.length){
-          const d=new Date(penaltyDate);d.setDate(d.getDate()+1);
-          penaltyDate=d.toISOString().split('T')[0];
-        }
-        await supa.from('boarding_penalties').insert({
-          student_name:name,infraction_type:infraction,infraction_date:today,
-          penalty_type:'phone_'+penaltyMins+'min',penalty_date:penaltyDate,
-          status:'active',logged_by:'HSM',notes:getSessionLabel(session)
-        });
-      }
-    } else {
-      if(hasPhonePenalty){
-        // Delete ALL rows for this student+infraction today (catches any duplicates too)
-        await supa.from('boarding_penalties')
-          .delete().eq('student_name',name).eq('infraction_date',today).eq('infraction_type',infraction);
-      }
-    }
-    // Update DB row in background
     const existing=_brStates[session][name]||{};
+    // Sync registration row
     supa.from('boarding_registrations').upsert({
       student_name:name,register_date:today,session_type:session,
       status:existing.status||'',updated_by:'HSM',updated_at:new Date().toISOString(),
       late_wake:existing.lateWake||false,late_floor:existing.lateFloor||false,late_sleep:existing.lateSleep||false
-    },{onConflict:'student_name,register_date,session_type'}).then(()=>{},e=>console.warn('Penalty save:',e));
-    // Surgical UI update
-    _brRerenderRow(name,session);
-    // Refresh sanctions tab if open
-    if(_hwkFilter==='sanctions'){
-      const _el=document.getElementById('hawking-list-content');
-      if(_el)renderSanctionsList(_el);
+    },{onConflict:'student_name,register_date,session_type'}).then(()=>{},e=>console.warn('Reg save:',e));
+    // Sync penalty row in background
+    if(hasPhonePenalty){
+      (async()=>{
+        try{
+          const penaltyMins=field==='lateSleep'?(parseInt(bs.penaltySleepMins)||2):(parseInt(bs.penaltyWakeMins)||5);
+          // Always delete first to prevent duplicates
+          await supa.from('boarding_penalties')
+            .delete().eq('student_name',name).eq('infraction_date',today).eq('infraction_type',infraction);
+          if(!cur){
+            // Toggling ON — insert new penalty
+            let penaltyDate=field==='lateSleep'
+              ?new Date(new Date().getTime()+86400000).toISOString().split('T')[0]
+              :today;
+            const {data:conflict}=await supa.from('boarding_penalties')
+              .select('id').eq('student_name',name).eq('penalty_date',penaltyDate).in('status',['active','pending']);
+            if(conflict&&conflict.length){
+              const d=new Date(penaltyDate);d.setDate(d.getDate()+1);
+              penaltyDate=d.toISOString().split('T')[0];
+            }
+            await supa.from('boarding_penalties').insert({
+              student_name:name,infraction_type:infraction,infraction_date:today,
+              penalty_type:'phone_'+penaltyMins+'min',penalty_date:penaltyDate,
+              status:'active',logged_by:'HSM',notes:getSessionLabel(session)
+            });
+          }
+          // Refresh sanctions if open (after DB settled)
+          if(_hwkFilter==='sanctions'){
+            const _el=document.getElementById('hawking-list-content');
+            if(_el)renderSanctionsList(_el);
+          }
+        }catch(e){console.warn('Penalty sync:',e);}
+      })();
     }
   }finally{
     _penaltyInFlight.delete(guardKey);
