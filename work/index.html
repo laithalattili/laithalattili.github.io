@@ -25938,7 +25938,9 @@ async function renderSanctionsList(el){
   const boarderNames=new Set(STUDENTS.filter(s=>(HAWKING_STATUS[s.name]||{}).boarder).map(s=>s.name));
   try{
     const {data,error}=await supa.from('boarding_penalties')
-      .select('*').in('status',['active','pending']).order('penalty_date').order('student_name');
+      .select('*').in('status',['active','pending'])
+      .neq('infraction_type','late_floor')
+      .order('penalty_date').order('student_name');
     if(error)throw error;
     // Filter to boarders only
     const filtered=(data||[]).filter(p=>boarderNames.has(p.student_name));
@@ -25993,9 +25995,18 @@ async function renderSanctionsList(el){
 
 async function markSanctionDone(id){
   try{
-    await supa.from('boarding_penalties').update({status:'applied'}).eq('id',id);
-    showToastMsg('✓ Sanction marked as done','#16a34a');
-    // Force immediate refresh of both views
+    const today=new Date().toISOString().split('T')[0];
+    // Get the penalty to check if it's from today
+    const {data:p}=await supa.from('boarding_penalties').select('penalty_date,infraction_date').eq('id',id).single();
+    if(p&&(p.penalty_date===today||p.infraction_date===today)){
+      // Same day — delete entirely
+      await supa.from('boarding_penalties').delete().eq('id',id);
+      showToastMsg('✓ Sanction removed','#16a34a');
+    } else {
+      // Future/past — mark as applied
+      await supa.from('boarding_penalties').update({status:'applied'}).eq('id',id);
+      showToastMsg('✓ Sanction marked done','#16a34a');
+    }
     const el=document.getElementById('hawking-list-content');
     if(_hwkFilter==='sanctions'&&el)renderSanctionsList(el);
     if(_hwkFilter==='register'&&el){
@@ -30834,16 +30845,14 @@ function _subscribePenaltiesRealtime(){
   if(_penaltySub)return;
   _penaltySub=supa.channel('boarding_penalties_rt')
     .on('postgres_changes',{event:'*',schema:'public',table:'boarding_penalties'},
-      ()=>{
-        // Refresh sanctions tab if open
-        if(_hwkFilter==='sanctions'){
-          const el=document.getElementById('hawking-list-content');
-          if(el)renderSanctionsList(el);
+      payload=>{
+        console.log('Penalty RT event:',payload.eventType);
+        const el=document.getElementById('hawking-list-content');
+        if(_hwkFilter==='sanctions'&&el){
+          setTimeout(()=>renderSanctionsList(el),100);
         }
-        // Refresh register badges if register open
-        if(_hwkFilter==='register'){
-          const el=document.getElementById('hawking-list-content');
-          if(el)renderHawkingRegister(el,window._lastExcusedMap);
+        if(_hwkFilter==='register'&&el){
+          setTimeout(()=>renderHawkingRegister(el,window._lastExcusedMap),100);
         }
       })
     .subscribe();
@@ -31093,6 +31102,11 @@ async function _brTogglePenalty(name, field){
   },{onConflict:'student_name,register_date,session_type'}).then(()=>{},e=>console.warn('Penalty save:',e));
   // Surgical UI update — just re-render the affected row
   _brRerenderRow(name,session);
+  // Also refresh sanctions tab if open
+  if(_hwkFilter==='sanctions'){
+    const _el=document.getElementById('hawking-list-content');
+    if(_el)renderSanctionsList(_el);
+  }
 }
 
 function _brRerenderRow(name, session){
