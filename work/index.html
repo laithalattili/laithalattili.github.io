@@ -1122,6 +1122,8 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
         <button class="hwk-filter-btn" id="hwk-f-register" onclick="setHwkFilter('register',this)">Register</button>
         <button class="hwk-filter-btn" id="hwk-f-away" onclick="setHwkFilter('away',this)">Away</button>
         <button class="hwk-filter-btn" id="hwk-f-sanctions" onclick="setHwkFilter('sanctions',this)">⚠️ Sanctions</button>
+        <button id="export-report-btn" onclick="exportWeekReport()" style="margin-left:auto;font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid #00205B;background:#00205B;color:#fff;cursor:pointer;font-weight:600;flex-shrink:0">📄 Export Report</button>
+        <button onclick="exportRegistrationCSV()" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid #16a34a;background:#f0fdf4;color:#15803d;cursor:pointer;font-weight:600;flex-shrink:0">📊 CSV</button>
       </div>
       <div id="hwk-count-badge" style="font-size:11px;color:var(--text3);padding:4px 6px;flex-shrink:0"></div>
       <button id="hwk-collapse-toggle-btn" onclick="hwkToggleAll()" style="font-size:10px;padding:4px 8px;border:1px solid var(--border);border-radius:var(--rsm);background:#fff;color:var(--text3);cursor:pointer;white-space:nowrap;flex-shrink:0">Expand All</button>
@@ -1832,6 +1834,62 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
             <input type="number" id="bs-penalty-sleep" value="2" min="1" max="20" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;width:60px">
             <span style="font-size:11px;color:var(--text3)">min · next day</span>
           </div>
+        </div>
+
+        <!-- PIN & SESSION MANAGEMENT -->
+        <div style="padding:.75rem 1rem;border-top:1px solid var(--border3)">
+          <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">🔐 PIN & Session Management</div>
+
+          <!-- AHSM/RT PIN -->
+          <div style="margin-bottom:12px;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid var(--border)">
+            <div style="font-size:12px;font-weight:600;color:var(--text1);margin-bottom:8px">AHSM / RT App PIN</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <span style="font-size:12px;color:var(--text2);width:80px;flex-shrink:0">New PIN</span>
+              <input type="password" id="bs-ahsm-pin" maxlength="6" placeholder="6 digits" inputmode="numeric"
+                style="font-size:14px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;width:110px;letter-spacing:4px">
+              <button onclick="savePinSetting('ahsm')" style="font-size:11px;padding:4px 12px;border-radius:6px;background:#00205B;color:#fff;border:none;cursor:pointer;font-weight:600">Set</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:12px;color:var(--text2);width:80px;flex-shrink:0">Session</span>
+              <select id="bs-ahsm-session" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;flex:1">
+                <option value="always">Every time (always ask)</option>
+                <option value="daily">Once per day</option>
+                <option value="weekly" selected>Once per week</option>
+                <option value="2weeks">Every 2 weeks</option>
+                <option value="inactivity_4">After 4h inactivity</option>
+                <option value="inactivity_8">After 8h inactivity</option>
+                <option value="inactivity_24">After 24h inactivity</option>
+              </select>
+            </div>
+            <div id="bs-ahsm-pin-status" style="font-size:10px;color:#16a34a;margin-top:4px;display:none">✓ Saved</div>
+          </div>
+
+          <!-- LIAISON PIN -->
+          <div style="margin-bottom:12px;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid var(--border)">
+            <div style="font-size:12px;font-weight:600;color:var(--text1);margin-bottom:8px">Liaison App PIN</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <span style="font-size:12px;color:var(--text2);width:80px;flex-shrink:0">New PIN</span>
+              <input type="password" id="bs-liaison-pin" maxlength="6" placeholder="6 digits" inputmode="numeric"
+                style="font-size:14px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;width:110px;letter-spacing:4px">
+              <button onclick="savePinSetting('liaison')" style="font-size:11px;padding:4px 12px;border-radius:6px;background:#00205B;color:#fff;border:none;cursor:pointer;font-weight:600">Set</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:12px;color:var(--text2);width:80px;flex-shrink:0">Session</span>
+              <select id="bs-liaison-session" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;flex:1">
+                <option value="always">Every time (always ask)</option>
+                <option value="daily">Once per day</option>
+                <option value="weekly" selected>Once per week</option>
+                <option value="2weeks">Every 2 weeks</option>
+                <option value="inactivity_4">After 4h inactivity</option>
+                <option value="inactivity_8">After 8h inactivity</option>
+                <option value="inactivity_24">After 24h inactivity</option>
+              </select>
+            </div>
+            <div id="bs-liaison-pin-status" style="font-size:10px;color:#16a34a;margin-top:4px;display:none">✓ Saved</div>
+          </div>
+
+          <button onclick="savePinSessions()" style="width:100%;font-size:12px;padding:7px;border-radius:7px;background:#475569;color:#fff;border:none;cursor:pointer;font-weight:600">Save Session Policies</button>
+          <div id="bs-session-status" style="font-size:10px;color:#16a34a;text-align:center;margin-top:4px;display:none">✓ Session policies saved</div>
         </div>
 
         <!-- SAVE ALL -->
@@ -26193,10 +26251,15 @@ async function renderHawkingRegister(el, preloadedMap){
     rows+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #f1f5f9;background:${rowBg}">
       <span style="font-size:10px;color:#d1d5db;min-width:18px;text-align:right;font-variant-numeric:tabular-nums">${i+1}</span>
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:500;color:#111">${p.name}</div>
+        <div style="font-size:13px;font-weight:500;color:#111">
+          <span onclick="openCommentModal('${p.name}')" style="cursor:pointer;border-bottom:1px dotted #ccc">${p.name}</span>
+          ${(_nurseMap[p.name]||[]).length?`<span style="font-size:10px;color:#a855f7;margin-left:4px">🏥×${(_nurseMap[p.name]||[]).length}</span>`:''}
+          ${(_commentMap[p.name]||[]).length?'<span style="font-size:10px;color:#60a5fa;margin-left:4px">💬</span>':''}
+        </div>
         ${excuseTag}${depTimeStr}${depBtn}
         ${penBadges}${timeStr}
       </div>
+      <button onclick="logNurseVisit('${p.name}')" style="font-size:12px;padding:3px 6px;border-radius:5px;border:1px solid ${(_nurseMap[p.name]||[]).length?'#a855f7':'#e5e7eb'};background:${(_nurseMap[p.name]||[]).length?'#f3e8ff':'#fff'};color:${(_nurseMap[p.name]||[]).length?'#7c3aed':'#aaa'};cursor:pointer" title="Log nurse visit">🏥</button>
       ${typeTag}
       ${displayBadge}
     </div>`;
@@ -26332,7 +26395,7 @@ function setHwkFilter(f,btn){
   btn.classList.add('active');
   const el=document.getElementById('hawking-list-content');
   if(f==='register'){
-    _brSubscribeRealtime();
+    _brSubscribeRealtime();loadNurseMap();loadCommentMap();
     if(el)el.innerHTML='<div style="padding:2rem;text-align:center;color:#9ca3af;font-size:13px">Loading...</div>';
     _brLoadToday().then(()=>{
       const el2=document.getElementById('hawking-list-content');
@@ -28038,7 +28101,7 @@ function initApp(){
   settingsUnlocked=false;
   const sl=document.getElementById('settings-locked');if(sl)sl.style.display='flex';
   const sc=document.getElementById('settings-content');if(sc)sc.style.display='none';
-  loadSettings();loadPeople();loadState();loadSlotNotes();loadHolidays();applyHolidaysToCalendar();loadCalCustomEvents();loadListsData();loadLinks();loadDuties();loadTutorMeetings();dsLoad();loadBoardingSettings();_subscribePenaltiesRealtime();
+  loadSettings();loadPeople();loadState();loadSlotNotes();loadHolidays();applyHolidaysToCalendar();loadCalCustomEvents();loadListsData();loadLinks();loadDuties();loadTutorMeetings();dsLoad();loadBoardingSettings();_subscribePenaltiesRealtime();loadNurseMap();loadCommentMap();
   buildMorningChecks();restoreMCState();
   initWeekTab();checkTaskReset();renderCustomFlowsList();
   // Apply global default (overrides individual defaults)
@@ -30617,6 +30680,7 @@ async function loadBoardingSettings(){
   renderBoardingStaffSettings();
   renderBoardingLocations();
   _populateBSTimes();
+  _populatePinSettings();
 }
 
 function _populateBSTimes(){
@@ -30837,6 +30901,561 @@ function getSessionEmoji(s){
   return s==='morning'?'🌅':s==='prep'?'📋':'🌙';
 }
 
+// ── NURSE VISITS + COMMENTS ──────────────────────────────────
+let _nurseMap={};   // {name: [{id,time,notes}]}
+let _commentMap={}; // {name: [{id,comment,date}]}
+
+async function loadNurseMap(){
+  const today=_brToday();
+  try{
+    const {data}=await supa.from('boarding_medical').select('*').eq('visit_date',today);
+    _nurseMap={};
+    (data||[]).forEach(r=>{
+      if(!_nurseMap[r.student_name])_nurseMap[r.student_name]=[];
+      _nurseMap[r.student_name].push(r);
+    });
+  }catch(e){console.warn('Nurse map:',e);}
+}
+
+async function loadCommentMap(){
+  const today=_brToday();
+  try{
+    const {data}=await supa.from('boarding_comments').select('*').eq('comment_date',today).order('created_at');
+    _commentMap={};
+    (data||[]).forEach(r=>{
+      if(!_commentMap[r.student_name])_commentMap[r.student_name]=[];
+      _commentMap[r.student_name].push(r);
+    });
+  }catch(e){console.warn('Comment map:',e);}
+}
+
+async function logNurseVisit(name){
+  const note=prompt('Nurse visit note for '+name+' (optional):','');
+  if(note===null)return; // cancelled
+  try{
+    await supa.from('boarding_medical').insert({
+      student_name:name,visit_date:_brToday(),
+      visit_time:new Date().toISOString(),
+      logged_by:'HSM',notes:note||'',
+      session_type:_brCurrentSession||'prep'
+    });
+    showToastMsg('🏥 Nurse visit logged for '+name,'#7c3aed');
+    await loadNurseMap();
+    _brRerender();
+    _brRefreshListsTab();
+  }catch(e){showToastMsg('Error: '+e.message,'#dc2626');}
+}
+
+async function openCommentModal(name){
+  const existing=(_commentMap[name]||[]).map(c=>c.comment).join(' | ');
+  const note=prompt('Add comment for '+name+(existing?'\nExisting: '+existing:'')+':', '');
+  if(note===null||!note.trim())return;
+  try{
+    await supa.from('boarding_comments').insert({
+      student_name:name,comment_date:_brToday(),
+      comment:note.trim(),logged_by:'HSM',
+    });
+    showToastMsg('💬 Comment saved','#16a34a');
+    await loadCommentMap();
+    _brRerender();
+    _brRefreshListsTab();
+  }catch(e){showToastMsg('Error: '+e.message,'#dc2626');}
+}
+
+// ── HAWKING HOUSE WEEK REPORT GENERATOR (client-side JS) ─────────────────────
+// Generates HTML → user prints to PDF
+
+async function generateWeekReport(supaClient, students, boarderRooms, hawkingStatus, boardingSettings) {
+
+  // ── DATES ──────────────────────────────────────────────────────────────────
+  function getMondayOfWeek() {
+    const d = new Date(); d.setHours(0,0,0,0);
+    const day = d.getDay();
+    d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+    return d;
+  }
+  function getCW(mon) {
+    const t = new Date(mon); t.setDate(t.getDate() + 3 - ((t.getDay()+6)%7));
+    const w1 = new Date(t.getFullYear(),0,4);
+    return 'CW ' + (1 + Math.round(((t-w1)/86400000 - 3 + ((w1.getDay()+6)%7))/7));
+  }
+  function fmt(d) { return d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}); }
+  function fmtISO(d) { return d.toISOString().split('T')[0]; }
+
+  const monday = getMondayOfWeek();
+  const weekDates = [0,1,2,3,4].map(i => { const d=new Date(monday); d.setDate(monday.getDate()+i); return d; });
+  const today = new Date(); today.setHours(0,0,0,0);
+  const weekLabel = getCW(monday);
+  const yr = monday.getFullYear();
+  const DAYS = ['Mon','Tue','Wed','Thu','Fri'];
+  const DAY_FULL = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+  const CHECKLIST = [
+    'Boys came on time to pick device before 7:30',
+    'Boys left floor on time (before 7:30 am)',
+    'Boys left floor with correct uniform',
+    'Prep started on time',
+    'HOOB on time',
+    'Medical Concern',
+  ];
+
+  // ── FETCH DATA FROM SUPABASE ────────────────────────────────────────────────
+  const weekStart = fmtISO(weekDates[0]);
+  const weekEnd   = fmtISO(weekDates[4]);
+
+  const [regRes, penRes, nurseRes, commentRes, leaveRes, dutyRes] = await Promise.all([
+    supaClient.from('boarding_registrations').select('*')
+      .gte('register_date', weekStart).lte('register_date', weekEnd),
+    supaClient.from('boarding_penalties').select('*')
+      .gte('infraction_date', weekStart).lte('infraction_date', weekEnd),
+    supaClient.from('boarding_medical').select('*')
+      .gte('visit_date', weekStart).lte('visit_date', weekEnd),
+    supaClient.from('boarding_comments').select('*')
+      .gte('comment_date', weekStart).lte('comment_date', weekEnd),
+    supaClient.from('boarding_leaves').select('*')
+      .in('status',['approved','active','returned'])
+      .lte('start_date', weekEnd),
+    supaClient.from('boarding_duty').select('*')
+      .gte('duty_date', weekStart).lte('duty_date', weekEnd),
+  ]);
+
+  const registrations = regRes.data || [];
+  const penalties     = penRes.data || [];
+  const nurseVisits   = nurseRes.data || [];
+  const comments      = commentRes.data || [];
+  const leaves        = leaveRes.data || [];
+  const duties        = dutyRes.data || [];
+
+  // ── INDEX DATA ──────────────────────────────────────────────────────────────
+  // reg[name][ISO date][session] = {status, late_wake, late_floor, late_sleep}
+  const regIdx = {};
+  registrations.forEach(r => {
+    if (!regIdx[r.student_name]) regIdx[r.student_name] = {};
+    if (!regIdx[r.student_name][r.register_date]) regIdx[r.student_name][r.register_date] = {};
+    regIdx[r.student_name][r.register_date][r.session_type] = r;
+  });
+
+  // penalty[name][ISO date] = {lateWake, lateFloor, lateSleep}
+  const penIdx = {};
+  penalties.forEach(p => {
+    if (!penIdx[p.student_name]) penIdx[p.student_name] = {};
+    if (!penIdx[p.student_name][p.infraction_date]) penIdx[p.student_name][p.infraction_date] = {};
+    if (p.infraction_type === 'late_wake')  penIdx[p.student_name][p.infraction_date].lateWake = true;
+    if (p.infraction_type === 'late_floor') penIdx[p.student_name][p.infraction_date].lateFloor = true;
+    if (p.infraction_type === 'late_sleep') penIdx[p.student_name][p.infraction_date].lateSleep = true;
+  });
+
+  // nurse[name][ISO date] = true
+  const nurseIdx = {};
+  nurseVisits.forEach(n => {
+    if (!nurseIdx[n.student_name]) nurseIdx[n.student_name] = {};
+    nurseIdx[n.student_name][n.visit_date] = true;
+  });
+
+  // comments[name][ISO date] = [comment strings]
+  const commentIdx = {};
+  comments.forEach(c => {
+    if (!commentIdx[c.student_name]) commentIdx[c.student_name] = {};
+    if (!commentIdx[c.student_name][c.comment_date]) commentIdx[c.student_name][c.comment_date] = [];
+    commentIdx[c.student_name][c.comment_date].push(c.comment);
+  });
+
+  // leaves indexed by student
+  const leaveIdx = {};
+  leaves.forEach(l => {
+    if (!leaveIdx[l.student_name]) leaveIdx[l.student_name] = [];
+    leaveIdx[l.student_name].push(l);
+  });
+
+  // duty[ISO date] = "LA / VC"
+  const dutyIdx = {};
+  duties.forEach(d => {
+    const names = [d.staff1, d.staff2].filter(Boolean).join(' / ');
+    dutyIdx[d.duty_date] = names;
+  });
+
+  // Staff by day — fallback to settings if no duty table data
+  const staffByDay = {};
+  DAYS.forEach((day, di) => {
+    const iso = fmtISO(weekDates[di]);
+    staffByDay[day] = dutyIdx[iso] || boardingSettings?.dutyStaff || '—';
+  });
+
+  // ── BUILD STUDENT DATA ──────────────────────────────────────────────────────
+  const boarders = students.filter(s => (hawkingStatus[s.name]||{}).boarder);
+
+  // Get room from boarderRooms
+  const studentRoom = {};
+  (boarderRooms || []).forEach(room => {
+    (room.boarders || []).forEach(name => { studentRoom[name] = room.id || room.name; });
+  });
+
+  // Build per-student data
+  const studentData = boarders.map(s => {
+    const name = s.name;
+    const grade = s.grade || s.tutor || '';
+    const room = studentRoom[name] || '—';
+
+    const reg = {}, lateWake = {}, lateFloor = {}, lateSleep = {};
+    const onLeave = {}, leaveConfirmed = {};
+    const studentComments = {};
+    const nurse = {};
+
+    DAYS.forEach((day, di) => {
+      const iso = fmtISO(weekDates[di]);
+
+      // Registration — derive W/P/H from morning/prep/hoob sessions
+      const dayReg = (regIdx[name] || {})[iso] || {};
+      const morning = dayReg['morning'] || {};
+      const prep    = dayReg['prep']    || {};
+      const hoob    = dayReg['hoob']    || {};
+      reg[day] = {
+        w: morning.status || '',
+        p: prep.status    || '',
+        h: hoob.status    || '',
+      };
+
+      // Penalties
+      const dayPen = (penIdx[name] || {})[iso] || {};
+      if (dayPen.lateWake)  lateWake[day]  = true;
+      if (dayPen.lateFloor) lateFloor[day] = true;
+      if (dayPen.lateSleep) lateSleep[day] = true;
+
+      // Leave
+      const studentLeaves = leaveIdx[name] || [];
+      const activeLeave = studentLeaves.find(l => l.start_date <= iso && (!l.end_date || l.end_date >= iso));
+      if (activeLeave) {
+        onLeave[day] = true;
+        leaveConfirmed[day] = activeLeave.status === 'active'; // departed
+      }
+
+      // Comments
+      const dayCmts = (commentIdx[name] || {})[iso] || [];
+      if (dayCmts.length) studentComments[day] = dayCmts.join(' · ');
+
+      // Nurse
+      if ((nurseIdx[name] || {})[iso]) nurse[day] = true;
+    });
+
+    return { room, name, grade, reg, lateWake, lateFloor, lateSleep, onLeave, leaveConfirmed, comments: studentComments, nurse };
+  });
+
+  // Sort by room
+  studentData.sort((a,b) => (a.room+a.name).localeCompare(b.room+b.name));
+
+  // ── LOGOS (base64 embedded) ─────────────────────────────────────────────────
+  // Logos fetched from the app's own assets
+  async function fetchImgBase64(url) {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      return new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+    } catch { return ''; }
+  }
+
+  const [img1, img2] = await Promise.all([
+    fetchImgBase64('https://laithalattili.github.io/xlsx_media/image1.png'),
+    fetchImgBase64('https://laithalattili.github.io/xlsx_media/image2.jpeg'),
+  ]);
+
+  // ── STATUS HTML ────────────────────────────────────────────────────────────
+  function stCell(v, late=false) {
+    if (!v) return '<td class="st future"></td>';
+    const val = v.toLowerCase();
+    let cls, sym;
+    if (val==='present'||val==='p')    { cls=late?'st late-warn':'st present'; sym=late?'⚠':'✓'; }
+    else if (val==='absent'||val==='a') { cls='st absent'; sym='✗'; }
+    else if (val==='excused'||val==='~'){ cls='st excused'; sym='~'; }
+    else if (val==='l')                 { cls='st leave';   sym='L'; }
+    else { cls='st'; sym=v; }
+    return `<td class="${cls}">${sym}</td>`;
+  }
+
+  // ── CHECKLIST AUTO-TICK ────────────────────────────────────────────────────
+  function checklistAnswers(dayKey, dayDate) {
+    if (dayDate > today) return Array(6).fill([null,'']);
+    const ss = studentData;
+    const lw = ss.filter(s=>s.lateWake[dayKey]).map(s=>s.name);
+    const lf = ss.filter(s=>s.lateFloor[dayKey]).map(s=>s.name);
+    const ap = ss.filter(s=>(s.reg[dayKey]||{}).p==='absent'&&!s.onLeave[dayKey]).map(s=>s.name);
+    const ls = ss.filter(s=>s.lateSleep[dayKey]).map(s=>s.name);
+    const nv = ss.filter(s=>s.nurse[dayKey]).map(s=>s.name);
+    return [
+      [lw.length===0, lw.join(', ')],
+      [lf.length===0, lf.join(', ')],
+      [true, ''],
+      [ap.length===0, ap.join(', ')],
+      [ls.length===0, ls.join(', ')],
+      [nv.length>0,   nv.join(', ')],
+    ];
+  }
+
+  // ── CSS ────────────────────────────────────────────────────────────────────
+  const CSS = `
+    @page { size: A4 landscape; margin: 8mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+    body { background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page { page-break-after: always; width: 100%; }
+    .page:last-child { page-break-after: auto; }
+    .header { display:flex; align-items:center; border:2.5px solid #00205B; background:white; min-height:68px; }
+    .header .logo { width:62px; height:68px; object-fit:contain; padding:4px 6px; flex-shrink:0; }
+    .header-centre { flex:1; text-align:center; padding:5px 10px; border-left:1px solid #ddd; border-right:1px solid #ddd; }
+    .h-title { font-size:16pt; font-weight:bold; color:#00205B; line-height:1.2; }
+    .h-sub   { font-size:8.5pt; color:#555; margin-top:2px; }
+    .h-staff { font-size:7pt; color:#888; margin-top:2px; }
+    .register-table { width:100%; border-collapse:collapse; font-size:7.5pt; }
+    .register-table th { background:#00205B; color:white; padding:3px 2px; text-align:center; font-size:7pt; border:1px solid #001a47; }
+    .day-hdr th { background:#DBEAFE; color:#00205B; font-size:7.5pt; }
+    .wph-hdr th { font-size:7pt; font-weight:bold; }
+    .wph-hdr .w { background:#EFF6FF; color:#1D4ED8; }
+    .wph-hdr .p { background:#F0FDF4; color:#15803D; }
+    .wph-hdr .h { background:#FFF7ED; color:#C2410C; }
+    .register-table td { border:1px solid #ddd; padding:2px 3px; vertical-align:middle; text-align:center; font-size:7.5pt; }
+    .room-cell { background:#DBEAFE; color:#00205B; font-weight:bold; font-size:7pt; white-space:nowrap; }
+    .name-cell { text-align:left; min-width:100px; }
+    .name-line { font-size:8pt; font-weight:500; color:#111; }
+    .grade-txt { color:#999; font-weight:400; font-size:7pt; }
+    .comment-line { font-size:6pt; color:#bbb; font-style:italic; margin-top:1px; }
+    .st { font-weight:bold; font-size:8.5pt; }
+    .present   { background:#F0FDF4; color:#16A34A; }
+    .absent    { background:#FEF2F2; color:#DC2626; }
+    .excused   { background:#FFFBEB; color:#D97706; }
+    .leave     { background:#F3E8FF; color:#7C3AED; }
+    .late-warn { background:#FFFBEB; color:#D97706; }
+    .future    { background:#F9FAFB; }
+    .first-row td { border-top:2px solid #00205B !important; }
+    .room-sep td { height:4px; background:#E5E7EB; border-top:2px solid #00205B; }
+    .key-row { font-size:6pt; color:#666; padding:3px 5px; background:#F3F4F6; border:1px solid #ddd; margin-top:2px; }
+    .checklist-table { width:100%; border-collapse:collapse; font-size:8pt; }
+    .checklist-table thead th { background:#00205B; color:white; padding:4px 6px; border:1px solid #001a47; font-size:7.5pt; }
+    .yn-hdr { width:44px; text-align:center; }
+    .no-hdr { background:#7F1D1D !important; }
+    .yes-hdr { background:#14532D !important; }
+    .day-hdr-row td { background:#DBEAFE; color:#00205B; font-size:8.5pt; font-weight:bold; padding:4px 8px; border-top:2.5px solid #00205B; border-bottom:1.5px solid #00205B; border-left:1px solid #ddd; border-right:1px solid #ddd; }
+    .day-hdr-row.future td { background:#F9FAFB; color:#ccc; }
+    .staff-lbl { font-size:7pt; color:#7777aa; margin-left:10px; font-weight:400; }
+    .not-yet { font-size:6.5pt; color:#ccc; font-style:italic; margin-left:6px; }
+    .check-row td { border:1px solid #ddd; padding:3px 7px; vertical-align:middle; }
+    .check-row.future td { color:#ccc; background:#fafafa; }
+    .item-num { width:20px; text-align:right; color:#bbb; font-size:7pt; }
+    .item-text { text-align:left; }
+    .cmt-cell { text-align:left; font-size:7pt; color:#888; font-style:italic; }
+    .yn-cell { width:44px; text-align:center; font-weight:bold; font-size:11pt; }
+    .yes-tick { background:#F0FDF4; color:#16A34A; }
+    .no-tick  { background:#FEF2F2; color:#DC2626; }
+    .day-sep td { height:5px; background:#E5E7EB; border-top:2px solid #00205B; }
+  `;
+
+  // ── PAGE 1: REGISTER ───────────────────────────────────────────────────────
+  const dayHdrs = DAYS.map((_,i) => `<th colspan="3">${DAY_FULL[i]}<br><span style="font-weight:400;font-size:6.5pt">${fmt(weekDates[i])}</span></th>`).join('');
+  const wphHdrs = '<th></th><th></th>' + DAYS.map(()=>'<th class="w">W</th><th class="p">P</th><th class="h">H</th>').join('');
+
+  // Group by room
+  const byRoom = {};
+  studentData.forEach(s => {
+    if (!byRoom[s.room]) byRoom[s.room] = [];
+    byRoom[s.room].push(s);
+  });
+
+  let studentRows = '';
+  Object.keys(byRoom).sort().forEach(room => {
+    byRoom[room].forEach((s, si) => {
+      const allCmts = Object.entries(s.comments).map(([d,c])=>`${d}: ${c}`).join('  ·  ');
+      const nurseFlag = Object.values(s.nurse).some(v=>v) ? ' 🏥' : '';
+      const nameLine = `<div class="name-line">${s.name} <span class="grade-txt">· ${s.grade}${nurseFlag}</span></div>${allCmts?`<div class="comment-line">${allCmts}</div>`:''}`;
+      const roomCell = si===0 ? `<td class="room-cell" rowspan="1">${room}</td>` : '<td></td>';
+
+      let dayCells = '';
+      DAYS.forEach((day,di) => {
+        const isFuture = weekDates[di] > today;
+        if (isFuture) { dayCells += '<td class="future"></td>'.repeat(3); return; }
+        if (s.onLeave[day]) {
+          const v = s.leaveConfirmed[day] ? 'L' : '~';
+          const cls = s.leaveConfirmed[day] ? 'st leave' : 'st excused';
+          dayCells += `<td class="${cls}">${v}</td>`.repeat(3);
+          return;
+        }
+        const reg = s.reg[day] || {};
+        dayCells += stCell(reg.w, s.lateWake[day]);
+        dayCells += stCell(reg.p);
+        dayCells += stCell(reg.h);
+      });
+
+      studentRows += `<tr class="${si===0?'first-row':''}">${roomCell}<td class="name-cell">${nameLine}</td>${dayCells}</tr>`;
+    });
+    studentRows += '<tr class="room-sep"><td colspan="17"></td></tr>';
+  });
+
+  const page1 = `
+    <div class="page">
+      <div class="header">
+        <img src="${img1}" class="logo">
+        <div class="header-centre">
+          <div class="h-title">HAWKING HOUSE — BOARDING REGISTER</div>
+          <div class="h-sub">${weekLabel} &nbsp;·&nbsp; W/C ${fmt(weekDates[0])} – ${fmt(weekDates[4])} &nbsp;·&nbsp; ${yr}/${yr+1}</div>
+          <div class="h-staff">Staff on Duty: &nbsp;${DAYS.map(d=>`${d} ${staffByDay[d]}`).join(' &nbsp;·&nbsp; ')}</div>
+        </div>
+        <img src="${img2}" class="logo">
+      </div>
+      <table class="register-table">
+        <thead>
+          <tr class="day-hdr"><th>Room</th><th>Student · Grade</th>${dayHdrs}</tr>
+          <tr class="wph-hdr">${wphHdrs}</tr>
+        </thead>
+        <tbody>${studentRows}</tbody>
+      </table>
+      <div class="key-row">KEY: &nbsp; W=Morning Wake &nbsp;·&nbsp; P=Evening Prep &nbsp;·&nbsp; H=Heads on Beds &nbsp;·&nbsp; ✓ Present &nbsp;·&nbsp; ✗ Absent &nbsp;·&nbsp; ~ Excused &nbsp;·&nbsp; L=On Leave &nbsp;·&nbsp; ⚠ Late Wake &nbsp;·&nbsp; 🏥 Nurse visit</div>
+    </div>`;
+
+  // ── PAGE 2: CHECKLIST ──────────────────────────────────────────────────────
+  let checkRows = '';
+  DAYS.forEach((day,di) => {
+    const isFuture = weekDates[di] > today;
+    const answers = checklistAnswers(day, weekDates[di]);
+    const futureCls = isFuture ? ' future' : '';
+    checkRows += `<tr class="day-hdr-row${futureCls}">
+      <td colspan="4"><strong>${DAY_FULL[di]}</strong>
+        <span style="font-size:7.5pt;font-weight:400;margin-left:8px">${fmt(weekDates[di])}</span>
+        <span class="staff-lbl">Staff: ${staffByDay[day]}</span>
+        ${isFuture?'<span class="not-yet">(not yet)</span>':''}
+      </td>
+    </tr>`;
+    CHECKLIST.forEach((item,ci) => {
+      const [ans,cmt] = answers[ci];
+      let yesTd, noTd;
+      if (isFuture || ans===null) {
+        yesTd = '<td class="yn-cell"></td>';
+        noTd  = '<td class="yn-cell"></td>';
+      } else if (ans===true) {
+        yesTd = '<td class="yn-cell yes-tick">✓</td>';
+        noTd  = '<td class="yn-cell"></td>';
+      } else {
+        yesTd = '<td class="yn-cell"></td>';
+        noTd  = '<td class="yn-cell no-tick">✓</td>';
+      }
+      checkRows += `<tr class="check-row${futureCls}">
+        <td class="item-num">${ci+1}.</td>
+        <td class="item-text">${item}</td>
+        <td class="cmt-cell">${isFuture?'':cmt}</td>
+        ${noTd}${yesTd}
+      </tr>`;
+    });
+    if (di < 4) checkRows += '<tr class="day-sep"><td colspan="4"></td></tr>';
+  });
+
+  const page2 = `
+    <div class="page">
+      <div class="header">
+        <img src="${img1}" class="logo">
+        <div class="header-centre">
+          <div class="h-title">HAWKING HOUSE — DAILY CHECKLIST</div>
+          <div class="h-sub">${weekLabel} &nbsp;·&nbsp; ${fmt(weekDates[0])} – ${fmt(weekDates[4])}</div>
+        </div>
+        <img src="${img2}" class="logo">
+      </div>
+      <table class="checklist-table">
+        <thead><tr>
+          <th colspan="2" style="text-align:left">Checklist Item</th>
+          <th>Comments / Auto-filled</th>
+          <th class="yn-hdr no-hdr">NO</th>
+          <th class="yn-hdr yes-hdr">YES</th>
+        </tr></thead>
+        <tbody>${checkRows}</tbody>
+      </table>
+    </div>`;
+
+  // ── ASSEMBLE & OPEN ────────────────────────────────────────────────────────
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>Hawking House — ${weekLabel}</title>
+    <style>${CSS}</style>
+  </head><body>${page1}${page2}</body></html>`;
+
+  const blob = new Blob([html], {type:'text/html'});
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url,'_blank');
+  if (win) {
+    win.onload = () => {
+      setTimeout(() => { win.print(); }, 800);
+    };
+  }
+  return url;
+}
+
+
+// ── PIN MANAGEMENT ───────────────────────────────────────────────────────────
+function sessionToMs(policy){
+  if(policy==='always') return 0;
+  if(policy==='daily')  return 24*60*60*1000;
+  if(policy==='weekly') return 7*24*60*60*1000;
+  if(policy==='2weeks') return 14*24*60*60*1000;
+  if(policy==='inactivity_4')  return 4*60*60*1000;
+  if(policy==='inactivity_8')  return 8*60*60*1000;
+  if(policy==='inactivity_24') return 24*60*60*1000;
+  return 7*24*60*60*1000;
+}
+
+async function savePinSetting(role){
+  const inputId = role==='ahsm' ? 'bs-ahsm-pin' : 'bs-liaison-pin';
+  const statusId = role==='ahsm' ? 'bs-ahsm-pin-status' : 'bs-liaison-pin-status';
+  const pin = document.getElementById(inputId)?.value?.trim();
+  if(!pin || pin.length < 4){
+    alert('PIN must be at least 4 digits (6 recommended).');
+    return;
+  }
+  if(!/^\d+$/.test(pin)){
+    alert('PIN must be numbers only.');
+    return;
+  }
+  try{
+    const key = role==='ahsm' ? 'ahsmPin' : 'liaisonPin';
+    await supa.from('boarding_settings').upsert({key, value: JSON.stringify(pin)},{onConflict:'key'});
+    document.getElementById(inputId).value='';
+    const s=document.getElementById(statusId);
+    s.style.display='block';
+    setTimeout(()=>s.style.display='none',2000);
+    showToastMsg('✓ '+role.toUpperCase()+' PIN updated','#16a34a');
+  }catch(e){alert('Failed to save PIN: '+e.message);}
+}
+
+async function savePinSessions(){
+  try{
+    const ahsmPolicy = document.getElementById('bs-ahsm-session')?.value||'weekly';
+    const liaisonPolicy = document.getElementById('bs-liaison-session')?.value||'weekly';
+    await Promise.all([
+      supa.from('boarding_settings').upsert({key:'ahsmSessionPolicy',value:JSON.stringify(ahsmPolicy)},{onConflict:'key'}),
+      supa.from('boarding_settings').upsert({key:'liaisonSessionPolicy',value:JSON.stringify(liaisonPolicy)},{onConflict:'key'}),
+    ]);
+    const s=document.getElementById('bs-session-status');
+    s.style.display='block';
+    setTimeout(()=>s.style.display='none',2000);
+  }catch(e){alert('Failed: '+e.message);}
+}
+
+function _populatePinSettings(){
+  // Load current session policies from boarding settings
+  const bs=_boardingSettings||{};
+  const ahsmSel=document.getElementById('bs-ahsm-session');
+  const liaisonSel=document.getElementById('bs-liaison-session');
+  if(ahsmSel&&bs.ahsmSessionPolicy) ahsmSel.value=bs.ahsmSessionPolicy;
+  if(liaisonSel&&bs.liaisonSessionPolicy) liaisonSel.value=bs.liaisonSessionPolicy;
+}
+
+async function exportWeekReport(){
+  const btn=document.getElementById('export-report-btn');
+  if(btn){btn.textContent='⏳ Generating...';btn.disabled=true;}
+  try{
+    await generateWeekReport(supa, STUDENTS, BOARDER_ROOMS, HAWKING_STATUS, _boardingSettings);
+  }catch(e){
+    console.error('Report error:',e);
+    alert('Report generation failed: '+e.message);
+  }finally{
+    if(btn){btn.textContent='📄 Export Report';btn.disabled=false;}
+  }
+}
+
 // ── BOARDING PENALTIES REALTIME ──────────────────────────────
 let _penaltySub=null;
 let _penaltyOwnWrite=false; // suppress RT re-render for our own writes
@@ -30996,9 +31615,15 @@ function _amBoardingRegisterHtml(type,excusedMap){
       }
       rows+=`<div data-br-name="${_safeBrN}" style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.05);background:${bg}">
         <span style="font-size:10px;color:#555;min-width:22px;text-align:right;font-variant-numeric:tabular-nums">${globalIdx}.</span>
-        <div style="flex:1;font-size:13px;color:#e0e0e0;font-weight:500">${p.name}${_excTag}${_depBtn}</div>
+        <div style="flex:1;font-size:13px;color:#e0e0e0;font-weight:500">
+          <span onclick="_brNameTap('${_safeBrN}')" style="cursor:pointer;border-bottom:1px dotted #666">${p.name}</span>
+          ${(_nurseMap[p.name]||[]).length?'<span style="font-size:10px;color:#a855f7;margin-left:4px">🏥×'+(_nurseMap[p.name]||[]).length+'</span>':''}
+          ${(_commentMap[p.name]||[]).length?'<span style="font-size:10px;color:#60a5fa;margin-left:4px">💬</span>':''}
+          ${_excTag}${_depBtn}
+        </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
-          <div style="display:flex;gap:4px">
+          <div style="display:flex;gap:4px;align-items:center">
+            <button onclick="logNurseVisit('${_safeBrN}')" style="font-size:12px;padding:3px 5px;border-radius:5px;border:1px solid ${(_nurseMap[p.name]||[]).length?'#a855f7':'rgba(255,255,255,.12)'};background:${(_nurseMap[p.name]||[]).length?'rgba(168,85,247,.2)':'transparent'};color:${(_nurseMap[p.name]||[]).length?'#c084fc':'#555'};cursor:pointer" title="Log nurse visit">🏥</button>
             ${['present','absent','excused'].map(opt=>`<button data-br-opt="${opt}" onclick="_brTap('${_safeBrN}','${opt}')" style="font-size:11px;padding:4px 7px;border-radius:6px;border:1px solid ${opt===st?statColor[opt]:'rgba(255,255,255,.12)'};background:${opt===st?'rgba(255,255,255,.1)':'transparent'};color:${opt===st?statColor[opt]:'#666'};cursor:pointer;font-weight:${opt===st?'700':'400'}">${opt==='present'?'✓':opt==='absent'?'✗':'~'}</button>`).join('')}
           </div>
           ${(_isMorning||_isHoob)?`<div style="display:flex;gap:3px">
@@ -31120,6 +31745,18 @@ async function _brTogglePenalty(name, field){
   }finally{
     _penaltyInFlight.delete(guardKey);
   }
+}
+
+function _brNameTap(name){
+  // Show options: comment or nurse visit
+  const opts=['💬 Add comment','🏥 Log nurse visit'];
+  const existing=_commentMap[name]||[];
+  const nurses=_nurseMap[name]||[];
+  const info=existing.length?'\nComments: '+existing.map(c=>c.comment).join(' | '):'';
+  const nurseInfo=nurses.length?'\nNurse visits today: '+nurses.length:'';
+  const choice=prompt('Student: '+name+info+nurseInfo+'\n\n1. Add comment\n2. Log nurse visit\n\nEnter 1 or 2:');
+  if(choice==='1')openCommentModal(name);
+  else if(choice==='2')logNurseVisit(name);
 }
 
 function _brRerenderRow(name, session){
@@ -32106,4 +32743,50 @@ function initActiveMode(){
 </div>
 
 </body>
-</html>
+</html><script>
+// ── REGISTRATION HISTORY CSV EXPORT ──────────────────────────────────────────
+async function exportRegistrationCSV(){
+  try{
+    const today=new Date().toISOString().split('T')[0];
+    // Get last 30 days
+    const from=new Date();from.setDate(from.getDate()-30);
+    const fromISO=from.toISOString().split('T')[0];
+
+    const [regRes,penRes,nurseRes,leaveRes]=await Promise.all([
+      supa.from('boarding_registrations').select('*').gte('register_date',fromISO).order('register_date').order('student_name'),
+      supa.from('boarding_penalties').select('*').gte('infraction_date',fromISO).order('infraction_date'),
+      supa.from('boarding_medical').select('*').gte('visit_date',fromISO).order('visit_date'),
+      supa.from('boarding_leaves').select('*').gte('created_at',new Date(from).toISOString()).order('start_date'),
+    ]);
+
+    let csv='Date,Student,Session,Status,Late Wake,Late Floor,Late Sleep,Updated By\n';
+    (regRes.data||[]).forEach(r=>{
+      csv+=`${r.register_date},${r.student_name},${r.session_type},${r.status||''},${r.late_wake?'YES':''},${r.late_floor?'YES':''},${r.late_sleep?'YES':''},${r.updated_by||''}\n`;
+    });
+
+    csv+='\n\nPENALTIES\nDate,Student,Infraction,Penalty Date,Phone Minutes,Status,Logged By\n';
+    (penRes.data||[]).forEach(p=>{
+      const mins=(p.penalty_type||'').replace('phone_','').replace('min','');
+      csv+=`${p.infraction_date},${p.student_name},${p.infraction_type},${p.penalty_date},${mins},${p.status},${p.logged_by||''}\n`;
+    });
+
+    csv+='\n\nNURSE VISITS\nDate,Time,Student,Notes,Session,Logged By\n';
+    (nurseRes.data||[]).forEach(n=>{
+      const t=n.visit_time?new Date(n.visit_time).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'';
+      csv+=`${n.visit_date},${t},${n.student_name},"${(n.notes||'').replace(/"/g,"'")}",${n.session_type||''},${n.logged_by||''}\n`;
+    });
+
+    csv+='\n\nLEAVE LOG\nStudent,Type,Start,End,Status,Approved By\n';
+    (leaveRes.data||[]).forEach(l=>{
+      csv+=`${l.student_name},${l.leave_type||''},${l.start_date},${l.end_date||''},${l.status||''},${l.approved_by||''}\n`;
+    });
+
+    const blob=new Blob([csv],{type:'text/csv'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`hawking_register_${fromISO}_to_${today}.csv`;
+    a.click();
+    showToastMsg('✓ CSV exported','#16a34a');
+  }catch(e){showToastMsg('Export failed: '+e.message,'#dc2626');}
+}
+</script>
