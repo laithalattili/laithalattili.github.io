@@ -1233,9 +1233,9 @@ function _regMakeRow(name, idx){
       ${excTag}${depTimeStr}${depBtn}${penaltyBtns}
     </div>
     <div class="reg-btns">
-      <button class="reg-btn ${st==='present'?'active-present':''}" data-opt="present" onclick="${_boardingWindowOpen?'regTap(\''+safe+'\',\'present\')':''}" style="${_boardingWindowOpen?'':'opacity:.35;cursor:not-allowed'}" ${_boardingWindowOpen?'':'disabled'}>✓</button>
-      <button class="reg-btn ${st==='absent'?'active-absent':''}" data-opt="absent" onclick="${_boardingWindowOpen?'regTap(\''+safe+'\',\'absent\')':''}" style="${_boardingWindowOpen?'':'opacity:.35;cursor:not-allowed'}" ${_boardingWindowOpen?'':'disabled'}>✗</button>
-      <button class="reg-btn ${st==='excused'?'active-excused':''}" data-opt="excused" onclick="${_boardingWindowOpen?'regTap(\''+safe+'\',\'excused\')':''}" style="${_boardingWindowOpen?'':'opacity:.35;cursor:not-allowed'}" ${_boardingWindowOpen?'':'disabled'}>~</button>
+      <button class="reg-btn ${st==='present'?'active-present':''}" data-opt="present" data-regname="${safe}" style="${_boardingWindowOpen?'':'opacity:.35;cursor:not-allowed'}" ${_boardingWindowOpen?'':'disabled'}>✓</button>
+      <button class="reg-btn ${st==='absent'?'active-absent':''}" data-opt="absent" data-regname="${safe}" style="${_boardingWindowOpen?'':'opacity:.35;cursor:not-allowed'}" ${_boardingWindowOpen?'':'disabled'}>✗</button>
+      <button class="reg-btn ${st==='excused'?'active-excused':''}" data-opt="excused" data-regname="${safe}" style="${_boardingWindowOpen?'':'opacity:.35;cursor:not-allowed'}" ${_boardingWindowOpen?'':'disabled'}>~</button>
     </div>
   </div>`;
 }
@@ -1334,6 +1334,7 @@ function renderRegister(){
     <span style="color:#c4622d;margin-left:8px">Departure/return confirmation always available</span>
   </div>`:'';
   document.getElementById('reg-list').innerHTML=windowBanner+(html||'<div style="padding:2rem;text-align:center;color:var(--text3);font-size:13px">No students found.</div>');
+  initRegListeners();
 }
 
 function renderPendingActions(){
@@ -1391,6 +1392,20 @@ function renderRegControls(){
       segBtn('Boarders ('+getBoarders().length+')',"setRegScope('boarders')",_regScope==='boarders')+
       segBtn('All House ('+STUDENTS.length+')',"setRegScope('house')",_regScope==='house')+
     '</div>';
+}
+
+// Delegated register tap handler — attached once, handles all reg-btn clicks
+function initRegListeners(){
+  const list=document.getElementById('reg-list');
+  if(!list||list._listenersAttached)return;
+  list._listenersAttached=true;
+  list.addEventListener('click',e=>{
+    const btn=e.target.closest('[data-opt][data-regname]');
+    if(!btn||btn.disabled)return;
+    const name=btn.getAttribute('data-regname');
+    const opt=btn.getAttribute('data-opt');
+    if(name&&opt)regTap(name,opt);
+  });
 }
 
 function toggleRegSection(key){
