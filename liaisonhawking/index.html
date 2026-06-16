@@ -144,26 +144,41 @@ let LIAISON_PIN=''; // Loaded from Supabase
 let _liaison_session_ms = 7*24*60*60*1000; // default 1 week
 
 async function loadLiaisonPin(){
-  try{
-    // Use the same supa() helper as the rest of the app
-    const data = await (await supa('boarding_settings')).get('key=in.(liaisonPin,liaisonSessionPolicy)');
-    (Array.isArray(data)?data:[]).forEach(r=>{
-      try{
-        if(r.key==='liaisonPin'){
-          let v=r.value;
-          try{v=JSON.parse(v);}catch{}
-          // Handle double-stringified values
-          if(typeof v==='string'&&(v.startsWith('"')||v.startsWith("'"))) try{v=JSON.parse(v);}catch{}
-          LIAISON_PIN=String(v).trim();
-          console.log('Liaison PIN loaded, length='+LIAISON_PIN.length);
-          updatePinDots();
-        }
-        if(r.key==='liaisonSessionPolicy'){
-          try{_liaison_session_ms=sessionPolicyToMs(JSON.parse(r.value));}catch{}
-        }
-      }catch(e){console.warn('PIN parse error:',e);}
-    });
-  }catch(e){console.warn('PIN load failed:',e);}
+  // Try boarding_settings first, fall back to work_app_data
+  const tables = ['boarding_settings', 'work_app_data'];
+  for(const table of tables){
+    try{
+      const res = await fetch(
+        `${SUPA_URL}/rest/v1/${table}?key=in.(liaisonPin,liaisonSessionPolicy)&apikey=${SUPA_KEY}`,
+        {headers:{
+          'Authorization': `Bearer ${SUPA_KEY}`,
+          'apikey': SUPA_KEY,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        }}
+      );
+      if(!res.ok){console.warn('loadLiaisonPin: '+table+' returned '+res.status);continue;}
+      const data = await res.json();
+      if(!Array.isArray(data)||!data.length){continue;}
+      data.forEach(r=>{
+        try{
+          if(r.key==='liaisonPin'){
+            let v=r.value;
+            try{v=JSON.parse(v);}catch{}
+            if(typeof v==='string'&&v.startsWith('"')) try{v=JSON.parse(v);}catch{}
+            LIAISON_PIN=String(v).trim();
+            console.log('Liaison PIN loaded from '+table+', length='+LIAISON_PIN.length);
+            updatePinDots();
+          }
+          if(r.key==='liaisonSessionPolicy'){
+            try{_liaison_session_ms=sessionPolicyToMs(JSON.parse(r.value));}catch{}
+          }
+        }catch(e){console.warn('PIN parse error:',e);}
+      });
+      if(LIAISON_PIN) break; // got it, stop trying
+    }catch(e){console.warn('loadLiaisonPin error on '+table+':',e);}
+  }
+  if(!LIAISON_PIN) console.warn('Could not load liaison PIN from any source');
 }
 
 function sessionPolicyToMs(policy){
