@@ -25996,9 +25996,15 @@ async function renderSanctionsList(el){
 async function markSanctionDone(id){
   try{
     const today=new Date().toISOString().split('T')[0];
-    // Get the penalty to check if it's from today
-    const {data:p}=await supa.from('boarding_penalties').select('penalty_date,infraction_date').eq('id',id).single();
-    if(p&&(p.penalty_date===today||p.infraction_date===today)){
+    const {data:rows}=await supa.from('boarding_penalties').select('id,penalty_date,infraction_date').eq('id',id);
+    const p=rows&&rows[0];
+    if(!p){
+      showToastMsg('Already removed','#6b7280');
+      const el=document.getElementById('hawking-list-content');
+      if(_hwkFilter==='sanctions'&&el)renderSanctionsList(el);
+      return;
+    }
+    if(p.penalty_date===today||p.infraction_date===today){
       // Same day — delete entirely
       await supa.from('boarding_penalties').delete().eq('id',id);
       showToastMsg('✓ Sanction removed','#16a34a');
@@ -26090,7 +26096,9 @@ async function renderHawkingRegister(el, preloadedMap){
   try{
     const {data}=await supa.from('boarding_penalties')
       .select('student_name,infraction_type,penalty_date,status')
-      .in('status',['active','pending']).eq('infraction_date',today);
+      .in('status',['active','pending'])
+      .neq('infraction_type','late_floor')
+      .eq('infraction_date',today);
     (data||[]).forEach(p=>{
       if(!_penaltyMap[p.student_name])_penaltyMap[p.student_name]=[];
       _penaltyMap[p.student_name].push(p);
@@ -31002,7 +31010,7 @@ function _amBoardingRegisterHtml(type,excusedMap){
           </div>
           ${(_isMorning||_isHoob)?`<div style="display:flex;gap:3px">
             ${_isMorning?`<button data-penalty="lateWake" onclick="_brTogglePenalty('${_safeBrN}','lateWake')" style="font-size:9px;padding:2px 5px;border-radius:4px;border:1px solid ${stObj.lateWake?'#f59e0b':'rgba(255,255,255,.1)'};background:${stObj.lateWake?'rgba(245,158,11,.2)':'transparent'};color:${stObj.lateWake?'#f59e0b':'#555'};cursor:pointer">🛏 Wake</button>`:''}
-            ${_isMorning?`<button data-penalty="lateFloor" onclick="_brTogglePenalty('${_safeBrN}','lateFloor')" style="font-size:9px;padding:2px 5px;border-radius:4px;border:1px solid ${stObj.lateFloor?'#f59e0b':'rgba(255,255,255,.1)'};background:${stObj.lateFloor?'rgba(245,158,11,.2)':'transparent'};color:${stObj.lateFloor?'#f59e0b':'#555'};cursor:pointer">🚶 Floor</button>`:''}
+            ${_isMorning?`<button data-penalty="lateFloor" onclick="_brTogglePenalty('${_safeBrN}','lateFloor')" style="font-size:9px;padding:2px 5px;border-radius:4px;border:1px solid ${stObj.lateFloor?'#6b7280':'rgba(255,255,255,.1)'};background:${stObj.lateFloor?'rgba(107,114,128,.15)':'transparent'};color:${stObj.lateFloor?'#aaa':'#555'};cursor:pointer" title="Log only — no phone penalty">🚶 Floor</button>`:''}
             ${_isHoob?`<button data-penalty="lateSleep" onclick="_brTogglePenalty('${_safeBrN}','lateSleep')" style="font-size:9px;padding:2px 5px;border-radius:4px;border:1px solid ${stObj.lateSleep?'#ef4444':'rgba(255,255,255,.1)'};background:${stObj.lateSleep?'rgba(239,68,68,.2)':'transparent'};color:${stObj.lateSleep?'#ef4444':'#555'};cursor:pointer">😴 Sleep</button>`:''}
           </div>`:''}
         </div>
