@@ -554,39 +554,23 @@ function updateLiaisonMsg(){
     const dEn=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     dateLabel=dEn[d.getDay()]+' '+d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
     dateLabelZh=days[d.getDay()]+' '+(d.getMonth()+1)+'月'+d.getDate()+'日';
-  }catch{}
+  }catch(e){}
   const rzh={parents:'家长接送',relative:'亲属接送（需查验证件）',didi:'滴滴/出租车接送',activity:'学校活动外出'}[r]||'家长接送';
   const ren={parents:'Parents picking up',relative:'Relative pick-up (ID required)',didi:'Didi / Taxi pick-up',activity:'School activity'}[r]||'Parents picking up';
+  const NL='\n';
   let exZh='',exEn='';
   if(r==='relative'){
     const rn=document.getElementById('lv-gm-rel')?.value?.trim()||'';
     const ri=document.getElementById('lv-gm-relid')?.value?.trim()||'';
-    if(rn){exZh+='
-亲属姓名：'+rn;exEn+='
-Relative: '+rn;}
-    if(ri){exZh+='
-证件号码：'+ri;exEn+='
-ID: '+ri;}
+    if(rn){exZh+=NL+'亲属姓名：'+rn;exEn+=NL+'Relative: '+rn;}
+    if(ri){exZh+=NL+'证件号码：'+ri;exEn+=NL+'ID: '+ri;}
   } else if(r==='didi'){
     const pl=document.getElementById('lv-gm-plate')?.value?.trim()||'';
-    if(pl){exZh+='
-车牌号：'+pl;exEn+='
-Plate: '+pl;}
+    if(pl){exZh+=NL+'车牌号：'+pl;exEn+=NL+'Plate: '+pl;}
   }
-  const zh=`【霍金宿舍 Hawking House】
-${dateLabelZh} ${time}
-
-学生：${name||'___'}
-离开原因：${rzh}${exZh}
-
-请允许该学生出门，谢谢 ✅`;
-  const en=`Hawking House | ${dateLabel} ${time}
-Student: ${name||'___'}
-Reason: ${ren}${exEn}
-Please allow student through the gate ✅`;
-  _gmText=zh+'
-
-'+en;
+  const zh='【霍金宿舍 Hawking House】'+NL+dateLabelZh+' '+time+NL+NL+'学生：'+(name||'___')+NL+'离开原因：'+rzh+exZh+NL+NL+'请允许该学生出门，谢谢 ✅';
+  const en='Hawking House | '+dateLabel+' '+time+NL+'Student: '+(name||'___')+NL+'Reason: '+ren+exEn+NL+'Please allow student through the gate ✅';
+  _gmText=zh+NL+NL+en;
   const pr=document.getElementById('lv-gm-preview');
   if(pr)pr.textContent=_gmText;
 }
