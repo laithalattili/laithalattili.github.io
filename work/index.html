@@ -1840,28 +1840,23 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
         <div style="padding:.75rem 1rem;border-top:1px solid var(--border3)">
           <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">🔐 PIN & Session Management</div>
 
-          <!-- AHSM/RT PIN -->
+          <div style="font-size:11px;color:var(--text3);margin-bottom:8px">AHSM/RT staff PINs are set individually in the Staff section above.</div>
+
+          <!-- AHSM SESSION POLICY (no PIN here, just how long session lasts) -->
           <div style="margin-bottom:12px;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid var(--border)">
-            <div style="font-size:12px;font-weight:600;color:var(--text1);margin-bottom:8px">AHSM / RT App PIN</div>
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-              <span style="font-size:12px;color:var(--text2);width:80px;flex-shrink:0">New PIN</span>
-              <input type="password" id="bs-ahsm-pin" maxlength="6" placeholder="6 digits" inputmode="numeric"
-                style="font-size:14px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;width:110px;letter-spacing:4px">
-              <button onclick="savePinSetting('ahsm')" style="font-size:11px;padding:4px 12px;border-radius:6px;background:#00205B;color:#fff;border:none;cursor:pointer;font-weight:600">Set</button>
-            </div>
+            <div style="font-size:12px;font-weight:600;color:var(--text1);margin-bottom:8px">AHSM / RT Session Duration</div>
             <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-size:12px;color:var(--text2);width:80px;flex-shrink:0">Session</span>
+              <span style="font-size:12px;color:var(--text2);width:80px;flex-shrink:0">Stay logged in</span>
               <select id="bs-ahsm-session" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;flex:1">
-                <option value="always">Every time (always ask)</option>
+                <option value="always">Ask every time</option>
                 <option value="daily">Once per day</option>
                 <option value="weekly" selected>Once per week</option>
                 <option value="2weeks">Every 2 weeks</option>
-                <option value="inactivity_4">After 4h inactivity</option>
-                <option value="inactivity_8">After 8h inactivity</option>
-                <option value="inactivity_24">After 24h inactivity</option>
+                <option value="inactivity_4">Until 4h inactive</option>
+                <option value="inactivity_8">Until 8h inactive</option>
+                <option value="inactivity_24">Until 24h inactive</option>
               </select>
             </div>
-            <div id="bs-ahsm-pin-status" style="font-size:10px;color:#16a34a;margin-top:4px;display:none">✓ Saved</div>
           </div>
 
           <!-- LIAISON PIN -->
@@ -1888,7 +1883,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
             <div id="bs-liaison-pin-status" style="font-size:10px;color:#16a34a;margin-top:4px;display:none">✓ Saved</div>
           </div>
 
-          <button onclick="savePinSessions()" style="width:100%;font-size:12px;padding:7px;border-radius:7px;background:#475569;color:#fff;border:none;cursor:pointer;font-weight:600">Save Session Policies</button>
+          <button onclick="savePinSessions()" style="width:100%;font-size:12px;padding:7px;border-radius:7px;background:#475569;color:#fff;border:none;cursor:pointer;font-weight:600">Save PIN & Session Settings</button>
           <div id="bs-session-status" style="font-size:10px;color:#16a34a;text-align:center;margin-top:4px;display:none">✓ Session policies saved</div>
         </div>
 
@@ -31425,7 +31420,7 @@ async function savePinSessions(){
     const ahsmPolicy = document.getElementById('bs-ahsm-session')?.value||'weekly';
     const liaisonPolicy = document.getElementById('bs-liaison-session')?.value||'weekly';
     await Promise.all([
-      supa.from('boarding_settings').upsert({key:'ahsmSessionPolicy',value:JSON.stringify(ahsmPolicy)},{onConflict:'key'}),
+      ahsmPolicy ? supa.from('boarding_settings').upsert({key:'ahsmSessionPolicy',value:JSON.stringify(ahsmPolicy)},{onConflict:'key'}) : Promise.resolve(),
       supa.from('boarding_settings').upsert({key:'liaisonSessionPolicy',value:JSON.stringify(liaisonPolicy)},{onConflict:'key'}),
     ]);
     const s=document.getElementById('bs-session-status');
