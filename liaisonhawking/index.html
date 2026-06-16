@@ -127,13 +127,13 @@ body{background:var(--bg);min-height:100vh;}
   <div class="tabs">
     <button class="tab-btn active" onclick="showTab('leaves',this)">📋 Leaves</button>
     <button class="tab-btn" onclick="showTab('register',this)">📊 Register</button>
-    <button class="tab-btn" onclick="showTab('sanctions',this)">⚠️ Sanctions</button>
+    <button class="tab-btn" onclick="showTab('message',this)">📨 Message</button>
     <button class="tab-btn" onclick="showTab('medical',this)">🏥 Medical</button>
   </div>
 
   <div id="tab-leaves" class="section"></div>
   <div id="tab-register" class="section" style="display:none"></div>
-  <div id="tab-sanctions" class="section" style="display:none"></div>
+  <div id="tab-message" class="section" style="display:none"></div>
   <div id="tab-medical" class="section" style="display:none"></div>
 </div>
 
@@ -275,23 +275,81 @@ async function init(){
 
 // ── TABS ─────────────────────────────────────────────────────────────────────
 function showTab(name,btn){
-  ['leaves','register','sanctions','medical'].forEach(t=>{
+  ['leaves','register','message','medical'].forEach(t=>{
     document.getElementById('tab-'+t).style.display=t===name?'block':'none';
   });
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   if(name==='leaves')loadLeaves();
   if(name==='register')loadRegister();
-  if(name==='sanctions')loadSanctions();
+  if(name==='message')renderMessageTab();
   if(name==='medical')loadMedical();
 }
 
 // ── LEAVES ───────────────────────────────────────────────────────────────────
+async function submitLeave(){
+  const name=document.getElementById('lv-name')?.value?.trim();
+  const type=document.getElementById('lv-type')?.value;
+  const start=document.getElementById('lv-start')?.value;
+  const end=document.getElementById('lv-end')?.value;
+  const notes=document.getElementById('lv-notes')?.value?.trim();
+  if(!name||!type||!start){alert('Please fill in student name, type and start date.');return;}
+  const btn=document.getElementById('lv-submit');
+  btn.disabled=true; btn.textContent='Saving…';
+  try{
+    const db=await supa('boarding_leaves');
+    await db.patch ? null : null; // ensure client ready
+    const res=await fetch(`${SUPA_URL}/rest/v1/boarding_leaves`,{
+      method:'POST',
+      headers:{'Authorization':`Bearer ${SUPA_KEY}`,'apikey':SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({student_name:name,leave_type:type,start_date:start,end_date:end||null,notes:notes||null,status:'pending',active:true,created_by:'Liaison'})
+    });
+    if(!res.ok)throw new Error('Save failed: '+res.status);
+    document.getElementById('lv-name').value='';
+    document.getElementById('lv-notes').value='';
+    showLiaisonToast('✓ Leave request submitted');
+    loadLeaves();
+  }catch(e){alert('Error: '+e.message);}
+  finally{btn.disabled=false;btn.textContent='Submit Request';}
+}
+
+function showLiaisonToast(msg,color='#16a34a'){
+  let t=document.getElementById('liaison-toast');
+  if(!t){t=document.createElement('div');t.id='liaison-toast';t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:9999;transition:opacity .3s';document.body.appendChild(t);}
+  t.textContent=msg;t.style.background=color;t.style.opacity='1';
+  setTimeout(()=>t.style.opacity='0',2500);
+}
+
 async function loadLeaves(){
   const el=document.getElementById('tab-leaves');
-  el.innerHTML='<div class="loading">Loading leaves...</div>';
+  // Add leave form at top
+  const today_=new Date().toISOString().split('T')[0];
+  const addForm=`<div class="card" style="margin-bottom:12px">
+    <div class="card-title">➕ New Leave Request</div>
+    <div style="display:flex;flex-direction:column;gap:8px;padding:4px 0">
+      <input id="lv-name" placeholder="Student name" style="padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%">
+      <select id="lv-type" style="padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%">
+        <option value="">— Leave type —</option>
+        <option value="weekend">🏠 Weekend Leave</option>
+        <option value="medical">🏥 Medical</option>
+        <option value="family">👨‍👩‍👧 Family</option>
+        <option value="activity">⚽ School Activity</option>
+        <option value="longterm">📅 Long-term</option>
+      </select>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1"><label style="font-size:10px;color:#888">FROM</label>
+          <input id="lv-start" type="date" value="${today_}" style="padding:7px 8px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%"></div>
+        <div style="flex:1"><label style="font-size:10px;color:#888">TO (optional)</label>
+          <input id="lv-end" type="date" style="padding:7px 8px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%"></div>
+      </div>
+      <input id="lv-notes" placeholder="Notes (optional)" style="padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%">
+      <button id="lv-submit" onclick="submitLeave()" style="background:#00205B;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer">Submit Request</button>
+    </div>
+  </div>`;
+  el.innerHTML=addForm+'<div class="loading">Loading leaves…</div>';
   const data=await(await supa('boarding_leaves')).get('order=created_at.desc&limit=50');
-  if(!data.length){el.innerHTML='<div class="empty">No leave requests.</div>';return;}
+  const listEl=el.querySelector('.loading');
+  if(!data.length){if(listEl)listEl.outerHTML='<div class="empty">No leave requests yet.</div>';return;}
 
   const grouped={pending:[],approved:[],active:[],returned:[]};
   data.forEach(l=>{(grouped[l.status]||grouped.returned).push(l);});
@@ -319,7 +377,19 @@ async function loadLeaves(){
     });
     html+='</div>';
   });
-  el.innerHTML=html;
+  // Replace loading with list, preserving the form
+  const formEl=document.getElementById('lv-submit')?.closest('.card');
+  if(formEl){
+    // Remove old list if any
+    const oldList=el.querySelector('.leaves-list');
+    if(oldList)oldList.remove();
+    const listDiv=document.createElement('div');
+    listDiv.className='leaves-list';
+    listDiv.innerHTML=html;
+    el.appendChild(listDiv);
+  } else {
+    el.innerHTML=html;
+  }
 }
 
 // ── REGISTER ─────────────────────────────────────────────────────────────────
@@ -335,7 +405,7 @@ async function loadRegister(){
   data.forEach(r=>{
     allNames.add(r.student_name);
     if(!byName[r.student_name])byName[r.student_name]={};
-    byName[r.student_name][r.session_type]=r.status;
+    byName[r.student_name][r.session_type]={status:r.status,updated_at:r.updated_at};
   });
 
   const sessionLabel={morning:'🌅 Morning Clearance',prep:'📚 Evening Prep',hoob:'🌙 Heads on Beds'};
@@ -346,42 +416,177 @@ async function loadRegister(){
   ['morning','prep','hoob'].forEach(sess=>{
     html+=`<div class="card-title" style="background:#f8fafc;padding:6px 14px;font-size:10px">${sessionLabel[sess]}</div>`;
     [...allNames].sort().forEach(name=>{
-      const st=(byName[name]||{})[sess]||'';
+      const st=((byName[name]||{})[sess]||{}).status||'';
       const cls=st==='present'?'stat-p':st==='absent'?'stat-a':st==='excused'?'stat-e':st==='l'?'stat-l':'stat-blank';
       const sym=st==='present'?'✓':st==='absent'?'✗':st==='excused'?'~':st==='l'?'L':'·';
-      html+=`<div class="reg-item"><span class="reg-name">${name}</span><span class="reg-stat ${cls}">${sym}</span></div>`;
+      const reg=byName[name]?.[sess];
+      // Show last updated time (not staff name)
+      const updTime=reg?.updated_at?new Date(reg.updated_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'';
+      html+=`<div class="reg-item">
+        <span class="reg-name">${name}</span>
+        <span style="flex:1;font-size:10px;color:#bbb;text-align:right;padding-right:6px">${updTime}</span>
+        <span class="reg-stat ${cls}">${sym}</span>
+      </div>`;
     });
   });
   html+='</div>';
   el.innerHTML=html;
 }
 
-// ── SANCTIONS ────────────────────────────────────────────────────────────────
-async function loadSanctions(){
-  const el=document.getElementById('tab-sanctions');
-  el.innerHTML='<div class="loading">Loading...</div>';
-  const data=await(await supa('boarding_penalties')).get('status=in.(active,pending)&order=penalty_date&order=student_name');
-  const active=data.filter(p=>p.infraction_type!=='late_floor');
-  if(!active.length){el.innerHTML='<div class="empty">No active sanctions.</div>';return;}
-  const today_=today();
-  const infraLabel={late_wake:'🛏 Late Wake',late_floor:'🚶 Late Floor',late_sleep:'😴 Late Sleep'};
-  let html='<div class="card"><div class="card-title">Active Phone Time Sanctions</div>';
-  active.forEach(p=>{
-    const mins=parseInt((p.penalty_type||'').replace('phone_','').replace('min',''))||0;
-    const isPast=p.penalty_date<today_;
-    const isToday=p.penalty_date===today_;
-    const dateLabel=isToday?'Today':isPast?'Overdue: '+p.penalty_date:p.penalty_date;
-    const dateColor=isPast?'#dc2626':isToday?'#d97706':'#475569';
-    html+=`<div class="card-row">
-      <div style="flex:1">
-        <div class="leave-name">${p.student_name}</div>
-        <div class="leave-meta">${infraLabel[p.infraction_type]||p.infraction_type} &nbsp;·&nbsp; ${mins} min phone time</div>
-        <div style="font-size:10px;color:${dateColor};margin-top:2px;font-weight:600">${isPast?'⚠️ ':''}${dateLabel}</div>
+// ── MESSAGE GENERATOR ────────────────────────────────────────────
+let _gmReason='parents';
+let _gmText='';
+let _liaisonStudents=[];
+
+async function renderMessageTab(){
+  // Load student list from Supabase if not yet loaded
+  if(!_liaisonStudents.length){
+    try{
+      const db=await supa('work_app_data');
+      const data=await db.get('key=eq.students');
+      if(data&&data[0]){
+        let v=data[0].value;
+        try{v=JSON.parse(v);}catch{}
+        if(Array.isArray(v))_liaisonStudents=v.map(s=>s.name||s);
+      }
+    }catch(e){}
+  }
+  const now=new Date();
+  const dateVal=now.toISOString().split('T')[0];
+  const timeVal=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const opts=_liaisonStudents.map(n=>`<option value="${n}">`).join('');
+  const el=document.getElementById('tab-message');
+  el.innerHTML=`<div class="card">
+    <div class="card-title">📨 Gate Pass Message</div>
+    <div style="display:flex;flex-direction:column;gap:10px;padding:4px 0">
+      <div>
+        <label style="font-size:10px;color:#888;display:block;margin-bottom:3px">STUDENT</label>
+        <input id="lv-gm-student" list="lv-gm-list" placeholder="Type name…" oninput="updateLiaisonMsg()"
+          style="width:100%;padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:14px">
+        <datalist id="lv-gm-list">${opts}</datalist>
       </div>
-    </div>`;
+      <div style="display:flex;gap:8px">
+        <div style="flex:1">
+          <label style="font-size:10px;color:#888;display:block;margin-bottom:3px">DATE</label>
+          <input id="lv-gm-date" type="date" value="${dateVal}" oninput="updateLiaisonMsg()"
+            style="width:100%;padding:7px 8px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px">
+        </div>
+        <div style="flex:1">
+          <label style="font-size:10px;color:#888;display:block;margin-bottom:3px">TIME</label>
+          <input id="lv-gm-time" type="time" value="${timeVal}" oninput="updateLiaisonMsg()"
+            style="width:100%;padding:7px 8px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:10px;color:#888;display:block;margin-bottom:5px">REASON</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px" id="lv-gm-reasons">
+          ${[['parents','👨‍👩‍👧 Parents','家长接送'],['relative','👤 Relative','亲属接送'],['didi','🚗 Didi/Taxi','滴滴/出租车'],['activity','🏃 Activity','学校活动']].map(([v,l,s])=>`
+            <button onclick="selectLiaisonReason('${v}')" id="lv-r-${v}"
+              style="background:${v==='parents'?'#00205B':'#f8fafc'};border:1px solid ${v==='parents'?'#00205B':'#e5e7eb'};border-radius:8px;color:${v==='parents'?'#fff':'#333'};padding:8px 10px;cursor:pointer;text-align:left">
+              <div style="font-size:13px;font-weight:600">${l}</div>
+              <div style="font-size:10px;opacity:.7">${s}</div>
+            </button>`).join('')}
+        </div>
+      </div>
+      <div id="lv-gm-extra"></div>
+      <div>
+        <label style="font-size:10px;color:#888;display:block;margin-bottom:4px">MESSAGE PREVIEW</label>
+        <div id="lv-gm-preview" style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:12px;font-size:13px;line-height:1.7;white-space:pre-wrap;min-height:80px;color:#333"></div>
+      </div>
+      <button onclick="copyLiaisonMsg()"
+        style="background:#00205B;color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer">
+        📋 Copy Message
+      </button>
+    </div>
+  </div>`;
+  _gmReason='parents';
+  updateLiaisonMsg();
+}
+
+function selectLiaisonReason(r){
+  _gmReason=r;
+  document.querySelectorAll('#lv-gm-reasons button').forEach(b=>{
+    const on=b.id==='lv-r-'+r;
+    b.style.background=on?'#00205B':'#f8fafc';
+    b.style.borderColor=on?'#00205B':'#e5e7eb';
+    b.style.color=on?'#fff':'#333';
   });
-  html+='</div>';
-  el.innerHTML=html;
+  // Extra fields
+  const ex=document.getElementById('lv-gm-extra');
+  if(r==='relative'){
+    ex.innerHTML=`<div style="display:flex;flex-direction:column;gap:6px">
+      <input id="lv-gm-rel" placeholder="Relative name (optional)" oninput="updateLiaisonMsg()"
+        style="width:100%;padding:7px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px">
+      <input id="lv-gm-relid" placeholder="ID number (optional)" oninput="updateLiaisonMsg()"
+        style="width:100%;padding:7px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px">
+    </div>`;
+  } else if(r==='didi'){
+    ex.innerHTML=`<input id="lv-gm-plate" placeholder="Plate number e.g. 苏EK1234 (optional)" oninput="updateLiaisonMsg()"
+      style="width:100%;padding:7px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:14px;letter-spacing:2px">`;
+  } else { ex.innerHTML=''; }
+  updateLiaisonMsg();
+}
+
+function updateLiaisonMsg(){
+  const name=(document.getElementById('lv-gm-student')?.value||'').trim();
+  const date=document.getElementById('lv-gm-date')?.value||'';
+  const time=document.getElementById('lv-gm-time')?.value||'';
+  const r=_gmReason;
+  let dateLabel=date,dateLabelZh=date;
+  try{
+    const d=new Date(date+'T12:00:00');
+    const days=['周日','周一','周二','周三','周四','周五','周六'];
+    const dEn=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    dateLabel=dEn[d.getDay()]+' '+d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+    dateLabelZh=days[d.getDay()]+' '+(d.getMonth()+1)+'月'+d.getDate()+'日';
+  }catch{}
+  const rzh={parents:'家长接送',relative:'亲属接送（需查验证件）',didi:'滴滴/出租车接送',activity:'学校活动外出'}[r]||'家长接送';
+  const ren={parents:'Parents picking up',relative:'Relative pick-up (ID required)',didi:'Didi / Taxi pick-up',activity:'School activity'}[r]||'Parents picking up';
+  let exZh='',exEn='';
+  if(r==='relative'){
+    const rn=document.getElementById('lv-gm-rel')?.value?.trim()||'';
+    const ri=document.getElementById('lv-gm-relid')?.value?.trim()||'';
+    if(rn){exZh+='
+亲属姓名：'+rn;exEn+='
+Relative: '+rn;}
+    if(ri){exZh+='
+证件号码：'+ri;exEn+='
+ID: '+ri;}
+  } else if(r==='didi'){
+    const pl=document.getElementById('lv-gm-plate')?.value?.trim()||'';
+    if(pl){exZh+='
+车牌号：'+pl;exEn+='
+Plate: '+pl;}
+  }
+  const zh=`【霍金宿舍 Hawking House】
+${dateLabelZh} ${time}
+
+学生：${name||'___'}
+离开原因：${rzh}${exZh}
+
+请允许该学生出门，谢谢 ✅`;
+  const en=`Hawking House | ${dateLabel} ${time}
+Student: ${name||'___'}
+Reason: ${ren}${exEn}
+Please allow student through the gate ✅`;
+  _gmText=zh+'
+
+'+en;
+  const pr=document.getElementById('lv-gm-preview');
+  if(pr)pr.textContent=_gmText;
+}
+
+async function copyLiaisonMsg(){
+  if(!_gmText)return;
+  try{
+    await navigator.clipboard.writeText(_gmText);
+    showLiaisonToast('✓ Copied to clipboard');
+  }catch{
+    const ta=document.createElement('textarea');
+    ta.value=_gmText;ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();
+    showLiaisonToast('✓ Copied');
+  }
 }
 
 // ── MEDICAL ──────────────────────────────────────────────────────────────────
