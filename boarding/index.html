@@ -1398,7 +1398,7 @@ async function generateWeekReport(supaClient, students, boarderRooms, hawkingSta
   const weekStart = fmtISO(weekDates[0]);
   const weekEnd   = fmtISO(weekDates[4]);
 
-  const [regRes, penRes, nurseRes, commentRes, leaveRes, dutyRes] = await Promise.all([
+  const [regRes, penRes, nurseRes, commentRes, leaveRes] = await Promise.all([
     supaClient.from('boarding_registrations').select('*')
       .gte('register_date', weekStart).lte('register_date', weekEnd),
     supaClient.from('boarding_penalties').select('*')
@@ -1408,10 +1408,7 @@ async function generateWeekReport(supaClient, students, boarderRooms, hawkingSta
     supaClient.from('boarding_comments').select('*')
       .gte('comment_date', weekStart).lte('comment_date', weekEnd),
     supaClient.from('boarding_leaves').select('*')
-      .in('status',['approved','active','returned'])
-      .lte('start_date', weekEnd),
-    supaClient.from('boarding_duty').select('*')
-      .gte('duty_date', weekStart).lte('duty_date', weekEnd),
+      .lte('departure_planned', weekEnd + 'T23:59:59'),
   ]);
 
   const registrations = regRes.data || [];
@@ -1419,7 +1416,7 @@ async function generateWeekReport(supaClient, students, boarderRooms, hawkingSta
   const nurseVisits   = nurseRes.data || [];
   const comments      = commentRes.data || [];
   const leaves        = leaveRes.data || [];
-  const duties        = dutyRes.data || [];
+  const duties        = []; // boarding_duty table not yet created
 
   // ── INDEX DATA ──────────────────────────────────────────────────────────────
   // reg[name][ISO date][session] = {status, late_wake, late_floor, late_sleep}
