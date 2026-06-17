@@ -30422,8 +30422,10 @@ async function _undoDeparture(id){
 
 async function confirmDeparture(id){
   try{
+    const now=new Date().toISOString();
     await supa.from('boarding_leaves').update({
-      departure_actual:new Date().toISOString(),
+      departure_actual:now,
+      departed_at:now,
       departure_confirmed_by:'HSM'
     }).eq('id',id);
     showToastMsg('↑ Departure confirmed','#d97706');
@@ -30466,6 +30468,7 @@ async function confirmReturn(id){
     // Update leave record
     await supa.from('boarding_leaves').update({
       return_actual:new Date().toISOString(),
+      returned_at:new Date().toISOString(),
       return_confirmed_by:'HSM'
     }).eq('id',id);
 
