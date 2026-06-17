@@ -1270,7 +1270,7 @@ function switchTab(id,btn){
   const sub=document.getElementById('reg-sticky-sub');
   if(sub)sub.style.display=id==='register'?'block':'none';
   if(id==='register'){loadExcusedMap().then(()=>{renderRegister();});}
-  if(id==='daily'){_dsDayOffset=0;renderDailySummary('daily-summary-content',getBoarders().map(n=>({name:n})),BOARDER_STATUS,BS);}
+  if(id==='daily'){_dsDayOffset=0;renderDailySummary('daily-summary-content',getBoarders(),BOARDER_STATUS,BS);}
   if(id==='info'){loadInfoLeaves();loadInfoPenalties();loadHolidayDeparturePanel();}
 }
 
@@ -1944,6 +1944,14 @@ async function renderDailySummary(containerId, students, boarderStatus, boarding
       { key:'hoob',    label:'HOOB',     short:'H', time:bs.hoobTime||'21:30',   color:'#C2410C', bg:'#FFF7ED' },
     ];
 
+    const isFutureSession = (sessKey) => {
+      if (!isToday) return false; // past days: show all
+      if (sessKey === 'morning') return false; // morning always past if it's been shown
+      if (sessKey === 'prep') return nowM < prepM;
+      if (sessKey === 'hoob') return nowM < hoobM;
+      return false;
+    };
+
     const statSym = (s, lw) => {
       if (!s) return { sym:'·', col:'#d1d5db', bg:'transparent' };
       const v = (s.status||'').toLowerCase();
@@ -2039,7 +2047,7 @@ function _dsNav(dir, containerId, students, boarderStatus, bs) {
 // Override _dsNav for boarding app context
 function _dsNav(dir){
   _dsDayOffset=Math.min(0,_dsDayOffset+dir);
-  renderDailySummary('daily-summary-content',getBoarders().map(n=>({name:n})),BOARDER_STATUS,BS);
+  renderDailySummary('daily-summary-content',getBoarders(),BOARDER_STATUS,BS);
 }
 
 
