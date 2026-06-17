@@ -285,7 +285,23 @@ window.addEventListener('DOMContentLoaded', async ()=>{
 async function init(){
   document.getElementById('header-date').textContent=
     new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
+  // Pre-load students so message tab datalist is ready
+  loadLiaisonStudents();
   loadLeaves();
+}
+
+async function loadLiaisonStudents(){
+  if(_liaisonStudents.length)return;
+  try{
+    const data=await(await supa('work_app_data')).get('key=eq.students');
+    if(data&&data[0]){
+      let v=data[0].value;
+      try{v=JSON.parse(v);}catch{}
+      if(typeof v==='string'){try{v=JSON.parse(v);}catch{}}
+      if(Array.isArray(v))_liaisonStudents=v.map(s=>typeof s==='string'?s:(s.name||'')).filter(Boolean);
+      console.log('Students loaded:',_liaisonStudents.length);
+    }
+  }catch(e){console.warn('Student load:',e);}
 }
 
 // ── TABS ─────────────────────────────────────────────────────────────────────
