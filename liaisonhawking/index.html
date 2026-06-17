@@ -407,9 +407,14 @@ function renderLFireRegister(){
   if(!list)return;
   const boarderStatus=_lBoarderStatus||{};
   const allStudents=_liaisonStudents; // array of names
-  const visible=_lFireScope==='boarders'
-    ?allStudents.filter(n=>boarderStatus[n]||boarderStatus[n]===true||(boarderStatus[n]&&boarderStatus[n].boarder))
-    :allStudents;
+  const isBoarder=n=>{
+    const v=boarderStatus[n];
+    if(!v)return false;
+    if(v===true)return true;
+    if(typeof v==='object')return v.boarder===true||v===true;
+    return false;
+  };
+  const visible=_lFireScope==='boarders'?allStudents.filter(isBoarder):allStudents;
   if(!visible.length){
     list.innerHTML='<div style="padding:2rem;text-align:center;color:#666;font-size:13px">No students loaded.<br><span style="font-size:11px;opacity:.6">Boarder count: '+Object.keys(boarderStatus).length+'</span></div>';
     return;
@@ -479,13 +484,18 @@ function subscribeLiaisonRealtime(){
     })
     .subscribe(status=>console.log('Liaison RT status:',status));
   // Also poll every 20s as fallback (in case realtime isn't enabled on boarding_leaves)
-  setInterval(refreshLiaisonLeaveData, 20000);
+  // Poll every 15s — catches updates even if RT not enabled on boarding_leaves
+  setInterval(()=>{
+    console.log('Polling leaves...');
+    refreshLiaisonLeaveData();
+  }, 15000);
 }
 
 function refreshLiaisonLeaveData(){
+  loadLiaisonHolidayPanel(); // always refresh holiday/departure panel
   if(_lCurrentTab==='leaves')loadLeaves();
-  if(_lCurrentTab==='calendar')initLeaveCalendar('liaison-calendar-content',_liaisonStudents.map(n=>({name:n})),_lBoarderStatus,_supaClient);
-  loadLiaisonHolidayPanel();
+  else if(_lCurrentTab==='register')loadRegister();
+  else if(_lCurrentTab==='calendar')initLeaveCalendar('liaison-calendar-content',_liaisonStudents.map(n=>({name:n})),_lBoarderStatus,_supaClient);
 }
 
 let _lBoarderStatus={};
