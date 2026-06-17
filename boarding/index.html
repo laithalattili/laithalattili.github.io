@@ -235,6 +235,7 @@
     <!-- TABS -->
     <div class="tabs">
       <div class="tab active" onclick="switchTab('register',this)">📋 Register</div>
+      <div class="tab" onclick="switchTab('daily',this)">📊 Daily</div>
       <div class="tab" onclick="switchTab('info',this)">ℹ️ Info</div>
     </div>
 
@@ -260,6 +261,9 @@
   </div>
 
   <!-- INFO TAB -->
+  <div class="tab-content" id="tab-daily">
+    <div id="daily-summary-content"></div>
+  </div>
   <div class="tab-content" id="tab-info">
     <div class="info-card">
       <div style="display:flex;align-items:center;justify-content:space-between">
@@ -1198,6 +1202,7 @@ function switchTab(id,btn){
   const sub=document.getElementById('reg-sticky-sub');
   if(sub)sub.style.display=id==='register'?'block':'none';
   if(id==='register'){loadExcusedMap().then(()=>{renderRegister();});}
+  if(id==='daily'){_dsDayOffset=0;renderDailySummary('daily-summary-content',getBoarders().map(n=>({name:n})),BOARDER_STATUS,BS);}
   if(id==='info'){loadInfoLeaves();loadInfoPenalties();}
 }
 
@@ -1804,6 +1809,169 @@ async function exportWeekReportMini(){
   }finally{
     if(btn){btn.textContent='📄 Export Report';btn.disabled=false;}
   }
+}
+
+
+// ── DAILY SUMMARY VIEW ───────────────────────────────────────────────────────
+let _dsDayOffset = 0; // 0 = today, -1 = yesterday, etc.
+
+async function renderDailySummary(containerId, students, boarderStatus, boardingSettings) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+
+  const bs = boardingSettings || {};
+  const toM = t => { if (!t) return 0; const [h, m] = (t||'00:00').split(':'); return parseInt(h)*60+parseInt(m); };
+  const morningM = toM(bs.morningTime||'07:15');
+  const prepM    = toM(bs.prepTime||'19:00');
+  const hoobM    = toM(bs.hoobTime||'21:30');
+  const now = new Date();
+  const nowM = now.getHours()*60+now.getMinutes();
+
+  // Target date
+  const target = new Date();
+  target.setDate(target.getDate() + _dsDayOffset);
+  target.setHours(0,0,0,0);
+  const targetISO = target.toISOString().split('T')[0];
+  const isToday = _dsDayOffset === 0;
+
+  // Determine highlighted session
+  let highlightSess = 'morning';
+  if (isToday) {
+    if (nowM >= hoobM || nowM < morningM) highlightSess = 'hoob';
+    else if (nowM >= prepM) highlightSess = 'prep';
+    else highlightSess = 'morning';
+  }
+
+  // Fetch all three sessions for target date
+  let supaRef;
+  try { supaRef = typeof supa !== 'undefined' ? supa : null; } catch(e) { supaRef = null; }
+  if (!supaRef) { el.innerHTML = '<div style="padding:1rem;color:#999">Not available</div>'; return; }
+
+  el.innerHTML = '<div style="padding:1rem;text-align:center;color:#9ca3af;font-size:13px">Loading...</div>';
+
+  try {
+    const { data } = await supaRef.from('boarding_registrations')
+      .select('student_name,status,session_type,updated_at,late_wake,late_sleep')
+      .eq('register_date', targetISO);
+
+    // Index by name → session
+    const byName = {};
+    (data||[]).forEach(r => {
+      if (!byName[r.student_name]) byName[r.student_name] = {};
+      byName[r.student_name][r.session_type] = r;
+    });
+
+    // Get boarders in order
+    const boarders = students.filter(s => boarderStatus[s.name]);
+
+    // Day label
+    const dayLabel = isToday ? 'Today' : _dsDayOffset === -1 ? 'Yesterday' :
+      target.toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'});
+    const isFuture = _dsDayOffset > 0;
+
+    // Session configs
+    const sessions = [
+      { key:'morning', label:'Morning', short:'W', time:bs.morningTime||'07:15', color:'#1D4ED8', bg:'#EFF6FF' },
+      { key:'prep',    label:'Ev. Prep', short:'P', time:bs.prepTime||'19:00',   color:'#15803D', bg:'#F0FDF4' },
+      { key:'hoob',    label:'HOOB',     short:'H', time:bs.hoobTime||'21:30',   color:'#C2410C', bg:'#FFF7ED' },
+    ];
+
+    const statSym = (s, lw) => {
+      if (!s) return { sym:'·', col:'#d1d5db', bg:'transparent' };
+      const v = (s.status||'').toLowerCase();
+      const late = lw || s.late_wake || s.late_sleep;
+      if (v==='present') return { sym: late?'⚠':'✓', col: late?'#d97706':'#16a34a', bg: late?'#fffbeb':'#f0fdf4' };
+      if (v==='absent')  return { sym:'✗', col:'#dc2626', bg:'#fef2f2' };
+      if (v==='excused'||v==='~') return { sym:'~', col:'#d97706', bg:'#fffbeb' };
+      if (v==='l') return { sym:'L', col:'#7c3aed', bg:'#f3e8ff' };
+      return { sym:'·', col:'#d1d5db', bg:'transparent' };
+    };
+
+    const fmtTime = iso => {
+      if (!iso) return '';
+      try { return new Date(iso).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); } catch { return ''; }
+    };
+
+    let html = `<div style="position:sticky;top:0;z-index:10;background:#fff;border-bottom:2px solid #e5e7eb;padding:8px 12px;display:flex;align-items:center;justify-content:space-between">
+      <button onclick="_dsNav(-1)" style="background:none;border:1px solid #e5e7eb;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:16px;color:#374151">‹</button>
+      <div style="text-align:center">
+        <div style="font-size:14px;font-weight:700;color:#111">${dayLabel}</div>
+        <div style="font-size:11px;color:#9ca3af">${targetISO}</div>
+      </div>
+      <button onclick="_dsNav(1)" style="background:none;border:1px solid ${_dsDayOffset>=0?'#e5e7eb':'#e5e7eb'};border-radius:6px;padding:4px 10px;cursor:pointer;font-size:16px;color:${_dsDayOffset>=0?'#d1d5db':'#374151'}" ${_dsDayOffset>=0?'disabled':''}>›</button>
+    </div>`;
+
+    if (isFuture) {
+      html += '<div style="padding:2rem;text-align:center;color:#9ca3af;font-size:13px">No data for future dates.</div>';
+      el.innerHTML = html;
+      return;
+    }
+
+    // Table
+    html += `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr style="background:#f8fafc">
+        <th style="text-align:left;padding:8px 12px;font-size:12px;color:#374151;border-bottom:2px solid #e5e7eb;position:sticky;left:0;background:#f8fafc;min-width:120px">Student</th>`;
+
+    sessions.forEach(sess => {
+      const isHL = sess.key === highlightSess && isToday;
+      html += `<th style="text-align:center;padding:8px 6px;font-size:12px;color:${isHL?sess.color:'#374151'};border-bottom:${isHL?'3px solid '+sess.color:'2px solid #e5e7eb'};background:${isHL?sess.bg:'#f8fafc'};min-width:90px">
+        <div style="font-weight:700">${sess.label}</div>
+        <div style="font-size:10px;font-weight:400;color:#9ca3af">${sess.time}</div>
+      </th>`;
+    });
+
+    html += '</tr></thead><tbody>';
+
+    boarders.forEach((s, i) => {
+      const row = byName[s.name] || {};
+      const rowBg = i % 2 === 0 ? '#fff' : '#fafafa';
+      html += `<tr style="background:${rowBg};border-bottom:1px solid #f1f5f9">
+        <td style="padding:8px 12px;font-weight:500;color:#111;position:sticky;left:0;background:${rowBg}">${s.name}</td>`;
+
+      sessions.forEach(sess => {
+        const reg = row[sess.key];
+        const isHL = sess.key === highlightSess && isToday;
+        const st = statSym(reg, sess.key==='morning'?reg?.late_wake:reg?.late_sleep);
+        const tm = fmtTime(reg?.updated_at);
+        html += `<td style="text-align:center;padding:6px 4px;background:${isHL?sess.bg+'88':'transparent'}">
+          <div style="font-size:16px;font-weight:700;color:${st.col};background:${st.bg};display:inline-block;width:28px;height:28px;border-radius:6px;line-height:28px">${st.sym}</div>
+          ${tm?`<div style="font-size:9px;color:#9ca3af;margin-top:1px">${tm}</div>`:''}
+        </td>`;
+      });
+
+      html += '</tr>';
+    });
+
+    html += '</tbody></table></div>';
+
+    if (!boarders.length) {
+      html += '<div style="padding:2rem;text-align:center;color:#9ca3af;font-size:13px">No boarders found.</div>';
+    }
+
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = `<div style="padding:1rem;color:#dc2626;font-size:13px">Error: ${e.message}</div>`;
+  }
+}
+
+function _dsNav(dir, containerId, students, boarderStatus, bs) {
+  // Called from buttons — need to find context
+  // Work app version
+  if (typeof _hwkFilter !== 'undefined') {
+    _dsDayOffset = Math.min(0, _dsDayOffset + dir);
+    const el = document.getElementById('hawking-list-content');
+    if (el) renderDailySummary('hawking-list-content', STUDENTS, HAWKING_STATUS, _boardingSettings||{});
+    return;
+  }
+  // Boarding app version
+  _dsDayOffset = Math.min(0, _dsDayOffset + dir);
+  renderDailySummary('daily-summary-content', getBoarders().map(n=>({name:n})), BOARDER_STATUS, BS);
+}
+
+// Override _dsNav for boarding app context
+function _dsNav(dir){
+  _dsDayOffset=Math.min(0,_dsDayOffset+dir);
+  renderDailySummary('daily-summary-content',getBoarders().map(n=>({name:n})),BOARDER_STATUS,BS);
 }
 
 // ── GATE MESSAGE GENERATOR ────────────────────────────────────────────────────
