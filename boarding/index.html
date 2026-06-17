@@ -3043,8 +3043,19 @@ function toggleBoardingPenalty(name, field){
 }
 
 async function undoBoardingDeparture(leaveId){
+  const role=_identity?_identity.role:'AHSM';
+  const td=today();
   try{
-    await supa.from('boarding_leaves').update({departure_actual:null,departure_confirmed_by:null}).eq('id',leaveId);
+    const {data:leave}=await supa.from('boarding_leaves').select('student_name').eq('id',leaveId).single();
+    await supa.from('boarding_leaves').update({
+      departure_actual:null, departed_at:null, departure_confirmed_by:null
+    }).eq('id',leaveId);
+    // Revert registrations back to unregistered for today
+    if(leave?.student_name){
+      await supa.from('boarding_registrations').delete()
+        .eq('student_name',leave.student_name).eq('register_date',td);
+      delete _brState[leave.student_name];
+    }
     showToast('↩ Departure unconfirmed','#d97706');
     await loadExcusedMap();
     renderRegister();
@@ -3053,12 +3064,25 @@ async function undoBoardingDeparture(leaveId){
 
 async function confirmBoardingDeparture(leaveId){
   const role=_identity?_identity.role:'AHSM';
+  const now=new Date().toISOString();
+  const td=today();
   try{
+    // Get student name from leave record
+    const {data:leave}=await supa.from('boarding_leaves').select('student_name').eq('id',leaveId).single();
     await supa.from('boarding_leaves').update({
-      departure_actual:new Date().toISOString(),
-      departed_at:new Date().toISOString(),
-      departure_confirmed_by:role
+      departure_actual:now, departed_at:now, departure_confirmed_by:role
     }).eq('id',leaveId);
+    // Sync to registrations: mark excused for all today's sessions
+    if(leave?.student_name){
+      for(const sess of ['morning','prep','hoob']){
+        await supa.from('boarding_registrations').upsert({
+          student_name:leave.student_name, register_date:td, session_type:sess,
+          status:'excused', updated_by:role, updated_at:now
+        },{onConflict:'student_name,register_date,session_type'});
+      }
+      // Update local state
+      _brState[leave.student_name]={...(_brState[leave.student_name]||{}),status:'excused',updatedAt:now};
+    }
     showToast('↑ Departure confirmed','#d97706');
     await loadExcusedMap();
     renderRegister();
