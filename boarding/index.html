@@ -1337,10 +1337,11 @@ async function loadExcusedMap(){
       if(retDate&&retDate<today)return;
       const label=leaveLabel[l.leave_type]||'Leave';
       const emoji=leaveEmoji[l.leave_type]||'🏠';
-      excused[l.student_name]=l.departure_actual?{
+      const _dep=l.departed_at||l.departure_actual;
+      excused[l.student_name]=_dep?{
         reason:label,emoji,type:'leave',leaveId:l.id,
         state:'excused',
-        departedAt:l.departure_actual,
+        departedAt:_dep,
         departedBy:l.departure_confirmed_by||'',
         leave_type:l.leave_type
       }:{
@@ -2667,7 +2668,8 @@ function _regMakeRow(name, idx){
   const exc=_excusedMap[name]||null;
   const leaveState=exc?.state||null;
   const autoExcused=exc&&(leaveState==='excused'||(exc.type==='activity'));
-  const st=(!rawSt&&autoExcused)?'excused':rawSt;
+  // Departed students override even a 'present' registration
+  const st=autoExcused?'excused':(!rawSt&&exc)?'excused':rawSt;
   const safe=name.replace(/"/g,'&quot;');
   const excTag=exc?`<span style="font-size:10px;color:#d97706;display:block">${exc.emoji} ${exc.reason}</span>`:'';
   const depTimeStr=leaveState==='excused'&&exc.departedAt
@@ -3367,7 +3369,7 @@ function showToast(msg,color='#22c55e'){
 
 // ── SERVICE WORKER ───────────────────────────────────────────
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('/boarding/sw.js')
+  navigator.serviceWorker.register('./sw.js')
     .then(r=>console.log('SW registered',r.scope))
     .catch(e=>console.warn('SW failed',e));
 }
