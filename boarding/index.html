@@ -265,6 +265,7 @@
     <div id="daily-summary-content"></div>
   </div>
   <div class="tab-content" id="tab-info">
+    <div id="info-holiday-panel" style="display:none;padding:8px"></div>
     <div class="info-card">
       <div style="display:flex;align-items:center;justify-content:space-between">
         <div class="info-card-title">Registration Points</div>
@@ -1076,6 +1077,73 @@ async function loadInfoPenalties(){
   }catch(e){el.innerHTML='<div style="color:#dc2626;font-size:12px">Error loading</div>';}
 }
 
+async function loadHolidayDeparturePanel(){
+  const el=document.getElementById('info-holiday-panel');
+  if(!el)return;
+  const holidays=await loadHolidaysFromSupa(supa);
+  const upcomingHol=getUpcomingHoliday(holidays);
+  if(!upcomingHol){el.style.display='none';return;}
+  el.style.display='block';
+  const boarders=getBoarders();
+  let depList=[];
+  try{
+    const{data}=await supa.from('boarding_leaves')
+      .select('student_name,departed_at,returned_at,id,form_submitted,parents_called')
+      .eq('leave_type','holiday')
+      .gte('departure_planned',upcomingHol.start+'T00:00:00')
+      .lte('departure_planned',upcomingHol.start+'T23:59:59');
+    depList=data||[];
+  }catch(e){}
+  const depMap={};
+  depList.forEach(d=>{depMap[d.student_name]=d;});
+  const notDep=boarders.filter(n=>!depMap[n]?.departed_at).length;
+  const away=boarders.filter(n=>depMap[n]?.departed_at&&!depMap[n]?.returned_at).length;
+  const role=_identity?_identity.role:'RT';
+  el.innerHTML=`<div class="info-section">
+    <div class="info-section-title">🏖️ ${upcomingHol.name}</div>
+    <div style="font-size:11px;color:#6b7280;margin-bottom:8px">${upcomingHol.start} → ${upcomingHol.end} · ${notDep} pending · ${away} away</div>
+    ${boarders.map(name=>{
+      const d=depMap[name];
+      const hasDep=d?.departed_at;
+      const hasRet=d?.returned_at;
+      const lid=d?.id||'';
+      const formOK=d?.form_submitted;
+      const callOK=d?.parents_called;
+      return `<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.06)">
+        <span style="flex:1;font-size:13px;color:#1a1a1a;font-weight:500">${name}</span>
+        ${lid?`<button onclick="toggleLeaveChecklist('${lid}','form_submitted',${!formOK},supa).then(()=>loadHolidayDeparturePanel())"
+          style="font-size:10px;padding:2px 5px;border-radius:4px;border:1px solid ${formOK?'#16a34a':'#e5e7eb'};background:${formOK?'#f0fdf4':'transparent'};color:${formOK?'#16a34a':'#9ca3af'};cursor:pointer" title="Form submitted">📋</button>
+        <button onclick="toggleLeaveChecklist('${lid}','parents_called',${!callOK},supa).then(()=>loadHolidayDeparturePanel())"
+          style="font-size:10px;padding:2px 5px;border-radius:4px;border:1px solid ${callOK?'#16a34a':'#e5e7eb'};background:${callOK?'#f0fdf4':'transparent'};color:${callOK?'#16a34a':'#9ca3af'};cursor:pointer" title="Parents called">📞</button>`:''}
+        ${!hasDep?`<button onclick="_miniHolDep('${name}',${JSON.stringify(upcomingHol).replace(/"/g,"'")},this)"
+          style="font-size:11px;padding:3px 8px;border-radius:5px;background:#f97316;color:#fff;border:none;cursor:pointer;font-weight:600">↑ Depart</button>`
+        :hasRet?`<span style="font-size:10px;color:#7c3aed;font-weight:600">↩ Back</span>`
+        :`<button onclick="_miniHolRet('${name}',${JSON.stringify(upcomingHol).replace(/"/g,"'")},this)"
+          style="font-size:11px;padding:3px 8px;border-radius:5px;background:#16a34a;color:#fff;border:none;cursor:pointer;font-weight:600">↩ Return</button>`}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+async function _miniHolDep(name,holiday,btn){
+  btn.disabled=true;btn.textContent='...';
+  const role=_identity?_identity.role:'RT';
+  const ok=await confirmHolidayDeparture(name,holiday,supa,role);
+  if(ok){showToast('↑ '+name+' departed','#f97316');}
+  else{showToast('Error','#dc2626');btn.disabled=false;btn.textContent='↑ Depart';return;}
+  _cachedHolidays=null;
+  loadHolidayDeparturePanel();
+}
+
+async function _miniHolRet(name,holiday,btn){
+  btn.disabled=true;btn.textContent='...';
+  const ok=await confirmHolidayReturn(name,holiday,supa);
+  if(ok){showToast('↩ '+name+' returned','#16a34a');}
+  else{showToast('Error','#dc2626');btn.disabled=false;btn.textContent='↩ Return';return;}
+  _cachedHolidays=null;
+  loadHolidayDeparturePanel();
+}
+
 async function boardingMarkDone(id){
   try{
     const today=new Date().toISOString().split('T')[0];
@@ -1203,7 +1271,7 @@ function switchTab(id,btn){
   if(sub)sub.style.display=id==='register'?'block':'none';
   if(id==='register'){loadExcusedMap().then(()=>{renderRegister();});}
   if(id==='daily'){_dsDayOffset=0;renderDailySummary('daily-summary-content',getBoarders().map(n=>({name:n})),BOARDER_STATUS,BS);}
-  if(id==='info'){loadInfoLeaves();loadInfoPenalties();}
+  if(id==='info'){loadInfoLeaves();loadInfoPenalties();loadHolidayDeparturePanel();}
 }
 
 // ── EXCUSED MAP ───────────────────────────────────────────────
@@ -1972,6 +2040,99 @@ function _dsNav(dir, containerId, students, boarderStatus, bs) {
 function _dsNav(dir){
   _dsDayOffset=Math.min(0,_dsDayOffset+dir);
   renderDailySummary('daily-summary-content',getBoarders().map(n=>({name:n})),BOARDER_STATUS,BS);
+}
+
+
+// ── HOLIDAY DEPARTURE SYSTEM ─────────────────────────────────────────────────
+let _cachedHolidays = null;
+
+async function loadHolidaysFromSupa(supaRef) {
+  if (_cachedHolidays) return _cachedHolidays;
+  try {
+    const { data } = await supaRef.from('work_app_data')
+      .select('value').eq('key', 'holidaysData').single();
+    if (data) {
+      let v = data.value;
+      try { v = JSON.parse(v); } catch {}
+      if (Array.isArray(v)) { _cachedHolidays = v; return v; }
+    }
+  } catch(e) { console.warn('Holiday load:', e); }
+  return [];
+}
+
+function getUpcomingHoliday(holidays) {
+  // Find any holiday starting within 7 days
+  const now = new Date(); now.setHours(0,0,0,0);
+  const soon = new Date(now); soon.setDate(soon.getDate() + 7);
+  return holidays.find(h => {
+    const start = new Date(h.start + 'T00:00:00');
+    return start >= now && start <= soon;
+  }) || holidays.find(h => {
+    // Also check ongoing holidays (started but not ended)
+    const start = new Date(h.start + 'T00:00:00');
+    const end = new Date(h.end + 'T00:00:00');
+    return start <= now && end >= now;
+  }) || null;
+}
+
+async function confirmHolidayDeparture(studentName, holiday, supaRef, role) {
+  const now = new Date().toISOString();
+  try {
+    // Check if leave already exists for this holiday
+    const { data: existing } = await supaRef.from('boarding_leaves')
+      .select('id').eq('student_name', studentName)
+      .gte('departure_planned', holiday.start + 'T00:00:00')
+      .lte('departure_planned', holiday.start + 'T23:59:59');
+    
+    if (existing && existing.length) {
+      // Update existing leave with departure
+      await supaRef.from('boarding_leaves')
+        .update({ departed_at: now })
+        .eq('id', existing[0].id);
+    } else {
+      // Create new holiday leave + mark departed
+      await supaRef.from('boarding_leaves').insert({
+        student_name: studentName,
+        leave_type: 'holiday',
+        departure_planned: holiday.start + 'T00:00:00',
+        return_planned: holiday.end + 'T23:59:59',
+        reason: holiday.name,
+        active: true,
+        created_by: role || 'System',
+        departed_at: now,
+        form_submitted: false,
+        parents_called: false,
+      });
+    }
+    return true;
+  } catch(e) {
+    console.error('Holiday departure error:', e);
+    return false;
+  }
+}
+
+async function confirmHolidayReturn(studentName, holiday, supaRef) {
+  const now = new Date().toISOString();
+  try {
+    const { data: existing } = await supaRef.from('boarding_leaves')
+      .select('id').eq('student_name', studentName)
+      .gte('departure_planned', holiday.start + 'T00:00:00');
+    if (existing && existing.length) {
+      await supaRef.from('boarding_leaves')
+        .update({ returned_at: now })
+        .eq('id', existing[0].id);
+      return true;
+    }
+    return false;
+  } catch(e) { return false; }
+}
+
+async function toggleLeaveChecklist(leaveId, field, value, supaRef) {
+  // field: 'form_submitted' | 'parents_called'
+  try {
+    await supaRef.from('boarding_leaves').update({ [field]: value }).eq('id', leaveId);
+    return true;
+  } catch(e) { return false; }
 }
 
 // ── GATE MESSAGE GENERATOR ────────────────────────────────────────────────────
