@@ -125,20 +125,39 @@ body{background:var(--bg);min-height:100vh;}
       <div class="header-title">🏠 Hawking House</div>
       <div class="header-sub" id="header-date"></div>
     </div>
-    <span class="role-badge">LIAISON</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div id="l-clock" style="font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;color:#fff;letter-spacing:.02em"></div>
+      <button onclick="showLiaisonFireScreen()" style="background:#dc2626;color:#fff;border:none;border-radius:8px;padding:5px 10px;font-size:13px;font-weight:700;cursor:pointer">🔥 FIRE</button>
+      <button onclick="setLiaisonDefaultTab()" title="Set current tab as default" id="l-star-btn"
+        style="background:rgba(255,255,255,.1);color:#fff;border:none;border-radius:8px;padding:5px 8px;font-size:16px;cursor:pointer">☆</button>
+      <span class="role-badge">LIAISON</span>
+    </div>
   </div>
 
   <div class="tabs">
-    <button class="tab-btn active" onclick="showTab('leaves',this)">📋 Leaves</button>
-    <button class="tab-btn" onclick="showTab('register',this)">📊 Register</button>
-    <button class="tab-btn" onclick="showTab('message',this)">📨 Message</button>
-    <button class="tab-btn" onclick="showTab('medical',this)">🏥 Medical</button>
+    <button class="tab-btn active" id="ltab-leaves" onclick="showTab('leaves',this)">📋 Leaves</button>
+    <button class="tab-btn" id="ltab-register" onclick="showTab('register',this)">📊 Register</button>
+    <button class="tab-btn" id="ltab-calendar" onclick="showTab('calendar',this)">📅 Calendar</button>
+    <button class="tab-btn" id="ltab-message" onclick="showTab('message',this)">📨 Message</button>
+    <button class="tab-btn" id="ltab-medical" onclick="showTab('medical',this)">🏥 Medical</button>
   </div>
 
   <div id="tab-leaves" class="section"></div>
   <div id="tab-register" class="section" style="display:none"></div>
-  <div id="tab-message" class="section" style="display:none"></div>
+  <div id="tab-calendar" class="section" style="display:none">
+    <div id="liaison-calendar-content"></div>
+  </div>
+  <div id="tab-message" class="section" style="display:none;padding:12px"></div>
   <div id="tab-medical" class="section" style="display:none"></div>
+  <!-- Fire screen overlay -->
+  <div id="l-fire-screen" style="display:none;position:fixed;inset:0;background:#dc2626;z-index:9999;flex-direction:column;align-items:center;justify-content:center;color:#fff">
+    <div style="font-size:64px;margin-bottom:16px">🔥</div>
+    <div style="font-size:24px;font-weight:900;letter-spacing:.1em;margin-bottom:8px">FIRE EVACUATION</div>
+    <div style="font-size:14px;opacity:.8;margin-bottom:32px">All students evacuate immediately</div>
+    <div style="font-size:13px;opacity:.7;margin-bottom:32px" id="l-fire-time"></div>
+    <button onclick="document.getElementById('l-fire-screen').style.display='none'"
+      style="background:rgba(255,255,255,.2);color:#fff;border:2px solid rgba(255,255,255,.5);border-radius:10px;padding:12px 28px;font-size:15px;font-weight:700;cursor:pointer">✕ Dismiss</button>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -282,12 +301,51 @@ window.addEventListener('DOMContentLoaded', async ()=>{
   }
 });
 
+let _lDefaultTab = 'leaves';
+
+function setLiaisonDefaultTab(){
+  try{localStorage.setItem('liaison_default_tab',_lCurrentTab);}catch{}
+  const btn=document.getElementById('l-star-btn');
+  if(btn){btn.textContent='★';btn.style.color='#fbbf24';}
+  showLiaisonToast('★ Default tab set: '+_lCurrentTab);
+  setTimeout(()=>{if(btn){btn.textContent='☆';btn.style.color='#fff';}},1500);
+}
+
+function showLiaisonFireScreen(){
+  const el=document.getElementById('l-fire-screen');
+  if(el){
+    el.style.display='flex';
+    const t=document.getElementById('l-fire-time');
+    if(t)t.textContent=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  }
+}
+
+function updateLiaisonClock(){
+  const el=document.getElementById('l-clock');
+  if(!el)return;
+  const now=new Date();
+  el.textContent=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+}
+
+let _lCurrentTab='leaves';
+
 async function init(){
   document.getElementById('header-date').textContent=
     new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
-  // Pre-load students so message tab datalist is ready
+  // Start clock
+  updateLiaisonClock();
+  setInterval(updateLiaisonClock,10000);
+  // Load default tab preference
+  try{_lDefaultTab=localStorage.getItem('liaison_default_tab')||'leaves';}catch{}
+  // Pre-load students
   loadLiaisonStudents();
-  loadLeaves();
+  // Open default tab
+  const defBtn=document.getElementById('ltab-'+_lDefaultTab);
+  if(_lDefaultTab!=='leaves'&&defBtn){
+    showTab(_lDefaultTab,defBtn);
+  } else {
+    loadLeaves();
+  }
 }
 
 
@@ -384,6 +442,197 @@ async function toggleLeaveChecklist(leaveId, field, value, _supaClient) {
 }
 
 // ── STUDENT LOADER ──────────────────────────────────────
+
+// ── LEAVE CALENDAR ───────────────────────────────────────────────────────────
+let _calYear = new Date().getFullYear();
+let _calMonth = new Date().getMonth(); // 0-based
+let _calScope = 'boarders'; // 'boarders' | 'all'
+let _calLeaves = [];
+let _calStudents = [];
+let _calBoarderStatus = {};
+let _calSelectedDay = null;
+
+async function initLeaveCalendar(containerId, students, boarderStatus, supaRef) {
+  _calStudents = students || [];
+  _calBoarderStatus = boarderStatus || {};
+  _calYear = new Date().getFullYear();
+  _calMonth = new Date().getMonth();
+  _calSelectedDay = null;
+  await loadCalendarLeaves(supaRef);
+  renderCalendar(containerId, supaRef);
+}
+
+async function loadCalendarLeaves(supaRef) {
+  try {
+    // Load 3 months around current
+    const from = new Date(_calYear, _calMonth - 1, 1).toISOString().split('T')[0];
+    const to   = new Date(_calYear, _calMonth + 2, 0).toISOString().split('T')[0];
+    const { data } = await supaRef.from('boarding_leaves')
+      .select('id,student_name,leave_type,departure_planned,return_planned,departed_at,returned_at,active')
+      .gte('departure_planned', from + 'T00:00:00')
+      .lte('departure_planned', to + 'T23:59:59');
+    _calLeaves = data || [];
+  } catch(e) { console.warn('Calendar load:', e); }
+}
+
+function renderCalendar(containerId, supaRef) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayISO = today.toISOString().split('T')[0];
+  const monthStart = new Date(_calYear, _calMonth, 1);
+  const monthEnd   = new Date(_calYear, _calMonth + 1, 0);
+  const firstDay   = (monthStart.getDay() + 6) % 7; // Mon=0
+  const daysInMonth = monthEnd.getDate();
+  const monthLabel = monthStart.toLocaleDateString('en-GB', {month:'long', year:'numeric'});
+
+  // Scope filter
+  const visibleNames = new Set(
+    _calScope === 'boarders'
+      ? _calStudents.filter(s => _calBoarderStatus[s.name||s]).map(s => s.name||s)
+      : _calStudents.map(s => s.name||s)
+  );
+
+  // Build day → leaves map
+  const dayLeaves = {}; // 'YYYY-MM-DD' → [{student, type, confirmed}]
+  _calLeaves.forEach(l => {
+    if (!visibleNames.has(l.student_name)) return;
+    const depPlanned = l.departure_planned ? l.departure_planned.split('T')[0] : null;
+    const retPlanned = l.return_planned    ? l.return_planned.split('T')[0]    : null;
+    const confirmed  = !!l.departed_at;
+    if (!depPlanned) return;
+    // Mark every day of the leave range
+    const start = new Date(depPlanned + 'T00:00:00');
+    const end   = retPlanned ? new Date(retPlanned + 'T00:00:00') : new Date(depPlanned + 'T00:00:00');
+    const cur   = new Date(start);
+    while (cur <= end) {
+      const iso = cur.toISOString().split('T')[0];
+      if (!dayLeaves[iso]) dayLeaves[iso] = [];
+      dayLeaves[iso].push({ name: l.student_name, type: l.leave_type, confirmed, id: l.id });
+      cur.setDate(cur.getDate() + 1);
+    }
+  });
+
+  const typeColor = {
+    weekend: '#3b82f6', medical: '#ef4444', family: '#8b5cf6',
+    activity: '#10b981', holiday: '#f97316', longterm: '#6b7280'
+  };
+
+  // Calendar HTML
+  let html = `
+  <div style="padding:12px">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <button onclick="_calNav(-1,'${containerId}',_calSupaRef)" style="background:none;border:1px solid #e5e7eb;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:16px;color:#374151">‹</button>
+      <div style="text-align:center">
+        <div style="font-size:15px;font-weight:700;color:#111">${monthLabel}</div>
+      </div>
+      <button onclick="_calNav(1,'${containerId}',_calSupaRef)" style="background:none;border:1px solid #e5e7eb;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:16px;color:#374151">›</button>
+    </div>
+    <!-- Scope toggle -->
+    <div style="display:flex;gap:6px;margin-bottom:12px;justify-content:center">
+      <button onclick="_calSetScope('boarders','${containerId}')" style="font-size:12px;padding:4px 14px;border-radius:20px;border:none;background:${_calScope==='boarders'?'#00205B':'#f3f4f6'};color:${_calScope==='boarders'?'#fff':'#374151'};cursor:pointer;font-weight:${_calScope==='boarders'?'700':'400'}">Boarders</button>
+      <button onclick="_calSetScope('all','${containerId}')" style="font-size:12px;padding:4px 14px;border-radius:20px;border:none;background:${_calScope==='all'?'#00205B':'#f3f4f6'};color:${_calScope==='all'?'#fff':'#374151'};cursor:pointer;font-weight:${_calScope==='all'?'700':'400'}">All House</button>
+    </div>
+    <!-- Day headers -->
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">
+      ${['M','T','W','T','F','S','S'].map(d=>`<div style="text-align:center;font-size:11px;font-weight:700;color:#9ca3af;padding:4px 0">${d}</div>`).join('')}
+    </div>
+    <!-- Days grid -->
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">`;
+
+  // Empty cells before month start
+  for (let i = 0; i < firstDay; i++) {
+    html += `<div style="min-height:52px"></div>`;
+  }
+
+  // Day cells
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = `${_calYear}-${String(_calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = iso === todayISO;
+    const isPast  = iso < todayISO;
+    const isSelected = iso === _calSelectedDay;
+    const leaves  = dayLeaves[iso] || [];
+    const count   = leaves.length;
+    // Unique types for dot colours
+    const types   = [...new Set(leaves.map(l => l.type))];
+    const hasUnconfirmed = leaves.some(l => !l.confirmed);
+    const hasConfirmed   = leaves.some(l => l.confirmed);
+
+    html += `<div onclick="_calSelectDay('${iso}','${containerId}')" style="
+      min-height:52px;border-radius:8px;padding:4px 2px;cursor:${count?'pointer':'default'};
+      background:${isSelected?'#dbeafe':isToday?'#fef3c7':count?'#f8fafc':'transparent'};
+      border:2px solid ${isSelected?'#3b82f6':isToday?'#f59e0b':count?'#e5e7eb':'transparent'};
+      opacity:${isPast&&!count?'0.4':'1'};
+      transition:all .15s">
+      <div style="text-align:center;font-size:13px;font-weight:${isToday?'800':'500'};color:${isToday?'#d97706':isPast?'#9ca3af':'#111'};margin-bottom:3px">${d}</div>
+      ${count ? `<div style="text-align:center;font-size:9px;font-weight:700;color:#6b7280;margin-bottom:3px">${count}</div>` : ''}
+      <div style="display:flex;flex-wrap:wrap;gap:1px;justify-content:center">
+        ${types.slice(0,4).map(t => {
+          const col = typeColor[t] || '#9ca3af';
+          return `<div style="width:7px;height:7px;border-radius:50%;background:${col};opacity:${hasUnconfirmed&&!hasConfirmed?'0.4':'1'};border:${hasUnconfirmed?'1px solid '+col:'none'}"></div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
+  html += `</div>`; // end grid
+
+  // Selected day detail
+  if (_calSelectedDay && dayLeaves[_calSelectedDay]) {
+    const d = new Date(_calSelectedDay + 'T12:00:00');
+    const dayLabel = d.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long'});
+    const dayLs = dayLeaves[_calSelectedDay];
+    html += `<div style="margin-top:12px;background:#f8fafc;border-radius:10px;padding:12px;border:1px solid #e5e7eb">
+      <div style="font-size:13px;font-weight:700;color:#374151;margin-bottom:8px">${dayLabel} — ${dayLs.length} away</div>
+      ${dayLs.map(l => {
+        const col = typeColor[l.type] || '#9ca3af';
+        const status = l.confirmed ? '✓ Confirmed' : '⏳ Pending';
+        const statusCol = l.confirmed ? '#16a34a' : '#d97706';
+        return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #e5e7eb">
+          <div style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0"></div>
+          <span style="flex:1;font-size:13px;font-weight:500;color:#111">${l.name}</span>
+          <span style="font-size:10px;color:#6b7280">${l.type}</span>
+          <span style="font-size:10px;color:${statusCol};font-weight:600">${status}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  html += `</div>`; // end padding div
+
+  // Legend
+  html += `<div style="padding:0 12px 12px;display:flex;flex-wrap:wrap;gap:6px">
+    ${Object.entries(typeColor).map(([t,c])=>`<span style="font-size:10px;display:inline-flex;align-items:center;gap:3px;color:#6b7280">
+      <span style="width:8px;height:8px;border-radius:50%;background:${c};display:inline-block"></span>${t}
+    </span>`).join('')}
+    <span style="font-size:10px;color:#9ca3af;margin-left:4px">· solid=confirmed · hollow=pending</span>
+  </div>`;
+
+  el.innerHTML = html;
+}
+
+let _calSupaRef = null;
+
+function _calNav(dir, containerId) {
+  _calMonth += dir;
+  if (_calMonth < 0)  { _calMonth = 11; _calYear--; }
+  if (_calMonth > 11) { _calMonth = 0;  _calYear++; }
+  _calSelectedDay = null;
+  loadCalendarLeaves(_calSupaRef).then(() => renderCalendar(containerId, _calSupaRef));
+}
+
+function _calSetScope(scope, containerId) {
+  _calScope = scope;
+  renderCalendar(containerId, _calSupaRef);
+}
+
+function _calSelectDay(iso, containerId) {
+  _calSelectedDay = _calSelectedDay === iso ? null : iso;
+  renderCalendar(containerId, _calSupaRef);
+}
+
 async function loadLiaisonHolidayPanel(){
   const el=document.getElementById('l-hol-panel');
   if(!el)return;
@@ -476,13 +725,23 @@ async function loadLiaisonStudents(){
 
 // ── TABS ─────────────────────────────────────────────────────────────────────
 function showTab(name,btn){
-  ['leaves','register','message','medical'].forEach(t=>{
+  _lCurrentTab=name;
+  ['leaves','register','calendar','message','medical'].forEach(t=>{
     document.getElementById('tab-'+t).style.display=t===name?'block':'none';
   });
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   if(name==='leaves')loadLeaves();
   if(name==='register')loadRegister();
+  if(name==='calendar'){
+    _calSupaRef=_supaClient;
+    // Load boarder status from Supabase for toggle to work
+    _supaClient.from('work_app_data').select('value').eq('key','hawkingStatus').single().then(({data})=>{
+      let bs={};
+      try{let v=JSON.parse(data?.value||'{}');if(typeof v==='string')v=JSON.parse(v);bs=v;}catch{}
+      initLeaveCalendar('liaison-calendar-content',_liaisonStudents.map(n=>({name:n})),bs,_supaClient);
+    }).catch(()=>initLeaveCalendar('liaison-calendar-content',_liaisonStudents.map(n=>({name:n})),{},_supaClient));
+  }
   if(name==='message')renderMessageTab();
   if(name==='medical')loadMedical();
 }
@@ -819,11 +1078,11 @@ async function renderMessageTab(){
   const el=document.getElementById('tab-message');
   el.innerHTML=`<div class="card">
     <div class="card-title">📨 Gate Pass Message</div>
-    <div style="display:flex;flex-direction:column;gap:10px;padding:4px 0">
+    <div style="display:flex;flex-direction:column;gap:10px;padding:8px 4px">
       <div>
         <label style="font-size:10px;color:#888;display:block;margin-bottom:3px">STUDENT</label>
         <input id="lv-gm-student" list="lv-gm-list" placeholder="Type name…" oninput="updateLiaisonMsg()"
-          style="width:100%;padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:14px">
+          style="width:100%;padding:10px 12px;border-radius:7px;border:1px solid #e5e7eb;font-size:14px">
         <datalist id="lv-gm-list">${opts}</datalist>
       </div>
       <div style="display:flex;gap:8px">
@@ -852,7 +1111,7 @@ async function renderMessageTab(){
       <div id="lv-gm-extra"></div>
       <div>
         <label style="font-size:10px;color:#888;display:block;margin-bottom:4px">MESSAGE PREVIEW</label>
-        <div id="lv-gm-preview" style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:12px;font-size:13px;line-height:1.7;white-space:pre-wrap;min-height:80px;color:#333"></div>
+        <div id="lv-gm-preview" style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px;font-size:13px;line-height:1.8;white-space:pre-wrap;min-height:90px;color:#333;word-break:break-word"></div>
       </div>
       <button onclick="copyLiaisonMsg()"
         style="background:#00205B;color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer">
