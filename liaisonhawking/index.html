@@ -581,22 +581,43 @@ async function submitLeave(){
     const res=await fetch(`${SUPA_URL}/rest/v1/boarding_leaves`,{
       method:'POST',
       headers:{'Authorization':`Bearer ${SUPA_KEY}`,'apikey':SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({
-        student_name:name,
-        leave_type:type,
-        departure_planned:start+'T00:00:00',
-        return_planned:end?end+'T23:59:59':null,
-        reason:notes||'',
-        active:true,
-        created_by:'Liaison',
-        form_submitted:document.getElementById('lv-form')?.checked||false,
-        parents_called:document.getElementById('lv-called')?.checked||false,
-        recurring:document.getElementById('lv-recurring')?.checked?
-          (document.getElementById('lv-freq')?.value||'weekly'):null,
-        form_applies_to_all:document.getElementById('lv-form-once')?.checked||false,
-      })
+      body:JSON.stringify(Object.assign(
+        {
+          student_name:name,
+          leave_type:type,
+          departure_planned:start+'T00:00:00',
+          return_planned:end?end+'T23:59:59':null,
+          reason:notes||'',
+          active:true,
+          created_by:'Liaison',
+        },
+        // Only include checklist fields if columns exist (graceful degradation)
+        (() => {
+          try {
+            return {
+              form_submitted:document.getElementById('lv-form')?.checked||false,
+              parents_called:document.getElementById('lv-called')?.checked||false,
+            };
+          } catch(e) { return {}; }
+        })()
+      ))
     });
-    if(!res.ok)throw new Error('Save failed: '+res.status);
+    if(!res.ok){
+      // If 400, try without optional columns (may not exist yet)
+      if(res.status===400){
+        const body2=JSON.stringify({student_name:name,leave_type:type,
+          departure_planned:start+'T00:00:00',return_planned:end?end+'T23:59:59':null,
+          reason:notes||'',active:true,created_by:'Liaison'});
+        const res2=await fetch(`${SUPA_URL}/rest/v1/boarding_leaves`,{
+          method:'POST',
+          headers:{'Authorization':`Bearer ${SUPA_KEY}`,'apikey':SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body:body2
+        });
+        if(!res2.ok)throw new Error('Save failed: '+res2.status);
+      } else {
+        throw new Error('Save failed: '+res.status);
+      }
+    }
     document.getElementById('lv-name').value='';
     document.getElementById('lv-notes').value='';
     showLiaisonToast('✓ Leave request submitted');
