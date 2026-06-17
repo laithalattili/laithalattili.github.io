@@ -30410,14 +30410,19 @@ async function saveLeave(){
 
 async function _undoDeparture(id){
   try{
-    // Supabase needs explicit null handling - use raw SQL approach
+    const td=new Date().toISOString().split('T')[0];
+    const {data:leave}=await supa.from('boarding_leaves').select('student_name').eq('id',id).single();
     const {error}=await supa.from('boarding_leaves').update({
-      departure_actual:null,
-      departure_confirmed_by:null
+      departure_actual:null, departed_at:null, departure_confirmed_by:null
     }).eq('id',id);
     if(error)throw error;
+    // Revert registrations — delete excused entries so student is unregistered again
+    if(leave?.student_name){
+      await supa.from('boarding_registrations').delete()
+        .eq('student_name',leave.student_name).eq('register_date',td).eq('status','excused');
+      if(_brState) delete _brState[leave.student_name];
+    }
     showToastMsg('Departure unconfirmed','#d97706');
-    // Reload excused map then re-render
     window._lastExcusedMap=await getTodayExcusedMap();
     if(_hwkFilter==='register'){
       const el=document.getElementById('hawking-list-content');
@@ -30440,11 +30445,28 @@ async function _undoDeparture(id){
 async function confirmDeparture(id){
   try{
     const now=new Date().toISOString();
+    const td=new Date().toISOString().split('T')[0];
+    // Get student name
+    const {data:leave}=await supa.from('boarding_leaves').select('student_name').eq('id',id).single();
     await supa.from('boarding_leaves').update({
-      departure_actual:now,
-      departed_at:now,
-      departure_confirmed_by:'HSM'
+      departure_actual:now, departed_at:now, departure_confirmed_by:'HSM'
     }).eq('id',id);
+    // Sync to registrations
+    if(leave?.student_name){
+      const name=leave.student_name;
+      for(const sess of ['morning','prep','hoob']){
+        await supa.from('boarding_registrations').upsert({
+          student_name:name, register_date:td, session_type:sess,
+          status:'excused', updated_by:'HSM', updated_at:now
+        },{onConflict:'student_name,register_date,session_type'});
+      }
+      // Update local state immediately
+      if(!_brState)_brState={};
+      _brState[name]={...(_brState[name]||{}),status:'excused',updatedAt:now};
+      if(window._lastExcusedMap) window._lastExcusedMap[name]={
+        ...(window._lastExcusedMap[name]||{}), state:'excused', departedAt:now
+      };
+    }
     showToastMsg('↑ Departure confirmed','#d97706');
     // Optimistic update: immediately update cached map and re-render
     if(!window._lastExcusedMap)window._lastExcusedMap={};
