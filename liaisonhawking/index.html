@@ -405,25 +405,37 @@ function lFireTap(name,status){
 function renderLFireRegister(){
   const list=document.getElementById('l-fire-list');
   if(!list)return;
-  // Get students
-  const students=_liaisonStudents.map(n=>({name:n}));
   const boarderStatus=_lBoarderStatus||{};
+  const allStudents=_liaisonStudents; // array of names
   const visible=_lFireScope==='boarders'
-    ?students.filter(s=>boarderStatus[s.name])
-    :students;
-  if(!visible.length){list.innerHTML='<div style="padding:2rem;text-align:center;color:#666">No students loaded</div>';return;}
-  // Group
+    ?allStudents.filter(n=>boarderStatus[n]||boarderStatus[n]===true||(boarderStatus[n]&&boarderStatus[n].boarder))
+    :allStudents;
+  if(!visible.length){
+    list.innerHTML='<div style="padding:2rem;text-align:center;color:#666;font-size:13px">No students loaded.<br><span style="font-size:11px;opacity:.6">Boarder count: '+Object.keys(boarderStatus).length+'</span></div>';
+    return;
+  }
+  // Group by grade (from _lStudentGrades) or room (from _lBoarderRooms)
   let groups={};
-  if(_lFireScope==='boarders'&&_lFireGroup==='grade'){
-    // Group by grade via tutor lookup (use STUDENTS if available)
-    visible.forEach(s=>{
-      const grade='G?'; // simplified — just one group if no grade data
-      if(!groups[grade])groups[grade]=[];
-      groups[grade].push(s.name);
+  if(_lFireScope==='boarders'&&_lFireGroup==='room'&&_lBoarderRooms.length){
+    _lBoarderRooms.forEach(room=>{
+      const members=(room.boarders||[]).filter(n=>visible.includes(n));
+      if(members.length) groups[room.name||room.id]=members;
     });
-    groups={'All Boarders':visible.map(s=>s.name)};
+    const assigned=new Set(_lBoarderRooms.flatMap(r=>r.boarders||[]));
+    const unassigned=visible.filter(n=>!assigned.has(n));
+    if(unassigned.length) groups['No Room']=unassigned;
+  } else if(_lFireGroup==='grade'||_lFireScope==='all'){
+    // Group by grade using _lStudentData
+    visible.forEach(n=>{
+      const s=_lStudentData.find(x=>x.name===n);
+      const tutor=s?.tutor||'';
+      const grade=_lTutorGrades[tutor]||'Other';
+      if(!groups[grade])groups[grade]=[];
+      groups[grade].push(n);
+    });
+    if(!Object.keys(groups).length) groups['All']=visible;
   } else {
-    groups={'All Students':visible.map(s=>s.name)};
+    groups={[_lFireScope==='boarders'?'All Boarders':'All House']:visible};
   }
   let html='';
   const total=visible.length;
@@ -459,17 +471,52 @@ function updateLiaisonClock(){
 let _lCurrentTab='leaves';
 
 function subscribeLiaisonRealtime(){
+  // Realtime subscription
   _supaClient.channel('liaison_leaves_rt')
     .on('postgres_changes',{event:'*',schema:'public',table:'boarding_leaves'},()=>{
-      // Refresh current tab if it shows leaves data
-      if(_lCurrentTab==='leaves')loadLeaves();
-      if(_lCurrentTab==='calendar')initLeaveCalendar('liaison-calendar-content',_liaisonStudents.map(n=>({name:n})),_lBoarderStatus,_supaClient);
-      loadLiaisonHolidayPanel();
+      console.log('Leaves RT update');
+      refreshLiaisonLeaveData();
     })
-    .subscribe();
+    .subscribe(status=>console.log('Liaison RT status:',status));
+  // Also poll every 20s as fallback (in case realtime isn't enabled on boarding_leaves)
+  setInterval(refreshLiaisonLeaveData, 20000);
+}
+
+function refreshLiaisonLeaveData(){
+  if(_lCurrentTab==='leaves')loadLeaves();
+  if(_lCurrentTab==='calendar')initLeaveCalendar('liaison-calendar-content',_liaisonStudents.map(n=>({name:n})),_lBoarderStatus,_supaClient);
+  loadLiaisonHolidayPanel();
 }
 
 let _lBoarderStatus={};
+let _lBoarderRooms=[];
+let _lStudentData=[];
+let _lTutorGrades={};
+
+async function loadLiaisonOrgData(){
+  // Load students with tutor info, boarder rooms, tutor grades
+  try{
+    const{data}=await _supaClient.from('work_app_data')
+      .select('key,value').in('key',['students','boarderRooms','tutors','hawkingStatus']);
+    (data||[]).forEach(r=>{
+      try{
+        let v=r.value;
+        try{v=JSON.parse(v);}catch{}
+        if(typeof v==='string'){try{v=JSON.parse(v);}catch{}}
+        if(r.key==='students'&&Array.isArray(v)){
+          _lStudentData=v;
+          _liaisonStudents=v.map(s=>s.name||s).filter(Boolean);
+        }
+        if(r.key==='boarderRooms'&&Array.isArray(v)) _lBoarderRooms=v;
+        if(r.key==='tutors'&&Array.isArray(v)){
+          v.forEach(t=>{if(t.name&&t.grade)_lTutorGrades[t.name]=t.grade;});
+        }
+        if(r.key==='hawkingStatus'&&v&&typeof v==='object') _lBoarderStatus=v;
+      }catch{}
+    });
+    console.log('Org data: students='+_liaisonStudents.length+' boarders='+Object.keys(_lBoarderStatus).length+' rooms='+_lBoarderRooms.length);
+  }catch(e){console.warn('loadLiaisonOrgData:',e);}
+}
 
 async function init(){
   document.getElementById('header-date').textContent=
@@ -477,12 +524,7 @@ async function init(){
   updateLiaisonClock();
   setInterval(updateLiaisonClock,10000);
   try{_lDefaultTab=localStorage.getItem('liaison_default_tab')||'leaves';}catch{}
-  loadLiaisonStudents();
-  // Load boarder status for calendar toggle
-  try{
-    const{data}=await _supaClient.from('work_app_data').select('value').eq('key','hawkingStatus').maybeSingle();
-    if(data){let v=data.value;try{v=JSON.parse(v);}catch{}if(typeof v==='string'){try{v=JSON.parse(v);}catch{}}_lBoarderStatus=v||{};}
-  }catch{}
+  await loadLiaisonOrgData(); // loads students, boarderRooms, tutors, hawkingStatus
   subscribeLiaisonRealtime();
   const defBtn=document.getElementById('ltab-'+_lDefaultTab);
   if(_lDefaultTab!=='leaves'&&defBtn){
