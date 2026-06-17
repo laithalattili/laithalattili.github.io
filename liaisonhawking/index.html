@@ -1161,8 +1161,10 @@ async function loadLeaves(){
 
   let html='<div class="card"><div class="card-title">Leave Requests ('+data.length+')</div>';
   data.forEach(l=>{
-    const departed=l.departed_at;
-    const returned=l.returned_at;
+    const depActual=l.departed_at||l.departure_actual;
+    const retActual=l.returned_at||l.return_actual;
+    const departed=depActual;
+    const returned=retActual;
     const depPlan=l.departure_planned;
     const retPlan=l.return_planned;
     const emoji=typeEmoji[l.leave_type]||'📋';
