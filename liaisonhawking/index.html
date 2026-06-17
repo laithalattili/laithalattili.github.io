@@ -326,6 +326,78 @@ function showTab(name,btn){
 }
 
 // ── LEAVES ───────────────────────────────────────────────────────────────────
+let _editingLeaveId=null;
+
+async function deleteLeave(id){
+  if(!confirm('Delete this leave request?'))return;
+  try{
+    const {error}=await _supaClient.from('boarding_leaves').delete().eq('id',id);
+    if(error)throw error;
+    showLiaisonToast('✓ Leave deleted');
+    loadLeaves();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function editLeave(id){
+  // Find the leave in the DOM data — reload from DB
+  try{
+    const {data,error}=await _supaClient.from('boarding_leaves').select('*').eq('id',id).single();
+    if(error||!data)throw error||new Error('Not found');
+    // Show edit modal
+    const existing=document.getElementById('edit-leave-modal');
+    if(existing)existing.remove();
+    const dep=data.departure_planned?data.departure_planned.split('T')[0]:'';
+    const ret=data.return_planned?data.return_planned.split('T')[0]:'';
+    const typeLabels={weekend:'🏠 Weekend Leave',medical:'🏥 Medical',family:'👨‍👩‍👧 Family',activity:'⚽ School Activity',longterm:'📅 Long-term'};
+    const modal=document.createElement('div');
+    modal.id='edit-leave-modal';
+    modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+    modal.innerHTML=`<div style="background:#fff;border-radius:12px;padding:20px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+      <div style="font-size:16px;font-weight:700;color:#00205B;margin-bottom:16px">✏️ Edit Leave — ${data.student_name}</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <select id="el-type" style="padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px">
+          ${Object.entries(typeLabels).map(([v,l])=>`<option value="${v}" ${data.leave_type===v?'selected':''}>${l}</option>`).join('')}
+        </select>
+        <div style="display:flex;gap:8px">
+          <div style="flex:1"><label style="font-size:10px;color:#888">FROM</label>
+            <input id="el-start" type="date" value="${dep}" style="padding:7px 8px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%"></div>
+          <div style="flex:1"><label style="font-size:10px;color:#888">TO</label>
+            <input id="el-end" type="date" value="${ret}" style="padding:7px 8px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%"></div>
+        </div>
+        <input id="el-notes" placeholder="Notes" value="${data.reason||''}"
+          style="padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px">
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <button onclick="document.getElementById('edit-leave-modal').remove()"
+            style="flex:1;padding:10px;border-radius:8px;border:1px solid #e5e7eb;background:#f9fafb;color:#374151;cursor:pointer;font-size:13px">Cancel</button>
+          <button onclick="saveEditLeave('${id}')"
+            style="flex:1;padding:10px;border-radius:8px;border:none;background:#00205B;color:#fff;cursor:pointer;font-size:13px;font-weight:700">Save</button>
+        </div>
+      </div>
+    </div>`;
+    document.body.appendChild(modal);
+  }catch(e){alert('Error loading leave: '+e.message);}
+}
+
+async function saveEditLeave(id){
+  const type=document.getElementById('el-type')?.value;
+  const start=document.getElementById('el-start')?.value;
+  const end=document.getElementById('el-end')?.value;
+  const notes=document.getElementById('el-notes')?.value?.trim();
+  if(!type||!start){alert('Type and start date required');return;}
+  try{
+    const {error}=await _supaClient.from('boarding_leaves').update({
+      leave_type:type,
+      departure_planned:start+'T00:00:00',
+      return_planned:end?end+'T23:59:59':null,
+      reason:notes||''
+    }).eq('id',id);
+    if(error)throw error;
+    document.getElementById('edit-leave-modal')?.remove();
+    showLiaisonToast('✓ Leave updated');
+    loadLeaves();
+  }catch(e){alert('Error: '+e.message);}
+}
+
 async function submitLeave(){
   const name=document.getElementById('lv-name')?.value?.trim();
   const type=document.getElementById('lv-type')?.value;
@@ -395,36 +467,48 @@ async function loadLeaves(){
   if(dl&&_liaisonStudents.length){
     dl.innerHTML=_liaisonStudents.map(n=>`<option value="${n}">`).join('');
   }
-  const data=await(await supa('boarding_leaves')).get('order=created_at.desc&limit=50');
+  const data=await(await supa('boarding_leaves')).get('order=created_at.desc&limit=100');
   const listEl=el.querySelector('.loading');
   if(!data.length){if(listEl)listEl.outerHTML='<div class="empty">No leave requests yet.</div>';return;}
 
-  const grouped={pending:[],approved:[],active:[],returned:[]};
-  data.forEach(l=>{(grouped[l.status]||grouped.returned).push(l);});
+  const typeEmoji={weekend:'🏠',medical:'🏥',family:'👨‍👩‍👧',activity:'⚽',longterm:'📅'};
+  const fmtDT=iso=>{if(!iso)return'—';try{const d=new Date(iso);return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}catch{return iso;}};
+  const now_=Date.now();
 
-  const statusLabel={pending:'Pending Approval',approved:'Approved — Not Departed',active:'Currently Away',returned:'Returned'};
-  const statusCls={pending:'badge-pending',approved:'badge-approved',active:'badge-active',returned:'badge-returned'};
-  const icons={pending:'⏳',approved:'✅',active:'🚗',returned:'🏠'};
-
-  let html='';
-  ['pending','approved','active','returned'].forEach(status=>{
-    const items=grouped[status];
-    if(!items.length)return;
-    html+=`<div class="card">
-      <div class="card-title">${icons[status]} ${statusLabel[status]} (${items.length})</div>`;
-    items.forEach(l=>{
-      const typeEmoji={weekend:'🏠',medical:'🏥',family:'👨‍👩‍👧',activity:'⚽',longterm:'📅'}[l.leave_type]||'📋';
-      html+=`<div class="card-row">
-        <div class="leave-item">
-          <div class="leave-name">${l.student_name}</div>
-          <div class="leave-meta">${typeEmoji} ${l.leave_type||'leave'} &nbsp;·&nbsp; ${l.start_date}${l.end_date?' → '+l.end_date:''}</div>
-          ${l.notes?`<div class="leave-meta" style="color:#aaa;font-style:italic">${l.notes}</div>`:''}
+  let html='<div class="card"><div class="card-title">Leave Requests ('+data.length+')</div>';
+  data.forEach(l=>{
+    const departed=l.departed_at;
+    const returned=l.returned_at;
+    const depPlan=l.departure_planned;
+    const retPlan=l.return_planned;
+    const emoji=typeEmoji[l.leave_type]||'📋';
+    // Status derivation from actual data
+    let depBadge, retBadge;
+    if(departed){depBadge='<span style="font-size:10px;background:#d1fae5;color:#065f46;padding:1px 7px;border-radius:8px;font-weight:700">↑ Departed '+fmtDT(departed)+'</span>';}
+    else{depBadge='<span style="font-size:10px;background:#fef3c7;color:#92400e;padding:1px 7px;border-radius:8px">↑ Not yet departed</span>';}
+    if(returned){retBadge='<span style="font-size:10px;background:#ede9fe;color:#5b21b6;padding:1px 7px;border-radius:8px;font-weight:700;margin-left:4px">↩ Returned '+fmtDT(returned)+'</span>';}
+    else if(departed&&l.leave_type!=='longterm'){retBadge='<span style="font-size:10px;background:#fee2e2;color:#991b1b;padding:1px 7px;border-radius:8px;margin-left:4px">↩ Still out</span>';}
+    else{retBadge='';}
+    html+=`<div style="padding:10px 12px;border-bottom:1px solid #f1f5f9">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#111">${l.student_name}</div>
+          <div style="font-size:11px;color:#6b7280">${emoji} ${l.leave_type||'leave'}</div>
         </div>
-        <span class="status-badge ${statusCls[status]}">${status}</span>
-      </div>`;
-    });
-    html+='</div>';
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          <button onclick="editLeave('${l.id}')" style="font-size:11px;padding:3px 8px;border-radius:5px;border:1px solid #e5e7eb;background:#f9fafb;color:#374151;cursor:pointer">✏️</button>
+          <button onclick="deleteLeave('${l.id}')" style="font-size:11px;padding:3px 8px;border-radius:5px;border:1px solid #fecaca;background:#fef2f2;color:#dc2626;cursor:pointer">🗑</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#374151;margin-top:4px">
+        <span style="color:#9ca3af">From:</span> ${fmtDT(depPlan)}
+        ${retPlan?'<span style="color:#9ca3af;margin-left:6px">To:</span> '+fmtDT(retPlan):''}
+      </div>
+      <div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:3px">${depBadge}${retBadge}</div>
+      ${l.reason?`<div style="font-size:10px;color:#9ca3af;margin-top:3px;font-style:italic">${l.reason}</div>`:''}
+    </div>`;
   });
+  html+='</div>';
   // Replace loading with list, preserving the form
   const formEl=document.getElementById('lv-submit')?.closest('.card');
   if(formEl){
