@@ -24520,6 +24520,11 @@ function loadHolidays(){
 }
 function saveHolidays(){
   try{localStorage.setItem('holidaysData',JSON.stringify(HOLIDAYS));localStorage.setItem('schoolYear',JSON.stringify(SCHOOL_YEAR));}catch(e){}
+  // Mirror to Supabase so boarding/liaison apps can read holidays
+  supa.from('work_app_data').upsert(
+    {key:'holidays',value:JSON.stringify(HOLIDAYS),updated_at:new Date().toISOString()},
+    {onConflict:'key'}
+  ).then(()=>{},e=>console.warn('Holiday sync:',e));
 }
 
 function datesBetween(start,end){
@@ -25985,6 +25990,26 @@ function chip(num, lbl, cls=''){
   return `<div class="totals-chip ${cls}"><span class="tc-num">${num}</span><span class="tc-lbl">${lbl}</span></div>`;
 }
 
+async function _workHolDep(name, holiday, btn){
+  btn.disabled=true; btn.textContent='...';
+  const ok = await confirmHolidayDeparture(name, holiday, supa, 'HSM');
+  if(ok){ showToastMsg('↑ '+name+' departed','#f97316'); }
+  else { showToastMsg('Error','#dc2626'); btn.disabled=false; btn.textContent='↑ Depart'; return; }
+  _cachedHolidays = null;
+  const el=document.getElementById('hawking-list-content');
+  if(el) renderAwayList(el);
+}
+
+async function _workHolRet(name, holiday, btn){
+  btn.disabled=true; btn.textContent='...';
+  const ok = await confirmHolidayReturn(name, holiday, supa);
+  if(ok){ showToastMsg('↩ '+name+' returned','#16a34a'); }
+  else { showToastMsg('Error','#dc2626'); btn.disabled=false; btn.textContent='↩ Return'; return; }
+  _cachedHolidays = null;
+  const el=document.getElementById('hawking-list-content');
+  if(el) renderAwayList(el);
+}
+
 async function renderSanctionsList(el){
   if(!el)return;
   el.innerHTML='<div style="padding:1rem;text-align:center;color:var(--text3);font-size:13px">Loading...</div>';
@@ -26092,6 +26117,8 @@ async function renderAwayList(el){
   el.innerHTML='<div style="padding:1rem;text-align:center;color:var(--text3);font-size:13px">Loading...</div>';
   const excusedMap=await getTodayExcusedMap();
   const today=new Date().toISOString().split('T')[0];
+  const _holidays=HOLIDAYS&&HOLIDAYS.length?HOLIDAYS:await loadHolidaysFromSupa(supa);
+  const upcomingHol=getUpcomingHoliday(_holidays);
   const fmt=dt=>dt?new Date(dt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'';
   // Get boarders only
   const boarders=STUDENTS.filter(s=>{
@@ -26107,7 +26134,59 @@ async function renderAwayList(el){
       awayStudents.push({name:s.name,excInfo,brSt});
     }
   });
-  if(!awayStudents.length){
+  // Holiday departure panel
+  let holidayPanel = '';
+  if (upcomingHol) {
+    const boarders = STUDENTS.filter(s => {
+      const hw = HAWKING_STATUS[s.name];
+      return hw && (hw === true || hw.boarder === true);
+    });
+    // Get boarders already departed for this holiday
+    let depList = [];
+    try {
+      const { data: depData } = await supa.from('boarding_leaves')
+        .select('student_name,departed_at,returned_at,id,form_submitted,parents_called')
+        .eq('leave_type','holiday')
+        .gte('departure_planned', upcomingHol.start + 'T00:00:00')
+        .lte('departure_planned', upcomingHol.start + 'T23:59:59');
+      depList = depData || [];
+    } catch(e) {}
+    const depMap = {};
+    depList.forEach(d => { depMap[d.student_name] = d; });
+    
+    const notDep = boarders.filter(s => !depMap[s.name]?.departed_at);
+    const dep = boarders.filter(s => depMap[s.name]?.departed_at && !depMap[s.name]?.returned_at);
+    const ret = boarders.filter(s => depMap[s.name]?.returned_at);
+
+    holidayPanel = `<div style="background:linear-gradient(135deg,#fff7ed,#fffbeb);border:1px solid #fed7aa;border-radius:10px;padding:12px;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700;color:#c2410c;margin-bottom:8px">🏖️ ${upcomingHol.name} · ${upcomingHol.start} → ${upcomingHol.end}</div>
+      <div style="font-size:11px;color:#9ca3af;margin-bottom:10px">${notDep.length} not yet departed · ${dep.length} away · ${ret.length} returned</div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        ${boarders.map(s => {
+          const d = depMap[s.name];
+          const hasDep = d?.departed_at;
+          const hasRet = d?.returned_at;
+          const formOK = d?.form_submitted;
+          const callOK = d?.parents_called;
+          const lid = d?.id || '';
+          return `<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:#fff;border-radius:6px;border:1px solid #f3f4f6">
+            <span style="flex:1;font-size:13px;font-weight:500;color:#111">${s.name}</span>
+            ${lid ? `<button onclick="toggleLeaveChecklist('${lid}','form_submitted',${!formOK},supa).then(()=>renderAwayList(document.getElementById('hawking-list-content')))" 
+              style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid ${formOK?'#16a34a':'#e5e7eb'};background:${formOK?'#f0fdf4':'#f9fafb'};color:${formOK?'#16a34a':'#9ca3af'};cursor:pointer" title="Form submitted">📋</button>
+            <button onclick="toggleLeaveChecklist('${lid}','parents_called',${!callOK},supa).then(()=>renderAwayList(document.getElementById('hawking-list-content')))"
+              style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid ${callOK?'#16a34a':'#e5e7eb'};background:${callOK?'#f0fdf4':'#f9fafb'};color:${callOK?'#16a34a':'#9ca3af'};cursor:pointer" title="Parents called">📞</button>` : ''}
+            ${!hasDep ? `<button onclick="_workHolDep('${s.name}',${JSON.stringify(upcomingHol).replace(/"/g,"'")},this)" 
+              style="font-size:11px;padding:3px 8px;border-radius:5px;border:none;background:#f97316;color:#fff;cursor:pointer;font-weight:600">↑ Depart</button>` 
+            : hasRet ? `<span style="font-size:10px;background:#ede9fe;color:#7c3aed;padding:2px 7px;border-radius:8px;font-weight:600">↩ Back</span>`
+            : `<button onclick="_workHolRet('${s.name}',${JSON.stringify(upcomingHol).replace(/"/g,"'")},this)"
+              style="font-size:11px;padding:3px 8px;border-radius:5px;border:none;background:#16a34a;color:#fff;cursor:pointer;font-weight:600">↩ Return</button>`}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
+  if(!awayStudents.length && !upcomingHol){
     el.innerHTML='<div style="padding:2rem;text-align:center;color:var(--text3);font-size:13px">No students currently away, on leave, or marked absent.<br><span style="font-size:11px;color:#9ca3af">Unregistered students do not appear here.</span></div>';
     return;
   }
@@ -26116,7 +26195,7 @@ async function renderAwayList(el){
   const onActivity=awayStudents.filter(s=>s.excInfo&&s.excInfo.type==='activity');
   const markedAbsent=awayStudents.filter(s=>s.brSt==='absent'&&!s.excInfo);
   const markedExcused=awayStudents.filter(s=>s.brSt==='excused'&&!s.excInfo);
-  let html='<div style="padding:0">';
+  let html=holidayPanel+'<div style="padding:0">';
   const section=(title,items,color)=>{
     if(!items.length)return'';
     return `<div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:.06em;background:#f8fafc;border-bottom:1px solid #e2e8f0">${title}</div>`+
@@ -31869,6 +31948,99 @@ function _dsNav(dir, containerId, students, boarderStatus, bs) {
   // Boarding app version
   _dsDayOffset = Math.min(0, _dsDayOffset + dir);
   renderDailySummary('daily-summary-content', getBoarders().map(n=>({name:n})), BOARDER_STATUS, BS);
+}
+
+
+// ── HOLIDAY DEPARTURE SYSTEM ─────────────────────────────────────────────────
+let _cachedHolidays = null;
+
+async function loadHolidaysFromSupa(supaRef) {
+  if (_cachedHolidays) return _cachedHolidays;
+  try {
+    const { data } = await supaRef.from('work_app_data')
+      .select('value').eq('key', 'holidaysData').single();
+    if (data) {
+      let v = data.value;
+      try { v = JSON.parse(v); } catch {}
+      if (Array.isArray(v)) { _cachedHolidays = v; return v; }
+    }
+  } catch(e) { console.warn('Holiday load:', e); }
+  return [];
+}
+
+function getUpcomingHoliday(holidays) {
+  // Find any holiday starting within 7 days
+  const now = new Date(); now.setHours(0,0,0,0);
+  const soon = new Date(now); soon.setDate(soon.getDate() + 7);
+  return holidays.find(h => {
+    const start = new Date(h.start + 'T00:00:00');
+    return start >= now && start <= soon;
+  }) || holidays.find(h => {
+    // Also check ongoing holidays (started but not ended)
+    const start = new Date(h.start + 'T00:00:00');
+    const end = new Date(h.end + 'T00:00:00');
+    return start <= now && end >= now;
+  }) || null;
+}
+
+async function confirmHolidayDeparture(studentName, holiday, supaRef, role) {
+  const now = new Date().toISOString();
+  try {
+    // Check if leave already exists for this holiday
+    const { data: existing } = await supaRef.from('boarding_leaves')
+      .select('id').eq('student_name', studentName)
+      .gte('departure_planned', holiday.start + 'T00:00:00')
+      .lte('departure_planned', holiday.start + 'T23:59:59');
+    
+    if (existing && existing.length) {
+      // Update existing leave with departure
+      await supaRef.from('boarding_leaves')
+        .update({ departed_at: now })
+        .eq('id', existing[0].id);
+    } else {
+      // Create new holiday leave + mark departed
+      await supaRef.from('boarding_leaves').insert({
+        student_name: studentName,
+        leave_type: 'holiday',
+        departure_planned: holiday.start + 'T00:00:00',
+        return_planned: holiday.end + 'T23:59:59',
+        reason: holiday.name,
+        active: true,
+        created_by: role || 'System',
+        departed_at: now,
+        form_submitted: false,
+        parents_called: false,
+      });
+    }
+    return true;
+  } catch(e) {
+    console.error('Holiday departure error:', e);
+    return false;
+  }
+}
+
+async function confirmHolidayReturn(studentName, holiday, supaRef) {
+  const now = new Date().toISOString();
+  try {
+    const { data: existing } = await supaRef.from('boarding_leaves')
+      .select('id').eq('student_name', studentName)
+      .gte('departure_planned', holiday.start + 'T00:00:00');
+    if (existing && existing.length) {
+      await supaRef.from('boarding_leaves')
+        .update({ returned_at: now })
+        .eq('id', existing[0].id);
+      return true;
+    }
+    return false;
+  } catch(e) { return false; }
+}
+
+async function toggleLeaveChecklist(leaveId, field, value, supaRef) {
+  // field: 'form_submitted' | 'parents_called'
+  try {
+    await supaRef.from('boarding_leaves').update({ [field]: value }).eq('id', leaveId);
+    return true;
+  } catch(e) { return false; }
 }
 
 // ── BOARDING PENALTIES REALTIME ──────────────────────────────
