@@ -1330,7 +1330,7 @@ async function loadExcusedMap(){
   try{
     const {data}=await supa.from('boarding_leaves').select('*').eq('active',true);
     (data||[]).forEach(l=>{
-      if(l.return_actual)return; // already returned
+      if(l.returned_at||l.return_actual)return; // already returned
       const depDate=l.departure_planned?l.departure_planned.split('T')[0]:null;
       const retDate=l.return_planned?l.return_planned.split('T')[0]:null;
       if(!depDate||depDate>today)return;
