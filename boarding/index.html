@@ -209,7 +209,11 @@
     <!-- TOP BAR: logo + user -->
     <div class="hdr">
       <div style="font-size:13px;font-weight:700;color:#fff;flex:1">🏠 Hawking House</div>
-      <div class="hdr-user" id="hdr-user" onclick="showPinScreen()">—</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <button onclick="setBoardingDefaultTab()" id="b-star-btn" title="Set current tab as default"
+          style="background:rgba(255,255,255,.08);color:rgba(255,255,255,.7);border:none;border-radius:7px;padding:3px 7px;font-size:15px;cursor:pointer">☆</button>
+        <div class="hdr-user" id="hdr-user" onclick="showPinScreen()">—</div>
+      </div>
     </div>
 
     <!-- CLOCK BAR: centered time + fire button -->
@@ -236,6 +240,7 @@
     <div class="tabs">
       <div class="tab active" onclick="switchTab('register',this)">📋 Register</div>
       <div class="tab" onclick="switchTab('daily',this)">📊 Daily</div>
+      <div class="tab" onclick="switchTab('calendar',this)">📅 Calendar</div>
       <div class="tab" onclick="switchTab('info',this)">ℹ️ Info</div>
     </div>
 
@@ -263,6 +268,9 @@
   <!-- INFO TAB -->
   <div class="tab-content" id="tab-daily">
     <div id="daily-summary-content"></div>
+  </div>
+  <div class="tab-content" id="tab-calendar">
+    <div id="boarding-calendar-content"></div>
   </div>
   <div class="tab-content" id="tab-info">
     <div id="info-holiday-panel" style="display:none;padding:8px"></div>
@@ -813,6 +821,8 @@ async function showApp(){
 
   const userEl=document.getElementById('hdr-user');
   if(userEl){userEl.textContent=_identity?`${_identity.role} · ${_identity.name.split(' ')[0]}`:'—';userEl.onclick=()=>{showPinScreen();};}
+  // Restore star button state for default tab
+  _updateBoardingStarBtn();
 
   updateDutyBanner();
   // Wait for settings + people before rendering register — prevents blank list on first load
@@ -824,6 +834,14 @@ async function showApp(){
   loadInfoPenalties();
   updateBoardingTabState();
   setInterval(updateBoardingTabState,60000);
+  // Open default tab if not register
+  try{
+    const def=localStorage.getItem('boarding_default_tab')||'register';
+    if(def!=='register'){
+      const defBtn=document.querySelector(`.tab[onclick*="'${def}'"]`);
+      if(defBtn)switchTab(def,defBtn);
+    }
+  }catch{}
 }
 
 function updateBoardingTabState(){
@@ -1262,15 +1280,37 @@ function updateInfoTab(){
 }
 
 // ── TABS ──────────────────────────────────────────────────────
+let _bCurrentTab = 'register';
+
+function setBoardingDefaultTab(){
+  try{localStorage.setItem('boarding_default_tab',_bCurrentTab);}catch{}
+  const btn=document.getElementById('b-star-btn');
+  if(btn){btn.textContent='★';btn.style.color='#fbbf24';}
+  showToast('★ Default: '+_bCurrentTab,'#f59e0b');
+  setTimeout(()=>{if(btn){btn.textContent='☆';btn.style.color='#fff';}},1500);
+}
+
+function _updateBoardingStarBtn(){
+  try{
+    const def=localStorage.getItem('boarding_default_tab')||'register';
+    const btn=document.getElementById('b-star-btn');
+    if(btn&&def===_bCurrentTab){btn.textContent='★';btn.style.color='#fbbf24';}
+    else if(btn){btn.textContent='☆';btn.style.color='#fff';}
+  }catch{}
+}
+
 function switchTab(id,btn){
+  _bCurrentTab=id;
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('tab-'+id).classList.add('active');
+  _updateBoardingStarBtn();
   const sub=document.getElementById('reg-sticky-sub');
   if(sub)sub.style.display=id==='register'?'block':'none';
   if(id==='register'){loadExcusedMap().then(()=>{renderRegister();});}
   if(id==='daily'){_dsDayOffset=0;renderDailySummary('daily-summary-content',getBoarders(),BOARDER_STATUS,BS);}
+  if(id==='calendar'){_calSupaRef=supa;initLeaveCalendar('boarding-calendar-content',STUDENTS,BOARDER_STATUS,supa);}
   if(id==='info'){loadInfoLeaves();loadInfoPenalties();loadHolidayDeparturePanel();}
 }
 
@@ -2141,6 +2181,197 @@ async function toggleLeaveChecklist(leaveId, field, value, supaRef) {
     await supaRef.from('boarding_leaves').update({ [field]: value }).eq('id', leaveId);
     return true;
   } catch(e) { return false; }
+}
+
+
+// ── LEAVE CALENDAR ───────────────────────────────────────────────────────────
+let _calYear = new Date().getFullYear();
+let _calMonth = new Date().getMonth(); // 0-based
+let _calScope = 'boarders'; // 'boarders' | 'all'
+let _calLeaves = [];
+let _calStudents = [];
+let _calBoarderStatus = {};
+let _calSelectedDay = null;
+
+async function initLeaveCalendar(containerId, students, boarderStatus, supaRef) {
+  _calStudents = students || [];
+  _calBoarderStatus = boarderStatus || {};
+  _calYear = new Date().getFullYear();
+  _calMonth = new Date().getMonth();
+  _calSelectedDay = null;
+  await loadCalendarLeaves(supaRef);
+  renderCalendar(containerId, supaRef);
+}
+
+async function loadCalendarLeaves(supaRef) {
+  try {
+    // Load 3 months around current
+    const from = new Date(_calYear, _calMonth - 1, 1).toISOString().split('T')[0];
+    const to   = new Date(_calYear, _calMonth + 2, 0).toISOString().split('T')[0];
+    const { data } = await supaRef.from('boarding_leaves')
+      .select('id,student_name,leave_type,departure_planned,return_planned,departed_at,returned_at,active')
+      .gte('departure_planned', from + 'T00:00:00')
+      .lte('departure_planned', to + 'T23:59:59');
+    _calLeaves = data || [];
+  } catch(e) { console.warn('Calendar load:', e); }
+}
+
+function renderCalendar(containerId, supaRef) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayISO = today.toISOString().split('T')[0];
+  const monthStart = new Date(_calYear, _calMonth, 1);
+  const monthEnd   = new Date(_calYear, _calMonth + 1, 0);
+  const firstDay   = (monthStart.getDay() + 6) % 7; // Mon=0
+  const daysInMonth = monthEnd.getDate();
+  const monthLabel = monthStart.toLocaleDateString('en-GB', {month:'long', year:'numeric'});
+
+  // Scope filter
+  const visibleNames = new Set(
+    _calScope === 'boarders'
+      ? _calStudents.filter(s => _calBoarderStatus[s.name||s]).map(s => s.name||s)
+      : _calStudents.map(s => s.name||s)
+  );
+
+  // Build day → leaves map
+  const dayLeaves = {}; // 'YYYY-MM-DD' → [{student, type, confirmed}]
+  _calLeaves.forEach(l => {
+    if (!visibleNames.has(l.student_name)) return;
+    const depPlanned = l.departure_planned ? l.departure_planned.split('T')[0] : null;
+    const retPlanned = l.return_planned    ? l.return_planned.split('T')[0]    : null;
+    const confirmed  = !!l.departed_at;
+    if (!depPlanned) return;
+    // Mark every day of the leave range
+    const start = new Date(depPlanned + 'T00:00:00');
+    const end   = retPlanned ? new Date(retPlanned + 'T00:00:00') : new Date(depPlanned + 'T00:00:00');
+    const cur   = new Date(start);
+    while (cur <= end) {
+      const iso = cur.toISOString().split('T')[0];
+      if (!dayLeaves[iso]) dayLeaves[iso] = [];
+      dayLeaves[iso].push({ name: l.student_name, type: l.leave_type, confirmed, id: l.id });
+      cur.setDate(cur.getDate() + 1);
+    }
+  });
+
+  const typeColor = {
+    weekend: '#3b82f6', medical: '#ef4444', family: '#8b5cf6',
+    activity: '#10b981', holiday: '#f97316', longterm: '#6b7280'
+  };
+
+  // Calendar HTML
+  let html = `
+  <div style="padding:12px">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <button onclick="_calNav(-1,'${containerId}',_calSupaRef)" style="background:none;border:1px solid #e5e7eb;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:16px;color:#374151">‹</button>
+      <div style="text-align:center">
+        <div style="font-size:15px;font-weight:700;color:#111">${monthLabel}</div>
+      </div>
+      <button onclick="_calNav(1,'${containerId}',_calSupaRef)" style="background:none;border:1px solid #e5e7eb;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:16px;color:#374151">›</button>
+    </div>
+    <!-- Scope toggle -->
+    <div style="display:flex;gap:6px;margin-bottom:12px;justify-content:center">
+      <button onclick="_calSetScope('boarders','${containerId}')" style="font-size:12px;padding:4px 14px;border-radius:20px;border:none;background:${_calScope==='boarders'?'#00205B':'#f3f4f6'};color:${_calScope==='boarders'?'#fff':'#374151'};cursor:pointer;font-weight:${_calScope==='boarders'?'700':'400'}">Boarders</button>
+      <button onclick="_calSetScope('all','${containerId}')" style="font-size:12px;padding:4px 14px;border-radius:20px;border:none;background:${_calScope==='all'?'#00205B':'#f3f4f6'};color:${_calScope==='all'?'#fff':'#374151'};cursor:pointer;font-weight:${_calScope==='all'?'700':'400'}">All House</button>
+    </div>
+    <!-- Day headers -->
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">
+      ${['M','T','W','T','F','S','S'].map(d=>`<div style="text-align:center;font-size:11px;font-weight:700;color:#9ca3af;padding:4px 0">${d}</div>`).join('')}
+    </div>
+    <!-- Days grid -->
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">`;
+
+  // Empty cells before month start
+  for (let i = 0; i < firstDay; i++) {
+    html += `<div style="min-height:52px"></div>`;
+  }
+
+  // Day cells
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = `${_calYear}-${String(_calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = iso === todayISO;
+    const isPast  = iso < todayISO;
+    const isSelected = iso === _calSelectedDay;
+    const leaves  = dayLeaves[iso] || [];
+    const count   = leaves.length;
+    // Unique types for dot colours
+    const types   = [...new Set(leaves.map(l => l.type))];
+    const hasUnconfirmed = leaves.some(l => !l.confirmed);
+    const hasConfirmed   = leaves.some(l => l.confirmed);
+
+    html += `<div onclick="_calSelectDay('${iso}','${containerId}')" style="
+      min-height:52px;border-radius:8px;padding:4px 2px;cursor:${count?'pointer':'default'};
+      background:${isSelected?'#dbeafe':isToday?'#fef3c7':count?'#f8fafc':'transparent'};
+      border:2px solid ${isSelected?'#3b82f6':isToday?'#f59e0b':count?'#e5e7eb':'transparent'};
+      opacity:${isPast&&!count?'0.4':'1'};
+      transition:all .15s">
+      <div style="text-align:center;font-size:13px;font-weight:${isToday?'800':'500'};color:${isToday?'#d97706':isPast?'#9ca3af':'#111'};margin-bottom:3px">${d}</div>
+      ${count ? `<div style="text-align:center;font-size:9px;font-weight:700;color:#6b7280;margin-bottom:3px">${count}</div>` : ''}
+      <div style="display:flex;flex-wrap:wrap;gap:1px;justify-content:center">
+        ${types.slice(0,4).map(t => {
+          const col = typeColor[t] || '#9ca3af';
+          return `<div style="width:7px;height:7px;border-radius:50%;background:${col};opacity:${hasUnconfirmed&&!hasConfirmed?'0.4':'1'};border:${hasUnconfirmed?'1px solid '+col:'none'}"></div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
+  html += `</div>`; // end grid
+
+  // Selected day detail
+  if (_calSelectedDay && dayLeaves[_calSelectedDay]) {
+    const d = new Date(_calSelectedDay + 'T12:00:00');
+    const dayLabel = d.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long'});
+    const dayLs = dayLeaves[_calSelectedDay];
+    html += `<div style="margin-top:12px;background:#f8fafc;border-radius:10px;padding:12px;border:1px solid #e5e7eb">
+      <div style="font-size:13px;font-weight:700;color:#374151;margin-bottom:8px">${dayLabel} — ${dayLs.length} away</div>
+      ${dayLs.map(l => {
+        const col = typeColor[l.type] || '#9ca3af';
+        const status = l.confirmed ? '✓ Confirmed' : '⏳ Pending';
+        const statusCol = l.confirmed ? '#16a34a' : '#d97706';
+        return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #e5e7eb">
+          <div style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0"></div>
+          <span style="flex:1;font-size:13px;font-weight:500;color:#111">${l.name}</span>
+          <span style="font-size:10px;color:#6b7280">${l.type}</span>
+          <span style="font-size:10px;color:${statusCol};font-weight:600">${status}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  html += `</div>`; // end padding div
+
+  // Legend
+  html += `<div style="padding:0 12px 12px;display:flex;flex-wrap:wrap;gap:6px">
+    ${Object.entries(typeColor).map(([t,c])=>`<span style="font-size:10px;display:inline-flex;align-items:center;gap:3px;color:#6b7280">
+      <span style="width:8px;height:8px;border-radius:50%;background:${c};display:inline-block"></span>${t}
+    </span>`).join('')}
+    <span style="font-size:10px;color:#9ca3af;margin-left:4px">· solid=confirmed · hollow=pending</span>
+  </div>`;
+
+  el.innerHTML = html;
+}
+
+let _calSupaRef = null;
+
+function _calNav(dir, containerId) {
+  _calMonth += dir;
+  if (_calMonth < 0)  { _calMonth = 11; _calYear--; }
+  if (_calMonth > 11) { _calMonth = 0;  _calYear++; }
+  _calSelectedDay = null;
+  loadCalendarLeaves(_calSupaRef).then(() => renderCalendar(containerId, _calSupaRef));
+}
+
+function _calSetScope(scope, containerId) {
+  _calScope = scope;
+  renderCalendar(containerId, _calSupaRef);
+}
+
+function _calSelectDay(iso, containerId) {
+  _calSelectedDay = _calSelectedDay === iso ? null : iso;
+  renderCalendar(containerId, _calSupaRef);
 }
 
 // ── GATE MESSAGE GENERATOR ────────────────────────────────────────────────────
