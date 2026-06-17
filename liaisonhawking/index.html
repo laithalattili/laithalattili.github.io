@@ -73,6 +73,34 @@ body{background:var(--bg);min-height:100vh;}
 /* LOADING */
 .loading{text-align:center;padding:40px;color:var(--text3);font-size:13px;}
 
+/* FIRE REGISTER */
+#l-fire-overlay{display:none;position:fixed;inset:0;background:#111;z-index:9999;flex-direction:column;overflow:hidden;}
+#l-fire-overlay.open{display:flex;}
+.l-fire-hdr{background:#dc2626;padding:12px 16px;flex-shrink:0;}
+.l-fire-hdr-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.l-fire-hdr-title{color:#fff;font-size:18px;font-weight:900;letter-spacing:.05em;}
+.l-fire-hdr-count{color:#fff;font-size:14px;font-weight:700;background:rgba(0,0,0,.3);padding:4px 10px;border-radius:8px;}
+.l-fire-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.l-fire-seg{display:flex;background:rgba(0,0,0,.3);border-radius:8px;overflow:hidden;}
+.l-fire-seg-btn{background:none;border:none;color:rgba(255,255,255,.6);padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer;}
+.l-fire-seg-btn.active{background:rgba(255,255,255,.25);color:#fff;}
+.l-fire-list{flex:1;overflow-y:auto;padding:8px;}
+.l-fire-sec-hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#222;border-radius:8px;margin-bottom:4px;cursor:pointer;margin-top:8px;}
+.l-fire-sec-title{color:#fff;font-size:13px;font-weight:700;}
+.l-fire-sec-count{color:#aaa;font-size:11px;}
+.l-fire-row{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#1a1a1a;border-radius:7px;margin-bottom:3px;}
+.l-fire-row.present{background:#14532d22;}
+.l-fire-row.absent{background:#7f1d1d22;}
+.l-fire-name{flex:1;color:#fff;font-size:14px;font-weight:500;}
+.l-fire-btns{display:flex;gap:4px;}
+.l-fire-btn{width:36px;height:36px;border-radius:8px;border:1px solid #333;background:#222;color:#888;font-size:14px;font-weight:700;cursor:pointer;}
+.l-fire-btn.active-present{background:#16a34a;border-color:#16a34a;color:#fff;}
+.l-fire-btn.active-absent{background:#dc2626;border-color:#dc2626;color:#fff;}
+.l-fire-btn.active-excused{background:#d97706;border-color:#d97706;color:#fff;}
+.l-fire-footer{background:#1a1a1a;padding:12px 16px;display:flex;gap:8px;flex-shrink:0;}
+.l-fire-cancel-btn{flex:1;padding:12px;border-radius:10px;border:1px solid #333;background:none;color:#888;font-size:14px;font-weight:700;cursor:pointer;}
+.l-fire-submit-btn{flex:2;padding:12px;border-radius:10px;border:none;background:#22c55e;color:#fff;font-size:14px;font-weight:700;cursor:pointer;}
+
 /* REGISTER VIEW */
 .reg-item{display:flex;align-items:center;gap:10px;padding:9px 14px;border-top:1px solid var(--border);}
 .reg-name{flex:1;font-size:13px;font-weight:500;}
@@ -149,14 +177,29 @@ body{background:var(--bg);min-height:100vh;}
   </div>
   <div id="tab-message" class="section" style="display:none;padding:12px"></div>
   <div id="tab-medical" class="section" style="display:none"></div>
-  <!-- Fire screen overlay -->
-  <div id="l-fire-screen" style="display:none;position:fixed;inset:0;background:#dc2626;z-index:9999;flex-direction:column;align-items:center;justify-content:center;color:#fff">
-    <div style="font-size:64px;margin-bottom:16px">🔥</div>
-    <div style="font-size:24px;font-weight:900;letter-spacing:.1em;margin-bottom:8px">FIRE EVACUATION</div>
-    <div style="font-size:14px;opacity:.8;margin-bottom:32px">All students evacuate immediately</div>
-    <div style="font-size:13px;opacity:.7;margin-bottom:32px" id="l-fire-time"></div>
-    <button onclick="document.getElementById('l-fire-screen').style.display='none'"
-      style="background:rgba(255,255,255,.2);color:#fff;border:2px solid rgba(255,255,255,.5);border-radius:10px;padding:12px 28px;font-size:15px;font-weight:700;cursor:pointer">✕ Dismiss</button>
+  <!-- Fire Register Overlay -->
+  <div id="l-fire-overlay">
+    <div class="l-fire-hdr">
+      <div class="l-fire-hdr-top">
+        <span class="l-fire-hdr-title">🔥 FIRE REGISTER</span>
+        <span class="l-fire-hdr-count" id="l-fire-count">0/0</span>
+      </div>
+      <div class="l-fire-controls">
+        <div class="l-fire-seg" id="l-fire-scope-seg">
+          <button class="l-fire-seg-btn active" onclick="lSetFireScope('boarders',this)">Boarders</button>
+          <button class="l-fire-seg-btn" onclick="lSetFireScope('all',this)">All House</button>
+        </div>
+        <div class="l-fire-seg" id="l-fire-group-seg">
+          <button class="l-fire-seg-btn active" onclick="lSetFireGroup('grade',this)">Grade</button>
+          <button class="l-fire-seg-btn" onclick="lSetFireGroup('room',this)">Room</button>
+        </div>
+      </div>
+    </div>
+    <div class="l-fire-list" id="l-fire-list"></div>
+    <div class="l-fire-footer">
+      <button class="l-fire-cancel-btn" onclick="lCloseFireRegister()">✕ Close</button>
+      <button class="l-fire-submit-btn" onclick="lSubmitFireRegister()">✓ Submit Register</button>
+    </div>
   </div>
 </div>
 
@@ -311,13 +354,99 @@ function setLiaisonDefaultTab(){
   setTimeout(()=>{if(btn){btn.textContent='☆';btn.style.color='#fff';}},1500);
 }
 
-function showLiaisonFireScreen(){
-  const el=document.getElementById('l-fire-screen');
-  if(el){
-    el.style.display='flex';
-    const t=document.getElementById('l-fire-time');
-    if(t)t.textContent=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+function showLiaisonFireScreen(){ openLFireRegister(); }
+
+// ── LIAISON FIRE REGISTER ──────────────────────────────────────
+let _lFireState={}, _lFireScope='boarders', _lFireGroup='grade', _lFireSections={};
+
+function openLFireRegister(){
+  _lFireState={};_lFireSections={};
+  document.getElementById('l-fire-overlay').classList.add('open');
+  renderLFireRegister();
+}
+function lCloseFireRegister(){ document.getElementById('l-fire-overlay').classList.remove('open'); }
+function lSubmitFireRegister(){
+  lCloseFireRegister();
+  showLiaisonToast('🔥 Fire register submitted','#22c55e');
+}
+function lSetFireScope(scope,btn){
+  _lFireScope=scope;
+  document.querySelectorAll('#l-fire-scope-seg .l-fire-seg-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const gs=document.getElementById('l-fire-group-seg');
+  if(gs)gs.style.display=scope==='boarders'?'flex':'none';
+  renderLFireRegister();
+}
+function lSetFireGroup(g,btn){
+  _lFireGroup=g;
+  document.querySelectorAll('#l-fire-group-seg .l-fire-seg-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderLFireRegister();
+}
+function lFireTap(name,status){
+  const cur=(_lFireState[name]||{}).status;
+  _lFireState[name]={status:cur===status?'':status};
+  const row=document.querySelector(`[data-lfire="${CSS.escape(name)}"]`);
+  if(row){
+    const st=(_lFireState[name]||{}).status||'';
+    row.className='l-fire-row'+(st?' '+st:'');
+    row.querySelectorAll('[data-lfire-opt]').forEach(b=>{
+      const opt=b.getAttribute('data-lfire-opt');
+      b.className='l-fire-btn'+(opt===st?' active-'+opt:'');
+    });
+    // Update count
+    const allRows=document.querySelectorAll('[data-lfire]');
+    const done=[...allRows].filter(r=>(_lFireState[r.getAttribute('data-lfire')]||{}).status).length;
+    const present=[...allRows].filter(r=>(_lFireState[r.getAttribute('data-lfire')]||{}).status==='present').length;
+    const el=document.getElementById('l-fire-count');
+    if(el)el.textContent=`${done}/${allRows.length} · ${present}✓`;
   }
+}
+function renderLFireRegister(){
+  const list=document.getElementById('l-fire-list');
+  if(!list)return;
+  // Get students
+  const students=_liaisonStudents.map(n=>({name:n}));
+  const boarderStatus=_lBoarderStatus||{};
+  const visible=_lFireScope==='boarders'
+    ?students.filter(s=>boarderStatus[s.name])
+    :students;
+  if(!visible.length){list.innerHTML='<div style="padding:2rem;text-align:center;color:#666">No students loaded</div>';return;}
+  // Group
+  let groups={};
+  if(_lFireScope==='boarders'&&_lFireGroup==='grade'){
+    // Group by grade via tutor lookup (use STUDENTS if available)
+    visible.forEach(s=>{
+      const grade='G?'; // simplified — just one group if no grade data
+      if(!groups[grade])groups[grade]=[];
+      groups[grade].push(s.name);
+    });
+    groups={'All Boarders':visible.map(s=>s.name)};
+  } else {
+    groups={'All Students':visible.map(s=>s.name)};
+  }
+  let html='';
+  const total=visible.length;
+  const done=visible.filter(s=>(_lFireState[s.name]||{}).status).length;
+  const present=visible.filter(s=>(_lFireState[s.name]||{}).status==='present').length;
+  document.getElementById('l-fire-count').textContent=`${done}/${total} · ${present}✓`;
+  Object.entries(groups).forEach(([grp,names])=>{
+    const grpDone=names.filter(n=>(_lFireState[n]||{}).status).length;
+    html+=`<div class="l-fire-sec-hdr"><span class="l-fire-sec-title">${grp}</span><span class="l-fire-sec-count">${grpDone}/${names.length}</span></div>`;
+    names.forEach(name=>{
+      const safe=name.replace(/"/g,'&quot;');
+      const st=(_lFireState[name]||{}).status||'';
+      html+=`<div class="l-fire-row${st?' '+st:''}" data-lfire="${safe}">
+        <span class="l-fire-name">${name}</span>
+        <div class="l-fire-btns">
+          <button class="l-fire-btn${st==='present'?' active-present':''}" data-lfire-opt="present" onclick="lFireTap('${safe}','present')">✓</button>
+          <button class="l-fire-btn${st==='absent'?' active-absent':''}" data-lfire-opt="absent" onclick="lFireTap('${safe}','absent')">✗</button>
+          <button class="l-fire-btn${st==='excused'?' active-excused':''}" data-lfire-opt="excused" onclick="lFireTap('${safe}','excused')">~</button>
+        </div>
+      </div>`;
+    });
+  });
+  list.innerHTML=html;
 }
 
 function updateLiaisonClock(){
@@ -329,17 +458,32 @@ function updateLiaisonClock(){
 
 let _lCurrentTab='leaves';
 
+function subscribeLiaisonRealtime(){
+  _supaClient.channel('liaison_leaves_rt')
+    .on('postgres_changes',{event:'*',schema:'public',table:'boarding_leaves'},()=>{
+      // Refresh current tab if it shows leaves data
+      if(_lCurrentTab==='leaves')loadLeaves();
+      if(_lCurrentTab==='calendar')initLeaveCalendar('liaison-calendar-content',_liaisonStudents.map(n=>({name:n})),_lBoarderStatus,_supaClient);
+      loadLiaisonHolidayPanel();
+    })
+    .subscribe();
+}
+
+let _lBoarderStatus={};
+
 async function init(){
   document.getElementById('header-date').textContent=
     new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
-  // Start clock
   updateLiaisonClock();
   setInterval(updateLiaisonClock,10000);
-  // Load default tab preference
   try{_lDefaultTab=localStorage.getItem('liaison_default_tab')||'leaves';}catch{}
-  // Pre-load students
   loadLiaisonStudents();
-  // Open default tab
+  // Load boarder status for calendar toggle
+  try{
+    const{data}=await _supaClient.from('work_app_data').select('value').eq('key','hawkingStatus').maybeSingle();
+    if(data){let v=data.value;try{v=JSON.parse(v);}catch{}if(typeof v==='string'){try{v=JSON.parse(v);}catch{}}_lBoarderStatus=v||{};}
+  }catch{}
+  subscribeLiaisonRealtime();
   const defBtn=document.getElementById('ltab-'+_lDefaultTab);
   if(_lDefaultTab!=='leaves'&&defBtn){
     showTab(_lDefaultTab,defBtn);
@@ -356,7 +500,7 @@ async function loadHolidaysFromSupa(_supaClient) {
   if (_cachedHolidays) return _cachedHolidays;
   try {
     const { data } = await _supaClient.from('work_app_data')
-      .select('value').eq('key', 'holidaysData').single();
+      .select('value').eq('key', 'holidaysData').maybeSingle();
     if (data) {
       let v = data.value;
       try { v = JSON.parse(v); } catch {}
@@ -736,7 +880,7 @@ function showTab(name,btn){
   if(name==='calendar'){
     _calSupaRef=_supaClient;
     // Load boarder status from Supabase for toggle to work
-    _supaClient.from('work_app_data').select('value').eq('key','hawkingStatus').single().then(({data})=>{
+    _supaClient.from('work_app_data').select('value').eq('key','hawkingStatus').maybeSingle().then(({data})=>{
       let bs={};
       try{let v=JSON.parse(data?.value||'{}');if(typeof v==='string')v=JSON.parse(v);bs=v;}catch{}
       initLeaveCalendar('liaison-calendar-content',_liaisonStudents.map(n=>({name:n})),bs,_supaClient);
