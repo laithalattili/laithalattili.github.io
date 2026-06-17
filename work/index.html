@@ -26204,11 +26204,24 @@ async function renderAwayList(el){
         const depTime=exc?.departedAt?`<span style="font-size:10px;color:#16a34a"> · ↑ ${fmt(exc.departedAt)}${exc.departedBy?' by '+exc.departedBy:''}</span>`:'';
         const pending=exc?.state==='pending_departure'?`<span style="font-size:10px;color:#d97706"> · not yet departed</span>`:'';
         const brTime=(_brState[s.name]||{}).updatedAt?`<span style="font-size:10px;color:#9ca3af"> · ${_brFormatTime((_brState[s.name]||{}).updatedAt)}</span>`:'';
+        // Form/parents badges from leave record
+        let chkBadges='';
+        if(exc?.leaveId){
+          const lid=exc.leaveId;
+          // We need form_submitted/parents_called — fetch inline would be slow
+          // Show them from excuseInfo if available
+          const fOK=exc.form_submitted; const cOK=exc.parents_called;
+          chkBadges=`<span style="display:inline-flex;gap:3px;margin-left:6px">
+            <span style="font-size:10px;padding:1px 5px;border-radius:4px;border:1px solid ${fOK?'#16a34a':'#e5e7eb'};color:${fOK?'#16a34a':'#9ca3af'};cursor:pointer" onclick="toggleLeaveChecklist('${lid}','form_submitted',${!fOK},supa).then(()=>renderAwayList(document.getElementById('hawking-list-content')))" title="Form submitted">📋</span>
+            <span style="font-size:10px;padding:1px 5px;border-radius:4px;border:1px solid ${cOK?'#16a34a':'#e5e7eb'};color:${cOK?'#16a34a':'#9ca3af'};cursor:pointer" onclick="toggleLeaveChecklist('${lid}','parents_called',${!cOK},supa).then(()=>renderAwayList(document.getElementById('hawking-list-content')))" title="Parents called">📞</span>
+          </span>`;
+        }
         return `<div style="display:flex;align-items:center;gap:8px;padding:8px 1rem;border-bottom:1px solid #f1f5f9">
           <span style="font-size:10px;color:#d1d5db;min-width:18px;text-align:right">${i+1}</span>
           <div style="flex:1">
             <span style="font-size:13px;font-weight:500;color:#111">${s.name}</span>
             ${exc?`<span style="font-size:11px;color:${color};margin-left:6px">${exc.emoji} ${exc.reason}${depTime}${pending}</span>`:''}
+            ${chkBadges}
             ${!exc?brTime:''}
           </div>
         </div>`;
@@ -26260,7 +26273,10 @@ async function renderHawkingRegister(el, preloadedMap){
   const counts={present:0,absent:0,excused:0,late:0,unregistered:0};
   people.forEach(p=>{
     let st=(_brState[p.name]||{}).status||'unregistered';
-    if(st==='unregistered'&&excusedMap[p.name])st='excused';
+    const _exc=excusedMap[p.name];
+    const _leaveState=_exc?.state||null;
+    if(_exc&&(_leaveState==='excused'||_exc.type==='activity'))st='excused';
+    else if(st==='unregistered'&&_exc)st='excused';
     counts[st]=(counts[st]||0)+1;
   });
   const total=people.length;
@@ -26272,9 +26288,10 @@ async function renderHawkingRegister(el, preloadedMap){
     let st=stObj.status||'unregistered';
     const excuseInfo=excusedMap[p.name]||null;
     const leaveState=excuseInfo?.state||null; // 'pending_departure'|'excused'|null
-    // Only auto-excused if departure confirmed OR it's an activity (not pending leave)
+    // If student has confirmed departure, override their status to show they're away
     const autoExcused=excuseInfo&&(leaveState==='excused'||(excuseInfo.type==='activity'));
-    const effectiveSt=(st==='unregistered'&&autoExcused)?'excused':st;
+    // Departed students always show as away — overrides even a 'present' registration
+    const effectiveSt=autoExcused?'excused':st;
     const col=statColor[effectiveSt];
     const bg=statBg[effectiveSt];
     const updatedAt=stObj.updatedAt?_brFormatTime(stObj.updatedAt):'';
@@ -30657,7 +30674,7 @@ async function getTodayExcusedMap(){
   //   (returned: ignore — student is back)
   try{
     const {data}=await supa.from('boarding_leaves')
-      .select('*').eq('active',true);
+      .select('*,form_submitted,parents_called').eq('active',true);
     const leaveLabel={weekend:'Weekend Leave',extended:'Extended Leave',daytime:'Daytime Departure',longterm:'Long-term Leave'};
     const leaveEmoji={weekend:'🏠',extended:'📅',daytime:'🌅',longterm:'🏥'};
     (data||[]).forEach(l=>{
@@ -30681,13 +30698,17 @@ async function getTodayExcusedMap(){
           leaveId:l.id,state:'excused',
           departedAt:depActual,
           departedBy:l.departure_confirmed_by||l.created_by||'',
-          leave_type:l.leave_type
+          leave_type:l.leave_type,
+          form_submitted:l.form_submitted||false,
+          parents_called:l.parents_called||false,
         };
       } else {
         excused[l.student_name]={
           reason:label,emoji,type:'leave',
           leaveId:l.id,state:'pending_departure',
-          leave_type:l.leave_type
+          leave_type:l.leave_type,
+          form_submitted:l.form_submitted||false,
+          parents_called:l.parents_called||false,
         };
       }
     });
