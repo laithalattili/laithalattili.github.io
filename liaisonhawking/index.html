@@ -294,14 +294,22 @@ async function loadLiaisonStudents(){
   if(_liaisonStudents.length)return;
   try{
     const data=await(await supa('work_app_data')).get('key=eq.students');
+    console.log('Student raw data:',data);
     if(data&&data[0]){
       let v=data[0].value;
-      try{v=JSON.parse(v);}catch{}
+      // May be double-stringified
       if(typeof v==='string'){try{v=JSON.parse(v);}catch{}}
-      if(Array.isArray(v))_liaisonStudents=v.map(s=>typeof s==='string'?s:(s.name||'')).filter(Boolean);
-      console.log('Students loaded:',_liaisonStudents.length);
+      if(typeof v==='string'){try{v=JSON.parse(v);}catch{}}
+      if(Array.isArray(v)){
+        _liaisonStudents=v.map(s=>typeof s==='string'?s:(s.name||'')).filter(Boolean);
+      } else if(typeof v==='object'&&v!==null){
+        // Might be {students:[...]}
+        const arr=v.students||v.data||Object.values(v);
+        if(Array.isArray(arr))_liaisonStudents=arr.map(s=>typeof s==='string'?s:(s.name||'')).filter(Boolean);
+      }
+      console.log('Students loaded:',_liaisonStudents.length,_liaisonStudents.slice(0,3));
     }
-  }catch(e){console.warn('Student load:',e);}
+  }catch(e){console.warn('Student load error:',e);}
 }
 
 // ── TABS ─────────────────────────────────────────────────────────────────────
@@ -358,7 +366,9 @@ async function loadLeaves(){
   const addForm=`<div class="card" style="margin-bottom:12px">
     <div class="card-title">➕ New Leave Request</div>
     <div style="display:flex;flex-direction:column;gap:8px;padding:4px 0">
-      <input id="lv-name" placeholder="Student name" style="padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%">
+      <input id="lv-name" list="lv-name-list" placeholder="Type student name…" autocomplete="off"
+        style="padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%">
+      <datalist id="lv-name-list"></datalist>
       <select id="lv-type" style="padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%">
         <option value="">— Leave type —</option>
         <option value="weekend">🏠 Weekend Leave</option>
@@ -378,6 +388,12 @@ async function loadLeaves(){
     </div>
   </div>`;
   el.innerHTML=addForm+'<div class="loading">Loading leaves…</div>';
+  // Populate student datalist
+  await loadLiaisonStudents();
+  const dl=document.getElementById('lv-name-list');
+  if(dl&&_liaisonStudents.length){
+    dl.innerHTML=_liaisonStudents.map(n=>`<option value="${n}">`).join('');
+  }
   const data=await(await supa('boarding_leaves')).get('order=created_at.desc&limit=50');
   const listEl=el.querySelector('.loading');
   if(!data.length){if(listEl)listEl.outerHTML='<div class="empty">No leave requests yet.</div>';return;}
