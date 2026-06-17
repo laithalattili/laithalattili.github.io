@@ -341,7 +341,7 @@ async function submitLeave(){
     const res=await fetch(`${SUPA_URL}/rest/v1/boarding_leaves`,{
       method:'POST',
       headers:{'Authorization':`Bearer ${SUPA_KEY}`,'apikey':SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({student_name:name,leave_type:type,start_date:start,end_date:end||null,notes:notes||null,status:'pending',active:true,created_by:'Liaison'})
+      body:JSON.stringify({student_name:name,leave_type:type,departure_planned:start+'T00:00:00',return_planned:end?end+'T23:59:59':null,reason:notes||'',active:true,created_by:'Liaison'})
     });
     if(!res.ok)throw new Error('Save failed: '+res.status);
     document.getElementById('lv-name').value='';
@@ -366,9 +366,10 @@ async function loadLeaves(){
   const addForm=`<div class="card" style="margin-bottom:12px">
     <div class="card-title">➕ New Leave Request</div>
     <div style="display:flex;flex-direction:column;gap:8px;padding:4px 0">
-      <input id="lv-name" list="lv-name-list" placeholder="Type student name…" autocomplete="off"
+      <input id="lv-name" list="lv-student-list" placeholder="Type student name…"
+        autocomplete="new-password"
         style="padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%">
-      <datalist id="lv-name-list"></datalist>
+      <datalist id="lv-student-list"></datalist>
       <select id="lv-type" style="padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%">
         <option value="">— Leave type —</option>
         <option value="weekend">🏠 Weekend Leave</option>
@@ -390,7 +391,7 @@ async function loadLeaves(){
   el.innerHTML=addForm+'<div class="loading">Loading leaves…</div>';
   // Populate student datalist
   await loadLiaisonStudents();
-  const dl=document.getElementById('lv-name-list');
+  const dl=document.getElementById('lv-student-list');
   if(dl&&_liaisonStudents.length){
     dl.innerHTML=_liaisonStudents.map(n=>`<option value="${n}">`).join('');
   }
