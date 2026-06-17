@@ -290,6 +290,168 @@ async function init(){
   loadLeaves();
 }
 
+
+// ── HOLIDAY DEPARTURE SYSTEM ─────────────────────────────────────────────────
+let _cachedHolidays = null;
+
+async function loadHolidaysFromSupa(_supaClient) {
+  if (_cachedHolidays) return _cachedHolidays;
+  try {
+    const { data } = await _supaClient.from('work_app_data')
+      .select('value').eq('key', 'holidaysData').single();
+    if (data) {
+      let v = data.value;
+      try { v = JSON.parse(v); } catch {}
+      if (Array.isArray(v)) { _cachedHolidays = v; return v; }
+    }
+  } catch(e) { console.warn('Holiday load:', e); }
+  return [];
+}
+
+function getUpcomingHoliday(holidays) {
+  // Find any holiday starting within 7 days
+  const now = new Date(); now.setHours(0,0,0,0);
+  const soon = new Date(now); soon.setDate(soon.getDate() + 7);
+  return holidays.find(h => {
+    const start = new Date(h.start + 'T00:00:00');
+    return start >= now && start <= soon;
+  }) || holidays.find(h => {
+    // Also check ongoing holidays (started but not ended)
+    const start = new Date(h.start + 'T00:00:00');
+    const end = new Date(h.end + 'T00:00:00');
+    return start <= now && end >= now;
+  }) || null;
+}
+
+async function confirmHolidayDeparture(studentName, holiday, _supaClient, role) {
+  const now = new Date().toISOString();
+  try {
+    // Check if leave already exists for this holiday
+    const { data: existing } = await _supaClient.from('boarding_leaves')
+      .select('id').eq('student_name', studentName)
+      .gte('departure_planned', holiday.start + 'T00:00:00')
+      .lte('departure_planned', holiday.start + 'T23:59:59');
+    
+    if (existing && existing.length) {
+      // Update existing leave with departure
+      await _supaClient.from('boarding_leaves')
+        .update({ departed_at: now })
+        .eq('id', existing[0].id);
+    } else {
+      // Create new holiday leave + mark departed
+      await _supaClient.from('boarding_leaves').insert({
+        student_name: studentName,
+        leave_type: 'holiday',
+        departure_planned: holiday.start + 'T00:00:00',
+        return_planned: holiday.end + 'T23:59:59',
+        reason: holiday.name,
+        active: true,
+        created_by: role || 'System',
+        departed_at: now,
+        form_submitted: false,
+        parents_called: false,
+      });
+    }
+    return true;
+  } catch(e) {
+    console.error('Holiday departure error:', e);
+    return false;
+  }
+}
+
+async function confirmHolidayReturn(studentName, holiday, _supaClient) {
+  const now = new Date().toISOString();
+  try {
+    const { data: existing } = await _supaClient.from('boarding_leaves')
+      .select('id').eq('student_name', studentName)
+      .gte('departure_planned', holiday.start + 'T00:00:00');
+    if (existing && existing.length) {
+      await _supaClient.from('boarding_leaves')
+        .update({ returned_at: now })
+        .eq('id', existing[0].id);
+      return true;
+    }
+    return false;
+  } catch(e) { return false; }
+}
+
+async function toggleLeaveChecklist(leaveId, field, value, _supaClient) {
+  // field: 'form_submitted' | 'parents_called'
+  try {
+    await _supaClient.from('boarding_leaves').update({ [field]: value }).eq('id', leaveId);
+    return true;
+  } catch(e) { return false; }
+}
+
+// ── STUDENT LOADER ──────────────────────────────────────
+async function loadLiaisonHolidayPanel(){
+  const el=document.getElementById('l-hol-panel');
+  if(!el)return;
+  const holidays=await loadHolidaysFromSupa(_supaClient);
+  const upcomingHol=getUpcomingHoliday(holidays);
+  if(!upcomingHol){el.innerHTML='';return;}
+  let depList=[];
+  try{
+    const{data}=await _supaClient.from('boarding_leaves')
+      .select('student_name,departed_at,returned_at,id,form_submitted,parents_called')
+      .eq('leave_type','holiday')
+      .gte('departure_planned',upcomingHol.start+'T00:00:00')
+      .lte('departure_planned',upcomingHol.start+'T23:59:59');
+    depList=data||[];
+  }catch(e){}
+  const depMap={};
+  depList.forEach(d=>{depMap[d.student_name]=d;});
+  const students=_liaisonStudents.length?_liaisonStudents:[];
+  const notDep=students.filter(n=>!depMap[n]?.departed_at).length;
+  const away=students.filter(n=>depMap[n]?.departed_at&&!depMap[n]?.returned_at).length;
+  if(!students.length){el.innerHTML='';return;}
+  el.innerHTML=`<div class="card" style="margin-bottom:12px;border-left:3px solid #f97316">
+    <div class="card-title" style="color:#c2410c">🏖️ ${upcomingHol.name} · ${upcomingHol.start} → ${upcomingHol.end}</div>
+    <div style="font-size:11px;color:#9ca3af;margin-bottom:10px">${notDep} not yet departed · ${away} currently away</div>
+    ${students.map(name=>{
+      const d=depMap[name];
+      const hasDep=d?.departed_at;
+      const hasRet=d?.returned_at;
+      const lid=d?.id||'';
+      const formOK=d?.form_submitted;
+      const callOK=d?.parents_called;
+      const fmtT=iso=>iso?new Date(iso).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'';
+      return `<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid #f1f5f9">
+        <span style="flex:1;font-size:13px;font-weight:600;color:#111">${name}</span>
+        ${lid?`<button onclick="toggleLeaveChecklist('${lid}','form_submitted',${!formOK},_supaClient).then(()=>loadLiaisonHolidayPanel())"
+          style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid ${formOK?'#16a34a':'#e5e7eb'};background:${formOK?'#f0fdf4':'#f9fafb'};color:${formOK?'#16a34a':'#9ca3af'};cursor:pointer" title="Form submitted">📋</button>
+        <button onclick="toggleLeaveChecklist('${lid}','parents_called',${!callOK},_supaClient).then(()=>loadLiaisonHolidayPanel())"
+          style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid ${callOK?'#16a34a':'#e5e7eb'};background:${callOK?'#f0fdf4':'#f9fafb'};color:${callOK?'#16a34a':'#9ca3af'};cursor:pointer" title="Parents called">📞</button>`:''}
+        ${!hasDep?`<button onclick="liaisonHolDep('${name}',${JSON.stringify(upcomingHol).replace(/"/g,"'")},this)"
+          style="font-size:11px;padding:3px 10px;border-radius:5px;background:#f97316;color:#fff;border:none;cursor:pointer;font-weight:600">↑ Depart</button>`
+        :hasRet?`<span style="font-size:10px;background:#ede9fe;color:#7c3aed;padding:2px 8px;border-radius:8px;font-weight:600">↩ Back ${fmtT(d.returned_at)}</span>`
+        :`<button onclick="liaisonHolRet('${name}',${JSON.stringify(upcomingHol).replace(/"/g,"'")},this)"
+          style="font-size:11px;padding:3px 10px;border-radius:5px;background:#16a34a;color:#fff;border:none;cursor:pointer;font-weight:600">↩ Return</button>`}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+async function liaisonHolDep(name,holiday,btn){
+  btn.disabled=true;btn.textContent='...';
+  const ok=await confirmHolidayDeparture(name,holiday,_supaClient,'Liaison');
+  if(ok){showLiaisonToast('↑ '+name+' departed','#f97316');}
+  else{showLiaisonToast('Error','#dc2626');btn.disabled=false;btn.textContent='↑ Depart';return;}
+  _cachedHolidays=null;
+  loadLiaisonHolidayPanel();
+  loadLeaves();
+}
+
+async function liaisonHolRet(name,holiday,btn){
+  btn.disabled=true;btn.textContent='...';
+  const ok=await confirmHolidayReturn(name,holiday,_supaClient);
+  if(ok){showLiaisonToast('↩ '+name+' returned','#16a34a');}
+  else{showLiaisonToast('Error','#dc2626');btn.disabled=false;btn.textContent='↩ Return';return;}
+  _cachedHolidays=null;
+  loadLiaisonHolidayPanel();
+  loadLeaves();
+}
+
 async function loadLiaisonStudents(){
   if(_liaisonStudents.length)return;
   try{
@@ -398,6 +560,12 @@ async function saveEditLeave(id){
   }catch(e){alert('Error: '+e.message);}
 }
 
+function toggleRecurringOptions(){
+  const show=document.getElementById('lv-recurring')?.checked;
+  const opts=document.getElementById('lv-recurring-opts');
+  if(opts)opts.style.display=show?'block':'none';
+}
+
 async function submitLeave(){
   const name=document.getElementById('lv-name')?.value?.trim();
   const type=document.getElementById('lv-type')?.value;
@@ -413,7 +581,20 @@ async function submitLeave(){
     const res=await fetch(`${SUPA_URL}/rest/v1/boarding_leaves`,{
       method:'POST',
       headers:{'Authorization':`Bearer ${SUPA_KEY}`,'apikey':SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({student_name:name,leave_type:type,departure_planned:start+'T00:00:00',return_planned:end?end+'T23:59:59':null,reason:notes||'',active:true,created_by:'Liaison'})
+      body:JSON.stringify({
+        student_name:name,
+        leave_type:type,
+        departure_planned:start+'T00:00:00',
+        return_planned:end?end+'T23:59:59':null,
+        reason:notes||'',
+        active:true,
+        created_by:'Liaison',
+        form_submitted:document.getElementById('lv-form')?.checked||false,
+        parents_called:document.getElementById('lv-called')?.checked||false,
+        recurring:document.getElementById('lv-recurring')?.checked?
+          (document.getElementById('lv-freq')?.value||'weekly'):null,
+        form_applies_to_all:document.getElementById('lv-form-once')?.checked||false,
+      })
     });
     if(!res.ok)throw new Error('Save failed: '+res.status);
     document.getElementById('lv-name').value='';
@@ -457,10 +638,37 @@ async function loadLeaves(){
           <input id="lv-end" type="date" style="padding:7px 8px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%"></div>
       </div>
       <input id="lv-notes" placeholder="Notes (optional)" style="padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%">
+      <div style="background:#f8fafc;border-radius:7px;padding:10px;border:1px solid #e5e7eb">
+        <div style="font-size:11px;font-weight:700;color:#374151;margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">Checklist</div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;cursor:pointer;margin-bottom:6px">
+          <input type="checkbox" id="lv-form" style="width:16px;height:16px;accent-color:#00205B"> Official leave form submitted
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;cursor:pointer;margin-bottom:6px">
+          <input type="checkbox" id="lv-called" style="width:16px;height:16px;accent-color:#00205B"> Parents have been called/notified
+        </label>
+        <div style="border-top:1px solid #e5e7eb;margin-top:8px;padding-top:8px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;cursor:pointer;margin-bottom:4px">
+            <input type="checkbox" id="lv-recurring" onchange="toggleRecurringOptions()" style="width:16px;height:16px;accent-color:#00205B"> Recurring leave
+          </label>
+          <div id="lv-recurring-opts" style="display:none;margin-top:6px;padding-left:24px">
+            <select id="lv-freq" style="padding:6px 8px;border-radius:6px;border:1px solid #e5e7eb;font-size:12px;width:100%;margin-bottom:6px">
+              <option value="weekly">Every week (same days)</option>
+              <option value="biweekly">Every two weeks</option>
+              <option value="holiday">Every holiday</option>
+            </select>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#6b7280;cursor:pointer">
+              <input type="checkbox" id="lv-form-once" checked style="width:14px;height:14px;accent-color:#00205B">
+              Form counts for all future instances (don't re-tick each time)
+            </label>
+          </div>
+        </div>
+      </div>
       <button id="lv-submit" onclick="submitLeave()" style="background:#00205B;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer">Submit Request</button>
     </div>
   </div>`;
-  el.innerHTML=addForm+'<div class="loading">Loading leaves…</div>';
+  el.innerHTML='<div id="l-hol-panel"></div>'+addForm+'<div class="loading">Loading leaves…</div>';
+  // Load holiday departure panel
+  loadLiaisonHolidayPanel();
   // Populate student datalist
   await loadLiaisonStudents();
   const dl=document.getElementById('lv-student-list');
