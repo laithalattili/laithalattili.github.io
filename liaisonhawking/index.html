@@ -474,6 +474,67 @@ function updateLiaisonClock(){
 }
 
 let _lCurrentTab='leaves';
+let _lSelectedStudent=''; // tracks confirmed selection
+
+function lFilterStudents(){
+  const inp=document.getElementById('lv-name');
+  const drop=document.getElementById('lv-name-drop');
+  if(!inp||!drop)return;
+  const q=inp.value.trim().toLowerCase();
+  _lSelectedStudent=inp.value.trim(); // track typed value
+  const matches=q.length===0
+    ?_liaisonStudents.slice(0,30)
+    :_liaisonStudents.filter(n=>n.toLowerCase().includes(q)).slice(0,20);
+  if(!matches.length){drop.style.display='none';return;}
+  drop.innerHTML=matches.map(n=>`
+    <div onclick="lSelectStudent('${n.replace(/'/g,"\'")}')"
+      style="padding:10px 14px;font-size:14px;cursor:pointer;border-bottom:1px solid #f3f4f6;color:#111"
+      onmousedown="event.preventDefault()"
+      ontouchstart="event.preventDefault();lSelectStudent('${n.replace(/'/g,"\'")}')">
+      ${n}
+    </div>`).join('');
+  drop.style.display='block';
+}
+
+function lSelectStudent(name){
+  const inp=document.getElementById('lv-name');
+  const drop=document.getElementById('lv-name-drop');
+  if(inp)inp.value=name;
+  _lSelectedStudent=name;
+  if(drop)drop.style.display='none';
+}
+
+function lHideDropdown(){
+  const drop=document.getElementById('lv-name-drop');
+  if(drop)drop.style.display='none';
+}
+
+function lGmFilterStudents(){
+  const inp=document.getElementById('lv-gm-student');
+  const drop=document.getElementById('lv-gm-drop');
+  if(!inp||!drop)return;
+  const q=inp.value.trim().toLowerCase();
+  const matches=q.length===0
+    ?_liaisonStudents.slice(0,30)
+    :_liaisonStudents.filter(n=>n.toLowerCase().includes(q)).slice(0,20);
+  if(!matches.length){drop.style.display='none';return;}
+  drop.innerHTML=matches.map(n=>`
+    <div onclick="lGmSelectStudent('${n.replace(/'/g,"\'")}')"
+      style="padding:10px 14px;font-size:14px;cursor:pointer;border-bottom:1px solid #f3f4f6;color:#111"
+      onmousedown="event.preventDefault()"
+      ontouchstart="event.preventDefault();lGmSelectStudent('${n.replace(/'/g,"\'")}')">
+      ${n}
+    </div>`).join('');
+  drop.style.display='block';
+}
+
+function lGmSelectStudent(name){
+  const inp=document.getElementById('lv-gm-student');
+  const drop=document.getElementById('lv-gm-drop');
+  if(inp)inp.value=name;
+  if(drop)drop.style.display='none';
+  updateLiaisonMsg();
+}
 
 function subscribeLiaisonRealtime(){
   // Realtime subscription
@@ -1022,7 +1083,7 @@ function toggleRecurringOptions(){
 }
 
 async function submitLeave(){
-  const name=document.getElementById('lv-name')?.value?.trim();
+  const name=(document.getElementById('lv-name')?.value||'').trim();
   const type=document.getElementById('lv-type')?.value;
   const start=document.getElementById('lv-start')?.value;
   const end=document.getElementById('lv-end')?.value;
@@ -1095,10 +1156,13 @@ async function loadLeaves(){
   const addForm=`<div class="card" style="margin-bottom:12px">
     <div class="card-title">➕ New Leave Request</div>
     <div style="display:flex;flex-direction:column;gap:8px;padding:4px 0">
-      <input id="lv-name" list="lv-student-list" placeholder="Type student name…"
-        autocomplete="new-password"
-        style="padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%">
-      <datalist id="lv-student-list"></datalist>
+      <div style="position:relative" id="lv-name-wrap">
+        <input id="lv-name" placeholder="Type student name…"
+          autocomplete="off" autocorrect="off" spellcheck="false"
+          oninput="lFilterStudents()" onfocus="lFilterStudents()" onblur="setTimeout(()=>lHideDropdown(),200)"
+          style="padding:10px 12px;border-radius:7px;border:1px solid #e5e7eb;font-size:14px;width:100%">
+        <div id="lv-name-drop" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #e5e7eb;border-radius:7px;box-shadow:0 4px 16px rgba(0,0,0,.12);max-height:220px;overflow-y:auto;z-index:999;margin-top:2px"></div>
+      </div>
       <select id="lv-type" style="padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%">
         <option value="">— Leave type —</option>
         <option value="weekend">🏠 Weekend Leave</option>
@@ -1145,12 +1209,8 @@ async function loadLeaves(){
   el.innerHTML='<div id="l-hol-panel"></div>'+addForm+'<div class="loading">Loading leaves…</div>';
   // Load holiday departure panel
   loadLiaisonHolidayPanel();
-  // Populate student datalist
-  await loadLiaisonStudents();
-  const dl=document.getElementById('lv-student-list');
-  if(dl&&_liaisonStudents.length){
-    dl.innerHTML=_liaisonStudents.map(n=>`<option value="${n}">`).join('');
-  }
+  // Students already loaded in init via loadLiaisonOrgData
+  // Dropdown is populated dynamically via lFilterStudents()
   const data=await(await supa('boarding_leaves')).get('order=created_at.desc&limit=100');
   const listEl=el.querySelector('.loading');
   if(!data.length){if(listEl)listEl.outerHTML='<div class="empty">No leave requests yet.</div>';return;}
@@ -1279,9 +1339,15 @@ async function renderMessageTab(){
     <div style="display:flex;flex-direction:column;gap:10px;padding:8px 4px">
       <div>
         <label style="font-size:10px;color:#888;display:block;margin-bottom:3px">STUDENT</label>
-        <input id="lv-gm-student" list="lv-gm-list" placeholder="Type name…" oninput="updateLiaisonMsg()"
-          style="width:100%;padding:10px 12px;border-radius:7px;border:1px solid #e5e7eb;font-size:14px">
-        <datalist id="lv-gm-list">${opts}</datalist>
+        <div style="position:relative">
+          <input id="lv-gm-student" placeholder="Type name…"
+            autocomplete="off" autocorrect="off" spellcheck="false"
+            oninput="lGmFilterStudents();updateLiaisonMsg()"
+            onfocus="lGmFilterStudents()"
+            onblur="setTimeout(()=>{const d=document.getElementById('lv-gm-drop');if(d)d.style.display='none';},200)"
+            style="width:100%;padding:10px 12px;border-radius:7px;border:1px solid #e5e7eb;font-size:14px">
+          <div id="lv-gm-drop" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #e5e7eb;border-radius:7px;box-shadow:0 4px 16px rgba(0,0,0,.12);max-height:200px;overflow-y:auto;z-index:999;margin-top:2px"></div>
+        </div>
       </div>
       <div style="display:flex;gap:8px">
         <div style="flex:1">
