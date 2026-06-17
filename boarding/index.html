@@ -3054,6 +3054,7 @@ async function confirmBoardingDeparture(leaveId){
   try{
     await supa.from('boarding_leaves').update({
       departure_actual:new Date().toISOString(),
+      departed_at:new Date().toISOString(),
       departure_confirmed_by:role
     }).eq('id',leaveId);
     showToast('↑ Departure confirmed','#d97706');
