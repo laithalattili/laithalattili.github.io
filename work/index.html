@@ -26211,9 +26211,11 @@ async function renderAwayList(el){
           // We need form_submitted/parents_called — fetch inline would be slow
           // Show them from excuseInfo if available
           const fOK=exc.form_submitted; const cOK=exc.parents_called;
-          chkBadges=`<span style="display:inline-flex;gap:3px;margin-left:6px">
-            <span style="font-size:10px;padding:1px 5px;border-radius:4px;border:1px solid ${fOK?'#16a34a':'#e5e7eb'};color:${fOK?'#16a34a':'#9ca3af'};cursor:pointer" onclick="toggleLeaveChecklist('${lid}','form_submitted',${!fOK},supa).then(()=>renderAwayList(document.getElementById('hawking-list-content')))" title="Form submitted">📋</span>
-            <span style="font-size:10px;padding:1px 5px;border-radius:4px;border:1px solid ${cOK?'#16a34a':'#e5e7eb'};color:${cOK?'#16a34a':'#9ca3af'};cursor:pointer" onclick="toggleLeaveChecklist('${lid}','parents_called',${!cOK},supa).then(()=>renderAwayList(document.getElementById('hawking-list-content')))" title="Parents called">📞</span>
+          chkBadges=`<span style="display:inline-flex;gap:3px;margin-left:4px;vertical-align:middle">
+            <span onclick="toggleLeaveChecklist('${lid}','form_submitted',${!fOK},supa).then(()=>renderAwayList(document.getElementById('hawking-list-content')))"
+              style="font-size:11px;padding:2px 6px;border-radius:4px;border:1px solid ${fOK?'#16a34a':'#e5e7eb'};background:${fOK?'#f0fdf4':'#fff'};cursor:pointer" title="${fOK?'Form submitted ✓':'Form not submitted'}">📋</span>
+            <span onclick="toggleLeaveChecklist('${lid}','parents_called',${!cOK},supa).then(()=>renderAwayList(document.getElementById('hawking-list-content')))"
+              style="font-size:11px;padding:2px 6px;border-radius:4px;border:1px solid ${cOK?'#16a34a':'#e5e7eb'};background:${cOK?'#f0fdf4':'#fff'};cursor:pointer" title="${cOK?'Parents called ✓':'Parents not called'}">📞</span>
           </span>`;
         }
         return `<div style="display:flex;align-items:center;gap:8px;padding:8px 1rem;border-bottom:1px solid #f1f5f9">
@@ -26221,6 +26223,7 @@ async function renderAwayList(el){
           <div style="flex:1">
             <span style="font-size:13px;font-weight:500;color:#111">${s.name}</span>
             ${exc?`<span style="font-size:11px;color:${color};margin-left:6px">${exc.emoji} ${exc.reason}${depTime}${pending}</span>`:''}
+            ${isReturnToday(exc)?`<span style="font-size:10px;background:#fef9c3;color:#854d0e;padding:1px 7px;border-radius:8px;font-weight:700;margin-left:4px">📅 Back today</span>`:''}
             ${chkBadges}
             ${!exc?brTime:''}
           </div>
@@ -26350,6 +26353,13 @@ async function renderHawkingRegister(el, preloadedMap){
           ${(_commentMap[p.name]||[]).length?'<span style="font-size:10px;color:#60a5fa;margin-left:4px">💬</span>':''}
         </div>
         ${excuseTag}${depTimeStr}${depBtn}
+        ${isReturnToday(excuseInfo)?`<span style="font-size:10px;background:#fef9c3;color:#854d0e;padding:2px 7px;border-radius:8px;font-weight:700;display:inline-block;margin-top:2px">📅 Expected back today — call parents</span>`:''}
+        ${excuseInfo?.leaveId?`<span style="display:inline-flex;gap:3px;margin-top:2px">
+          <span onclick="toggleLeaveChecklist('${excuseInfo.leaveId}','form_submitted',${!excuseInfo.form_submitted},supa).then(()=>{window._lastExcusedMap=null;renderHawkingRegister(document.getElementById('hawking-list-content'),[]);})"
+            style="font-size:11px;padding:2px 6px;border-radius:4px;border:1px solid ${excuseInfo.form_submitted?'#16a34a':'#e5e7eb'};background:${excuseInfo.form_submitted?'#f0fdf4':'#fff'};cursor:pointer" title="${excuseInfo.form_submitted?'Form submitted':'Form not submitted'}">📋</span>
+          <span onclick="toggleLeaveChecklist('${excuseInfo.leaveId}','parents_called',${!excuseInfo.parents_called},supa).then(()=>{window._lastExcusedMap=null;renderHawkingRegister(document.getElementById('hawking-list-content'),[]);})"
+            style="font-size:11px;padding:2px 6px;border-radius:4px;border:1px solid ${excuseInfo.parents_called?'#16a34a':'#e5e7eb'};background:${excuseInfo.parents_called?'#f0fdf4':'#fff'};cursor:pointer" title="${excuseInfo.parents_called?'Parents called':'Parents not called'}">📞</span>
+        </span>`:''}
         ${penBadges}${timeStr}
       </div>
       <button onclick="logNurseVisit('${p.name}')" style="font-size:12px;padding:3px 6px;border-radius:5px;border:1px solid ${(_nurseMap[p.name]||[]).length?'#a855f7':'#e5e7eb'};background:${(_nurseMap[p.name]||[]).length?'#f3e8ff':'#fff'};color:${(_nurseMap[p.name]||[]).length?'#7c3aed':'#aaa'};cursor:pointer" title="Log nurse visit">🏥</button>
@@ -30696,9 +30706,10 @@ async function getTodayExcusedMap(){
   //   (returned: ignore — student is back)
   try{
     const {data}=await supa.from('boarding_leaves')
-      .select('*,form_submitted,parents_called').eq('active',true);
-    const leaveLabel={weekend:'Weekend Leave',extended:'Extended Leave',daytime:'Daytime Departure',longterm:'Long-term Leave'};
-    const leaveEmoji={weekend:'🏠',extended:'📅',daytime:'🌅',longterm:'🏥'};
+      .select('*,form_submitted,parents_called')
+      .neq('active',false); // include active=true and active=null
+    const leaveLabel={weekend:'Weekend Leave',extended:'Extended Leave',daytime:'Daytime Departure',longterm:'Long-term Leave',medical:'Medical Leave',family:'Family Leave',activity:'Activity',holiday:'Holiday Leave'};
+    const leaveEmoji={weekend:'🏠',extended:'📅',daytime:'🌅',longterm:'🏥',medical:'🏥',family:'👨‍👩‍👧',activity:'⚽',holiday:'🌴'};
     (data||[]).forEach(l=>{
       // If already returned — skip
       if(l.returned_at||l.return_actual)return; // skip if already returned
@@ -30723,6 +30734,8 @@ async function getTodayExcusedMap(){
           leave_type:l.leave_type,
           form_submitted:l.form_submitted||false,
           parents_called:l.parents_called||false,
+          returnPlanned:l.return_planned||null,
+          returnedAt:l.returned_at||l.return_actual||null,
         };
       } else {
         excused[l.student_name]={
@@ -30731,6 +30744,8 @@ async function getTodayExcusedMap(){
           leave_type:l.leave_type,
           form_submitted:l.form_submitted||false,
           parents_called:l.parents_called||false,
+          returnPlanned:l.return_planned||null,
+          returnedAt:l.returned_at||l.return_actual||null,
         };
       }
     });
@@ -32103,6 +32118,15 @@ async function toggleLeaveChecklist(leaveId, field, value, supaRef) {
     await supaRef.from('boarding_leaves').update({ [field]: value }).eq('id', leaveId);
     return true;
   } catch(e) { return false; }
+}
+
+
+// ── RETURN REMINDER HELPER ──────────────────────────────────────────────────
+function isReturnToday(excuseInfo){
+  if(!excuseInfo||!excuseInfo.returnPlanned)return false;
+  if(excuseInfo.returnedAt)return false; // already returned
+  const today=new Date().toISOString().split('T')[0];
+  return excuseInfo.returnPlanned.split('T')[0]===today;
 }
 
 // ── BOARDING PENALTIES REALTIME ──────────────────────────────
