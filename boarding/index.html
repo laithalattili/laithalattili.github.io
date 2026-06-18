@@ -1346,6 +1346,8 @@ async function loadExcusedMap(){
         leave_type:l.leave_type,
         form_submitted:l.form_submitted||false,
         parents_called:l.parents_called||false,
+        returnPlanned:l.return_planned||null,
+        returnedAt:l.returned_at||l.return_actual||null,
       }:{
         reason:label,emoji,type:'leave',leaveId:l.id,
         state:'pending_departure',
@@ -2717,6 +2719,8 @@ function _regMakeRow(name, idx){
         <span style="font-size:9px;padding:1px 5px;border-radius:4px;border:1px solid ${exc.form_submitted?'#16a34a':'#e5e7eb'};color:${exc.form_submitted?'#16a34a':'#9ca3af'}" title="Form submitted">📋</span>
         <span style="font-size:9px;padding:1px 5px;border-radius:4px;border:1px solid ${exc.parents_called?'#16a34a':'#e5e7eb'};color:${exc.parents_called?'#16a34a':'#9ca3af'}" title="Parents called">📞</span>
       </span>`:''}
+      ${exc&&exc.returnPlanned&&!exc.returnedAt&&exc.returnPlanned.split('T')[0]===today()?
+        `<span style="font-size:9px;background:#fef9c3;color:#854d0e;padding:1px 6px;border-radius:8px;font-weight:700;display:block;margin-top:2px">📅 Expected back today — call parents</span>`:''}
       ${_penBadges}${penaltyBtns}
     </div>
     <div style="display:flex;gap:3px;align-items:center">
