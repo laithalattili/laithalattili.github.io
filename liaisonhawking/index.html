@@ -164,7 +164,7 @@ body{background:var(--bg);min-height:100vh;}
 
   <div class="tabs">
     <button class="tab-btn active" id="ltab-leaves" onclick="showTab('leaves',this)">📋 Leaves</button>
-    <button class="tab-btn" id="ltab-register" onclick="showTab('register',this)">📊 Register</button>
+    <button class="tab-btn" id="ltab-register" onclick="showTab('register',this)">📊 Boarders</button>
     <button class="tab-btn" id="ltab-calendar" onclick="showTab('calendar',this)">📅 Calendar</button>
     <button class="tab-btn" id="ltab-message" onclick="showTab('message',this)">📨 Message</button>
     <button class="tab-btn" id="ltab-medical" onclick="showTab('medical',this)">🏥 Medical</button>
@@ -1300,14 +1300,21 @@ async function loadRegister(){
     byName[r.student_name][r.session_type]={status:r.status,updated_at:r.updated_at};
   });
 
-  const sessionLabel={morning:'🌅 Morning Clearance',prep:'📚 Evening Prep',hoob:'🌙 Heads on Beds'};
-  let html='<div class="card"><div class="card-title" style="padding-bottom:8px">Today — '+new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short'})+'</div>';
+  // Filter to boarders only
+  const boarderNames=new Set(Object.keys(_lBoarderStatus).filter(n=>{
+    const v=_lBoarderStatus[n];
+    return v===true||(v&&v.boarder===true);
+  }));
 
-  if(!allNames.size){html+='<div class="empty">No registrations today.</div></div>';el.innerHTML=html;return;}
+  const sessionLabel={morning:'🌅 Morning Clearance',prep:'📚 Evening Prep',hoob:'🌙 Heads on Beds'};
+  let html='<div class="card"><div class="card-title" style="padding-bottom:8px">Boarders Register — '+new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short'})+'</div>';
+
+  const boarderNamesInData=[...allNames].filter(n=>boarderNames.has(n));
+  if(!boarderNamesInData.length){html+='<div class="empty">No boarder registrations today.</div></div>';el.innerHTML=html;return;}
 
   ['morning','prep','hoob'].forEach(sess=>{
     html+=`<div class="card-title" style="background:#f8fafc;padding:6px 14px;font-size:10px">${sessionLabel[sess]}</div>`;
-    [...allNames].sort().forEach(name=>{
+    boarderNamesInData.sort().forEach(name=>{
       const st=((byName[name]||{})[sess]||{}).status||'';
       const cls=st==='present'?'stat-p':st==='absent'?'stat-a':st==='excused'?'stat-e':st==='l'?'stat-l':'stat-blank';
       const sym=st==='present'?'✓':st==='absent'?'✗':st==='excused'?'~':st==='l'?'L':'·';
