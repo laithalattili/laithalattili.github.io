@@ -246,23 +246,37 @@
 
     <!-- REGISTER HEADER + CONTROLS (only visible on register tab) -->
     <div id="reg-sticky-sub" style="display:block">
-      <div class="reg-header">
-        <div class="reg-counts">
-          <span class="reg-total" id="reg-total" style="color:#e0e0e0">—</span>
-          <span class="reg-c present" id="reg-present" style="color:#22c55e">0✓</span>
-          <span class="reg-c absent" id="reg-absent" style="color:#ef4444">0✗</span>
-          <span class="reg-c excused" id="reg-excused" style="color:#f59e0b">0~</span>
-        </div>
-        <span class="reg-fetched" id="reg-fetched" style="color:#555"></span>
+      <!-- Register sub-tabs -->
+      <div style="display:flex;border-bottom:1px solid rgba(255,255,255,.1);background:var(--bg2)">
+        <button id="rsub-register" onclick="switchRegSub('register',this)"
+          style="flex:1;padding:8px 4px;background:none;border:none;border-bottom:2px solid var(--accent);color:var(--accent);font-size:12px;font-weight:700;cursor:pointer">📋 Register</button>
+        <button id="rsub-penalties" onclick="switchRegSub('penalties',this)"
+          style="flex:1;padding:8px 4px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-size:12px;font-weight:400;cursor:pointer">⚠️ Penalties</button>
+        <button id="rsub-leaves" onclick="switchRegSub('leaves',this)"
+          style="flex:1;padding:8px 4px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-size:12px;font-weight:400;cursor:pointer">📋 Leaves</button>
       </div>
-      <div id="reg-controls"></div>
+      <!-- Register counts (only shown on register sub-tab) -->
+      <div id="reg-sub-header" style="display:block">
+        <div class="reg-header">
+          <div class="reg-counts">
+            <span class="reg-total" id="reg-total" style="color:#e0e0e0">—</span>
+            <span class="reg-c present" id="reg-present" style="color:#22c55e">0✓</span>
+            <span class="reg-c absent" id="reg-absent" style="color:#ef4444">0✗</span>
+            <span class="reg-c excused" id="reg-excused" style="color:#f59e0b">0~</span>
+          </div>
+          <span class="reg-fetched" id="reg-fetched" style="color:#555"></span>
+        </div>
+        <div id="reg-controls"></div>
+      </div>
     </div>
 
   </div><!-- end sticky-top -->
 
   <!-- REGISTER TAB -->
   <div class="tab-content active" id="tab-register">
-    <div id="reg-list"></div>
+    <div id="reg-sub-register"><div id="reg-list"></div></div>
+    <div id="reg-sub-penalties" style="display:none;padding:8px"></div>
+    <div id="reg-sub-leaves" style="display:none;padding:8px"></div>
   </div>
 
   <!-- INFO TAB -->
@@ -1181,6 +1195,7 @@ async function boardingMarkDone(id){
     }
     await loadBoardingPenalties();
     loadInfoPenalties();
+    if(_bRegSub==='penalties')loadSubPenalties();
     renderRegister();
   }catch(e){
     console.error('boardingMarkDone error:',e);
@@ -1281,6 +1296,123 @@ function updateInfoTab(){
 
 // ── TABS ──────────────────────────────────────────────────────
 let _bCurrentTab = 'register';
+let _bRegSub = 'register';
+
+function switchRegSub(sub, btn){
+  _bRegSub = sub;
+  // Update button styles
+  ['register','penalties','leaves'].forEach(s=>{
+    const b=document.getElementById('rsub-'+s);
+    if(!b)return;
+    const active=s===sub;
+    b.style.borderBottom=active?'2px solid var(--accent)':'2px solid transparent';
+    b.style.color=active?'var(--accent)':'var(--text3)';
+    b.style.fontWeight=active?'700':'400';
+  });
+  // Show/hide content areas
+  ['register','penalties','leaves'].forEach(s=>{
+    const el=document.getElementById('reg-sub-'+s);
+    if(el)el.style.display=s===sub?'block':'none';
+  });
+  // Show/hide register header
+  const hdr=document.getElementById('reg-sub-header');
+  if(hdr)hdr.style.display=sub==='register'?'block':'none';
+  // Load content
+  if(sub==='penalties') loadSubPenalties();
+  if(sub==='leaves') loadSubLeaves();
+}
+
+async function loadSubPenalties(){
+  const el=document.getElementById('reg-sub-penalties');
+  if(!el)return;
+  el.innerHTML='<div style="padding:1rem;text-align:center;color:var(--text3);font-size:13px">Loading...</div>';
+  const today_=today();
+  try{
+    const {data}=await supa.from('boarding_penalties')
+      .select('*').in('status',['active','pending'])
+      .neq('infraction_type','late_floor')
+      .order('penalty_date').order('student_name');
+    if(!data||!data.length){el.innerHTML='<div style="padding:2rem;text-align:center;color:var(--text3);font-size:13px">No active sanctions.</div>';return;}
+    const infraLabel={late_wake:'🛏 Late Wake',late_sleep:'😴 Late Sleep'};
+    const normalMins=parseInt(BS.normalPhoneMins)||20;
+    // Group by student
+    const byStudent={};const order=[];
+    data.forEach(p=>{if(!byStudent[p.student_name]){byStudent[p.student_name]=[];order.push(p.student_name);}byStudent[p.student_name].push(p);});
+    el.innerHTML=order.map(name=>{
+      const penalties=byStudent[name];
+      const hasOverdue=penalties.some(p=>p.penalty_date<today_);
+      return `<div style="border:1px solid ${hasOverdue?'#fca5a5':'#2d2d2d'};border-radius:8px;margin-bottom:8px;overflow:hidden;background:${hasOverdue?'#2a1a1a':'#1e1e1e'}">
+        <div style="padding:8px 12px;background:${hasOverdue?'#3a1a1a':'#252525'};border-bottom:1px solid ${hasOverdue?'#fca5a5':'#333'};display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:13px;font-weight:700;color:#e0e0e0">${name}</span>
+          <span style="font-size:11px;color:#ef4444">⚠️ ${penalties.length} sanction${penalties.length!==1?'s':''}</span>
+        </div>
+        ${penalties.map(p=>{
+          const isPast=p.penalty_date<today_;const isToday=p.penalty_date===today_;
+          const dateLabel=isToday?'Today':isPast?'Overdue':p.penalty_date;
+          const dateColor=isPast?'#ef4444':isToday?'#f59e0b':'#9ca3af';
+          const mins=parseInt((p.penalty_type||'').replace('phone_','').replace('min',''))||0;
+          return `<div style="padding:8px 12px;border-bottom:1px solid #2a2a2a;display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <div>
+              <div style="font-size:11px;font-weight:600;color:#ccc">${infraLabel[p.infraction_type]||p.infraction_type} · ${mins} min (normally ${normalMins})</div>
+              <div style="font-size:10px;color:${dateColor};margin-top:1px">${isPast?'⚠️ ':''}${dateLabel}</div>
+            </div>
+            <div style="display:flex;gap:3px">
+              <button onclick="boardingMarkDone('${p.id}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #16a34a;background:rgba(22,163,74,.1);color:#16a34a;cursor:pointer;font-weight:600">✓</button>
+              ${isPast?`<button onclick="boardingRollSanction('${p.id}')" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid #555;background:transparent;color:#888;cursor:pointer">→</button>`:''}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }).join('');
+  }catch(e){el.innerHTML='<div style="padding:1rem;color:#ef4444;font-size:13px">Error: '+e.message+'</div>';}
+}
+
+async function loadSubLeaves(){
+  const el=document.getElementById('reg-sub-leaves');
+  if(!el)return;
+  el.innerHTML='<div style="padding:1rem;text-align:center;color:var(--text3);font-size:13px">Loading...</div>';
+  const today_=today();
+  try{
+    const {data}=await supa.from('boarding_leaves')
+      .select('*').neq('active',false).order('departure_planned',{ascending:false}).limit(50);
+    if(!data||!data.length){el.innerHTML='<div style="padding:2rem;text-align:center;color:var(--text3);font-size:13px">No leaves.</div>';return;}
+    const typeEmoji={weekend:'🏠',medical:'🏥',family:'👨‍👩‍👧',activity:'⚽',holiday:'🌴',longterm:'📅'};
+    const fmtDT=iso=>{if(!iso)return'—';try{const d=new Date(iso);return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}catch{return iso;}};
+    el.innerHTML=data.map(l=>{
+      const dep=l.departed_at||l.departure_actual;
+      const ret=l.returned_at||l.return_actual;
+      const retPlan=l.return_planned;
+      const isRetToday=retPlan&&retPlan.split('T')[0]===today_&&!ret;
+      const fOK=l.form_submitted;const cOK=l.parents_called;
+      const concluded=!!ret;
+      return `<div style="border:1px solid ${isRetToday?'#f59e0b':'#2d2d2d'};border-radius:8px;margin-bottom:8px;padding:10px 12px;background:${concluded?'#1a1a1a':'#1e1e1e'};opacity:${concluded?'0.5':'1'}">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:13px;font-weight:700;color:${concluded?'#888':'#e0e0e0'}">${l.student_name}</span>
+          <span style="font-size:11px;color:#888">${typeEmoji[l.leave_type]||'📋'} ${l.leave_type||'leave'}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:10px">
+          <div>
+            <div style="color:#666;margin-bottom:1px">Departed</div>
+            <div style="color:${dep?'#22c55e':'#f59e0b'};font-weight:600">${dep?fmtDT(dep):'Not yet'}</div>
+          </div>
+          <div>
+            <div style="color:#666;margin-bottom:1px">Planned return</div>
+            <div style="color:${isRetToday?'#f59e0b':'#9ca3af'};font-weight:${isRetToday?'700':'400'}">${retPlan?fmtDT(retPlan):'—'}${isRetToday?' 📅':''}</div>
+          </div>
+          ${dep?`<div>
+            <div style="color:#666;margin-bottom:1px">Returned</div>
+            <div style="color:${ret?'#a78bfa':'#555'};font-weight:600">${ret?fmtDT(ret):'Still out'}</div>
+          </div>`:''}
+          <div style="display:flex;gap:4px;align-items:center">
+            <span style="font-size:10px;padding:1px 5px;border-radius:4px;border:1px solid ${fOK?'#16a34a':'#444'};color:${fOK?'#16a34a':'#666'}" title="Form submitted">📋</span>
+            <span style="font-size:10px;padding:1px 5px;border-radius:4px;border:1px solid ${cOK?'#16a34a':'#444'};color:${cOK?'#16a34a':'#666'}" title="Parents called">📞</span>
+          </div>
+        </div>
+        ${l.reason?`<div style="font-size:10px;color:#555;margin-top:6px;font-style:italic">${l.reason}</div>`:''}
+      </div>`;
+    }).join('');
+  }catch(e){el.innerHTML='<div style="padding:1rem;color:#ef4444;font-size:13px">Error: '+e.message+'</div>';}
+}
 
 function setBoardingDefaultTab(){
   try{localStorage.setItem('boarding_default_tab',_bCurrentTab);}catch{}
