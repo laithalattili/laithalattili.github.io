@@ -1343,7 +1343,9 @@ async function loadExcusedMap(){
         state:'excused',
         departedAt:_dep,
         departedBy:l.departure_confirmed_by||'',
-        leave_type:l.leave_type
+        leave_type:l.leave_type,
+        form_submitted:l.form_submitted||false,
+        parents_called:l.parents_called||false,
       }:{
         reason:label,emoji,type:'leave',leaveId:l.id,
         state:'pending_departure',
@@ -1593,7 +1595,7 @@ async function generateWeekReport(supaClient, students, boarderRooms, hawkingSta
   // Get room from boarderRooms
   const studentRoom = {};
   (boarderRooms || []).forEach(room => {
-    (room.boarders || []).forEach(name => { studentRoom[name] = room.id || room.name; });
+    (room.boarders || []).forEach(name => { studentRoom[name] = room.name || room.id; });
   });
 
   // Build per-student data
@@ -2710,7 +2712,12 @@ function _regMakeRow(name, idx){
         ${_hasNurse?`<span style="font-size:10px;color:#a855f7">🏥×${(_boardingNurseMap[name]||[]).length}</span>`:''}
         ${_hasComment?'<span style="font-size:10px;color:#60a5fa">💬</span>':''}
       </div>
-      ${excTag}${depTimeStr}${depBtn}${_penBadges}${penaltyBtns}
+      ${excTag}${depTimeStr}${depBtn}
+      ${(exc&&exc.leaveId)?`<span style="display:inline-flex;gap:3px;margin-top:2px">
+        <span style="font-size:9px;padding:1px 5px;border-radius:4px;border:1px solid ${exc.form_submitted?'#16a34a':'#e5e7eb'};color:${exc.form_submitted?'#16a34a':'#9ca3af'}" title="Form submitted">📋</span>
+        <span style="font-size:9px;padding:1px 5px;border-radius:4px;border:1px solid ${exc.parents_called?'#16a34a':'#e5e7eb'};color:${exc.parents_called?'#16a34a':'#9ca3af'}" title="Parents called">📞</span>
+      </span>`:''}
+      ${_penBadges}${penaltyBtns}
     </div>
     <div style="display:flex;gap:3px;align-items:center">
       <button onclick="boardingLogNurse('${safe}')" style="width:32px;height:32px;border-radius:7px;border:1px solid ${_hasNurse?'#a855f7':'#e5e7eb'};background:${_hasNurse?'#f3e8ff':'transparent'};color:${_hasNurse?'#7c3aed':'#bbb'};cursor:pointer;font-size:14px" title="Log nurse visit">🏥</button>
