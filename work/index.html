@@ -32226,6 +32226,21 @@ function _brSubscribeRealtime(){
     .subscribe();
 }
 
+async function _brRefresh(){
+  // Refresh after checklist toggle — reload excused map then re-render everything
+  window._lastExcusedMap = await getTodayExcusedMap();
+  // Re-render lists tab if visible
+  _brRefreshListsTab();
+  // Re-render live mode: find the boarding register section by its unique marker
+  const brSection = document.querySelector('[data-br-section]');
+  if(brSection){
+    const type = brSection.getAttribute('data-br-section');
+    const tmp = document.createElement('div');
+    tmp.innerHTML = _amBoardingRegisterHtml(type, window._lastExcusedMap||{});
+    brSection.replaceWith(tmp.firstChild);
+  }
+}
+
 function _brRefreshListsTab(){
   if(_hwkFilter==='register'){
     const el=document.getElementById('hawking-list-content');
@@ -32314,6 +32329,12 @@ function _amBoardingRegisterHtml(type,excusedMap){
           ${(_nurseMap[p.name]||[]).length?'<span style="font-size:10px;color:#a855f7;margin-left:4px">🏥×'+(_nurseMap[p.name]||[]).length+'</span>':''}
           ${(_commentMap[p.name]||[]).length?'<span style="font-size:10px;color:#60a5fa;margin-left:4px">💬</span>':''}
           ${_excTag}${_depBtn}
+          ${_exc?.leaveId?`<span style="display:inline-flex;gap:3px;margin-top:2px">
+            <span onclick="toggleLeaveChecklist('${_exc.leaveId}','form_submitted',${!_exc.form_submitted},supa).then(()=>{window._lastExcusedMap=null;_brRefresh();})"
+              style="font-size:10px;padding:2px 5px;border-radius:4px;border:1px solid ${_exc.form_submitted?'#16a34a':'rgba(255,255,255,.15)'};background:${_exc.form_submitted?'rgba(22,163,74,.15)':'transparent'};cursor:pointer" title="${_exc.form_submitted?'Form submitted':'Form not submitted'}">📋</span>
+            <span onclick="toggleLeaveChecklist('${_exc.leaveId}','parents_called',${!_exc.parents_called},supa).then(()=>{window._lastExcusedMap=null;_brRefresh();})"
+              style="font-size:10px;padding:2px 5px;border-radius:4px;border:1px solid ${_exc.parents_called?'#16a34a':'rgba(255,255,255,.15)'};background:${_exc.parents_called?'rgba(22,163,74,.15)':'transparent'};cursor:pointer" title="${_exc.parents_called?'Parents called':'Parents not called'}">📞</span>
+          </span>`:''}
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
           <div style="display:flex;gap:4px;align-items:center">
@@ -32976,9 +32997,10 @@ function amRender(){
     const _custSlot2=getCustomForWeek(offset,slotIdx,dayName);
     if(_custSlot2&&(_custSlot2.boarding_register||_custSlot2.house_register)){
       const _brType=_custSlot2.boarding_register?'boarding':'house';
-      const _brDiv=document.createElement('div');
-      _brDiv.innerHTML=_amBoardingRegisterHtml(_brType);
-      while(_brDiv.firstChild)body.appendChild(_brDiv.firstChild);
+      const _brWrapper=document.createElement('div');
+      _brWrapper.setAttribute('data-br-section',_brType);
+      _brWrapper.innerHTML=_amBoardingRegisterHtml(_brType,window._lastExcusedMap||{});
+      body.appendChild(_brWrapper);
     }
   } else {
     // Tick only — update numbers without rebuilding DOM
