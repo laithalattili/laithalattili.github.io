@@ -480,8 +480,9 @@ function lFilterStudents(){
   const inp=document.getElementById('lv-name');
   const drop=document.getElementById('lv-name-drop');
   if(!inp||!drop)return;
+  inp.removeAttribute('data-selected'); // clear confirmed selection while typing
   const q=inp.value.trim().toLowerCase();
-  _lSelectedStudent=inp.value.trim(); // track typed value
+  _lSelectedStudent='';
   const matches=q.length===0
     ?_liaisonStudents.slice(0,30)
     :_liaisonStudents.filter(n=>n.toLowerCase().includes(q)).slice(0,20);
@@ -499,12 +500,14 @@ function lFilterStudents(){
 function lSelectStudent(name){
   const inp=document.getElementById('lv-name');
   const drop=document.getElementById('lv-name-drop');
-  if(inp)inp.value=name;
+  if(inp){inp.value=name;inp.setAttribute('data-selected',name);}
   _lSelectedStudent=name;
   if(drop)drop.style.display='none';
 }
 
 function lHideDropdown(){
+  // Only hide if input value matches a real student (confirmed selection)
+  const inp=document.getElementById('lv-name');
   const drop=document.getElementById('lv-name-drop');
   if(drop)drop.style.display='none';
 }
@@ -1083,7 +1086,8 @@ function toggleRecurringOptions(){
 }
 
 async function submitLeave(){
-  const name=(document.getElementById('lv-name')?.value||'').trim();
+  const _lvInp=document.getElementById('lv-name');
+  const name=(_lvInp?.getAttribute('data-selected')||_lvInp?.value||'').trim();
   const type=document.getElementById('lv-type')?.value;
   const start=document.getElementById('lv-start')?.value;
   const end=document.getElementById('lv-end')?.value;
