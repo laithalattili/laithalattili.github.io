@@ -557,7 +557,7 @@ function subscribeLiaisonRealtime(){
 
 function refreshLiaisonLeaveData(){
   loadLiaisonHolidayPanel(); // always refresh holiday/departure panel
-  if(_lCurrentTab==='leaves')loadLeaves();
+  if(_lCurrentTab==='leaves')refreshLeavesList(); // only refresh list, not the form
   else if(_lCurrentTab==='register')loadRegister();
   else if(_lCurrentTab==='calendar')initLeaveCalendar('liaison-calendar-content',_liaisonStudents.map(n=>({name:n})),_lBoarderStatus,_supaClient);
 }
@@ -991,7 +991,7 @@ function showTab(name,btn){
   });
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  if(name==='leaves')loadLeaves();
+  if(name==='leaves'){_leavesTabInited=false;loadLeaves();}
   if(name==='register')loadRegister();
   if(name==='calendar'){
     _calSupaRef=_supaClient;
@@ -1138,10 +1138,21 @@ async function submitLeave(){
         throw new Error('Save failed: '+res.status);
       }
     }
-    document.getElementById('lv-name').value='';
-    document.getElementById('lv-notes').value='';
+    // Reset form fields without rebuilding the form
+    const nameInp=document.getElementById('lv-name');
+    if(nameInp){nameInp.value='';nameInp.removeAttribute('data-selected');}
+    const typeInp=document.getElementById('lv-type');
+    if(typeInp)typeInp.value='';
+    const endInp=document.getElementById('lv-end');
+    if(endInp)endInp.value='';
+    const notesInp=document.getElementById('lv-notes');
+    if(notesInp)notesInp.value='';
+    const formChk=document.getElementById('lv-form');
+    if(formChk)formChk.checked=false;
+    const calledChk=document.getElementById('lv-called');
+    if(calledChk)calledChk.checked=false;
     showLiaisonToast('✓ Leave request submitted');
-    loadLeaves();
+    refreshLeavesList();
   }catch(e){alert('Error: '+e.message);}
   finally{btn.disabled=false;btn.textContent='Submit Request';}
 }
@@ -1153,71 +1164,80 @@ function showLiaisonToast(msg,color='#16a34a'){
   setTimeout(()=>t.style.opacity='0',2500);
 }
 
+let _leavesTabInited=false;
+
 async function loadLeaves(){
   const el=document.getElementById('tab-leaves');
-  // Add leave form at top
-  const today_=new Date().toISOString().split('T')[0];
-  const addForm=`<div class="card" style="margin-bottom:12px">
-    <div class="card-title">➕ New Leave Request</div>
-    <div style="display:flex;flex-direction:column;gap:8px;padding:4px 0">
-      <div style="position:relative" id="lv-name-wrap">
-        <input id="lv-name" placeholder="Type student name…"
-          autocomplete="off" autocorrect="off" spellcheck="false"
-          oninput="lFilterStudents()" onfocus="lFilterStudents()" onblur="setTimeout(()=>lHideDropdown(),200)"
-          style="padding:10px 12px;border-radius:7px;border:1px solid #e5e7eb;font-size:14px;width:100%">
-        <div id="lv-name-drop" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #e5e7eb;border-radius:7px;box-shadow:0 4px 16px rgba(0,0,0,.12);max-height:220px;overflow-y:auto;z-index:999;margin-top:2px"></div>
-      </div>
-      <select id="lv-type" style="padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%">
-        <option value="">— Leave type —</option>
-        <option value="weekend">🏠 Weekend Leave</option>
-        <option value="medical">🏥 Medical</option>
-        <option value="family">👨‍👩‍👧 Family</option>
-        <option value="activity">⚽ School Activity</option>
-        <option value="longterm">📅 Long-term</option>
-      </select>
-      <div style="display:flex;gap:8px">
-        <div style="flex:1"><label style="font-size:10px;color:#888">FROM</label>
-          <input id="lv-start" type="date" value="${today_}" style="padding:7px 8px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%"></div>
-        <div style="flex:1"><label style="font-size:10px;color:#888">TO (optional)</label>
-          <input id="lv-end" type="date" style="padding:7px 8px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%"></div>
-      </div>
-      <input id="lv-notes" placeholder="Notes (optional)" style="padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%">
-      <div style="background:#f8fafc;border-radius:7px;padding:10px;border:1px solid #e5e7eb">
-        <div style="font-size:11px;font-weight:700;color:#374151;margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">Checklist</div>
-        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;cursor:pointer;margin-bottom:6px">
-          <input type="checkbox" id="lv-form" style="width:16px;height:16px;accent-color:#00205B"> Official leave form submitted
+  // Only build the form once — never rebuild it (avoids wiping typed data)
+  if(!_leavesTabInited){
+    _leavesTabInited=true;
+    const today_=new Date().toISOString().split('T')[0];
+    el.innerHTML=`<div id="l-hol-panel"></div>
+<div class="card" style="margin-bottom:12px">
+  <div class="card-title">➕ New Leave Request</div>
+  <div style="display:flex;flex-direction:column;gap:8px;padding:4px 0">
+    <div style="position:relative" id="lv-name-wrap">
+      <input id="lv-name" placeholder="Type student name…"
+        autocomplete="off" autocorrect="off" spellcheck="false"
+        oninput="lFilterStudents()" onfocus="lFilterStudents()" onblur="setTimeout(()=>lHideDropdown(),200)"
+        style="padding:10px 12px;border-radius:7px;border:1px solid #e5e7eb;font-size:14px;width:100%">
+      <div id="lv-name-drop" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #e5e7eb;border-radius:7px;box-shadow:0 4px 16px rgba(0,0,0,.12);max-height:220px;overflow-y:auto;z-index:999;margin-top:2px"></div>
+    </div>
+    <select id="lv-type" style="padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%">
+      <option value="">— Leave type —</option>
+      <option value="weekend">🏠 Weekend Leave</option>
+      <option value="medical">🏥 Medical</option>
+      <option value="family">👨‍👩‍👧 Family</option>
+      <option value="activity">⚽ School Activity</option>
+      <option value="longterm">📅 Long-term</option>
+    </select>
+    <div style="display:flex;gap:8px">
+      <div style="flex:1"><label style="font-size:10px;color:#888">FROM</label>
+        <input id="lv-start" type="date" value="${today_}" style="padding:7px 8px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%"></div>
+      <div style="flex:1"><label style="font-size:10px;color:#888">TO (optional)</label>
+        <input id="lv-end" type="date" style="padding:7px 8px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%"></div>
+    </div>
+    <input id="lv-notes" placeholder="Notes (optional)" style="padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%">
+    <div style="background:#f8fafc;border-radius:7px;padding:10px;border:1px solid #e5e7eb">
+      <div style="font-size:11px;font-weight:700;color:#374151;margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">Checklist</div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;cursor:pointer;margin-bottom:6px">
+        <input type="checkbox" id="lv-form" style="width:16px;height:16px;accent-color:#00205B"> Official leave form submitted
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;cursor:pointer;margin-bottom:6px">
+        <input type="checkbox" id="lv-called" style="width:16px;height:16px;accent-color:#00205B"> Parents have been called/notified
+      </label>
+      <div style="border-top:1px solid #e5e7eb;margin-top:8px;padding-top:8px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;cursor:pointer;margin-bottom:4px">
+          <input type="checkbox" id="lv-recurring" onchange="toggleRecurringOptions()" style="width:16px;height:16px;accent-color:#00205B"> Recurring leave
         </label>
-        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;cursor:pointer;margin-bottom:6px">
-          <input type="checkbox" id="lv-called" style="width:16px;height:16px;accent-color:#00205B"> Parents have been called/notified
-        </label>
-        <div style="border-top:1px solid #e5e7eb;margin-top:8px;padding-top:8px">
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;cursor:pointer;margin-bottom:4px">
-            <input type="checkbox" id="lv-recurring" onchange="toggleRecurringOptions()" style="width:16px;height:16px;accent-color:#00205B"> Recurring leave
+        <div id="lv-recurring-opts" style="display:none;margin-top:6px;padding-left:24px">
+          <select id="lv-freq" style="padding:6px 8px;border-radius:6px;border:1px solid #e5e7eb;font-size:12px;width:100%;margin-bottom:6px">
+            <option value="weekly">Every week (same days)</option>
+            <option value="biweekly">Every two weeks</option>
+            <option value="holiday">Every holiday</option>
+          </select>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#6b7280;cursor:pointer">
+            <input type="checkbox" id="lv-form-once" checked style="width:14px;height:14px;accent-color:#00205B">
+            Form counts for all future instances
           </label>
-          <div id="lv-recurring-opts" style="display:none;margin-top:6px;padding-left:24px">
-            <select id="lv-freq" style="padding:6px 8px;border-radius:6px;border:1px solid #e5e7eb;font-size:12px;width:100%;margin-bottom:6px">
-              <option value="weekly">Every week (same days)</option>
-              <option value="biweekly">Every two weeks</option>
-              <option value="holiday">Every holiday</option>
-            </select>
-            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#6b7280;cursor:pointer">
-              <input type="checkbox" id="lv-form-once" checked style="width:14px;height:14px;accent-color:#00205B">
-              Form counts for all future instances (don't re-tick each time)
-            </label>
-          </div>
         </div>
       </div>
-      <button id="lv-submit" onclick="submitLeave()" style="background:#00205B;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer">Submit Request</button>
     </div>
-  </div>`;
-  el.innerHTML='<div id="l-hol-panel"></div>'+addForm+'<div class="loading">Loading leaves…</div>';
-  // Load holiday departure panel
-  loadLiaisonHolidayPanel();
-  // Students already loaded in init via loadLiaisonOrgData
-  // Dropdown is populated dynamically via lFilterStudents()
+    <button id="lv-submit" onclick="submitLeave()" style="background:#00205B;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer">Submit Request</button>
+  </div>
+</div>
+<div id="l-leaves-list"><div class="loading">Loading leaves…</div></div>`;
+    loadLiaisonHolidayPanel();
+  }
+  // Always refresh just the list — never touch the form
+  await refreshLeavesList();
+}
+
+async function refreshLeavesList(){
+  const listEl=document.getElementById('l-leaves-list');
+  if(!listEl)return;
   const data=await(await supa('boarding_leaves')).get('order=created_at.desc&limit=100');
-  const listEl=el.querySelector('.loading');
-  if(!data.length){if(listEl)listEl.outerHTML='<div class="empty">No leave requests yet.</div>';return;}
+  if(!data.length){listEl.innerHTML='<div class="empty">No leave requests yet.</div>';return;}
 
   const typeEmoji={weekend:'🏠',medical:'🏥',family:'👨‍👩‍👧',activity:'⚽',longterm:'📅'};
   const fmtDT=iso=>{if(!iso)return'—';try{const d=new Date(iso);return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}catch{return iso;}};
@@ -1259,19 +1279,7 @@ async function loadLeaves(){
     </div>`;
   });
   html+='</div>';
-  // Replace loading with list, preserving the form
-  const formEl=document.getElementById('lv-submit')?.closest('.card');
-  if(formEl){
-    // Remove old list if any
-    const oldList=el.querySelector('.leaves-list');
-    if(oldList)oldList.remove();
-    const listDiv=document.createElement('div');
-    listDiv.className='leaves-list';
-    listDiv.innerHTML=html;
-    el.appendChild(listDiv);
-  } else {
-    el.innerHTML=html;
-  }
+  listEl.innerHTML=html;
 }
 
 // ── REGISTER ─────────────────────────────────────────────────────────────────
