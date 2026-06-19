@@ -3357,7 +3357,6 @@ async function loadHabitsFor(dateStr){
     // Schedule feed for date (from Life Manager)
     const{data:feed}=await supaFrom('omni_schedule_feed')
       .select('*').eq('date',dateStr);
-    console.log('schedule_feed for',dateStr,':',feed?.length,'rows',feed?.map(r=>r.type));
     if(feed){
       feed.forEach(row=>{
         if(row.type==='book'||row.type==='reading')HAB_DATA.book=row;
@@ -3504,7 +3503,7 @@ async function renderHabits(dateStr,dayName){
   const bookData=HAB_DATA.book;
   if(bookData){
   const bookTitle=bookData?.title||'Reading';
-  const bookMeta=bookData?.meta?JSON.parse(bookData.meta):{};
+  const bookMeta=bookData?.meta?(typeof bookData.meta==='string'?JSON.parse(bookData.meta):bookData.meta):{};
   const pages=bookMeta.pages_planned||bookMeta.pages||null;
   h+=`<div class="habit-row${bookDone?' done':''}" id="hab-book">
     <span class="habit-icon">📖</span>
