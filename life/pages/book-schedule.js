@@ -299,6 +299,7 @@ PAGES.openBookSchedule = async (queueId, app) => {
       await app.refreshData();
 
       // Write reading plan to omni_schedule_feed
+      // Do this after refreshData so we have the latest queue/phases
       try {
         const sbUrl = CONFIG.supabase.url;
         const sbKey = CONFIG.supabase.key;
@@ -309,45 +310,61 @@ PAGES.openBookSchedule = async (queueId, app) => {
           'Prefer': 'resolution=merge-duplicates,return=minimal'
         };
 
-        // Rebuild schedule for this book using updated phases
         const freshQueue = app.yearQueue.find(q => q.id === queueId);
-        if (freshQueue && book) {
-          const freshPhases = app.phases.filter(p => p.queue_id === queueId).sort((a,b) => a.position - b.position);
-          const routine = app.routine || {};
-          const revRoutine = app.reviewRoutine || {};
-          const calRules = app.calRules || [];
-          const startDate = startDate || SCHEDULER.formatDate(new Date());
+        const freshBook = freshQueue?.book || book;
+        if (freshQueue && freshBook) {
+          const freshPhases = app.phases
+            .filter(p => p.queue_id === queueId)
+            .sort((a,b) => a.position - b.position);
+          const effectivePhases = freshPhases.length ? freshPhases : phases;
+          const effectiveStart = startDate || freshQueue.pinned_start_date || SCHEDULER.formatDate(new Date());
 
-          const { plan } = SCHEDULER.buildBookPlan(
-            freshQueue, freshPhases.length ? freshPhases : phases,
-            routine, revRoutine, calRules, startDate
+          // buildBookPlan(book, queueItem, phases, routine, rev, calRules, startDate)
+          const { plan, reviewStart } = SCHEDULER.buildBookPlan(
+            freshBook,
+            freshQueue,
+            effectivePhases,
+            app.routine || {},
+            app.reviewRoutine || {},
+            app.calRules || [],
+            effectiveStart
           );
 
-          // Write each reading day to omni_schedule_feed
+          // Delete old feed entries for this book first
+          await fetch(
+            `${sbUrl}/rest/v1/omni_schedule_feed?source_id=eq.${freshBook.id}&type=eq.reading`,
+            { method: 'DELETE', headers: sbHeaders }
+          );
+
+          // Write each reading day
           const readingDays = plan.filter(d => d.type === 'reading' && d.pagesPlanned > 0);
           for (const day of readingDays) {
             await fetch(`${sbUrl}/rest/v1/omni_schedule_feed`, {
               method: 'POST',
-              headers: sbHeaders,
+              headers: { ...sbHeaders, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
               body: JSON.stringify({
                 date: day.date,
                 type: 'reading',
-                title: book.title,
+                title: freshBook.title,
                 source_app: 'life',
-                source_id: book.id,
+                source_id: freshBook.id,
                 meta: JSON.stringify({
                   fromPage: day.fromPage,
                   toPage: day.toPage,
-                  pagesPlanned: day.pagesPlanned
+                  pagesPlanned: day.pagesPlanned,
+                  totalPages: freshBook.pages || null,
+                  currentPage: freshQueue.current_page || freshQueue.start_page || 1,
+                  reviewStart: reviewStart || null
                 }),
                 created_at: new Date().toISOString()
               })
             });
           }
+          console.log(`omni_schedule_feed: wrote ${readingDays.length} reading days for "${freshBook.title}"`);
         }
       } catch (omniErr) {
         console.warn('omni_schedule_feed write failed:', omniErr.message);
-        // Non-fatal — schedule is saved, Omni feed is best-effort
+        // Non-fatal — schedule saved OK, Omni feed is best-effort
       }
 
       PAGES.year(document.getElementById('main-content'), app);
