@@ -3107,7 +3107,7 @@ function renderDash(){
   const habRow=el('dc-habits-row');
   if(habRow){
     const gymDone=_hasSessToday();const gymType=_todayType();
-    const bookDone=_habDone('book',dateStr);
+    const bookDone=HAB_DATA.bookDone||_habDone('book',dateStr);
     const filmDone=_habDone('film',dateStr);
     const guitarDone=_habDone('guitar',dateStr);
     const habits=[
@@ -3367,6 +3367,13 @@ async function loadHabitsFor(dateStr){
     // Gym: check if session exists
     const{data:gym}=await supaFrom('omni_gym_sessions').select('id,session_type').eq('date',dateStr).limit(1);
     if(gym?.length)HAB_DATA.gym=gym[0];
+    // Reading: check reading_log for done state
+    if(HAB_DATA.book?.source_id){
+      const{data:rl}=await supaFrom('reading_log')
+        .select('id,pages_read').eq('book_id',HAB_DATA.book.source_id).eq('date',dateStr)
+        .gt('pages_read',0).maybeSingle();
+      HAB_DATA.bookDone=!!rl;
+    }
   }catch(e){console.warn('Habits load',e);}
 }
 
@@ -3415,29 +3422,27 @@ async function _logHabit(type,dateStr,meta={}){
   // ── Two-way sync to Life Manager tables ──────────────────────────────────
   try{
     if(type==='book'||type==='reading'){
-      // Write to reading_log using today's schedule feed entry
       const feed=HAB_DATA.book;
-      if(feed){
+      if(feed?.source_id){
         const m=typeof feed.meta==='string'?JSON.parse(feed.meta||'{}'):feed.meta||{};
         const bookId=feed.source_id;
-        const fromPage=m.fromPage||m.from_page||null;
-        const toPage=m.toPage||m.to_page||null;
-        const pagesPlanned=toPage&&fromPage?toPage-fromPage:0;
-        if(bookId){
-          // Check if already logged today
-          const{data:existing}=await supaFrom('reading_log')
-            .select('id').eq('book_id',bookId).eq('date',dateStr).eq('is_review',false).maybeSingle();
-          const entry={book_id:bookId,date:dateStr,pages_planned:pagesPlanned,pages_read:pagesPlanned,is_review:false,notes:'Logged from Omni',current_page_after:toPage};
-          if(existing?.id){
-            await supaFrom('reading_log').update(entry).eq('id',existing.id);
-          }else{
-            await supaFrom('reading_log').insert(entry);
-          }
-          // Update current_page on yearly_queue
-          if(toPage){
-            const{data:qr}=await supaFrom('yearly_queue').select('id').eq('book_id',bookId).maybeSingle();
-            if(qr?.id)await supaFrom('yearly_queue').update({current_page:toPage}).eq('id',qr.id);
-          }
+        const fromPage=+(m.fromPage||m.from_page||0);
+        const toPage=+(m.toPage||m.to_page||0);
+        const pagesPlanned=+(m.pagesPlanned||m.pages_planned||(toPage-fromPage)||0);
+        // Write to reading_log (source of truth shared with Life Manager)
+        const{data:existing}=await supaFrom('reading_log')
+          .select('id').eq('book_id',bookId).eq('date',dateStr).maybeSingle();
+        const entry={book_id:bookId,date:dateStr,pages_planned:pagesPlanned,pages_read:pagesPlanned,is_review:false,current_page_after:toPage||null};
+        if(existing?.id){
+          await supaFrom('reading_log').update(entry).eq('id',existing.id);
+        }else{
+          await supaFrom('reading_log').insert(entry);
+        }
+        HAB_DATA.bookDone=true;
+        // Update current_page on yearly_queue
+        if(toPage){
+          const{data:qr}=await supaFrom('yearly_queue').select('id').eq('book_id',bookId).maybeSingle();
+          if(qr?.id)await supaFrom('yearly_queue').update({current_page:toPage}).eq('id',qr.id);
         }
       }
     }
@@ -3512,7 +3517,7 @@ async function renderHabits(dateStr,dayName){
       <div class="habit-sub">${(()=>{const f=bookMeta.fromPage||bookMeta.from_page||'';const t=bookMeta.toPage||bookMeta.to_page||'';return f&&t?'pp.'+f+'–'+t:pages?pages+'p':'Daily reading';})()}${bookDone?' ✓':''}</div>
     </div>
     <button onclick="_habPickTime('book','${dateStr}')" style="font-size:10px;background:none;border:none;padding:0 4px;color:${_habSlotTime('book',dateStr)?'var(--acc)':'var(--tx4)'}">📌</button>
-    <div class="habit-tick${bookDone?' on':''}" onclick="_tickHabit('book','${dateStr}',${JSON.stringify(JSON.stringify(bookMeta))})">${bookDone?'✓':''}</div>
+    <div class="habit-tick${bookDone?' on':''}" onclick="${bookDone?`_unlogHabit('book','${dateStr}').then(()=>renderHabits('${dateStr}','${dayName}'))`:`_tickHabit('book','${dateStr}',${JSON.stringify(JSON.stringify(bookMeta))})`}">${bookDone?'✓':''}</div>
   </div>`;
   } // end if(bookData)
 
@@ -3576,6 +3581,21 @@ async function renderHabits(dateStr,dayName){
 function _tickHabitAndRefresh(type,dateStr){
   _tickHabit(type,dateStr,{}).then(()=>renderDay());
 }
+async function _unlogHabit(type,dateStr){
+  // Remove log entry — reverse of _logHabit
+  localStorage.removeItem('omni_hab_log_'+type+'_'+dateStr);
+  try{
+    await supaFrom('omni_habit_log').delete().eq('date',dateStr).eq('type',type);
+    if(type==='book'||type==='reading'){
+      const bookId=HAB_DATA.book?.source_id;
+      if(bookId){
+        await supaFrom('reading_log').delete().eq('book_id',bookId).eq('date',dateStr);
+        HAB_DATA.bookDone=false;
+      }
+    }
+  }catch(e){console.warn('Unlog habit:',e.message);}
+}
+
 async function _tickHabit(type,dateStr,metaJson){
   const was=_habDone(type,dateStr);
   _habSetDone(type,dateStr,!was);
