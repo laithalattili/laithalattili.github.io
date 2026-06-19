@@ -356,7 +356,8 @@ PAGES.openBookSchedule = async (queueId, app) => {
             console.log('[Omni] Delete old entries:', delRes.status);
 
             // Write each reading day
-            const readingDays = plan.filter(d => d.type === 'reading' && d.pagesPlanned > 0);
+            // Scheduler uses 'pages' field, not 'pagesPlanned'
+          const readingDays = plan.filter(d => d.type === 'reading' && d.pages > 0);
             console.log('[Omni] Writing', readingDays.length, 'reading days');
 
             for (const day of readingDays) {
@@ -372,7 +373,7 @@ PAGES.openBookSchedule = async (queueId, app) => {
                   meta: JSON.stringify({
                     fromPage: day.fromPage,
                     toPage: day.toPage,
-                    pagesPlanned: day.pagesPlanned,
+                    pagesPlanned: day.pages,
                     totalPages: freshBook.pages || null,
                     currentPage: freshQueue.current_page || freshQueue.start_page || 1,
                     reviewStart: reviewStart || null
