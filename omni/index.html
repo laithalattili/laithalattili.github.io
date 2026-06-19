@@ -3356,7 +3356,7 @@ async function loadHabitsFor(dateStr){
   try{
     // Schedule feed for date (from Life Manager)
     const{data:feed}=await supaFrom('omni_schedule_feed')
-      .select('*').eq('date',dateStr);
+      .select('*').eq('date',dateStr).eq('source_app','life');
     if(feed){
       feed.forEach(row=>{
         if(row.type==='book'||row.type==='reading')HAB_DATA.book=row;
