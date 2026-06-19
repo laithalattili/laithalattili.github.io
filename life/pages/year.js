@@ -63,6 +63,60 @@ PAGES.year = async (container, app) => {
     );
   });
 
+  // ── Sync current year reading plan to omni_schedule_feed ──────
+  // Runs automatically on every Year Plan page load — no manual save needed
+  try {
+    const sbUrl = CONFIG.supabase.url;
+    const sbKey = CONFIG.supabase.key;
+    const sbHeaders = {
+      'apikey': sbKey,
+      'Authorization': `Bearer ${sbKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'resolution=merge-duplicates,return=minimal'
+    };
+
+    const curSchedule = schedulesByYear[currentYear] || [];
+
+    for (const sched of curSchedule) {
+      if (!sched.plan || !sched.plan.length) continue;
+      if (!sched.bookId || !sched.title) continue;
+
+      // Delete stale entries for this book then rewrite
+      await fetch(
+        `${sbUrl}/rest/v1/omni_schedule_feed?source_id=eq.${sched.bookId}&type=eq.reading`,
+        { method: 'DELETE', headers: sbHeaders }
+      );
+
+      // Write all reading days (not rest days)
+      const readingDays = sched.plan.filter(d => d.type === 'reading' && d.pages > 0);
+      for (const day of readingDays) {
+        await fetch(`${sbUrl}/rest/v1/omni_schedule_feed`, {
+          method: 'POST',
+          headers: sbHeaders,
+          body: JSON.stringify({
+            date: day.date,
+            type: 'reading',
+            title: sched.title,
+            source_app: 'life',
+            source_id: sched.bookId,
+            meta: JSON.stringify({
+              fromPage: day.fromPage,
+              toPage: day.toPage,
+              pagesPlanned: day.pages,
+              totalPages: sched.pages || null,
+              currentPage: sched.currentPage || 1,
+              reviewStart: sched.reviewStart || null
+            }),
+            created_at: new Date().toISOString()
+          })
+        });
+      }
+    }
+    console.log('[Omni] Reading schedule synced:', curSchedule.length, 'books');
+  } catch(omniErr) {
+    console.warn('[Omni] Schedule sync failed:', omniErr.message);
+  }
+
   // Current year stats
   const curSched = schedulesByYear[currentYear] || [];
   const curQueueBookIds = new Set((allQueues[currentYear] || []).map(q => q.book_id).filter(Boolean));
