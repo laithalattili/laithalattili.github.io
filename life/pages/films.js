@@ -435,22 +435,42 @@ PAGES.filmsPlan = async (container, app) => {
   document.querySelectorAll('.btn-mark-done').forEach(btn =>
     btn.addEventListener('click', async () => {
       try {
-        await DB.update('film_plan', btn.dataset.id, { done: true });
-        // Log the watch and update status
+        const planId = btn.dataset.id;
         const filmId = btn.dataset.film;
         const film = filmMap[filmId];
+
+        // Get the plan item date before marking done
+        const planItem = plan.find(p => p.id === planId);
+        const watchDate = planItem?.planned_date || today;
+
+        await DB.update('film_plan', planId, { done: true });
+
         if (film) {
-          try {
-            await DB.insert('watch_log', {
-              film_id: filmId,
-              date: today,
-              session: 1
-            });
-          } catch(insertErr) {
-            console.warn('watch_log insert failed:', insertErr.message);
-          }
-          // Update status regardless
+          // Insert watch_log using direct fetch to avoid encoding issues
+          const sbUrl = CONFIG.supabase.url;
+          const sbKey = CONFIG.supabase.key;
+          const sbHeaders = {
+            'apikey': sbKey,
+            'Authorization': `Bearer ${sbKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          };
+
+          const wlRes = await fetch(`${sbUrl}/rest/v1/watch_log`, {
+            method: 'POST',
+            headers: sbHeaders,
+            body: JSON.stringify({ film_id: filmId, date: watchDate, session: 1 })
+          });
+          if (!wlRes.ok) console.warn('watch_log insert failed:', wlRes.status);
+
+          // Update film status to watched
           await DB.update('films', filmId, { status: 'watched', updated_at: new Date().toISOString() });
+
+          // Remove from omni_schedule_feed (film is now watched, no longer upcoming)
+          await fetch(
+            `${sbUrl}/rest/v1/omni_schedule_feed?source_id=eq.${filmId}&type=eq.film`,
+            { method: 'DELETE', headers: sbHeaders }
+          );
         }
         app.notify('Marked as watched', 'success');
         PAGES.filmsPlan(container, app);
@@ -462,7 +482,19 @@ PAGES.filmsPlan = async (container, app) => {
   document.querySelectorAll('.btn-delete-plan').forEach(btn =>
     btn.addEventListener('click', async () => {
       try {
+        // Find plan item to get film_id before deleting
+        const planItems = await DB.query('film_plan', {});
+        const planItem = planItems.find(p => p.id === btn.dataset.id);
         await DB.delete('film_plan', btn.dataset.id);
+        // Remove from omni_schedule_feed
+        if (planItem?.film_id) {
+          const sbUrl = CONFIG.supabase.url;
+          const sbKey = CONFIG.supabase.key;
+          await fetch(
+            `${sbUrl}/rest/v1/omni_schedule_feed?source_id=eq.${planItem.film_id}&type=eq.film`,
+            { method: 'DELETE', headers: { 'apikey': sbKey, 'Authorization': `Bearer ${sbKey}` } }
+          );
+        }
         PAGES.filmsPlan(container, app);
       } catch(e) { app.notify('Error: '+e.message, 'error'); }
     })
