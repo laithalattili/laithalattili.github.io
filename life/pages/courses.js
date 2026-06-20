@@ -11,11 +11,11 @@ PAGES.courses = async (container, app, initialTab = 'library') => {
       </div>
       <div id="module-content"></div>
     `;
-    document.querySelector('.module-tabs').addEventListener('click', e => {
+    container.querySelector('.module-tabs').addEventListener('click', e => {
       const tab = e.target.dataset.tab;
       if (!tab || tab === activeTab) return;
       activeTab = tab;
-      document.querySelectorAll('.module-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+      container.querySelectorAll('.module-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
       loadTab(tab);
     });
     loadTab(activeTab);
