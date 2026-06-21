@@ -4276,7 +4276,6 @@ function _getLiveCtx(){
     });
     if(nextDepart){
       const leaveBy=_calcLeaveBy(nextDepart.ps.start_time||nextDepart.time,nextDepart.ps.sensitivity,nextDepart.ps.travel_mins);
-      console.log('nextDepart:',nextDepart.label,nextDepart.time,'leaveBy:',leaveBy,'nowM:',nowM.toFixed(2));
       if(leaveBy){
         const leaveM=t2m(leaveBy);
         const startM=t2m(nextDepart.time);
@@ -4407,7 +4406,7 @@ function _liveTick(){
     else ne.textContent=ctx.et?'→ '+ctx.et:'';
   }
   const pf=el('live-prog-fill');if(pf){pf.style.width=ctx.pct+'%';pf.className='live-prog-fill '+(ctx.pct<50?'ahead':ctx.pct<80?'':'behind');}
-  if(_liveCtx?.st!==ctx.st){_liveRender();}else{_liveCtx=ctx;}
+  if(!_liveFrozen&&_liveCtx?.label!==ctx.label){_liveRender();}else{_liveCtx=ctx;}
 }
 function _liveNoteSave(idx,ds){const bs=[];el('live-body').querySelectorAll('.live-bullet').forEach(row=>{const ta=row.querySelector('textarea');const ind=parseInt(row.style.paddingLeft)||0;bs.push({text:ta?ta.value:'',depth:Math.round(ind/14)});});saveNotes(idx,ds,bs);}
 function addLiveNote(idx,ds){const bs=getNotes(idx,ds);bs.push({text:'',depth:0});saveNotes(idx,ds,bs);_liveRender();setTimeout(()=>{const tas=el('live-body').querySelectorAll('.live-bullet-inp');if(tas.length){const last=tas[tas.length-1];last.focus();last.style.height='auto';last.style.height=last.scrollHeight+'px';}},50);}
