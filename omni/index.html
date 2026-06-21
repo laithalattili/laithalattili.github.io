@@ -4273,7 +4273,7 @@ function _getLiveCtx(){
   }else{
     // Check UPCOMING personal slots with departure timing
     const nextDepart=todaySlots.find(sl=>{
-      if(!sl.ps?.sensitivity||sl.ps?.travel_mins==null)return false;
+      if(!sl.ps?.sensitivity)return false;
       return nowM<t2m(sl.time);
     });
     if(nextDepart){
@@ -4290,7 +4290,7 @@ function _getLiveCtx(){
           leaveBy,remToLeave,remToStart};
       }
     }
-    if(cur?.ps?.sensitivity&&cur.ps.travel_mins!=null){
+    if(cur?.ps?.sensitivity){
       const leaveBy=_calcLeaveBy(cur.ps.start_time||cur.time,cur.ps.sensitivity,cur.ps.travel_mins);
       if(leaveBy){
         const leaveM=t2m(leaveBy);
