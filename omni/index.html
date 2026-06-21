@@ -3166,7 +3166,7 @@ function renderDash(){
   const habRow=el('dc-habits-row');
   if(habRow){
     const gymDone=_hasSessToday();const gymType=_todayType();
-    const bookDone=HAB_DATA.bookDone||_habDone('book',dateStr);
+    const bookDone=HAB_DATA.bookDone; // source of truth: reading_log via HAB_DATA
     const filmDone=_habDone('film',dateStr);
     const guitarDone=_habDone('guitar',dateStr);
     const habits=[
@@ -3647,6 +3647,9 @@ function _tickHabitAndRefresh(type,dateStr){
 async function _unlogHabit(type,dateStr){
   // Remove log entry — reverse of _logHabit
   localStorage.removeItem('omni_hab_log_'+type+'_'+dateStr);
+  // Also clear generic done flag in case it was set
+  localStorage.removeItem('omni_done_book_'+dateStr);
+  localStorage.removeItem('omni_done_reading_'+dateStr);
   try{
     await supaFrom('omni_habit_log').delete().eq('date',dateStr).eq('type',type);
     if(type==='book'||type==='reading'){
