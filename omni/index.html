@@ -4235,7 +4235,7 @@ function _getLiveCtx(){
     if(p.recurrence==='daily')return true;
     return false;
   });
-  todayPS.forEach(p=>todaySlots.push({time:p.start_time,end:p.end_time||'',label:p.title,tp:'personal',idx:-1,ps:p}));
+  todayPS.forEach(p=>todaySlots.push({time:p.start_time,end:p.end_time||'',label:p.title,tp:'personal',src:'personal',idx:-1,ps:p}));
   todaySlots.sort((a,b)=>t2m(a.time)-t2m(b.time));
   // Find current and next
   let cur=null,curStart=0,curEnd=0;
@@ -4267,7 +4267,7 @@ function _getLiveCtx(){
   }else{
     // Check UPCOMING personal slots with departure timing
     const nextDepart=todaySlots.find(sl=>{
-      if(sl.src!=='personal'||!sl.ps?.sensitivity||sl.ps?.travel_mins==null)return false;
+      if(!sl.ps?.sensitivity||sl.ps?.travel_mins==null)return false;
       return nowM<t2m(sl.time);
     });
     if(nextDepart){
@@ -4362,15 +4362,37 @@ function _liveTick(){
   const ctx=_getLiveCtx();const now=new Date();
   const nowStr=_p(now.getHours())+':'+_p(now.getMinutes())+':'+_p(now.getSeconds());
   const{str,ot}=_fmtCd(ctx.rem);
-  const cdEl=el('live-cd-val');if(cdEl){cdEl.textContent=str;cdEl.className='live-cd-val'+(ot?' ot':'');}
+  const cdEl=el('live-cd-val');
+  if(cdEl){
+    cdEl.textContent=str;
+    cdEl.className='live-cd-val'+(ot?' ot':'');
+    // Amber colour for departure countdown
+    cdEl.style.color=ctx.type==='depart'&&!_liveShowStart?'var(--acc)':'';
+  }
+  // Title shows event name; subtitle shows departure context
+  const titleEl=el('live-title');
+  if(titleEl){
+    if(ctx.type==='depart')titleEl.textContent=ctx.label;
+  }
+  const subtitleEl=el('live-subtitle');
+  if(subtitleEl){
+    if(ctx.type==='depart'&&!_liveShowStart){
+      subtitleEl.innerHTML=`<span style="color:var(--acc);font-weight:700">🚶 Leave by ${ctx.leaveBy}</span>`;
+    }else if(ctx.type==='depart'&&_liveShowStart){
+      subtitleEl.textContent='Event starts at '+ctx.st;
+    }else{
+      subtitleEl.textContent=ctx.st?(ctx.st+(ctx.et?' – '+ctx.et:'')):'';
+    }
+  }
   const lbl=el('live-cd-lbl');
   if(lbl){
     if(ctx.type==='depart'&&!_liveShowStart){
-      lbl.innerHTML=`<span style="color:var(--acc);font-weight:700;font-size:13px">Leave by ${ctx.leaveBy}</span><span onclick="_liveShowStart=true;_liveTick()" style="font-size:10px;color:#555;cursor:pointer;display:block;margin-top:3px;text-decoration:underline">show time until event</span>`;
+      lbl.innerHTML=`<span style="color:var(--acc);font-size:12px;font-weight:600">Time until you must leave</span><br><span onclick="_liveShowStart=true;_liveTick()" style="font-size:10px;color:#666;cursor:pointer;text-decoration:underline">switch to time until event start</span>`;
     }else if(ctx.type==='depart'&&_liveShowStart){
-      lbl.innerHTML=`<span>Until ${ctx.label}</span><span onclick="_liveShowStart=false;_liveTick()" style="font-size:10px;color:var(--acc);cursor:pointer;display:block;margin-top:3px;text-decoration:underline">show departure countdown</span>`;
+      lbl.innerHTML=`<span style="font-size:12px">Time until event starts</span><br><span onclick="_liveShowStart=false;_liveTick()" style="font-size:10px;color:var(--acc);cursor:pointer;text-decoration:underline">🚶 switch to departure countdown</span>`;
     }else{
       lbl.textContent=ctx.cdLabel||(ot?'Overtime':'Remaining');
+      lbl.style.color='';
     }
   }
   const nt=el('live-now-t');if(nt)nt.textContent=nowStr;
