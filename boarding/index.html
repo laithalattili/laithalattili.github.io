@@ -3034,6 +3034,15 @@ function renderRegister(){
     Outside boarding hours · register is read-only
     <span style="color:#c4622d;margin-left:8px">Departure/return confirmation always available</span>
   </div>`:'';
+  // Sticky filter bar
+  const _brf3=window._bRegFilter||'all';
+  const filterBar=`<div style="display:flex;gap:4px;padding:6px 8px;background:var(--bg2);border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap;position:sticky;top:0;z-index:10">
+    <span onclick="setBRegFilter('all')" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;cursor:pointer;background:${_brf3==='all'?'#fff':'transparent'};color:${_brf3==='all'?'#111':'#aaa'};border:1px solid ${_brf3==='all'?'#fff':'rgba(255,255,255,.15)'}">${people.length+(window._bRegFilter&&window._bRegFilter!=='all'?'/'+getBoarders().length:'')} All</span>
+    <span onclick="setBRegFilter(_brf3==='present'?'all':'present')" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;cursor:pointer;background:${_brf3==='present'?'#16a34a':'transparent'};color:${_brf3==='present'?'#fff':'#22c55e'};border:1px solid #16a34a">${counts.present} ✓</span>
+    <span onclick="setBRegFilter(_brf3==='absent'?'all':'absent')" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;cursor:pointer;background:${_brf3==='absent'?'#dc2626':'transparent'};color:${_brf3==='absent'?'#fff':'#ef4444'};border:1px solid #dc2626">${counts.absent} ✗</span>
+    <span onclick="setBRegFilter(_brf3==='excused'?'all':'excused')" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;cursor:pointer;background:${_brf3==='excused'?'#d97706':'transparent'};color:${_brf3==='excused'?'#fff':'#f59e0b'};border:1px solid #d97706">${counts.excused} ~</span>
+    <span onclick="setBRegFilter(_brf3==='unset'?'all':'unset')" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;cursor:pointer;background:${_brf3==='unset'?'#6b7280':'transparent'};color:${_brf3==='unset'?'#fff':'#999'};border:1px solid rgba(255,255,255,.15)">${counts.unset} ?</span>
+  </div>`;
   document.getElementById('reg-list').innerHTML=filterBar+windowBanner+(html||'<div style="padding:2rem;text-align:center;color:var(--text3);font-size:13px">No students found.</div>');
   initRegListeners();
 }
