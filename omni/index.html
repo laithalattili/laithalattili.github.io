@@ -3567,7 +3567,7 @@ async function renderHabits(dateStr,dayName){
   } // end gym
 
   // ── BOOK ──────────────────────────────────────────────────────────────────
-  const bookDone=_habDone('book',dateStr);
+  const bookDone=HAB_DATA.bookDone; // reading_log is source of truth
   const bookData=HAB_DATA.book;
   if(bookData){
   const bookTitle=bookData?.title||'Reading';
