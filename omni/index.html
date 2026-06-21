@@ -4276,6 +4276,7 @@ function _getLiveCtx(){
     });
     if(nextDepart){
       const leaveBy=_calcLeaveBy(nextDepart.ps.start_time||nextDepart.time,nextDepart.ps.sensitivity,nextDepart.ps.travel_mins);
+      console.log('nextDepart:',nextDepart.label,nextDepart.time,'leaveBy:',leaveBy,'nowM:',nowM.toFixed(2));
       if(leaveBy){
         const leaveM=t2m(leaveBy);
         const startM=t2m(nextDepart.time);
