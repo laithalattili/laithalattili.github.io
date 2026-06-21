@@ -225,6 +225,7 @@
         <div class="clock-date" id="clock-date">—</div>
         <div style="display:flex;gap:8px;margin-top:6px;align-items:center">
           <button class="fire-big-btn" onclick="openFireRegister()">🔥 FIRE</button>
+          <button onclick="openAddLeaveModal()" style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer">+ Leave</button>
           <button onclick="openHouseActivity()" style="background:#2a2a2a;color:#ccc;border:1px solid #444;border-radius:10px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">🏠 House</button>
         </div>
       </div>
@@ -1414,6 +1415,12 @@ async function loadSubLeaves(){
   }catch(e){el.innerHTML='<div style="padding:1rem;color:#ef4444;font-size:13px">Error: '+e.message+'</div>';}
 }
 
+window._bRegFilter='all';
+function setBRegFilter(f){
+  window._bRegFilter=f;
+  renderRegister();
+}
+
 function setBoardingDefaultTab(){
   try{localStorage.setItem('boarding_default_tab',_bCurrentTab);}catch{}
   const btn=document.getElementById('b-star-btn');
@@ -2511,6 +2518,58 @@ function _calSelectDay(iso, containerId) {
   renderCalendar(containerId, _calSupaRef);
 }
 
+
+function openAddLeaveModal(){
+  document.getElementById('add-leave-modal').style.display='flex';
+  document.getElementById('al-start').value=today();
+  document.getElementById('al-name').value='';
+  document.getElementById('al-name').removeAttribute('data-selected');
+}
+function closeAddLeaveModal(){document.getElementById('add-leave-modal').style.display='none';}
+function alFilterStudents(){
+  const inp=document.getElementById('al-name');
+  const drop=document.getElementById('al-drop');
+  if(!inp||!drop)return;
+  inp.removeAttribute('data-selected');
+  const q=inp.value.trim().toLowerCase();
+  const src=STUDENTS.map(s=>s.name||s);
+  const matches=q?src.filter(n=>n.toLowerCase().includes(q)).slice(0,15):src.slice(0,20);
+  if(!matches.length){drop.style.display='none';return;}
+  drop.innerHTML=matches.map(n=>`<div onpointerdown="event.preventDefault();alSelectStudent('${n.replace(/'/g,"\'")}');"
+    style="padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06);color:#e0e0e0;background:#1e1e1e">${n}</div>`).join('');
+  drop.style.display='block';
+}
+function alSelectStudent(n){
+  const inp=document.getElementById('al-name');
+  if(inp){inp.value=n;inp.setAttribute('data-selected',n);}
+  const drop=document.getElementById('al-drop');if(drop)drop.style.display='none';
+}
+async function submitAddLeave(){
+  const inp=document.getElementById('al-name');
+  const name=(inp?.getAttribute('data-selected')||inp?.value||'').trim();
+  const type=document.getElementById('al-type')?.value;
+  const start=document.getElementById('al-start')?.value;
+  const end=document.getElementById('al-end')?.value;
+  const notes=document.getElementById('al-notes')?.value?.trim();
+  if(!name||!type||!start){showToast('Fill all required fields','#dc2626');return;}
+  const btn=document.getElementById('al-submit');
+  if(btn){btn.disabled=true;btn.textContent='Saving…';}
+  try{
+    const role=_identity?_identity.role:'RT';
+    const {error}=await supa.from('boarding_leaves').insert({
+      student_name:name,leave_type:type,
+      departure_planned:start+'T00:00:00',
+      return_planned:end?end+'T23:59:59':null,
+      reason:notes||'',active:true,created_by:role
+    });
+    if(error)throw error;
+    closeAddLeaveModal();
+    showToast('✓ Leave added for '+name,'#16a34a');
+    await loadExcusedMap();renderRegister();loadInfoLeaves();
+  }catch(e){showToast('Error: '+e.message,'#dc2626');}
+  finally{if(btn){btn.disabled=false;btn.textContent='Add Leave';}}
+}
+
 // ── GATE MESSAGE GENERATOR ────────────────────────────────────────────────────
 // Works in Work app, Boarding mini-app, and Liaison app
 
@@ -2915,12 +2974,27 @@ function renderRegister(){
   const _bSessionLabels={morning:'🌅 Morning',prep:'📋 Evening Prep',hoob:'🌙 Heads on Beds'};
   const totalEl=document.getElementById('reg-total');
   if(totalEl)totalEl.textContent=`${_bSessionLabels[_bSession]} · ${registered}/${total}`;
-  document.getElementById('reg-present').textContent=`${counts.present}✓`;
-  document.getElementById('reg-absent').textContent=`${counts.absent}✗`;
-  document.getElementById('reg-excused').textContent=`${counts.excused}~`;
+  const _brf=window._bRegFilter||'all';
+  const _stylePres=`cursor:pointer;padding:2px 8px;border-radius:10px;font-weight:700;background:${_brf==='present'?'#16a34a':'transparent'};color:${_brf==='present'?'#fff':'#22c55e'}`;
+  const _styleAbs=`cursor:pointer;padding:2px 8px;border-radius:10px;font-weight:700;background:${_brf==='absent'?'#dc2626':'transparent'};color:${_brf==='absent'?'#fff':'#ef4444'}`;
+  const _styleExc=`cursor:pointer;padding:2px 8px;border-radius:10px;font-weight:700;background:${_brf==='excused'?'#d97706':'transparent'};color:${_brf==='excused'?'#fff':'#f59e0b'}`;
+  const pEl=document.getElementById('reg-present');if(pEl){pEl.textContent=`${counts.present}✓`;pEl.style.cssText=_stylePres;pEl.onclick=()=>setBRegFilter(_brf==='present'?'all':'present');}
+  const aEl=document.getElementById('reg-absent');if(aEl){aEl.textContent=`${counts.absent}✗`;aEl.style.cssText=_styleAbs;aEl.onclick=()=>setBRegFilter(_brf==='absent'?'all':'absent');}
+  const eEl=document.getElementById('reg-excused');if(eEl){eEl.textContent=`${counts.excused}~`;eEl.style.cssText=_styleExc;eEl.onclick=()=>setBRegFilter(_brf==='excused'?'all':'excused');}
 
   document.getElementById('reg-fetched').textContent='fetched '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
 
+  // Apply filter
+  const _brfActive=window._bRegFilter||'all';
+  if(_brfActive!=='all'){
+    people=people.filter(name=>{
+      const rawSt=(_brState[name]||{}).status||'';
+      const exc=_excusedMap[name];
+      const auto=exc&&(exc.state==='excused'||exc.type==='activity');
+      const eff=auto?'excused':(rawSt||'unset');
+      return eff===_brfActive;
+    });
+  }
   let html='';
   let totalIdx=0;
 
@@ -2960,7 +3034,7 @@ function renderRegister(){
     Outside boarding hours · register is read-only
     <span style="color:#c4622d;margin-left:8px">Departure/return confirmation always available</span>
   </div>`:'';
-  document.getElementById('reg-list').innerHTML=windowBanner+(html||'<div style="padding:2rem;text-align:center;color:var(--text3);font-size:13px">No students found.</div>');
+  document.getElementById('reg-list').innerHTML=filterBar+windowBanner+(html||'<div style="padding:2rem;text-align:center;color:var(--text3);font-size:13px">No students found.</div>');
   initRegListeners();
 }
 
@@ -3087,31 +3161,29 @@ function regTap(name,status){
 // ── DEPARTURE/RETURN CONFIRMATION ─────────────────────────────
 async function confirmBoardingReturn(leaveId){
   const role=_identity?_identity.role:'AHSM';
+  const now=new Date().toISOString();
+  const td=today();
   try{
-    // Get student name
     const {data:ld}=await supa.from('boarding_leaves').select('student_name').eq('id',leaveId).single();
     const studentName=ld?.student_name;
-
-    // Update leave
+    // Write both column names for compatibility
     await supa.from('boarding_leaves').update({
-      return_actual:new Date().toISOString(),
-      return_confirmed_by:role
+      return_actual:now, returned_at:now, return_confirmed_by:role
     }).eq('id',leaveId);
-
-    // Auto-mark as Present
+    // Mark present in current session + clear excused for today
     if(studentName){
-      const td=today();
+      const sess=getBoardingCurrentSession();
+      // Remove the excused registrations we set on departure, then mark present
+      await supa.from('boarding_registrations').delete()
+        .eq('student_name',studentName).eq('register_date',td).eq('status','excused');
       await supa.from('boarding_registrations').upsert({
-        student_name:studentName,
-        register_date:td,
-        status:'present',
-        updated_by:role,
-        session_type:'boarding',
-        updated_at:new Date().toISOString()
-      },{onConflict:'student_name,register_date'});
-      _brState[studentName]={status:'present',updatedAt:new Date().toISOString(),updatedBy:role};
+        student_name:studentName,register_date:td,session_type:sess,
+        status:'present',updated_by:role,updated_at:now
+      },{onConflict:'student_name,register_date,session_type'});
+      _brState[studentName]={status:'present',updatedAt:now,updatedBy:role};
+      // Remove from excused map
+      delete _excusedMap[studentName];
     }
-
     showToast('✓ '+(studentName||'Student')+' returned & marked Present','#16a34a');
     // Remove from excused map immediately
     if(studentName&&_excusedMap){delete _excusedMap[studentName];}
@@ -3209,8 +3281,10 @@ async function confirmBoardingDeparture(leaveId){
   const role=_identity?_identity.role:'AHSM';
   const now=new Date().toISOString();
   const td=today();
+  // Instant UI feedback — update local state immediately
+  const _pending_btn=document.querySelector(`[onclick*="${leaveId}"]`);
+  if(_pending_btn){_pending_btn.disabled=true;_pending_btn.textContent='...';}
   try{
-    // Get student name from leave record
     const {data:leave}=await supa.from('boarding_leaves').select('student_name').eq('id',leaveId).single();
     await supa.from('boarding_leaves').update({
       departure_actual:now, departed_at:now, departure_confirmed_by:role
@@ -3545,5 +3619,40 @@ if('serviceWorker' in navigator){
 init();
 </script>
 <div style="text-align:center;padding:12px 16px 24px;font-size:10px;color:#555">© 2026 Laith Al-Attili · All rights reserved</div>
+
+<!-- Add Leave Modal -->
+<div id="add-leave-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#1e1e1e;border-radius:12px;padding:20px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="font-size:16px;font-weight:700;color:#e0e0e0;margin-bottom:16px">📋 Add Leave Request</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="position:relative">
+        <input id="al-name" placeholder="Student name…" autocomplete="off"
+          oninput="alFilterStudents()" onfocus="alFilterStudents()" onblur="setTimeout(()=>{const d=document.getElementById('al-drop');if(d)d.style.display='none';},200)"
+          style="width:100%;padding:10px 12px;border-radius:7px;border:1px solid #333;background:#111;color:#e0e0e0;font-size:14px">
+        <div id="al-drop" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #e5e7eb;border-radius:7px;box-shadow:0 4px 16px rgba(0,0,0,.12);max-height:180px;overflow-y:auto;z-index:10;margin-top:2px"></div>
+      </div>
+      <select id="al-type" style="padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px">
+        <option value="">— Leave type —</option>
+        <option value="weekend">🏠 Weekend Leave</option>
+        <option value="medical">🏥 Medical</option>
+        <option value="family">👨‍👩‍👧 Family</option>
+        <option value="activity">⚽ School Activity</option>
+        <option value="official_holiday">🏖️ Official Holiday</option>
+        <option value="longterm">📅 Long-term</option>
+      </select>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1"><label style="font-size:10px;color:#888">FROM</label>
+          <input id="al-start" type="date" style="padding:7px 8px;border-radius:7px;border:1px solid #333;background:#111;color:#e0e0e0;font-size:13px;width:100%"></div>
+        <div style="flex:1"><label style="font-size:10px;color:#888">TO (optional)</label>
+          <input id="al-end" type="date" style="padding:7px 8px;border-radius:7px;border:1px solid #333;background:#111;color:#e0e0e0;font-size:13px;width:100%"></div>
+      </div>
+      <input id="al-notes" placeholder="Notes (optional)" style="padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px">
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button onclick="closeAddLeaveModal()" style="flex:1;padding:10px;border-radius:8px;border:1px solid #e5e7eb;background:#f9fafb;color:#ccc;cursor:pointer;font-size:13px">Cancel</button>
+        <button onclick="submitAddLeave()" id="al-submit" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:13px;font-weight:700">Add Leave</button>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
