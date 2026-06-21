@@ -687,6 +687,27 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
         <option>Mon</option><option>Tue</option><option>Wed</option><option>Thu</option><option>Fri</option><option>Sat</option><option>Sun</option>
       </select>
     </div>
+    <!-- Departure timing toggle -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:.65rem;padding:.6rem .7rem;background:var(--bg3);border-radius:8px;cursor:pointer" onclick="document.getElementById('ps-depart-toggle').click()">
+      <input type="checkbox" id="ps-depart-toggle" onchange="_psDepartChange()" style="width:16px;height:16px;accent-color:var(--acc);cursor:pointer">
+      <div>
+        <div style="font-size:13px;font-weight:600;color:var(--tx)">🚶 Needs departure time?</div>
+        <div style="font-size:11px;color:var(--tx4)">For flights, trains, meetings away from here</div>
+      </div>
+    </div>
+    <div id="ps-depart-fields" style="display:none;flex-direction:column;gap:.55rem;margin-bottom:.65rem">
+      <div class="inp" style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:9px;font-weight:700;color:var(--tx4);text-transform:uppercase">Event sensitivity</label>
+        <div style="display:flex;flex-direction:column;gap:5px" id="ps-sensitivity-opts">
+          <!-- populated dynamically by _populateSensOpts() -->
+        </div>
+      </div>
+      <div class="inp" style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:9px;font-weight:700;color:var(--tx4);text-transform:uppercase">Travel time (minutes)</label>
+        <input type="number" id="ps-travel" min="0" max="600" placeholder="e.g. 25" style="padding:9px 10px;border:1px solid var(--bd2);border-radius:5px;background:var(--sur);color:var(--tx);font-size:14px">
+      </div>
+      <div id="ps-depart-preview" style="font-family:var(--mono);font-size:12px;color:var(--acc);padding:.4rem .6rem;background:rgba(184,88,40,.06);border-radius:6px;display:none"></div>
+    </div>
     <div style="display:flex;gap:8px;margin-top:.5rem">
       <button id="ps-delete-btn" onclick="deletePersonalSlot()" style="padding:10px;background:var(--er-bg,#fff0f0);color:var(--er,#c00);border:1px solid var(--er,#c00)33;border-radius:8px;font-size:13px;display:none">Delete</button>
       <button onclick="closePersonalSlotModal()" style="flex:1;padding:10px;background:var(--sur);color:var(--tx2);border:1px solid var(--bd2);border-radius:8px;font-size:13px">Cancel</button>
@@ -870,6 +891,11 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
         </div>
       </div>
       <div class="ss"><div class="ss-title">Audio Player</div><div class="sr"><span class="sr-lbl">Skip distance (seconds)</span><input type="number" id="s-audio-skip" class="si" min="1" max="120" style="width:60px;text-align:center" onchange="localStorage.setItem('omni_audio_skip',this.value);showToast('Skip: '+this.value+'s')"></div></div>
+      <div class="ss" id="depart-settings-section">
+        <div class="ss-title">🚶 Departure Categories</div>
+        <div id="depart-cats-list"></div>
+        <button onclick="_addDepartCat()" style="width:100%;margin-top:.4rem;padding:8px;background:var(--bg3);border:1px dashed var(--bd2);border-radius:7px;color:var(--tx3);font-size:12px;cursor:pointer">+ Add category</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1280,7 +1306,43 @@ function switchTab(t){
   if(t==='checklists'){if(!_cLoaded)loadChecklists().then(()=>switchCV(_cv||'rhythms'));else switchCV(_cv||'rhythms');}
 }
 function setDefault(){_defPage=_curTab;try{localStorage.setItem('omni_dp',_defPage);}catch(e){}showToast('Default: '+_defPage+' ⭐');const b=el('btn-star');if(b){b.classList.add('lit');setTimeout(()=>b.classList.remove('lit'),1100);}}
-function openSettings(){el('settings-sh').classList.add('on');_refreshSUI();}
+function _renderDepartCats(){
+  const list=document.getElementById('depart-cats-list');
+  if(!list)return;
+  const cats=_getDepartCats();
+  list.innerHTML=cats.map((c,i)=>`
+    <div style="display:flex;align-items:center;gap:6px;padding:.35rem 0;border-bottom:.5px solid var(--bd)">
+      <input type="text" value="${c.label}" onchange="_editDepartCat(${i},'label',this.value)"
+        style="flex:1;padding:5px 7px;border:1px solid var(--bd);border-radius:5px;background:var(--sur);color:var(--tx);font-size:12px">
+      <input type="number" value="${c.buffer}" min="0" max="600" onchange="_editDepartCat(${i},'buffer',+this.value)"
+        style="width:52px;padding:5px 6px;border:1px solid var(--bd);border-radius:5px;background:var(--sur);color:var(--tx);font-size:12px;text-align:center">
+      <span style="font-size:11px;color:var(--tx4)">min</span>
+      <button onclick="_deleteDepartCat(${i})" style="font-size:13px;color:var(--er,#c00);background:none;border:none;padding:0 2px;cursor:pointer">×</button>
+    </div>`).join('');
+}
+function _editDepartCat(idx,field,val){
+  const cats=_getDepartCats();
+  if(cats[idx])cats[idx][field]=val;
+  _saveDepartCats(cats);
+}
+function _deleteDepartCat(idx){
+  const cats=_getDepartCats();
+  cats.splice(idx,1);
+  _saveDepartCats(cats);
+  _renderDepartCats();
+  showToast('Category removed');
+}
+function _addDepartCat(){
+  const cats=_getDepartCats();
+  cats.push({key:'custom_'+Date.now(),label:'New category',buffer:10});
+  _saveDepartCats(cats);
+  _renderDepartCats();
+}
+function openSettings(){
+  el('settings-sh').classList.add('on');
+  _refreshSUI();
+  _renderDepartCats();
+}
 function closeSettings(){el('settings-sh').classList.remove('on');}
 let _wake=null;
 async function toggleWake(){
@@ -1874,7 +1936,8 @@ function _renderDayNow(){
           const rmBtn=t2.src==='work'?`<button onclick="removeWorkHint('${t2.id}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`:`<button onclick="unassignTask('${t2.id}','${dateStr}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`;
           return`<div class="slot-task-row"><div class="slot-task-cb${t2.done?' on':''}" onclick="toggleDone('${t2.dk}',this);setTimeout(renderDay,50)">${t2.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t2.done?' done':''}">${t2.text}</div>${rmBtn}</div>`;
         }).join('')}</div>`:'';
-        slotsHtml+=`<div class="slot personal-slot"><div class="slot-hdr"><span class="slot-tr">${sl.time} <b>–${sl.end||sl.endTime}</b></span><span class="slot-pip" style="background:#7080c0"></span><span class="slot-lbl">${sl.label}</span><button onclick="openEditPersonalSlot('${sl.psId}')" style="font-size:11px;color:#7080c0;background:none;border:none;padding:0 4px">✎</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:20px;font-weight:300;color:#7080c0;background:none;border:none;padding:0 3px;line-height:1">+</button></div>${psTasksHtml}</div>`;
+        const _leaveBy=sl.ps?.sensitivity&&sl.ps?.travel_mins!=null?_calcLeaveBy(sl.time,sl.ps.sensitivity,sl.ps.travel_mins):null;
+        slotsHtml+=`<div class="slot personal-slot"><div class="slot-hdr"><span class="slot-tr">${sl.time} <b>–${sl.end||sl.endTime}</b></span><span class="slot-pip" style="background:#7080c0"></span><span class="slot-lbl">${sl.label}</span>${_leaveBy?`<span style="font-family:var(--mono);font-size:10px;color:var(--acc);margin-left:4px">🚶${_leaveBy}</span>`:''}<button onclick="openEditPersonalSlot('${sl.psId}')" style="font-size:11px;color:#7080c0;background:none;border:none;padding:0 4px">✎</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:20px;font-weight:300;color:#7080c0;background:none;border:none;padding:0 3px;line-height:1">+</button></div>${psTasksHtml}</div>`;
         return;
       }
       // Hide free/empty work slots covered by a personal event's time range
@@ -3357,6 +3420,7 @@ async function loadHabitsFor(dateStr){
     // Schedule feed for date (from Life Manager)
     const{data:feed}=await supaFrom('omni_schedule_feed')
       .select('*').eq('date',dateStr).eq('source_app','life');
+    console.log('feed for',dateStr,feed?.length,'rows:',JSON.stringify(feed?.map(r=>({type:r.type,title:r.title,source_id:r.source_id}))));
     if(feed){
       feed.forEach(row=>{
         if(row.type==='book'||row.type==='reading')HAB_DATA.book=row;
@@ -3711,6 +3775,12 @@ function openAddPersonalSlot(dateStr){
   document.getElementById('ps-recur').value='once';
   document.getElementById('ps-date').value=dateStr||new Date().toISOString().split('T')[0];
   document.getElementById('ps-delete-btn').style.display='none';
+  document.getElementById('ps-depart-toggle').checked=false;
+  document.getElementById('ps-depart-fields').style.display='none';
+  document.querySelectorAll('input[name="ps-sens"]').forEach(r=>r.checked=false);
+  document.querySelectorAll('#ps-sensitivity-opts label').forEach(l=>{l.style.borderColor='var(--bd)';l.style.background='var(--sur)';});
+  document.getElementById('ps-travel').value='';
+  _populateSensOpts();
   _psRecurChange();
   document.getElementById('personal-slot-modal').style.display='flex';
 }
@@ -3725,6 +3795,16 @@ function openEditPersonalSlot(id){
   document.getElementById('ps-date').value=ps.date||'';
   document.getElementById('ps-dow').value=ps.day_of_week||'Mon';
   document.getElementById('ps-delete-btn').style.display='';
+  // Restore departure fields
+  const hasDep=!!(ps.sensitivity||ps.travel_mins);
+  document.getElementById('ps-depart-toggle').checked=hasDep;
+  document.getElementById('ps-depart-fields').style.display=hasDep?'flex':'none';
+  if(ps.sensitivity){
+    const radio=document.querySelector('input[name="ps-sens"][value="'+ps.sensitivity+'"]');
+    if(radio){radio.checked=true;radio.closest('label').style.borderColor='var(--acc)';radio.closest('label').style.background='rgba(184,88,40,.05)';}
+  }
+  document.getElementById('ps-travel').value=ps.travel_mins||'';
+  _psUpdateDepartPreview();
   _psRecurChange();
   document.getElementById('personal-slot-modal').style.display='flex';
 }
@@ -3741,6 +3821,9 @@ async function savePersonalSlot(){
   const title=document.getElementById('ps-title').value.trim();
   if(!title){showToast('Title required');return;}
   const recur=document.getElementById('ps-recur').value;
+  const hasDep=document.getElementById('ps-depart-toggle').checked;
+  const sensitivity=hasDep?(document.querySelector('input[name="ps-sens"]:checked')?.value||null):null;
+  const travel_mins=hasDep?(+document.getElementById('ps-travel').value||null):null;
   const row={
     title,
     start_time:document.getElementById('ps-start').value,
@@ -3748,6 +3831,8 @@ async function savePersonalSlot(){
     recurrence:recur,
     date:recur==='once'?document.getElementById('ps-date').value:null,
     day_of_week:recur==='weekly'?document.getElementById('ps-dow').value:null,
+    sensitivity,
+    travel_mins,
   };
   try{
     if(_editingPsId){
@@ -3771,6 +3856,74 @@ async function deletePersonalSlot(){
     renderDay();
     showToast('Deleted');
   }catch(e){showToast('Delete failed');console.error(e);}
+}
+
+
+// ── DEPARTURE TIMING ──────────────────────────────────────────────────────────
+// Departure categories — fully user-editable, seeded with defaults on first load
+const _DEPART_DEFAULTS=[
+  {key:'flight_intl',label:'International flight',buffer:180},
+  {key:'flight_dom',label:'Domestic flight',buffer:120},
+  {key:'hard',label:'Hard deadline',buffer:15},
+  {key:'scheduled',label:'Scheduled event',buffer:5},
+  {key:'casual',label:'Casual',buffer:0},
+];
+function _getDepartCats(){
+  try{
+    const stored=localStorage.getItem('omni_depart_cats');
+    if(stored)return JSON.parse(stored);
+    // Seed defaults on first load
+    localStorage.setItem('omni_depart_cats',JSON.stringify(_DEPART_DEFAULTS));
+    return _DEPART_DEFAULTS;
+  }catch(e){return _DEPART_DEFAULTS;}
+}
+function _saveDepartCats(cats){
+  localStorage.setItem('omni_depart_cats',JSON.stringify(cats));
+}
+function _departBuffer(sensitivity){
+  const cats=_getDepartCats();
+  return cats.find(c=>c.key===sensitivity)?.buffer??0;
+}
+function _calcLeaveBy(startTime,sensitivity,travelMins){
+  if(!startTime||!sensitivity||travelMins==null)return null;
+  const startM=t2m(startTime);
+  const leaveM=startM-_departBuffer(sensitivity)-travelMins;
+  if(leaveM<0)return null;
+  return _p(Math.floor(leaveM/60))+':'+_p(leaveM%60);
+}
+function _populateSensOpts(selectedKey){
+  const opts=document.getElementById('ps-sensitivity-opts');
+  if(!opts)return;
+  const cats=_getDepartCats();
+  opts.innerHTML=cats.map(c=>`
+    <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;border:1.5px solid ${c.key===selectedKey?'var(--acc)':'var(--bd)'};cursor:pointer;background:${c.key===selectedKey?'rgba(184,88,40,.05)':'var(--sur)'}" onclick="_psSensSelect('${c.key}',this)">
+      <input type="radio" name="ps-sens" value="${c.key}" ${c.key===selectedKey?'checked':''} style="accent-color:var(--acc)">
+      <div style="flex:1"><div style="font-size:13px;font-weight:600">${c.label}</div><div style="font-size:11px;color:var(--tx4)">${c.buffer} min buffer</div></div>
+    </label>`).join('');
+}
+function _psDepartChange(){
+  const on=document.getElementById('ps-depart-toggle').checked;
+  document.getElementById('ps-depart-fields').style.display=on?'flex':'none';
+  if(on)_populateSensOpts();
+  _psUpdateDepartPreview();
+}
+function _psSensSelect(val,labelEl){
+  document.querySelectorAll('#ps-sensitivity-opts label').forEach(l=>{
+    l.style.borderColor='var(--bd)';l.style.background='var(--sur)';
+  });
+  labelEl.style.borderColor='var(--acc)';labelEl.style.background='rgba(184,88,40,.05)';
+  _psUpdateDepartPreview();
+}
+function _psUpdateDepartPreview(){
+  const prev=document.getElementById('ps-depart-preview');if(!prev)return;
+  const sens=document.querySelector('input[name="ps-sens"]:checked')?.value;
+  const travel=+document.getElementById('ps-travel')?.value||0;
+  const start=document.getElementById('ps-start')?.value;
+  const leaveBy=_calcLeaveBy(start,sens,travel);
+  if(leaveBy){
+    prev.textContent='🚶 Leave by '+leaveBy;
+    prev.style.display='block';
+  }else prev.style.display='none';
 }
 
 // ── PULL TO REFRESH ───────────────────────────────────────────────────────────
