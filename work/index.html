@@ -2033,6 +2033,41 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       </label>
     </div>
 
+    <!-- Departure timing (commitment slots only) -->
+    <div id="edit-dep-section" style="display:none;margin-top:.6rem;background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding:10px 12px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;font-weight:600;color:#495057;margin-bottom:0">
+        <input type="checkbox" id="edit-dep-toggle" style="width:15px;height:15px;accent-color:#0d6efd;cursor:pointer" onchange="toggleDepFields()">
+        <span>Needs departure time?</span>
+      </label>
+      <div id="edit-dep-fields" style="display:none;margin-top:10px;display:flex;flex-direction:column;gap:8px">
+        <div>
+          <label style="font-size:11px;color:#6c757d;display:block;margin-bottom:3px">Travel time (minutes)</label>
+          <input type="number" id="edit-dep-mins" min="0" max="300" placeholder="e.g. 30"
+            style="width:100%;font-size:13px;padding:7px 8px;border:1px solid #dee2e6;border-radius:6px;background:#fff;color:#212529">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#6c757d;display:block;margin-bottom:5px">Sensitivity</label>
+          <div style="display:flex;flex-direction:column;gap:4px" id="edit-dep-sensitivity">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#495057;padding:5px 8px;border:1px solid #dee2e6;border-radius:5px;background:#fff">
+              <input type="radio" name="dep-sensitivity" value="flight_intl" style="accent-color:#0d6efd"> ✈️ International flight
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#495057;padding:5px 8px;border:1px solid #dee2e6;border-radius:5px;background:#fff">
+              <input type="radio" name="dep-sensitivity" value="flight_dom" style="accent-color:#0d6efd"> 🛫 Domestic flight
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#495057;padding:5px 8px;border:1px solid #dee2e6;border-radius:5px;background:#fff">
+              <input type="radio" name="dep-sensitivity" value="hard" style="accent-color:#0d6efd"> 🚆 Hard deadline (train/exam/interview)
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#495057;padding:5px 8px;border:1px solid #dee2e6;border-radius:5px;background:#fff">
+              <input type="radio" name="dep-sensitivity" value="scheduled" style="accent-color:#0d6efd"> 🎬 Scheduled (meeting/cinema)
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#495057;padding:5px 8px;border:1px solid #dee2e6;border-radius:5px;background:#fff">
+              <input type="radio" name="dep-sensitivity" value="casual" style="accent-color:#0d6efd"> ☕ Casual (dinner/coffee)
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- STEP 4: Recurrence -->
     <div style="margin-bottom:.75rem">
       <div style="font-size:11px;font-weight:600;color:#495057;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Recurrence</div>
@@ -23433,7 +23468,28 @@ function openEditModal(slotIdx,day,_bypassEditMode){
     brEl.onchange=function(){if(this.checked)hrEl.checked=false;};
     hrEl.onchange=function(){if(this.checked)brEl.checked=false;};
   }
+  // Populate departure timing fields
+  const depToggle=document.getElementById('edit-dep-toggle');
+  const depFields=document.getElementById('edit-dep-fields');
+  const depMins=document.getElementById('edit-dep-mins');
+  const hasDep=!!(custom&&custom.travel_mins!=null);
+  if(depToggle)depToggle.checked=hasDep;
+  if(depFields)depFields.style.display=hasDep?'flex':'none';
+  if(depMins)depMins.value=hasDep?custom.travel_mins:'';
+  const depSens=custom&&custom.sensitivity?custom.sensitivity:'scheduled';
+  document.querySelectorAll('input[name="dep-sensitivity"]').forEach(r=>{r.checked=r.value===depSens;});
+  // Show/hide the departure section based on current category
+  const depSect=document.getElementById('edit-dep-section');
+  const cat2=document.getElementById('edit-cat').value||'empty';
+  const isCommit2=['go','lesson','duty','tmtg'].includes(cat2)||(!['empty','support'].includes(cat2)&&cat2.startsWith('ucat_'));
+  if(depSect)depSect.style.display=isCommit2?'block':'none';
   document.getElementById('edit-modal').classList.add('open');
+}
+
+function toggleDepFields(){
+  const on=document.getElementById('edit-dep-toggle')?.checked;
+  const fields=document.getElementById('edit-dep-fields');
+  if(fields)fields.style.display=on?'flex':'none';
 }
 
 function _renderEditCatChips(selectedCat){
@@ -23460,6 +23516,12 @@ function _renderEditCatChips(selectedCat){
   }
   // Show label suggestions based on category
   _renderLabelSuggestions(selectedCat);
+  // Show/hide departure section (only for commitment categories: go and user-defined)
+  const depSection=document.getElementById('edit-dep-section');
+  if(depSection){
+    const isCommit=['go','lesson','duty','tmtg'].includes(selectedCat)||(!['empty','support'].includes(selectedCat)&&selectedCat.startsWith('ucat_'));
+    depSection.style.display=isCommit?'block':'none';
+  }
   // Show/hide tutor picker
   const tp=document.getElementById('tutor-mtg-picker');
   if(tp)tp.style.display=selectedCat==='tmtg'?'block':'none';
@@ -23666,7 +23728,11 @@ function saveSlot(){
   const _hrEl=document.getElementById('edit-house-register');
   const boarding_register=!!((_brEl&&_brEl.checked));
   const house_register=!!((_hrEl&&_hrEl.checked));
-  const evtData={l:document.getElementById('edit-label').value||'',tp:document.getElementById('edit-type').value||'free',cat:catVal,recur:document.getElementById('edit-recur').value||'once',placedWeek:week,endSlotIdx,customStartTime,customEndTime,boarding_register,house_register};
+  // Departure timing fields
+  const _depOn=document.getElementById('edit-dep-toggle')?.checked;
+  const _depMins=_depOn?parseInt(document.getElementById('edit-dep-mins')?.value||'0')||null:null;
+  const _depSens=_depOn?(document.querySelector('input[name="dep-sensitivity"]:checked')?.value||null):null;
+  const evtData={l:document.getElementById('edit-label').value||'',tp:document.getElementById('edit-type').value||'free',cat:catVal,recur:document.getElementById('edit-recur').value||'once',placedWeek:week,endSlotIdx,customStartTime,customEndTime,boarding_register,house_register,...(_depOn&&_depMins?{travel_mins:_depMins,sensitivity:_depSens}:{travel_mins:null,sensitivity:null})};
   // Record label history for quick-fill suggestions
   _saveLabelHistory(evtData.l,evtData.tp,catVal);
   // Save for each slot in range
@@ -24405,6 +24471,7 @@ function renderTimetable(){
       const isCleanSpan=isSpanStart&&_startIsClean&&_endIsClean;
       const tdOpen=rowSpan>1?`<td class="${tdCls}" rowspan="${rowSpan}" style="vertical-align:middle;position:relative;padding:0">`:`<td class="${tdCls}">`;
       const _cellClick=ttEditMode?`openEditModal(${idx},'${d}')`:`openSlotNotes(${idx},'${d}',${offset})`;
+      const _depBadge=(cust&&cust.travel_mins&&cust.sensitivity)?`<span style="font-size:9px;color:#6c757d;opacity:.7" title="${cust.travel_mins}min · ${cust.sensitivity}">🚗${cust.travel_mins}'</span>`:'';
       const _longPress=`_lpStart(event,${idx},'${d}')`;
       const _longPressEnd=`_lpEnd(event)`;
       if(!cell){
