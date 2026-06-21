@@ -688,13 +688,13 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
       </select>
     </div>
     <!-- Departure timing toggle -->
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:.65rem;padding:.6rem .7rem;background:var(--bg3);border-radius:8px;cursor:pointer" onclick="document.getElementById('ps-depart-toggle').click()">
+    <label for="ps-depart-toggle" style="display:flex;align-items:center;gap:10px;margin-bottom:.65rem;padding:.6rem .7rem;background:var(--bg3);border-radius:8px;cursor:pointer">
       <input type="checkbox" id="ps-depart-toggle" onchange="_psDepartChange()" style="width:16px;height:16px;accent-color:var(--acc);cursor:pointer">
       <div>
         <div style="font-size:13px;font-weight:600;color:var(--tx)">🚶 Needs departure time?</div>
         <div style="font-size:11px;color:var(--tx4)">For flights, trains, meetings away from here</div>
       </div>
-    </div>
+    </label>
     <div id="ps-depart-fields" style="display:none;flex-direction:column;gap:.55rem;margin-bottom:.65rem">
       <div class="inp" style="display:flex;flex-direction:column;gap:4px">
         <label style="font-size:9px;font-weight:700;color:var(--tx4);text-transform:uppercase">Event sensitivity</label>
@@ -1107,7 +1107,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
     <button class="btn-danger" id="rh-del" style="display:none" onclick="deleteRhythm()">Delete</button>
   </div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="config.js" onerror="console.warn('config.js missing')"></script>
 <script>
 'use strict';
@@ -3420,7 +3420,6 @@ async function loadHabitsFor(dateStr){
     // Schedule feed for date (from Life Manager)
     const{data:feed}=await supaFrom('omni_schedule_feed')
       .select('*').eq('date',dateStr).eq('source_app','life');
-    console.log('feed for',dateStr,feed?.length,'rows:',JSON.stringify(feed?.map(r=>({type:r.type,title:r.title,source_id:r.source_id}))));
     if(feed){
       feed.forEach(row=>{
         if(row.type==='book'||row.type==='reading')HAB_DATA.book=row;
@@ -3834,12 +3833,14 @@ async function savePersonalSlot(){
     sensitivity,
     travel_mins,
   };
+  console.log('Saving personal slot:',JSON.stringify(row));
   try{
     if(_editingPsId){
       await supaFrom('omni_personal_slots').update(row).eq('id',_editingPsId);
       PERSONAL_SLOTS=PERSONAL_SLOTS.map(p=>p.id===_editingPsId?{...p,...row}:p);
     }else{
       const{data}=await supaFrom('omni_personal_slots').insert(row).select().single();
+      console.log('Saved personal slot:',JSON.stringify(data));
       if(data)PERSONAL_SLOTS.push(data);
     }
     closePersonalSlotModal();
