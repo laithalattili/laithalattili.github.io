@@ -4301,3 +4301,163 @@ function _getLiveCtx(){
     cdLabel=next?'Until '+next.label:'Free until end of day';
   }
   return{type:cur?'slot':'free',label:cur?cur.label:'Free',tp:cur?.tp||'free',st:cur?.time||'',et:cur?.end||'',rem,pct,next,cdLabel,dateStr,idx:cur?.idx??-1,dayName,isMorning:!isCommitment};
+}
+function _fmtCd(remMins){
+  const tot=Math.round(remMins*60);const ot=tot<0;const ab=Math.abs(tot);
+  const pre=ot?'+':'';
+  if(_liveCdLong){
+    const h=Math.floor(ab/3600),m=Math.floor((ab%3600)/60),s=ab%60;
+    return{str:pre+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0'),ot};
+  }else{
+    const totalMin=Math.floor(ab/60);const s=ab%60;
+    return{str:pre+String(totalMin).padStart(2,'0')+':'+String(s).padStart(2,'0'),ot};
+  }
+}
+function openLive(){
+  if(_curTab==='gym'&&_todayType()&&!_hasSessToday()){openGymLivePicker(_todayType());return;}
+  _liveOpen=true;_liveShowStart=false;el('live-overlay').classList.add('on');el('btn-live').classList.add('active');
+  _liveRender();if(_liveInterval)clearInterval(_liveInterval);_liveInterval=setInterval(_liveTick,500);
+}
+function closeLive(){
+  _liveOpen=false;el('live-overlay').classList.remove('on');el('btn-live').classList.remove('active');
+  if(_liveInterval){clearInterval(_liveInterval);_liveInterval=null;}
+  if(_liveFrozen)toggleFreeze();if(_liveWake){try{_liveWake.release();}catch(e){}_liveWake=null;}
+}
+function toggleLiveCdFmt(){_liveCdLong=!_liveCdLong;_liveTick();}
+async function toggleLiveWake(){
+  const b=el('live-wake-btn');
+  if(_liveWake){try{await _liveWake.release();}catch(e){}_liveWake=null;b.classList.remove('lit');}
+  else{try{_liveWake=await navigator.wakeLock.request('screen');b.classList.add('lit');_liveWake.addEventListener('release',()=>{_liveWake=null;b.classList.remove('lit');});}catch(e){showToast('Wake lock unavailable');}}
+}
+function toggleFreeze(){
+  _liveFrozen=!_liveFrozen;const ov=el('freeze-ov');
+  const hdr=document.querySelector('#live-overlay .live-hdr');const hdrH=hdr?hdr.getBoundingClientRect().bottom:80;
+  if(ov){ov.style.top=hdrH+'px';ov.classList.toggle('on',_liveFrozen);}
+  const btn=el('live-freeze-btn');if(btn){btn.classList.toggle('freeze-on',_liveFrozen);btn.textContent='🧊';}
+}
+function _liveRender(){
+  const ctx=_getLiveCtx();_liveCtx=ctx;
+  el('live-title').textContent=ctx.label;
+  el('live-subtitle').textContent=ctx.st?(ctx.st+(ctx.et?' – '+ctx.et:'')):(ctx.et?'until '+ctx.et:'');
+  el('live-prog-st').textContent=ctx.st||'';el('live-prog-et').textContent=ctx.et||'';
+  const dateStr=ctx.dateStr;let body='';
+  if(ctx.isMorning&&_wLoaded&&WCOMBOS.length){
+    const ds=todayStr();const todayLog=WLOG.find(l=>l.date===ds);
+    const sugg=todayLog?WCOMBOS.find(c=>c.id===todayLog.combination_id):getOutfitSuggestion(ds,[],DS[new Date().getDay()]);
+    if(sugg){const items=(sugg.item_ids||[]).map(id=>WITEMS.find(i=>i.id===id)).filter(Boolean);
+      body+=`<div class="live-outfit-strip"><div class="live-outfit-lbl">${todayLog?'✓ Outfit confirmed':'Suggested'} — ${sugg.name}</div><div style="display:flex;gap:5px;overflow-x:auto;padding:2px 0">${items.map(i=>i.photo_url?`<img src="${i.photo_url}" style="width:48px;height:48px;object-fit:cover;border-radius:5px;flex-shrink:0;border:1px solid #222">`:`<div style="width:48px;height:48px;background:#1a1a1a;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px">${W_ICO[i.category]||'👔'}</div>`).join('')}</div>${!todayLog?`<div style="display:flex;gap:6px;margin-top:6px"><button onclick="dashConfirm('${sugg.id}');_liveRender()" style="flex:2;padding:6px;background:var(--acc);color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:700;font-family:var(--font)">✓ Wearing this</button><button onclick="dashSkip('${sugg.id}');_liveRender()" style="flex:1;padding:6px;background:#1a1a1a;color:#666;border:1px solid #222;border-radius:5px;font-size:11px;font-family:var(--font)">Skip</button></div>`:''}</div>`;
+    }
+  }
+  if(ctx.idx>=0){
+    const notes=getNotes(ctx.idx,dateStr).filter(b=>b.text.trim());
+    body+=`<div class="live-notes-card"><div class="live-notes-lbl">Notes</div>${notes.map((b,i)=>{const ind=b.depth*14;const mk=b.depth===0?'●':b.depth===1?'○':'▸';return`<div class="live-bullet" style="padding-left:${ind}px"><span class="live-bullet-m">${mk}</span><textarea class="live-bullet-inp" rows="1" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px';_liveNoteSave(${ctx.idx},'${dateStr}')" onblur="_liveNoteSave(${ctx.idx},'${dateStr}')">${b.text}</textarea></div>`;}).join('')}<button onclick="addLiveNote(${ctx.idx},'${dateStr}')" style="font-size:11px;color:#555;background:none;border:none;padding:.3rem 0 0;cursor:pointer">+ note</button></div>`;
+  }
+  if(ctx.idx>=0){const tasks=getTasksFor(0).filter(t=>!t.done&&t._t?.taskTime===ctx.st);if(tasks.length){body+=`<div class="live-notes-card"><div class="live-notes-lbl">Tasks this slot</div>${tasks.map(t=>`<div style="display:flex;align-items:center;gap:8px;padding:.25rem 0;border-bottom:.5px solid #1a1a1a"><div style="width:16px;height:16px;border-radius:3px;border:1.5px solid #333;display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="toggleDone('${t.dk}',this)"></div><span style="font-size:13px;color:#ccc;flex:1">${t.text}</span></div>`).join('')}</div>`;}}
+  if(ctx.next){const tot=Math.round(ctx.next.secUntil);const ab=Math.abs(tot);const hh=Math.floor(ab/3600),mm=Math.floor((ab%3600)/60),ss=ab%60;const str=String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');body+=`<div class="live-next-card"><div class="live-next-lbl">Up next · in ${str}</div><div class="live-next-row"><div class="live-next-dot" style="background:${catCol(ctx.next.tp)}"></div><span class="live-next-name">${ctx.next.label}</span><span class="live-next-time">${ctx.next.st}</span></div></div>`;}
+  el('live-body').innerHTML=body;
+  el('live-body').querySelectorAll('textarea').forEach(ta=>{ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';});
+}
+function _liveTick(){
+  if(!_liveOpen)return;
+  const ctx=_getLiveCtx();const now=new Date();
+  const nowStr=_p(now.getHours())+':'+_p(now.getMinutes())+':'+_p(now.getSeconds());
+  const{str,ot}=_fmtCd(ctx.rem);
+  const cdEl=el('live-cd-val');if(cdEl){cdEl.textContent=str;cdEl.className='live-cd-val'+(ot?' ot':'');}
+  const lbl=el('live-cd-lbl');
+  if(lbl){
+    if(ctx.type==='depart'&&!_liveShowStart){
+      lbl.innerHTML=`<span style="color:var(--acc);font-weight:700;font-size:13px">Leave by ${ctx.leaveBy}</span><span onclick="_liveShowStart=true;_liveTick()" style="font-size:10px;color:#555;cursor:pointer;display:block;margin-top:3px;text-decoration:underline">show time until event</span>`;
+    }else if(ctx.type==='depart'&&_liveShowStart){
+      lbl.innerHTML=`<span>Until ${ctx.label}</span><span onclick="_liveShowStart=false;_liveTick()" style="font-size:10px;color:var(--acc);cursor:pointer;display:block;margin-top:3px;text-decoration:underline">show departure countdown</span>`;
+    }else{
+      lbl.textContent=ctx.cdLabel||(ot?'Overtime':'Remaining');
+    }
+  }
+  const nt=el('live-now-t');if(nt)nt.textContent=nowStr;
+  const ne=el('live-now-end');
+  if(ne){
+    if(ctx.type==='depart'&&!_liveShowStart)ne.textContent='event at '+ctx.st;
+    else ne.textContent=ctx.et?'→ '+ctx.et:'';
+  }
+  const pf=el('live-prog-fill');if(pf){pf.style.width=ctx.pct+'%';pf.className='live-prog-fill '+(ctx.pct<50?'ahead':ctx.pct<80?'':'behind');}
+  if(_liveCtx?.st!==ctx.st){_liveRender();}else{_liveCtx=ctx;}
+}
+function _liveNoteSave(idx,ds){const bs=[];el('live-body').querySelectorAll('.live-bullet').forEach(row=>{const ta=row.querySelector('textarea');const ind=parseInt(row.style.paddingLeft)||0;bs.push({text:ta?ta.value:'',depth:Math.round(ind/14)});});saveNotes(idx,ds,bs);}
+function addLiveNote(idx,ds){const bs=getNotes(idx,ds);bs.push({text:'',depth:0});saveNotes(idx,ds,bs);_liveRender();setTimeout(()=>{const tas=el('live-body').querySelectorAll('.live-bullet-inp');if(tas.length){const last=tas[tas.length-1];last.focus();last.style.height='auto';last.style.height=last.scrollHeight+'px';}},50);}
+
+// ═══════════════════════════════════════════════════
+// GYM LIVE MODE
+// ═══════════════════════════════════════════════════
+let _gymLiveOpen=false,_gymLiveSessType='',_gymLiveDurMins=90,_gymLiveStartMs=0;
+let _gymLiveExs=[],_gymLiveRestType=null,_gymLiveRestEndMs=0,_gymLiveRestBeepDone=false,_gymLiveInterval=null;
+let _gymLiveExpandedEx=-1;
+const GYM_SET_REST_MS=90000,GYM_EX_REST_MS=180000;
+function openGymLivePicker(type){
+  const t=type||_todayType();if(!t)return;
+  openGymLive(t);
+}
+function openGymLive(type){
+  _gymLiveSessType=type;const exs=_exForType(type);
+  _gymLiveExs=exs.map(ex=>({id:ex.id,name:ex.name,type,sets:REPSCHEME.map((r,i)=>({num:i+1,reps:r,weight:_lastW(ex.id)||'',done:false}))}));
+  _gymLiveRestType=null;_gymLiveRestEndMs=0;_gymLiveRestBeepDone=false;_gymLiveStartMs=Date.now();_gymLiveExpandedEx=-1;
+  _gymLiveOpen=true;el('live-overlay').classList.add('on');el('btn-live').classList.add('active');
+  _gymLiveRender();if(_gymLiveInterval)clearInterval(_gymLiveInterval);_gymLiveInterval=setInterval(_gymLiveTick,500);
+}
+function closeGymLive(){
+  _gymLiveOpen=false;el('live-overlay').classList.remove('on');el('btn-live').classList.remove('active');
+  if(_gymLiveInterval){clearInterval(_gymLiveInterval);_gymLiveInterval=null;}
+}
+function glToggleEx(ei){_gymLiveExpandedEx=(_gymLiveExpandedEx===ei)?-1:ei;_gymLiveRender();}
+function _gymLiveRender(){
+  const elapsed=(Date.now()-_gymLiveStartMs)/60000;const rem=_gymLiveDurMins-elapsed;
+  const{str,ot}=_fmtCd(rem);
+  const cdEl=el('live-cd-val');if(cdEl){cdEl.textContent=str;cdEl.className='live-cd-val'+(ot?' ot':'');}
+  const lbl=el('live-cd-lbl');if(lbl)lbl.textContent=ot?'Overtime':'Remaining';
+  el('live-title').textContent=_gymLiveSessType+' Session';
+  el('live-subtitle').textContent='Fixed · '+_gymLiveDurMins+' min';
+  el('live-prog-st').textContent='';el('live-prog-et').textContent='';
+  const pct=Math.min(100,Math.max(0,(elapsed/_gymLiveDurMins)*100));
+  const pf=el('live-prog-fill');if(pf){pf.style.width=pct+'%';pf.className='live-prog-fill '+(pct<50?'ahead':pct<90?'':'behind');}
+  const now=new Date();const nt=el('live-now-t');if(nt)nt.textContent=_p(now.getHours())+':'+_p(now.getMinutes())+':'+_p(now.getSeconds());
+  const endT=new Date(_gymLiveStartMs+_gymLiveDurMins*60000);const ne=el('live-now-end');if(ne)ne.textContent='→ '+_p(endT.getHours())+':'+_p(endT.getMinutes());
+  const firstIncompleteIdx=_gymLiveExs.findIndex(ex=>ex.sets.some(s=>!s.done));
+  let body=`<div class="gl-sess-info"><span class="gl-sess-type">${_gymLiveSessType}</span><span class="gl-sess-prog">${_gymLiveExs.filter(ex=>ex.sets.every(s=>s.done)).length}/${_gymLiveExs.length} exercises</span></div>`;
+  _gymLiveExs.forEach((ex,ei)=>{
+    const allDone=ex.sets.every(s=>s.done);const isActive=ei===firstIncompleteIdx;
+    body+=`<div class="gl-ex-block${isActive?' active':''}${allDone?' done-ex':''}" id="glex-${ei}"><div class="gl-ex-hdr">${gymIcon(ex.name)}<div class="gl-ex-name${allDone?' done-name':''}">${ex.name}</div>${allDone?'<span style="color:var(--ok);font-size:14px">✓</span>':''}</div>`;
+    if(isActive||allDone){ex.sets.forEach((set,si)=>{body+=`<div class="gl-set-row"><div class="gl-set-dot${set.done?' done':''}" onclick="glTickSet(${ei},${si})">${set.done?'✓':set.num}</div><span class="gl-set-reps">${set.reps} rep</span><input type="number" class="gl-set-w" value="${set.weight}" placeholder="0" step="0.5" onchange="glSetW(${ei},${si},this.value)" onclick="this.select()"><span class="gl-set-unit">${unit()}</span></div>`;});}
+    else{body+=`<div style="padding:.28rem .8rem;font-size:11px;color:#333">${ex.sets.length} sets</div>`;}
+    if(isActive&&_gymLiveRestType){const restLeft=Math.max(0,(_gymLiveRestEndMs-Date.now())/1000);const total=_gymLiveRestType==='set'?GYM_SET_REST_MS/1000:GYM_EX_REST_MS/1000;const pct2=Math.max(0,Math.min(100,(1-restLeft/total)*100));const done2=restLeft<=0;const cls=done2?'done-rest':_gymLiveRestType==='set'?'set-rest':'ex-rest';const m2=Math.floor(restLeft/60),s2=Math.round(restLeft%60);const tStr=done2?'Go!':`${m2>0?m2+'m ':''}${String(s2).padStart(2,'0')}s`;body+=`<div class="gl-rest"><span class="gl-rest-lbl">${_gymLiveRestType==='set'?'Set rest':'Exercise rest'}</span><span class="gl-rest-val ${cls}" id="gl-rest-val">${tStr}</span><div class="gl-rest-bg"><div class="gl-rest-fill" id="gl-rest-fill" style="width:${pct2}%"></div></div><button class="gl-rest-skip" onclick="glSkipRest()">Skip ›</button></div>`;}
+    body+=`</div>`;
+  });
+  if(firstIncompleteIdx===-1){body+=`<div style="margin:.5rem .8rem;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:10px;padding:1.25rem;text-align:center"><div style="font-size:28px;margin-bottom:8px">💪</div><div style="font-size:15px;font-weight:700;color:#e0e0e0;margin-bottom:4px">Session complete!</div><div style="font-size:12px;color:#555;margin-bottom:1rem">${_gymLiveExs.length} exercises · ${Math.round(elapsed)} min</div><button onclick="glSaveAndClose()" style="padding:10px 24px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:var(--font)">Save & Exit</button></div>`;}
+  else{body+=`<div style="margin:.5rem .8rem"><div style="display:flex;gap:8px"><button onclick="glSaveAndClose()" style="flex:1;padding:9px;background:#1a1a1a;color:#666;border:1px solid #2a2a2a;border-radius:8px;font-size:12px;font-family:var(--font)">Save & Exit</button><button onclick="closeGymLive()" style="flex:1;padding:9px;background:transparent;color:#444;border:1px solid #1a1a1a;border-radius:8px;font-size:12px;font-family:var(--font)">Exit without saving</button></div></div>`;}
+  el('live-body').innerHTML=body;
+}
+function _gymLiveTick(){
+  if(!_gymLiveOpen)return;
+  const elapsed=(Date.now()-_gymLiveStartMs)/60000;const rem=_gymLiveDurMins-elapsed;
+  const{str,ot}=_fmtCd(rem);
+  const cdEl=el('live-cd-val');if(cdEl){cdEl.textContent=str;cdEl.className='live-cd-val'+(ot?' ot':'');}
+  const lbl=el('live-cd-lbl');if(lbl)lbl.textContent=ot?'Overtime':'Remaining';
+  const now=new Date();const nt=el('live-now-t');if(nt)nt.textContent=_p(now.getHours())+':'+_p(now.getMinutes())+':'+_p(now.getSeconds());
+  const pct=Math.min(100,Math.max(0,(elapsed/_gymLiveDurMins)*100));const pf=el('live-prog-fill');if(pf)pf.style.width=pct+'%';
+  if(_gymLiveRestType){const restLeft=Math.max(0,(_gymLiveRestEndMs-Date.now())/1000);const total=_gymLiveRestType==='set'?GYM_SET_REST_MS/1000:GYM_EX_REST_MS/1000;const pct2=Math.max(0,Math.min(100,(1-restLeft/total)*100));const done2=restLeft<=0;if(done2&&!_gymLiveRestBeepDone){_gymLiveRestBeepDone=true;beepRest();}const rvEl=el('gl-rest-val');if(rvEl){const m2=Math.floor(restLeft/60),s2=Math.round(restLeft%60);rvEl.textContent=done2?'Go!':`${m2>0?m2+'m ':''}${String(s2).padStart(2,'0')}s`;rvEl.className='gl-rest-val '+(done2?'done-rest':_gymLiveRestType==='set'?'set-rest':'ex-rest');}const rfEl=el('gl-rest-fill');if(rfEl)rfEl.style.width=pct2+'%';}
+}
+function glTickSet(ei,si){
+  const ex=_gymLiveExs[ei];const set=ex.sets[si];set.done=!set.done;beepSetDone();
+  if(set.done){const allDone=ex.sets.every(s=>s.done);const isLast=_gymLiveExs.slice(ei+1).every(e=>e.sets.every(s=>s.done));if(allDone&&!isLast){_gymLiveRestType='ex';_gymLiveRestEndMs=Date.now()+GYM_EX_REST_MS;_gymLiveRestBeepDone=false;}else if(!allDone){_gymLiveRestType='set';_gymLiveRestEndMs=Date.now()+GYM_SET_REST_MS;_gymLiveRestBeepDone=false;}else{_gymLiveRestType=null;}}else{_gymLiveRestType=null;}
+  _gymLiveRender();
+}
+function glSetW(ei,si,v){_gymLiveExs[ei].sets[si].weight=v;const sets=_gymLiveExs[ei].sets;for(let i=si+1;i<sets.length;i++){if(!sets[i].done)sets[i].weight=v;}}
+function glSkipRest(){_gymLiveRestType=null;_gymLiveRestBeepDone=true;_gymLiveRender();}
+async function glSaveAndClose(){
+  const type=_gymLiveSessType;
+  const{data:sess,error}=await supaFrom('omni_gym_sessions').insert({date:todayStr(),session_type:type,programme_id:GPROG?.id||null,notes:''}).select().single();
+  if(!error&&sess){GSESS.unshift(sess);const rows=[];_gymLiveExs.forEach(ex=>ex.sets.forEach(s=>rows.push({session_id:sess.id,exercise_id:ex.id,set_number:s.num,reps:s.reps,weight:s.weight?+s.weight:null,completed:s.done})));const{data:sets}=await supaFrom('omni_gym_sets').insert(rows).select();if(sets)GSETS.push(...sets);}
+  closeGymLive();showToast(type+' saved ✓');if(_curTab==='gym')renderGymToday();
+}
+
+</script>
+</body>
+</html>
