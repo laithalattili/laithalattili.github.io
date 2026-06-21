@@ -3085,7 +3085,7 @@ async function renderDash(){
   await loadHabitsFor(dateStr);
 
   // ── NOW block ──────────────────────────────────────────────────────────────
-  const _ds=_daySlots||WSLOTS.filter(s=>t2m(s.t)>=420);
+  const _ds=(typeof _daySlots!=='undefined'&&_daySlots?.length)?_daySlots:WSLOTS.filter(s=>t2m(s.t)>=420);
   let curSlot=null,nxtSlot=null,curStart=0,curEnd=0;
   for(let i=0;i<_ds.length;i++){
     const s=_ds[i];const sm=t2m(s.t);const em=t2m(_ds[i+1]?.t||'00:00')||1440;
@@ -3137,14 +3137,14 @@ async function renderDash(){
   if(nextTime)nextTime.textContent=nxtSlot?nxtSlot.time:'';
 
   // ── TASKS block ────────────────────────────────────────────────────────────
-  const tasks=getTasksFor(0).filter(t=>!t.done);
+  const tasks=(typeof getTasksFor==='function'?getTasksFor(0):[]).filter(t=>!t.done);
   const tr=el('dc-tasks-rows');
   if(tr){
     if(!tasks.length){tr.innerHTML='<span style="color:var(--ok);font-size:13px;font-weight:700">All clear ✓</span>';
     }else{
       const bycat={};
       tasks.forEach(t=>{const cat=t._t?.cat||t.src||'other';if(!bycat[cat])bycat[cat]=[];bycat[cat].push(t);});
-      const catNames={};WCATS.forEach(c=>{catNames[c.id]=c.name;});
+      const catNames={};(WCATS||[]).forEach(c=>{catNames[c.id]=c.name;});
       let html='';
       // Tier 1 (due today) first
       const tier1=tasks.filter(t=>t.tier===1);
@@ -3156,8 +3156,8 @@ async function renderDash(){
       const cats=new Set(rest.map(t=>t._t?.cat||'other'));
       cats.forEach(c=>{
         const ct=rest.filter(t=>(t._t?.cat||'other')===c);
-        const name=catNames[c]||WCATS.find(w=>w.id===c)?.name||'Other';
-        const col=WCATS.find(w=>w.id===c)?.color||'var(--tx4)';
+        const name=catNames[c]||(WCATS||[]).find(w=>w.id===c)?.name||'Other';
+        const col=(WCATS||[]).find(w=>w.id===c)?.color||'var(--tx4)';
         html+=`<div style="display:flex;align-items:center;gap:6px;font-size:12px"><span style="width:7px;height:7px;border-radius:50%;background:${col};flex-shrink:0"></span><span style="color:var(--tx2);flex:1">${name}</span><span style="font-family:var(--mono);font-size:11px;color:var(--tx4)">${ct.length}</span></div>`;
       });
       tr.innerHTML=html||'<span style="color:var(--tx4);font-size:12px">No tasks</span>';
@@ -3167,7 +3167,7 @@ async function renderDash(){
   // ── HABITS block ───────────────────────────────────────────────────────────
   const habRow=el('dc-habits-row');
   if(habRow){
-    const gymDone=_hasSessToday();const gymType=_todayType();
+    const gymDone=typeof _hasSessToday==='function'?_hasSessToday():false;const gymType=typeof _todayType==='function'?_todayType():null;
     const bookDone=HAB_DATA.bookDone; // source of truth: reading_log via HAB_DATA
     const filmDone=_habDone('film',dateStr);
     const guitarDone=_habDone('guitar',dateStr);
