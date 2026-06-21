@@ -103,7 +103,7 @@ const SCHEDULER = {
     const pagesLeft = Math.max(1, totalPages - Math.max(startPage, currentPage) + 1);
 
     const plan = [];
-    let page = startPage;
+    let page = Math.max(startPage, Math.min(currentPage, totalPages));
     let date = startDate;
     const MAX = 800;
 
@@ -183,7 +183,7 @@ const SCHEDULER = {
     // Review
     const reviewStart = this.addDays(readEnd, 1);
     date = reviewStart;
-    let rPage = startPage;
+    let rPage = 1; // Review always starts from page 1, regardless of where reading started
     let days = 0;
     while (rPage <= totalPages && days < 200) {
       let pp = this.getReviewPagesForDate(date, rev, calRules);
