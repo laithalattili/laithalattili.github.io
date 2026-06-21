@@ -24471,7 +24471,7 @@ function renderTimetable(){
       const isCleanSpan=isSpanStart&&_startIsClean&&_endIsClean;
       const tdOpen=rowSpan>1?`<td class="${tdCls}" rowspan="${rowSpan}" style="vertical-align:middle;position:relative;padding:0">`:`<td class="${tdCls}">`;
       const _cellClick=ttEditMode?`openEditModal(${idx},'${d}')`:`openSlotNotes(${idx},'${d}',${offset})`;
-      const _depBadge=(cell&&cell.travel_mins&&cell.sensitivity)?`<span style="font-size:9px;color:#6c757d;opacity:.7" title="${cell.travel_mins}min · ${cell.sensitivity}">🚗${cell.travel_mins}'</span>`:'';
+      const _depBadge=(cell&&typeof cell==='object'&&cell.travel_mins!=null&&cell.sensitivity)?`<span style="font-size:9px;color:#6c757d;opacity:.7" title="${cell.travel_mins}min · ${cell.sensitivity}">🚗${cell.travel_mins}'</span>`:'';
       const _longPress=`_lpStart(event,${idx},'${d}')`;
       const _longPressEnd=`_lpEnd(event)`;
       if(!cell){
@@ -28313,6 +28313,15 @@ function initApp(){
   updateGlobalDefaultBtn();
   initActiveMode();
   fetchPersonalSlots().then(function(){renderTimetable();});
+  // Refresh personal slots every 60s so Omni events appear without manual reload
+  setInterval(function(){fetchPersonalSlots().then(function(){renderTimetable();});},60000);
+  // Also subscribe to realtime changes on omni_personal_slots for instant updates
+  try{
+    supa.channel('omni_slots_rt')
+      .on('postgres_changes',{event:'*',schema:'public',table:'omni_personal_slots'},function(){
+        fetchPersonalSlots().then(function(){renderTimetable();});
+      }).subscribe();
+  }catch(e){console.warn('omni RT:',e);}
   // Expose slot structure + custom slots to Supabase for Omni
   setTimeout(function(){
     supaSave('slotTimes',JSON.stringify(SLOTS.filter(function(s){return s.t>='07:00';}).map(function(s){return{t:s.t};})));
