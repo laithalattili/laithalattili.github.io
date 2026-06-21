@@ -357,33 +357,36 @@ PAGES.openBookSchedule = async (queueId, app) => {
 
             // Write each reading day
           // Scheduler uses 'pages' field, not 'pagesPlanned'
-          const readingDays = plan.filter(d => d.type === 'reading' && d.pages > 0);
+          const activeDays = plan.filter(d =>
+            (d.type === 'reading' || d.type === 'review') && d.pages > 0
+          );
           console.log('[Omni] Plan day types:', plan.map(d => d.type + ':' + d.pages).join(', '));
-          console.log('[Omni] Writing', readingDays.length, 'reading days');
+          console.log('[Omni] Writing', activeDays.length, 'active days');
 
-            for (const day of readingDays) {
-              const postRes = await fetch(`${sbUrl}/rest/v1/omni_schedule_feed`, {
-                method: 'POST',
-                headers: { ...sbHeaders, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
-                body: JSON.stringify({
-                  date: day.date,
-                  type: 'reading',
-                  title: freshBook.title,
-                  source_app: 'life',
-                  source_id: freshBook.id,
-                  meta: JSON.stringify({
-                    fromPage: day.fromPage,
-                    toPage: day.toPage,
-                    pagesPlanned: day.pages,
-                    totalPages: freshBook.pages || null,
-                    currentPage: freshQueue.current_page || freshQueue.start_page || 1,
-                    reviewStart: reviewStart || null
-                  }),
-                  created_at: new Date().toISOString()
-                })
-              });
-              if (!postRes.ok) console.warn('[Omni] POST failed:', postRes.status, await postRes.text());
-            }
+          for (const day of activeDays) {
+            const postRes = await fetch(`${sbUrl}/rest/v1/omni_schedule_feed`, {
+              method: 'POST',
+              headers: { ...sbHeaders, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+              body: JSON.stringify({
+                date: day.date,
+                type: day.type === 'review' ? 'reading-review' : 'reading',
+                title: freshBook.title,
+                source_app: 'life',
+                source_id: freshBook.id,
+                meta: JSON.stringify({
+                  fromPage: day.fromPage,
+                  toPage: day.toPage,
+                  pagesPlanned: day.pages,
+                  totalPages: freshBook.pages || null,
+                  currentPage: freshQueue.current_page || freshQueue.start_page || 1,
+                  reviewStart: reviewStart || null,
+                  isReview: day.type === 'review'
+                }),
+                created_at: new Date().toISOString()
+              })
+            });
+            if (!postRes.ok) console.warn('[Omni] POST failed:', postRes.status, await postRes.text());
+          }
             console.log(`[Omni] Done — wrote ${readingDays.length} reading days for "${freshBook.title}"`);
           }
         }

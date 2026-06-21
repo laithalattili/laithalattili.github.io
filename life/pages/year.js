@@ -88,14 +88,17 @@ PAGES.year = async (container, app) => {
       );
 
       // Write all reading days (not rest days)
-      const readingDays = sched.plan.filter(d => d.type === 'reading' && d.pages > 0);
-      for (const day of readingDays) {
+      // Write reading days AND review days to feed
+      const activeDays = sched.plan.filter(d =>
+        (d.type === 'reading' || d.type === 'review') && d.pages > 0
+      );
+      for (const day of activeDays) {
         await fetch(`${sbUrl}/rest/v1/omni_schedule_feed`, {
           method: 'POST',
           headers: sbHeaders,
           body: JSON.stringify({
             date: day.date,
-            type: 'reading',
+            type: day.type === 'review' ? 'reading-review' : 'reading',
             title: sched.title,
             source_app: 'life',
             source_id: sched.bookId,
@@ -105,7 +108,8 @@ PAGES.year = async (container, app) => {
               pagesPlanned: day.pages,
               totalPages: sched.pages || null,
               currentPage: sched.currentPage || 1,
-              reviewStart: sched.reviewStart || null
+              reviewStart: sched.reviewStart || null,
+              isReview: day.type === 'review'
             }),
             created_at: new Date().toISOString()
           })
