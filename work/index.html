@@ -26369,8 +26369,16 @@ async function renderHawkingRegister(el, preloadedMap){
   const total=people.length;
   const registered=total-counts.unregistered;
 
+  const _rf=window._regFilter||'all';
+  const filteredPeople=_rf==='all'?people:people.filter(p=>{
+    const _st=(_brState[p.name]||{}).status||'unregistered';
+    const _exc=excusedMap[p.name];
+    const _auto=_exc&&(_exc.state==='excused'||_exc.type==='activity');
+    const _eff=_auto?'excused':_st;
+    return _eff===_rf;
+  });
   let rows='';
-  people.forEach((p,i)=>{
+  filteredPeople.forEach((p,i)=>{
     const stObj=_brState[p.name]||{};
     let st=stObj.status||'unregistered';
     const excuseInfo=excusedMap[p.name]||null;
@@ -26463,12 +26471,14 @@ async function renderHawkingRegister(el, preloadedMap){
   el.innerHTML=`<div>
     <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#f8fafc;border-bottom:1px solid #e2e8f0;position:sticky;top:0;z-index:2;flex-wrap:wrap;gap:4px">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <span style="font-size:12px;font-weight:600;color:#374151">${registered}/${total} registered</span>
-        <span style="font-size:11px;color:#16a34a">${counts.present}✓</span>
-        <span style="font-size:11px;color:#dc2626">${counts.absent}✗</span>
-        <span style="font-size:11px;color:#d97706">${counts.excused}~</span>
+        <span onclick="setRegFilter('all')" style="font-size:12px;font-weight:600;padding:2px 8px;border-radius:10px;cursor:pointer;background:${!window._regFilter||window._regFilter==='all'?'#374151':'transparent'};color:${!window._regFilter||window._regFilter==='all'?'#fff':'#374151'}">${registered}/${total}</span>
+        <span onclick="setRegFilter(window._regFilter==='present'?'all':'present')" style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;cursor:pointer;background:${window._regFilter==='present'?'#16a34a':'transparent'};color:${window._regFilter==='present'?'#fff':'#16a34a'}">${counts.present}✓</span>
+        <span onclick="setRegFilter(window._regFilter==='absent'?'all':'absent')" style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;cursor:pointer;background:${window._regFilter==='absent'?'#dc2626':'transparent'};color:${window._regFilter==='absent'?'#fff':'#dc2626'}">${counts.absent}✗</span>
+        <span onclick="setRegFilter(window._regFilter==='excused'?'all':'excused')" style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;cursor:pointer;background:${window._regFilter==='excused'?'#d97706':'transparent'};color:${window._regFilter==='excused'?'#fff':'#d97706'}">${counts.excused}~</span>
+        <span onclick="setRegFilter(window._regFilter==='unregistered'?'all':'unregistered')" style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;cursor:pointer;background:${window._regFilter==='unregistered'?'#6b7280':'transparent'};color:${window._regFilter==='unregistered'?'#fff':'#9ca3af'}">${counts.unregistered}?</span>
 
         ${revertBtn}
+        <button onclick="openAddLeaveModal()" style="font-size:11px;padding:3px 8px;border-radius:5px;border:1px solid #00205B;background:#fff;color:#00205B;cursor:pointer;font-weight:600">+ Leave</button>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
         <span style="font-size:9px;color:#d1d5db">fetched ${fetchedAt}</span>
@@ -26579,6 +26589,13 @@ let _boarderGrouping='grade'; // 'grade' | 'room'
 function toggleBoarderGrouping(g){
   _boarderGrouping=g;
   renderHawkingList();
+}
+
+window._regFilter='all';
+function setRegFilter(f){
+  window._regFilter=f;
+  const el=document.getElementById('hawking-list-content');
+  if(el)renderHawkingRegister(el);
 }
 
 function setHwkFilter(f,btn){
@@ -30618,28 +30635,20 @@ async function confirmReturn(id){
       return_confirmed_by:'HSM'
     }).eq('id',id);
 
-    // Auto-mark student as Present in today's register
+    // Mark present: delete excused rows, upsert present for current session
     if(studentName){
-      const today=new Date().toISOString().split('T')[0];
+      const td=new Date().toISOString().split('T')[0];
+      const now2=new Date().toISOString();
+      const sess=getCurrentSession();
+      // Remove excused rows added on departure
+      await supa.from('boarding_registrations').delete()
+        .eq('student_name',studentName).eq('register_date',td).eq('status','excused');
+      // Mark present in current session
       await supa.from('boarding_registrations').upsert({
-        student_name:studentName,
-        register_date:today,
-        status:'present',
-        updated_by:'HSM',
-        session_type:'boarding',
-        updated_at:new Date().toISOString()
-      },{onConflict:'student_name,register_date'});
-      // Update local state
-      _brState[studentName]={status:'present',updatedAt:new Date().toISOString(),updatedBy:'HSM'};
-      // Log to history
-      supa.from('boarding_registration_history').insert({
-        student_name:studentName,
-        register_date:today,
-        previous_status:'excused',
-        new_status:'present',
-        changed_by:'HSM',
-        session_type:'boarding'
-      }).then(()=>{},()=>{});
+        student_name:studentName, register_date:td, session_type:sess,
+        status:'present', updated_by:'HSM', updated_at:now2
+      },{onConflict:'student_name,register_date,session_type'});
+      _brState[studentName]={status:'present',updatedAt:now2,updatedBy:'HSM'};
     }
 
     showToastMsg('✓ '+(studentName||'Student')+' returned & marked Present','#16a34a');
@@ -30805,8 +30814,8 @@ async function getTodayExcusedMap(){
     const {data}=await supa.from('boarding_leaves')
       .select('*,form_submitted,parents_called')
       .neq('active',false); // include active=true and active=null
-    const leaveLabel={weekend:'Weekend Leave',extended:'Extended Leave',daytime:'Daytime Departure',longterm:'Long-term Leave',medical:'Medical Leave',family:'Family Leave',activity:'Activity',holiday:'Holiday Leave'};
-    const leaveEmoji={weekend:'🏠',extended:'📅',daytime:'🌅',longterm:'🏥',medical:'🏥',family:'👨‍👩‍👧',activity:'⚽',holiday:'🌴'};
+    const leaveLabel={weekend:'Weekend Leave',extended:'Extended Leave',daytime:'Daytime Departure',longterm:'Long-term Leave',medical:'Medical Leave',family:'Family Leave',activity:'Activity',holiday:'Holiday Leave',official_holiday:'🏖️ Official Holiday'};
+    const leaveEmoji={weekend:'🏠',extended:'📅',daytime:'🌅',longterm:'🏥',medical:'🏥',family:'👨‍👩‍👧',activity:'⚽',holiday:'🌴',official_holiday:'🏖️'};
     (data||[]).forEach(l=>{
       // If already returned — skip
       if(l.returned_at||l.return_actual)return; // skip if already returned
@@ -32226,6 +32235,62 @@ function isReturnToday(excuseInfo){
   return excuseInfo.returnPlanned.split('T')[0]===today;
 }
 
+
+function openAddLeaveModal(){
+  document.getElementById('add-leave-modal').style.display='flex';
+  document.getElementById('al-start').value=new Date().toISOString().split('T')[0];
+  document.getElementById('al-name').value='';
+  document.getElementById('al-name').removeAttribute('data-selected');
+}
+function closeAddLeaveModal(){document.getElementById('add-leave-modal').style.display='none';}
+function alFilterStudents(){
+  const inp=document.getElementById('al-name');
+  const drop=document.getElementById('al-drop');
+  if(!inp||!drop)return;
+  inp.removeAttribute('data-selected');
+  const q=inp.value.trim().toLowerCase();
+  const src=STUDENTS.map(s=>s.name||s);
+  const matches=q?src.filter(n=>n.toLowerCase().includes(q)).slice(0,15):src.slice(0,20);
+  if(!matches.length){drop.style.display='none';return;}
+  drop.innerHTML=matches.map(n=>`<div onpointerdown="event.preventDefault();alSelectStudent('${n.replace(/'/g,"\'")}');drop.style.display='none'"
+    style="padding:9px 12px;font-size:14px;cursor:pointer;border-bottom:1px solid #f3f4f6;color:#111">${n}</div>`).join('');
+  drop.style.display='block';
+}
+function alSelectStudent(n){
+  const inp=document.getElementById('al-name');
+  if(inp){inp.value=n;inp.setAttribute('data-selected',n);}
+  const drop=document.getElementById('al-drop');if(drop)drop.style.display='none';
+}
+async function submitAddLeave(){
+  const inp=document.getElementById('al-name');
+  const name=(inp?.getAttribute('data-selected')||inp?.value||'').trim();
+  const type=document.getElementById('al-type')?.value;
+  const start=document.getElementById('al-start')?.value;
+  const end=document.getElementById('al-end')?.value;
+  const notes=document.getElementById('al-notes')?.value?.trim();
+  if(!name){alert('Please select a student.');return;}
+  if(!type){alert('Please select a leave type.');return;}
+  if(!start){alert('Please set a start date.');return;}
+  const btn=document.getElementById('al-submit');
+  if(btn){btn.disabled=true;btn.textContent='Saving…';}
+  try{
+    const {error}=await supa.from('boarding_leaves').insert({
+      student_name:name,leave_type:type,
+      departure_planned:start+'T00:00:00',
+      return_planned:end?end+'T23:59:59':null,
+      reason:notes||'',active:true,created_by:'HSM'
+    });
+    if(error)throw error;
+    closeAddLeaveModal();
+    showToastMsg('✓ Leave added for '+name,'#16a34a');
+    window._lastExcusedMap=null;
+    const el=document.getElementById('hawking-list-content');
+    if(el&&_hwkFilter==='register')renderHawkingRegister(el);
+    if(el&&_hwkFilter==='away')renderAwayList(el);
+  }catch(e){alert('Error: '+e.message);}
+  finally{if(btn){btn.disabled=false;btn.textContent='Add Leave';}}
+}
+
 // ── BOARDING PENALTIES REALTIME ──────────────────────────────
 let _penaltySub=null;
 let _penaltyOwnWrite=false; // suppress RT re-render for our own writes
@@ -32354,10 +32419,8 @@ function _amBoardingRegisterHtml(type,excusedMap){
   allPeople.forEach(p=>{const st=(_brState[p.name]||{}).status||'';if(st)counts[st]=(counts[st]||0)+1;else counts.unset++;});
   const total=allPeople.length;
 
-  // Session header — use slot start time to determine session
-  const _ctx=amGetCtx();
-  const _slotSt=_ctx?getSlotTime(_ctx.slotIdx):null;
-  const _sess=getCurrentSession(_slotSt);
+  // Session header — always use current clock time, not slot start time
+  const _sess=getCurrentSession();
   _brCurrentSession=_sess; // sync global session state
   const _sessLabel=getSessionLabel(_sess);
   const _sessEmoji=getSessionEmoji(_sess);
@@ -33534,6 +33597,41 @@ function initActiveMode(){
   </div>
 </div>
 
+
+<!-- Add Leave Modal -->
+<div id="add-leave-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;border-radius:12px;padding:20px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="font-size:16px;font-weight:700;color:#00205B;margin-bottom:16px">📋 Add Leave Request</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="position:relative">
+        <input id="al-name" placeholder="Student name…" autocomplete="off"
+          oninput="alFilterStudents()" onfocus="alFilterStudents()" onblur="setTimeout(()=>{const d=document.getElementById('al-drop');if(d)d.style.display='none';},200)"
+          style="width:100%;padding:10px 12px;border-radius:7px;border:1px solid #e5e7eb;font-size:14px">
+        <div id="al-drop" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #e5e7eb;border-radius:7px;box-shadow:0 4px 16px rgba(0,0,0,.12);max-height:180px;overflow-y:auto;z-index:10;margin-top:2px"></div>
+      </div>
+      <select id="al-type" style="padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px">
+        <option value="">— Leave type —</option>
+        <option value="weekend">🏠 Weekend Leave</option>
+        <option value="medical">🏥 Medical</option>
+        <option value="family">👨‍👩‍👧 Family</option>
+        <option value="activity">⚽ School Activity</option>
+        <option value="official_holiday">🏖️ Official Holiday</option>
+        <option value="longterm">📅 Long-term</option>
+      </select>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1"><label style="font-size:10px;color:#888">FROM</label>
+          <input id="al-start" type="date" style="padding:7px 8px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%"></div>
+        <div style="flex:1"><label style="font-size:10px;color:#888">TO (optional)</label>
+          <input id="al-end" type="date" style="padding:7px 8px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px;width:100%"></div>
+      </div>
+      <input id="al-notes" placeholder="Notes (optional)" style="padding:8px 10px;border-radius:7px;border:1px solid #e5e7eb;font-size:13px">
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button onclick="closeAddLeaveModal()" style="flex:1;padding:10px;border-radius:8px;border:1px solid #e5e7eb;background:#f9fafb;color:#374151;cursor:pointer;font-size:13px">Cancel</button>
+        <button onclick="submitAddLeave()" id="al-submit" style="flex:1;padding:10px;border-radius:8px;border:none;background:#00205B;color:#fff;cursor:pointer;font-size:13px;font-weight:700">Add Leave</button>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html><script>
 // ── REGISTRATION HISTORY CSV EXPORT ──────────────────────────────────────────
