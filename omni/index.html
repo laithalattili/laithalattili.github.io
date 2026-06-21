@@ -3660,7 +3660,15 @@ async function _unlogHabit(type,dateStr){
 }
 
 async function _tickBook(dateStr){
-  await _tickHabit('book',dateStr,JSON.stringify(HAB_DATA.book?.meta||{}));
+  const d=new Date();d.setDate(d.getDate()+_dayOff);
+  const dayName=DS[d.getDay()];
+  if(HAB_DATA.bookDone){
+    await _unlogHabit('book',dateStr);
+    await renderHabits(dateStr,dayName);
+  }else{
+    await _logHabit('book',dateStr,HAB_DATA.book?.meta||{});
+    await renderHabits(dateStr,dayName);
+  }
 }
 
 async function _tickHabit(type,dateStr,metaJson){
