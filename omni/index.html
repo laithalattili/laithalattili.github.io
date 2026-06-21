@@ -3078,9 +3078,11 @@ async function deleteRhythm(){if(!_editRhId||!confirm('Delete?'))return;await su
 // ═══════════════════════════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════════════════════════
-function renderDash(){
+async function renderDash(){
   const now=new Date();const nowM=now.getHours()*60+now.getMinutes();
   const dateStr=todayStr();const dayName=DS[now.getDay()];
+  // Load today's habits data first
+  await loadHabitsFor(dateStr);
 
   // ── NOW block ──────────────────────────────────────────────────────────────
   const _ds=_daySlots||WSLOTS.filter(s=>t2m(s.t)>=420);
