@@ -4259,6 +4259,7 @@ function _getLiveCtx(){
     }
   }
   const isCommitment=cur&&!['free','sleep','personal'].includes(cur.tp);
+  console.log('LiveCtx: cur=',cur?.label,cur?.tp,'ps=',JSON.stringify(cur?.ps?.sensitivity),cur?.ps?.travel_mins,'isCommit=',isCommitment);
   let rem,cdLabel,pct=0;
   if(isCommitment){
     rem=(curEnd-nowM)/60;
