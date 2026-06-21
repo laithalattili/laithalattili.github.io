@@ -1788,7 +1788,7 @@ function _renderDayNow(){
   const _psMap={};
   _todayPS.forEach(ps=>{if(ps.start_time)_psMap[ps.start_time]=ps;});
   // Build unified work events using spec algorithm
-  const _personalEvts=_todayPS.map(ps=>({time:ps.start_time,end:ps.end_time||'',endTime:ps.end_time||'',label:ps.title,tp:'personal',idx:-1,src:'personal',psId:ps.id,ps}));
+  const _personalEvts=_todayPS.filter(ps=>!!ps.start_time).map(ps=>({time:ps.start_time,end:ps.end_time||'',endTime:ps.end_time||'',label:ps.title,tp:'personal',idx:-1,src:'personal',psId:ps.id,ps}));
   const skippedSlots=new Set();
   const _workEvts=[];
   // Build Work app index → WSLOTS index map
@@ -1936,7 +1936,7 @@ function _renderDayNow(){
           const rmBtn=t2.src==='work'?`<button onclick="removeWorkHint('${t2.id}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`:`<button onclick="unassignTask('${t2.id}','${dateStr}');renderDay()" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0 2px">×</button>`;
           return`<div class="slot-task-row"><div class="slot-task-cb${t2.done?' on':''}" onclick="toggleDone('${t2.dk}',this);setTimeout(renderDay,50)">${t2.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t2.done?' done':''}">${t2.text}</div>${rmBtn}</div>`;
         }).join('')}</div>`:'';
-        const _leaveBy=sl.ps?.sensitivity&&sl.ps?.travel_mins!=null?_calcLeaveBy(sl.time,sl.ps.sensitivity,sl.ps.travel_mins):null;
+        const _leaveBy=ps?.sensitivity&&ps?.travel_mins!=null?_calcLeaveBy(sl.time,ps.sensitivity,ps.travel_mins):null;
         slotsHtml+=`<div class="slot personal-slot"><div class="slot-hdr"><span class="slot-tr">${sl.time} <b>–${sl.end||sl.endTime}</b></span><span class="slot-pip" style="background:#7080c0"></span><span class="slot-lbl">${sl.label}</span>${_leaveBy?`<span style="font-family:var(--mono);font-size:10px;color:var(--acc);margin-left:4px">🚶${_leaveBy}</span>`:''}<button onclick="openEditPersonalSlot('${sl.psId}')" style="font-size:11px;color:#7080c0;background:none;border:none;padding:0 4px">✎</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:20px;font-weight:300;color:#7080c0;background:none;border:none;padding:0 3px;line-height:1">+</button></div>${psTasksHtml}</div>`;
         return;
       }
@@ -4235,7 +4235,11 @@ function _getLiveCtx(){
     if(p.recurrence==='daily')return true;
     return false;
   });
-  todayPS.forEach(p=>todaySlots.push({time:p.start_time,end:p.end_time||'',label:p.title,tp:'personal',src:'personal',idx:-1,ps:p}));
+  todayPS.forEach(p=>{
+    // Only add if has start_time
+    if(!p.start_time)return;
+    todaySlots.push({time:p.start_time,end:p.end_time||'',label:p.title,tp:'personal',src:'personal',idx:-1,ps:p});
+  });
   todaySlots.sort((a,b)=>t2m(a.time)-t2m(b.time));
   // Find current and next
   let cur=null,curStart=0,curEnd=0;
