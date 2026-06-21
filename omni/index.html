@@ -3792,15 +3792,16 @@ function openEditPersonalSlot(id){
   document.getElementById('ps-end').value=ps.end_time||'';
   document.getElementById('ps-recur').value=ps.recurrence||'once';
   document.getElementById('ps-date').value=ps.date||'';
-  document.getElementById('ps-dow').value=ps.day_of_week||'Mon';
+  const dowEl=document.getElementById('ps-dow');if(dowEl)dowEl.value=ps.day_of_week||'Mon';
   document.getElementById('ps-delete-btn').style.display='';
   // Restore departure fields
   const hasDep=!!(ps.sensitivity||ps.travel_mins);
   document.getElementById('ps-depart-toggle').checked=hasDep;
   document.getElementById('ps-depart-fields').style.display=hasDep?'flex':'none';
   if(ps.sensitivity){
-    const radio=document.querySelector('input[name="ps-sens"][value="'+ps.sensitivity+'"]');
-    if(radio){radio.checked=true;radio.closest('label').style.borderColor='var(--acc)';radio.closest('label').style.background='rgba(184,88,40,.05)';}
+    _populateSensOpts(ps.sensitivity);
+  }else{
+    _populateSensOpts();
   }
   document.getElementById('ps-travel').value=ps.travel_mins||'';
   _psUpdateDepartPreview();
@@ -3886,10 +3887,11 @@ function _departBuffer(sensitivity){
   return cats.find(c=>c.key===sensitivity)?.buffer??0;
 }
 function _calcLeaveBy(startTime,sensitivity,travelMins){
-  if(!startTime||!sensitivity||travelMins==null)return null;
+  if(!startTime||!sensitivity)return null;
+  const travel=travelMins!=null?+travelMins:0;
   const startM=t2m(startTime);
-  const leaveM=startM-_departBuffer(sensitivity)-travelMins;
-  if(leaveM<0)return null;
+  const leaveM=startM-_departBuffer(sensitivity)-travel;
+  if(leaveM<0||leaveM>=startM)return null;
   return _p(Math.floor(leaveM/60))+':'+_p(leaveM%60);
 }
 function _populateSensOpts(selectedKey){
