@@ -3573,11 +3573,13 @@ async function renderHabits(dateStr,dayName){
   const bookTitle=bookData?.title||'Reading';
   const bookMeta=bookData?.meta?(typeof bookData.meta==='string'?JSON.parse(bookData.meta):bookData.meta):{};
   const pages=bookMeta.pages_planned||bookMeta.pages||null;
+  const isReview=!!(bookMeta.isReview||bookMeta.is_review||bookData.type==='reading-review');
+  const pageRange=(()=>{const f=bookMeta.fromPage||bookMeta.from_page||'';const t=bookMeta.toPage||bookMeta.to_page||'';return f&&t?'pp.'+f+'–'+t:pages?pages+'p':'Daily reading';})();
   h+=`<div class="habit-row${bookDone?' done':''}" id="hab-book">
-    <span class="habit-icon">📖</span>
+    <span class="habit-icon">${isReview?'🔁':'📖'}</span>
     <div class="habit-body">
-      <div class="habit-name">${bookTitle}</div>
-      <div class="habit-sub">${(()=>{const f=bookMeta.fromPage||bookMeta.from_page||'';const t=bookMeta.toPage||bookMeta.to_page||'';return f&&t?'pp.'+f+'–'+t:pages?pages+'p':'Daily reading';})()}${bookDone?' ✓':''}</div>
+      <div class="habit-name">${bookTitle}${isReview?` <span style="font-size:10px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:4px;vertical-align:middle">REVIEW</span>`:''}</div>
+      <div class="habit-sub">${pageRange}${bookDone?' ✓':''}</div>
     </div>
     <button onclick="_habPickTime('book','${dateStr}')" style="font-size:10px;background:none;border:none;padding:0 4px;color:${_habSlotTime('book',dateStr)?'var(--acc)':'var(--tx4)'}">📌</button>
     <div class="habit-tick${bookDone?' on':''}" onclick="${bookDone?`_unlogHabit('book','${dateStr}').then(()=>renderHabits('${dateStr}','${dayName}'))`:`_tickBook('${dateStr}')`}">${bookDone?'✓':''}</div>
