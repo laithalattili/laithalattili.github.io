@@ -3414,17 +3414,22 @@ let HAB_LOADED=false;
 
 // ── Load habits data for a given date ────────────────────────────────────────
 async function loadHabitsFor(dateStr){
-  HAB_DATA={gym:null,book:null,film:null,course:null};
+  HAB_DATA={gym:null,book:null,film:null,course:null,bookDone:false};
   if(!_OK)return;
+  // Use local date string to match Life Manager's timezone
+  const localDateStr=dateStr||(()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
   try{
     // Schedule feed for date (from Life Manager)
     const{data:feed}=await supaFrom('omni_schedule_feed')
-      .select('*').eq('date',dateStr).eq('source_app','life');
+      .select('*').eq('date',localDateStr).eq('source_app','life');
     if(feed){
       feed.forEach(row=>{
-        if(row.type==='book'||row.type==='reading')HAB_DATA.book=row;
-        if(row.type==='film')HAB_DATA.film=row;
-        if(row.type==='course')HAB_DATA.course=row;
+        // Parse meta if it's a JSON string
+        const m=row.meta?(typeof row.meta==='string'?JSON.parse(row.meta):row.meta):{};
+        const rowWithMeta={...row,meta:m};
+        if(row.type==='book'||row.type==='reading'||row.type==='reading-review')HAB_DATA.book=rowWithMeta;
+        if(row.type==='film')HAB_DATA.film=rowWithMeta;
+        if(row.type==='course')HAB_DATA.course=rowWithMeta;
       });
     }
     // Gym: check if session exists
@@ -3495,7 +3500,7 @@ async function _logHabit(type,dateStr,meta={}){
         // Write to reading_log (source of truth shared with Life Manager)
         const{data:existing}=await supaFrom('reading_log')
           .select('id').eq('book_id',bookId).eq('date',dateStr).maybeSingle();
-        const entry={book_id:bookId,date:dateStr,pages_planned:pagesPlanned,pages_read:pagesPlanned,is_review:false,current_page_after:toPage||null};
+        const entry={book_id:bookId,date:dateStr,pages_planned:pagesPlanned,pages_read:pagesPlanned,is_review:!!(HAB_DATA.book?.meta?.isReview||HAB_DATA.book?.meta?.is_review),current_page_after:toPage||null};
         if(existing?.id){
           await supaFrom('reading_log').update(entry).eq('id',existing.id);
         }else{
