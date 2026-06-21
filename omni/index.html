@@ -3895,11 +3895,24 @@ function _populateSensOpts(selectedKey){
   const opts=document.getElementById('ps-sensitivity-opts');
   if(!opts)return;
   const cats=_getDepartCats();
-  opts.innerHTML=cats.map(c=>`
-    <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;border:1.5px solid ${c.key===selectedKey?'var(--acc)':'var(--bd)'};cursor:pointer;background:${c.key===selectedKey?'rgba(184,88,40,.05)':'var(--sur)'}" onclick="_psSensSelect('${c.key}',this)">
-      <input type="radio" name="ps-sens" value="${c.key}" ${c.key===selectedKey?'checked':''} style="accent-color:var(--acc)">
-      <div style="flex:1"><div style="font-size:13px;font-weight:600">${c.label}</div><div style="font-size:11px;color:var(--tx4)">${c.buffer} min buffer</div></div>
-    </label>`).join('');
+  opts.innerHTML=cats.map(c=>{
+    const sel=c.key===selectedKey;
+    return`<div onclick="_psSensSelect('${c.key}',this)" data-key="${c.key}"
+      style="display:flex;align-items:center;gap:10px;padding:.55rem .75rem;border-radius:8px;
+      border:1.5px solid ${sel?'var(--acc)':'var(--bd)'};
+      background:${sel?'rgba(184,88,40,.06)':'var(--sur)'};
+      cursor:pointer;margin-bottom:4px;transition:border-color .15s">
+      <div style="width:18px;height:18px;border-radius:50%;border:2px solid ${sel?'var(--acc)':'var(--bd2)'};
+        background:${sel?'var(--acc)':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center">
+        ${sel?'<div style="width:7px;height:7px;border-radius:50%;background:#fff"></div>':''}
+      </div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600;color:var(--tx)">${c.label}</div>
+        <div style="font-size:11px;color:var(--tx4);margin-top:1px">${c.buffer} min arrival buffer</div>
+      </div>
+      <input type="radio" name="ps-sens" value="${c.key}" ${sel?'checked':''} style="display:none">
+    </div>`;
+  }).join('');
 }
 function _psDepartChange(){
   const on=document.getElementById('ps-depart-toggle').checked;
@@ -3907,21 +3920,22 @@ function _psDepartChange(){
   if(on)_populateSensOpts();
   _psUpdateDepartPreview();
 }
-function _psSensSelect(val,labelEl){
-  document.querySelectorAll('#ps-sensitivity-opts label').forEach(l=>{
-    l.style.borderColor='var(--bd)';l.style.background='var(--sur)';
-  });
-  labelEl.style.borderColor='var(--acc)';labelEl.style.background='rgba(184,88,40,.05)';
+function _psSensSelect(val,el){
+  // Re-render with new selection
+  _populateSensOpts(val);
   _psUpdateDepartPreview();
 }
 function _psUpdateDepartPreview(){
   const prev=document.getElementById('ps-depart-preview');if(!prev)return;
-  const sens=document.querySelector('input[name="ps-sens"]:checked')?.value;
+  const sensEl=document.querySelector('#ps-sensitivity-opts [data-key]')?.closest('[data-key]');
+  const sens=document.querySelector('input[name="ps-sens"]:checked')?.value||
+    document.querySelector('#ps-sensitivity-opts div[style*="var(--acc)"]')?.dataset?.key;
   const travel=+document.getElementById('ps-travel')?.value||0;
   const start=document.getElementById('ps-start')?.value;
   const leaveBy=_calcLeaveBy(start,sens,travel);
-  if(leaveBy){
-    prev.textContent='🚶 Leave by '+leaveBy;
+  if(leaveBy&&sens&&travel>0){
+    const cat=_getDepartCats().find(c=>c.key===sens);
+    prev.innerHTML='🚶 Leave by <b>'+leaveBy+'</b>'+(cat?' ('+cat.buffer+'min buffer + '+travel+'min travel)':'');
     prev.style.display='block';
   }else prev.style.display='none';
 }
@@ -4197,38 +4211,76 @@ let _liveWake=null,_liveFrozen=false;
 function _getLiveCtx(){
   const now=new Date();const nowM=now.getHours()*60+now.getMinutes()+now.getSeconds()/60;
   const dayName=DS[now.getDay()];const dateStr=now.toISOString().split('T')[0];
-  if(!WSLOTS.length){return{type:'free',label:'Free',tp:'free',st:'',et:'',rem:60,pct:0,next:null,cdLabel:'Free',dateStr,idx:-1,dayName,isMorning:now.getHours()<12};}
-  let curIdx=-1;for(let i=0;i<WSLOTS.length;i++){if(nowM>=t2m(WSLOTS[i]?.t))curIdx=i;}
-  let cur=null,curStart=nowM,curEnd=nowM+60;
-  if(curIdx>=0){
-    const c=WSLOTS[curIdx]?.[dayName];
-    if(c&&!['free','personal','sleep'].includes(c.tp)){
-      curStart=t2m(WSLOTS[curIdx].t);
-      curEnd=WSLOTS[curIdx+1]?t2m(WSLOTS[curIdx+1].t):curStart+60;
-      cur={label:c.l,tp:c.tp,idx:curIdx,st:WSLOTS[curIdx].t,et:WSLOTS[curIdx+1]?.t||'00:00'};
-    }
+  // Use _daySlots (same as renderDay) for correct slot lookup
+  const ds=typeof _daySlots!=='undefined'&&_daySlots.length?_daySlots:WSLOTS.filter(s=>t2m(s.t)>=420);
+  const ttc=window._ttCustomData||{};
+  const wk=typeof _schoolWeekNum==='function'?_schoolWeekNum(dateStr):0;
+  // Build today's slots using same logic as renderDay
+  const todaySlots=[];
+  for(let i=0;i<ds.length;i++){
+    const s=ds[i];
+    const wIdx=window._timeToWorkIdx?.[s.t]??i;
+    const ov=ttc[wk+'_'+wIdx+'_'+dayName];
+    const base=s[dayName];
+    const label=ov?(ov.l||ov.label||base?.l||''):(base?.l||'');
+    const tp=ov?(typeof _ttcTpToOmni==='function'?_ttcTpToOmni(ov.tp||ov.cat||'free'):'free'):(base?.tp||'free');
+    const end=ov?.customEndTime||(ds[i+1]?.t||'00:00');
+    todaySlots.push({time:s.t,end,label,tp,idx:i});
   }
-  // Next real commitment (skip free/personal/sleep)
-  let next=null;
-  for(let i=curIdx+1;i<WSLOTS.length;i++){
-    const c=WSLOTS[i]?.[dayName];
-    if(c&&!['free','personal','sleep'].includes(c.tp)){
-      next={label:c.l,tp:c.tp,st:WSLOTS[i].t,secUntil:Math.round((t2m(WSLOTS[i].t)-nowM)*60)};
+  // Add personal slots
+  const todayPS=(PERSONAL_SLOTS||[]).filter(p=>{
+    if(p.recurrence==='once')return p.date===dateStr;
+    if(p.recurrence==='weekly')return p.day_of_week===dayName;
+    if(p.recurrence==='daily')return true;
+    return false;
+  });
+  todayPS.forEach(p=>todaySlots.push({time:p.start_time,end:p.end_time||'',label:p.title,tp:'personal',idx:-1,ps:p}));
+  todaySlots.sort((a,b)=>t2m(a.time)-t2m(b.time));
+  // Find current and next
+  let cur=null,curStart=0,curEnd=0;
+  for(let i=0;i<todaySlots.length;i++){
+    const sl=todaySlots[i];
+    const sm=t2m(sl.time);
+    const em=t2m(sl.end||'00:00')||1440;
+    if(nowM>=sm&&nowM<em){
+      curStart=sm;curEnd=em;
+      cur=sl;
       break;
     }
   }
+  let next=null;
+  for(let i=0;i<todaySlots.length;i++){
+    const sl=todaySlots[i];
+    const sm=t2m(sl.time);
+    if(sm>nowM&&!['free','sleep'].includes(sl.tp)){
+      next={label:sl.label,tp:sl.tp,st:sl.time,secUntil:Math.round((sm-nowM)*60)};
+      break;
+    }
+  }
+  const isCommitment=cur&&!['free','sleep','personal'].includes(cur.tp);
   let rem,cdLabel,pct=0;
-  if(cur){
-    // In a commitment: countdown = remaining time in this slot
+  if(isCommitment){
     rem=(curEnd-nowM)/60;
     cdLabel='Remaining — '+cur.label;
     pct=Math.min(100,Math.max(0,(nowM-curStart)/(curEnd-curStart)*100));
   }else{
-    // In free/empty: countdown = time until next commitment
+    // Check for departure time if in personal slot
+    if(cur?.ps?.sensitivity&&cur.ps.travel_mins!=null){
+      const leaveBy=_calcLeaveBy(cur.ps.start_time,cur.ps.sensitivity,cur.ps.travel_mins);
+      if(leaveBy){
+        const leaveM=t2m(leaveBy);
+        if(nowM<leaveM){
+          rem=(leaveM-nowM)/60;
+          cdLabel='Leave by '+leaveBy+' — '+cur.label;
+          pct=0;
+          return{type:'depart',label:cur.label,tp:'personal',st:cur.time,et:cur.end,rem,pct,next,cdLabel,dateStr,idx:-1,dayName,isMorning:false};
+        }
+      }
+    }
     rem=next?next.secUntil/60:60;
-    cdLabel=next?'Until '+next.label:'No commitments left';
+    cdLabel=next?'Until '+next.label:'Free until end of day';
   }
-  return{type:cur?'slot':'free',label:cur?cur.label:'Free',tp:cur?.tp||'free',st:cur?.st||'',et:cur?.et||'',rem,pct,next,cdLabel,dateStr,idx:cur?cur.idx:-1,dayName,isMorning:!cur||['personal','free'].includes(cur?.tp)};
+  return{type:cur?'slot':'free',label:cur?cur.label:'Free',tp:cur?.tp||'free',st:cur?.time||'',et:cur?.end||'',rem,pct,next,cdLabel,dateStr,idx:cur?.idx??-1,dayName,isMorning:!isCommitment};
 }
 function _fmtCd(remMins){
   const tot=Math.round(remMins*60);const ot=tot<0;const ab=Math.abs(tot);
