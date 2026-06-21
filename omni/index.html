@@ -4279,8 +4279,8 @@ function _getLiveCtx(){
       if(leaveBy){
         const leaveM=t2m(leaveBy);
         const startM=t2m(nextDepart.time);
-        const remToLeave=(leaveM-nowM)/60;
-        const remToStart=(startM-nowM)/60;
+        const remToLeave=leaveM-nowM;
+        const remToStart=startM-nowM;
         rem=_liveShowStart?remToStart:remToLeave;
         cdLabel=_liveShowStart?('Until '+nextDepart.label):('Leave by '+leaveBy);
         return{type:'depart',label:nextDepart.label,tp:'personal',st:nextDepart.time,et:nextDepart.end,
@@ -4293,8 +4293,8 @@ function _getLiveCtx(){
       if(leaveBy){
         const leaveM=t2m(leaveBy);
         if(nowM<leaveM){
-          const remToLeave=(leaveM-nowM)/60;
-          const remToStart=(t2m(cur.time)-nowM)/60;
+          const remToLeave=leaveM-nowM;
+          const remToStart=t2m(cur.time)-nowM;
           rem=_liveShowStart?remToStart:remToLeave;
           cdLabel=_liveShowStart?('Until '+cur.label):('Leave by '+leaveBy);
           return{type:'depart',label:cur.label,tp:'personal',st:cur.time,et:cur.end,rem,pct:0,next,cdLabel,dateStr,idx:-1,dayName,isMorning:false,leaveBy,remToLeave,remToStart};
