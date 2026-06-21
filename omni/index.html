@@ -2005,11 +2005,7 @@ function _renderDayNow(){
 
 
   // ── HABITS SECTION ───────────────────────────────────────────────────────────
-  if(isToday||_dayOff===0){
-    renderHabits(dateStr,dayName).catch(e=>console.warn('Habits',e));
-  } else {
-    const habEl=document.getElementById('day-habits');if(habEl)habEl.innerHTML='';
-  }
+  renderHabits(dateStr,dayName).catch(e=>console.warn('Habits',e));
 
   // ── TASKS SECTION ──────────────────────────────────────────────────────────
   // Determine if ANY category is currently expanded
@@ -3418,11 +3414,9 @@ async function loadHabitsFor(dateStr){
   if(!_OK)return;
   // Use local date string to match Life Manager's timezone
   const localDateStr=dateStr||(()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
-  console.log('loadHabitsFor: dateStr=',dateStr,'localDateStr=',localDateStr);
   try{
     const{data:feed}=await supaFrom('omni_schedule_feed')
       .select('*').eq('date',localDateStr).eq('source_app','life');
-    console.log('feed result:',feed?.length,'rows',feed?.map(r=>r.type+':'+r.date));
     if(feed){
       feed.forEach(row=>{
         // Parse meta if it's a JSON string
