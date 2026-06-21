@@ -3580,7 +3580,7 @@ async function renderHabits(dateStr,dayName){
       <div class="habit-sub">${(()=>{const f=bookMeta.fromPage||bookMeta.from_page||'';const t=bookMeta.toPage||bookMeta.to_page||'';return f&&t?'pp.'+f+'–'+t:pages?pages+'p':'Daily reading';})()}${bookDone?' ✓':''}</div>
     </div>
     <button onclick="_habPickTime('book','${dateStr}')" style="font-size:10px;background:none;border:none;padding:0 4px;color:${_habSlotTime('book',dateStr)?'var(--acc)':'var(--tx4)'}">📌</button>
-    <div class="habit-tick${bookDone?' on':''}" onclick="${bookDone?`_unlogHabit('book','${dateStr}').then(()=>renderHabits('${dateStr}','${dayName}'))`:`_tickHabit('book','${dateStr}',${JSON.stringify(JSON.stringify(bookMeta))})`}">${bookDone?'✓':''}</div>
+    <div class="habit-tick${bookDone?' on':''}" onclick="${bookDone?`_unlogHabit('book','${dateStr}').then(()=>renderHabits('${dateStr}','${dayName}'))`:`_tickBook('${dateStr}')`}">${bookDone?'✓':''}</div>
   </div>`;
   } // end if(bookData)
 
@@ -3657,6 +3657,10 @@ async function _unlogHabit(type,dateStr){
       }
     }
   }catch(e){console.warn('Unlog habit:',e.message);}
+}
+
+async function _tickBook(dateStr){
+  await _tickHabit('book',dateStr,JSON.stringify(HAB_DATA.book?.meta||{}));
 }
 
 async function _tickHabit(type,dateStr,metaJson){
