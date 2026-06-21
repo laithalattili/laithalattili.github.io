@@ -4269,6 +4269,7 @@ function _getLiveCtx(){
     // Check for departure time if in personal slot
     if(cur?.ps?.sensitivity&&cur.ps.travel_mins!=null){
       const leaveBy=_calcLeaveBy(cur.ps.start_time,cur.ps.sensitivity,cur.ps.travel_mins);
+      console.log('Depart calc: start=',cur.ps.start_time,'sens=',cur.ps.sensitivity,'travel=',cur.ps.travel_mins,'leaveBy=',leaveBy,'nowM=',nowM);
       if(leaveBy){
         const leaveM=t2m(leaveBy);
         if(nowM<leaveM){
