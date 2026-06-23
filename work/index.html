@@ -23322,16 +23322,29 @@ function getEffectiveSlots(){
 }
 
 function getCustomForWeek(offset,slotIdx,day){
+  // 1. Direct key match (the exact week this was placed)
   const directKey=offset+'_'+slotIdx+'_'+day;
-  if(ttCustom[directKey])return ttCustom[directKey];
+  const direct=ttCustom[directKey];
+  if(direct){
+    // "once" events only show on their placed week
+    // If recur is 'once' (or missing), only show if key's week matches current offset
+    const placedW=parseInt(directKey.split('_')[0]);
+    if(!direct.recur||direct.recur==='once'){
+      return placedW===offset?direct:null;
+    }
+    return direct;
+  }
+  // 2. Search for recurring entries that apply to this offset
   for(const[key,val]of Object.entries(ttCustom)){
-    if(!val||val.recur==='once')continue;
+    if(!val)continue;
+    // Skip non-recurring entries entirely
+    if(!val.recur||val.recur==='once')continue;
     const parts=key.split('_');
     if(parts.length<3)continue;
     const placedWeek=parseInt(parts[0]),si=parseInt(parts[1]),d=parts[2];
     if(si===slotIdx&&d===day){
       if(val.recur==='weekly')return val;
-      if(val.recur==='biweekly'&&(offset-placedWeek)%2===0)return val;
+      if(val.recur==='biweekly'&&Math.abs(offset-placedWeek)%2===0)return val;
     }
   }
   return null;
@@ -24472,6 +24485,8 @@ function renderTimetable(){
       const tdOpen=rowSpan>1?`<td class="${tdCls}" rowspan="${rowSpan}" style="vertical-align:middle;position:relative;padding:0">`:`<td class="${tdCls}">`;
       const _cellClick=ttEditMode?`openEditModal(${idx},'${d}')`:`openSlotNotes(${idx},'${d}',${offset})`;
       const _depBadge=(cell&&typeof cell==='object'&&cell.travel_mins!=null&&cell.sensitivity)?`<span style="font-size:9px;color:#6c757d;opacity:.7" title="${cell.travel_mins}min · ${cell.sensitivity}">🚗${cell.travel_mins}'</span>`:'';
+      // Show recur badge (only in edit mode) so mismatched recurrence is visible
+      const _recurBadge=(ttEditMode&&cell&&cell.recur&&cell.recur!=='once')?`<span style="font-size:9px;color:#7c3aed;opacity:.8" title="Recurs: ${cell.recur}">↻${cell.recur==='weekly'?'W':'2W'}</span>`:'';
       const _longPress=`_lpStart(event,${idx},'${d}')`;
       const _longPressEnd=`_lpEnd(event)`;
       if(!cell){
@@ -27383,7 +27398,11 @@ function removeStudent(classId,idx){
 let _negClassId=null,_negStudentName=null;
 const NEG_CATS=['Disruption','Device misuse','Sleeping','No homework','No effort'];
 
-const _todayStr=()=>new Date().toISOString().split('T')[0];
+const _todayStr=()=>{
+  // Use local timezone from boarding settings or default Asia/Shanghai
+  const tz=(_boardingSettings&&_boardingSettings.timezone)||'Asia/Shanghai';
+  return new Date().toLocaleDateString('en-CA',{timeZone:tz});
+};
 
 function getTodayHPCount(classId,studentName){
   const t=_todayStr();
@@ -30534,7 +30553,7 @@ async function saveLeave(){
 
 async function _undoDeparture(id){
   try{
-    const td=new Date().toISOString().split('T')[0];
+    const td=_todayStr();
     const {data:leave}=await supa.from('boarding_leaves').select('student_name').eq('id',id).single();
     const {error}=await supa.from('boarding_leaves').update({
       departure_actual:null, departed_at:null, departure_confirmed_by:null
@@ -30578,13 +30597,12 @@ async function confirmDeparture(id){
     // Sync to registrations
     if(leave?.student_name){
       const name=leave.student_name;
-      for(const sess of ['morning','prep','hoob']){
-        await supa.from('boarding_registrations').upsert({
-          student_name:name, register_date:td, session_type:sess,
-          status:'excused', updated_by:'HSM', updated_at:now
-        },{onConflict:'student_name,register_date,session_type'});
-      }
-      // Update local state immediately
+      // Only mark current session as excused — don't pre-fill future sessions
+      const sessCur=getCurrentSession();
+      await supa.from('boarding_registrations').upsert({
+        student_name:name, register_date:td, session_type:sessCur,
+        status:'excused', updated_by:'HSM', updated_at:now
+      },{onConflict:'student_name,register_date,session_type'});
       if(!_brState)_brState={};
       _brState[name]={...(_brState[name]||{}),status:'excused',updatedAt:now};
       if(window._lastExcusedMap) window._lastExcusedMap[name]={
