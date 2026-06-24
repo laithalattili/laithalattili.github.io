@@ -332,7 +332,9 @@ function checkSessionValid(){
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
-function today(){return new Date().toISOString().split('T')[0];}
+function today(){
+  return new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Shanghai'});
+}
 // Load PIN from Supabase, then check session
 window.addEventListener('DOMContentLoaded', async ()=>{
   await loadLiaisonPin();
@@ -613,10 +615,13 @@ async function init(){
 let _cachedHolidays = null;
 
 async function loadHolidaysFromSupa(_supaClient) {
-  if (_cachedHolidays) return _cachedHolidays;
+  if (_cachedHolidays && _cachedHolidays.length) return _cachedHolidays;
   try {
-    const { data } = await _supaClient.from('work_app_data')
-      .select('value').eq('key', 'holidaysData').maybeSingle();
+    let data=null;
+    for(const k of ['holidays','holidaysData']){
+      const r=await _supaClient.from('work_app_data').select('value').eq('key',k).maybeSingle();
+      if(r.data){data=r.data;break;}
+    }
     if (data) {
       let v = data.value;
       try { v = JSON.parse(v); } catch {}
@@ -1247,7 +1252,8 @@ async function refreshLeavesList(){
   data.forEach(l=>{
     const depActual=l.departed_at||l.departure_actual;
     const retActual=l.returned_at||l.return_actual;
-    const departed=depActual;
+    const isLongterm=l.leave_type==='longterm';
+    const departed=depActual||(isLongterm&&!retActual); // longterm = always departed
     const returned=retActual;
     const depPlan=l.departure_planned;
     const retPlan=l.return_planned;
