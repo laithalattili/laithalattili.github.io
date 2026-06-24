@@ -30933,7 +30933,7 @@ function showToastMsg(msg,color){
 async function getTodayExcusedMap(){
   // Returns {studentName: {reason, emoji, type}} for today
   const excused={};
-  const today=new Date().toISOString().split('T')[0];
+  const today=_todayStr();
   const nowMins=new Date().getHours()*60+new Date().getMinutes();
   const toMins=t=>parseInt(t.split(':')[0])*60+parseInt(t.split(':')[1]);
   const dayName=new Date().toLocaleDateString('en-US',{weekday:'short'}); // Mon,Tue etc
@@ -30953,21 +30953,28 @@ async function getTodayExcusedMap(){
       if(l.returned_at||l.return_actual)return; // skip if already returned
       const depPlannedDate=l.departure_planned?l.departure_planned.split('T')[0]:null;
       const retPlannedDate=l.return_planned?l.return_planned.split('T')[0]:null;
-      // Is this leave relevant today?
-      const leaveStartsOnOrBeforeToday=depPlannedDate&&depPlannedDate<=today;
-      const leaveEndsOnOrAfterToday=!retPlannedDate||retPlannedDate>=today;
-      if(!leaveStartsOnOrBeforeToday||!leaveEndsOnOrAfterToday)return;
+      // Longterm leaves: always active until returned (no date check needed)
+      if(l.leave_type==='longterm'){
+        // Already returned check above handles exit
+      } else {
+        // Is this leave relevant today?
+        const leaveStartsOnOrBeforeToday=depPlannedDate&&depPlannedDate<=today;
+        const leaveEndsOnOrAfterToday=!retPlannedDate||retPlannedDate>=today;
+        if(!leaveStartsOnOrBeforeToday||!leaveEndsOnOrAfterToday)return;
+      }
       const label=leaveLabel[l.leave_type]||'Leave';
       const emoji=leaveEmoji[l.leave_type]||'🏠';
       // Check both column name variants for compatibility
       const depActual = l.departed_at || l.departure_actual;
       const retActual = l.returned_at || l.return_actual;
       if(retActual) return; // already returned — skip
-      if(depActual){
+      // Longterm leaves are always excused regardless of departure confirmation
+      const isLongterm=l.leave_type==='longterm';
+      if(depActual||isLongterm){
         excused[l.student_name]={
           reason:label,emoji,type:'leave',
           leaveId:l.id,state:'excused',
-          departedAt:depActual,
+          departedAt:depActual||null,
           departedBy:l.departure_confirmed_by||l.created_by||'',
           leave_type:l.leave_type,
           form_submitted:l.form_submitted||false,
