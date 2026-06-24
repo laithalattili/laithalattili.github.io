@@ -32392,7 +32392,7 @@ function alFilterStudents(){
   const src=STUDENTS.map(s=>s.name||s);
   const matches=q?src.filter(n=>n.toLowerCase().includes(q)).slice(0,15):src.slice(0,20);
   if(!matches.length){drop.style.display='none';return;}
-  drop.innerHTML=matches.map(n=>`<div onpointerdown="event.preventDefault();alSelectStudent('${n.replace(/'/g,"\'")}');drop.style.display='none'"
+  drop.innerHTML=matches.map(n=>`<div onpointerdown="event.preventDefault();alSelectStudent('${n.replace(/'/g,"\'")}');document.getElementById('al-drop').style.display='none'"
     style="padding:9px 12px;font-size:14px;cursor:pointer;border-bottom:1px solid #f3f4f6;color:#111">${n}</div>`).join('');
   drop.style.display='block';
 }
