@@ -596,6 +596,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .seat-ctrl-btn.active-ctrl{background:var(--inf-bg);border-color:var(--inf-bd);color:var(--inf-tx)}
 .hwk-filter-btn{padding:5px 10px;font-size:11px;font-weight:500;border:none;border-radius:var(--rxs);background:none;color:var(--text2);cursor:pointer;text-align:center;white-space:nowrap;flex-shrink:0}
 .hwk-filter-btn.active{background:#fff;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.hwk-stab.active{border-bottom:2px solid var(--accent)!important;color:var(--accent)!important}
 .totals-chip{display:inline-flex;align-items:baseline;gap:4px;padding:4px 10px;border-radius:20px;font-size:11px;border:1px solid var(--border);background:#fff;white-space:nowrap}
 .totals-chip .tc-num{font-size:16px;font-weight:700;line-height:1;color:var(--text)}
 .totals-chip .tc-lbl{font-size:10px;color:var(--text3)}
@@ -1105,7 +1106,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
 <!-- LISTS -->
 <div id="tab-lists" class="tab-content">
   <div class="lists-subtabs">
-    <button class="lists-stab active" onclick="setListsTab('hawking',this)">🏠 Hawking Tutees</button>
+    <button class="lists-stab active" onclick="setListsTab('hawking',this)">🏠 My House</button>
     <button class="lists-stab" onclick="setListsTab('teaching',this)">📚 My Classes</button>
     <button class="lists-stab" onclick="setListsTab('duties',this)">📋 Duties</button>
     <button class="lists-stab" onclick="setListsTab('tutormtgs',this)">🤝 Meetings</button>
@@ -1113,26 +1114,25 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
   </div>
   <!-- HAWKING PANEL -->
   <div id="lists-hawking" class="lists-panel active">
-    <!-- Toolbar: filter + collapse controls -->
-    <div id="hwk-toolbar">
-    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-      <div id="hwk-filter-btns" style="display:flex;gap:2px;background:var(--bg3);border-radius:var(--rsm);padding:3px;flex-wrap:wrap">
-        <button class="hwk-filter-btn active" id="hwk-f-all" onclick="setHwkFilter('all',this)">All</button>
-        <button class="hwk-filter-btn" id="hwk-f-boarders" onclick="setHwkFilter('boarders',this)">Boarders</button>
-        <button class="hwk-filter-btn" id="hwk-f-register" onclick="setHwkFilter('register',this)">Register</button>
-        <button class="hwk-filter-btn" id="hwk-f-daily" onclick="setHwkFilter('daily',this)">📊 Daily</button>
-        <button class="hwk-filter-btn" id="hwk-f-away" onclick="setHwkFilter('away',this)">Away</button>
-        <button class="hwk-filter-btn" id="hwk-f-sanctions" onclick="setHwkFilter('sanctions',this)">⚠️ Sanctions</button>
-        <button id="export-report-btn" onclick="exportWeekReport()" style="margin-left:auto;font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid #00205B;background:#00205B;color:#fff;cursor:pointer;font-weight:600;flex-shrink:0">📄 Export Report</button>
-        <button onclick="exportRegistrationCSV()" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid #16a34a;background:#f0fdf4;color:#15803d;cursor:pointer;font-weight:600;flex-shrink:0">📊 CSV</button>
-        <button onclick="openGateMsg()" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid #f59e0b;background:#fffbeb;color:#d97706;cursor:pointer;font-weight:600;flex-shrink:0">📨 Gate Msg</button>
-      </div>
-      <div id="hwk-count-badge" style="font-size:11px;color:var(--text3);padding:4px 6px;flex-shrink:0"></div>
-      <button id="hwk-collapse-toggle-btn" onclick="hwkToggleAll()" style="font-size:10px;padding:4px 8px;border:1px solid var(--border);border-radius:var(--rsm);background:#fff;color:var(--text3);cursor:pointer;white-space:nowrap;flex-shrink:0">Expand All</button>
+    <!-- Sub-tab bar -->
+    <div style="display:flex;border-bottom:2px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:15;overflow-x:auto">
+      <button class="hwk-stab active" id="hwk-stab-tutees" onclick="setHwkFilter('tutees',this)" style="flex:1;padding:10px 4px;background:none;border:none;border-bottom:2px solid transparent;font-size:12px;font-weight:600;cursor:pointer;color:var(--text3);white-space:nowrap;min-width:60px">👥 Tutees</button>
+      <button class="hwk-stab" id="hwk-stab-register" onclick="setHwkFilter('register',this)" style="flex:1;padding:10px 4px;background:none;border:none;border-bottom:2px solid transparent;font-size:12px;font-weight:600;cursor:pointer;color:var(--text3);white-space:nowrap;min-width:60px">📋 Register</button>
+      <button class="hwk-stab" id="hwk-stab-daily" onclick="setHwkFilter('daily',this)" style="flex:1;padding:10px 4px;background:none;border:none;border-bottom:2px solid transparent;font-size:12px;font-weight:600;cursor:pointer;color:var(--text3);white-space:nowrap;min-width:60px">📊 Daily</button>
+      <button class="hwk-stab" id="hwk-stab-away" onclick="setHwkFilter('away',this)" style="flex:1;padding:10px 4px;background:none;border:none;border-bottom:2px solid transparent;font-size:12px;font-weight:600;cursor:pointer;color:var(--text3);white-space:nowrap;min-width:60px">✈️ Away</button>
+      <button class="hwk-stab" id="hwk-stab-sanctions" onclick="setHwkFilter('sanctions',this)" style="flex:1;padding:10px 4px;background:none;border:none;border-bottom:2px solid transparent;font-size:12px;font-weight:600;cursor:pointer;color:var(--text3);white-space:nowrap;min-width:60px">⚠️ Rules</button>
     </div>
+    <!-- Scope toggle (All / Boarders) — shown on tutees/register/daily/away -->
+    <div id="hwk-scope-bar" style="display:flex;align-items:center;gap:6px;padding:7px 12px;border-bottom:1px solid var(--border);background:var(--bg);flex-wrap:wrap">
+      <div style="display:flex;gap:3px;background:var(--bg3);border-radius:var(--rsm);padding:2px">
+        <button id="hwk-scope-all" onclick="setHwkScope('all')" style="padding:5px 14px;font-size:12px;font-weight:700;border:none;border-radius:4px;cursor:pointer;background:#fff;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.1)">All</button>
+        <button id="hwk-scope-boarders" onclick="setHwkScope('boarders')" style="padding:5px 14px;font-size:12px;font-weight:700;border:none;border-radius:4px;cursor:pointer;background:none;color:var(--text3)">Boarders</button>
+      </div>
+      <!-- Context-specific action buttons -->
+      <div id="hwk-action-btns" style="display:flex;gap:4px;flex-wrap:wrap;margin-left:auto"></div>
     </div>
     <div id="hwk-search-bar" style="margin-bottom:.5rem;display:none">
-      <input type="text" id="hwk-search-input" placeholder="Search boarders or students..." oninput="renderListsSearch(this.value)"
+      <input type="text" id="hwk-search-input" placeholder="Search..." oninput="renderListsSearch(this.value)"
         style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:var(--rsm);font-size:13px;background:#fff;color:var(--text)">
       <div id="hwk-search-results" style="margin-top:.25rem"></div>
     </div>
@@ -23852,6 +23852,8 @@ function saveGlobalDefault(){
   const state={
     tab:_activeMainTab,
     listsTab:_activeListsTab,
+    hwkFilter:_hwkFilter,
+    hwkScope:_hwkScope,
     classId:currentClassId,
     ttView:ttView,
     liveOpen:_amOpen||false
@@ -23900,13 +23902,22 @@ function loadGlobalDefault(){
       if(lp)lp.classList.add('active');
     }
     if(s.classId)currentClassId=s.classId;
+    if(s.hwkFilter&&s.listsTab==='hawking'){
+      _hwkFilter=s.hwkFilter;
+      const stab=document.getElementById('hwk-stab-'+s.hwkFilter);
+      if(stab)setHwkFilter(s.hwkFilter,stab);
+    }
+    if(s.hwkScope){
+      _hwkScope=s.hwkScope;
+      setHwkScope(s.hwkScope);
+    }
   }catch(e){}
 }
 function updateGlobalDefaultBtn(){
   try{
     const raw=localStorage.getItem('globalDefault');
     const match_state=(s)=>s.tab===_activeMainTab&&s.ttView===ttView
-      &&(s.tab!=='lists'||(s.listsTab===_activeListsTab&&s.classId===currentClassId))
+      &&(s.tab!=='lists'||(s.listsTab===_activeListsTab&&(s.listsTab!=='hawking'||(s.hwkFilter===_hwkFilter&&s.hwkScope===_hwkScope))&&s.classId===currentClassId))
       &&(!!s.liveOpen===_amOpen);
     // Header ★ (always visible)
     const hBtn=document.getElementById('global-default-btn');const amStarBtn=document.getElementById('am-star-btn');
@@ -26354,14 +26365,14 @@ async function renderHawkingRegister(el, preloadedMap){
     });
   }catch(e){}
 
-  const allHouse=window._regAllHouse||false;
+  // Use _hwkScope to determine people list
   let people=[];
   STUDENTS.forEach((s,i)=>{
     const hw=HAWKING_STATUS[s.name]||{};
-    if(!hw.boarder&&!allHouse)return;
+    if(_hwkScope==='boarders'&&!hw.boarder)return;
     people.push({name:s.name,type:hw.boarder?'boarder':'day',tutor:s.tutor});
   });
-  if(allHouse){
+  if(_hwkScope==='all'){
     TUTORS.forEach(t=>{
       people.push({name:t.name,type:'tutor',tutor:'',room:t.room});
     });
@@ -26598,7 +26609,8 @@ function renderTeachingTotals(){
   // No longer a row — count is shown inline in class header. Noop kept for compat.
 }
 
-let _hwkFilter='all';
+let _hwkFilter=(()=>{try{return localStorage.getItem('hwkFilter')||'tutees';}catch{return 'tutees';}})();
+let _hwkScope=(()=>{try{return localStorage.getItem('hwkScope')||'all';}catch{return 'all';}})(); // 'all' | 'boarders'
 let _boarderGrouping='grade'; // 'grade' | 'room'
 
 function toggleBoarderGrouping(g){
@@ -26613,25 +26625,95 @@ function setRegFilter(f){
   if(el)renderHawkingRegister(el);
 }
 
+function setHwkScope(scope){
+  _hwkScope=scope;
+  // Update scope buttons
+  ['all','boarders'].forEach(s=>{
+    const b=document.getElementById('hwk-scope-'+s);
+    if(!b)return;
+    b.style.background=s===scope?'#fff':'none';
+    b.style.color=s===scope?'var(--text)':'var(--text3)';
+    b.style.boxShadow=s===scope?'0 1px 3px rgba(0,0,0,.1)':'none';
+  });
+  // Save scope to localStorage
+  try{localStorage.setItem('hwkScope',scope);}catch{}
+  _hwkRenderCurrent();
+}
+
+function _hwkRenderCurrent(){
+  const f=_hwkFilter;
+  const el=document.getElementById('hawking-list-content');
+  if(!el)return;
+  if(f==='tutees'||f==='all'||f==='boarders'){
+    renderHawkingList();
+  } else if(f==='register'){
+    renderHawkingRegister(el);
+  } else if(f==='daily'){
+    _dsDayOffset=0;
+    renderDailySummary('hawking-list-content',STUDENTS,HAWKING_STATUS,_boardingSettings||{});
+  } else if(f==='away'){
+    renderAwayList(el);
+  } else if(f==='sanctions'){
+    renderSanctionsList(el);
+  }
+}
+
+function _hwkUpdateActionBtns(){
+  const bar=document.getElementById('hwk-action-btns');
+  if(!bar)return;
+  const f=_hwkFilter;
+  if(f==='tutees'){
+    bar.innerHTML=`
+      <button onclick="hwkToggleAll()" id="hwk-collapse-toggle-btn" style="font-size:11px;padding:5px 10px;border:1px solid var(--border);border-radius:var(--rsm);background:#fff;color:var(--text3);cursor:pointer">Expand All</button>`;
+  } else if(f==='register'){
+    bar.innerHTML=`
+      <button onclick="openAddLeaveModal()" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid #00205B;background:#fff;color:#00205B;cursor:pointer;font-weight:600">+ Leave</button>
+      <button onclick="exportRegistrationCSV()" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid #16a34a;background:#f0fdf4;color:#15803d;cursor:pointer;font-weight:600">📊 CSV</button>
+      <button onclick="exportWeekReport()" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid #00205B;background:#00205B;color:#fff;cursor:pointer;font-weight:600">📄 Export</button>`;
+  } else if(f==='away'){
+    bar.innerHTML=`
+      <button onclick="openGateMsg()" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid #f59e0b;background:#fffbeb;color:#d97706;cursor:pointer;font-weight:600">📨 Gate Msg</button>`;
+  } else {
+    bar.innerHTML='';
+  }
+}
+
+function _hwkUpdateScopeBar(){
+  const f=_hwkFilter;
+  const scopeBar=document.getElementById('hwk-scope-bar');
+  // Show scope toggle for all tabs except sanctions
+  if(scopeBar) scopeBar.style.display=f==='sanctions'?'none':'flex';
+}
+
 function setHwkFilter(f,btn){
   _hwkFilter=f;
-  document.querySelectorAll('.hwk-filter-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
+  // Update sub-tab buttons
+  document.querySelectorAll('.hwk-stab').forEach(b=>{b.classList.remove('active');b.style.borderBottomColor='transparent';b.style.color='var(--text3)';});
+  const activeStab=document.getElementById('hwk-stab-'+f);
+  if(activeStab){activeStab.classList.add('active');}
+  // Save filter
+  try{localStorage.setItem('hwkFilter',f);}catch{}
+  // Update scope bar and action buttons
+  _hwkUpdateScopeBar();
+  _hwkUpdateActionBtns();
   const el=document.getElementById('hawking-list-content');
+  if(!el)return;
+  el.innerHTML='<div style="padding:2rem;text-align:center;color:#9ca3af;font-size:13px">Loading...</div>';
   if(f==='register'){
     _brSubscribeRealtime();loadNurseMap();loadCommentMap();
-    if(el)el.innerHTML='<div style="padding:2rem;text-align:center;color:#9ca3af;font-size:13px">Loading...</div>';
     _brLoadToday().then(()=>{
       const el2=document.getElementById('hawking-list-content');
       if(el2&&_hwkFilter==='register')renderHawkingRegister(el2);
     });
+  } else if(f==='daily'){
+    _dsDayOffset=0;
+    renderDailySummary('hawking-list-content',STUDENTS,HAWKING_STATUS,_boardingSettings||{});
   } else if(f==='away'){
-    if(el)el.innerHTML='<div style="padding:2rem;text-align:center;color:#9ca3af;font-size:13px">Loading...</div>';
     renderAwayList(el);
   } else if(f==='sanctions'){
-    if(el)el.innerHTML='<div style="padding:2rem;text-align:center;color:#9ca3af;font-size:13px">Loading...</div>';
     renderSanctionsList(el);
   } else {
+    // tutees (all/boarders handled by scope)
     renderHawkingList();
   }
   renderHawkingTotals();
@@ -26687,7 +26769,9 @@ function renderHawkingList(){
   if(_hwkFilter==='away'){renderAwayList(el);return;}
   if(_hwkFilter==='sanctions'){renderSanctionsList(el);return;}
   if(_hwkFilter==='daily'){renderDailySummary('hawking-list-content',STUDENTS,HAWKING_STATUS,_boardingSettings||{});return;}
-  if(_hwkFilter==='daily'){_dsDayOffset=0;renderDailySummary('hawking-list-content',STUDENTS,HAWKING_STATUS,_boardingSettings||{});return;}
+  if(_hwkFilter==='daily'){_dsDayOffset=0;
+    const dStudents=_hwkScope==='boarders'?STUDENTS.filter(s=>HAWKING_STATUS[s.name]):STUDENTS;
+    renderDailySummary('hawking-list-content',dStudents,HAWKING_STATUS,_boardingSettings||{});return;}
 
   if(_hwkFilter==='rooms'){
     renderHawkingByRoom(el);
@@ -26698,7 +26782,7 @@ function renderHawkingList(){
     return;
   }
 
-  const boardersOnly=_hwkFilter==='boarders';
+  const boardersOnly=_hwkScope==='boarders';
 
   // Grouping toggle + room view for boarders
   if(boardersOnly){
