@@ -1,5 +1,5 @@
 // Hawking Boarding Mini-App — Service Worker v4
-const CACHE = 'hawking-boarding-v10';
+const CACHE = 'hawking-boarding-v11';
 const ASSETS = ['./', './index.html'];
 // Icons cached separately — missing icons won't break install
 
