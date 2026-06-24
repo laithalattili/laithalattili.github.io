@@ -818,7 +818,7 @@ function getNextRegistrationPoint(){
     {label:'Evening Prep',key:'prepTime',default:'19:00'},
     {label:'Heads on Beds',key:'hoobTime',default:'21:30'}
   ];
-  // Find next point today
+  // Find next point td_
   let next=null;
   for(const p of points){
     const t=BS[p.key]||p.default;
@@ -873,9 +873,9 @@ function updateDutyBanner(){
   const banner=document.getElementById('duty-banner');
   const namesEl=document.getElementById('duty-names');
   if(!BS.staff||!banner)return;
-  const today=new Date().toLocaleDateString('en-US',{weekday:'short'}); // Mon, Tue etc
+  const td_=new Date().toLocaleDateString('en-US',{weekday:'short'}); // Mon, Tue etc
   const dayMap={'Sun':'Sun','Mon':'Mon','Tue':'Tue','Wed':'Wed','Thu':'Thu','Fri':'Fri','Sat':'Sat'};
-  const todayKey=today.slice(0,3);
+  const todayKey=td_.slice(0,3);
   // Get current school week for A/B
   const curWeek=getCurrentWeekNum();
   const onDuty=BS.staff.filter(s=>{
@@ -1043,7 +1043,7 @@ async function saveBoardingAddLeave(){
 async function loadStudentPenalties(studentName){
   // Returns active/pending penalties for a student
   try{
-    const today=today();
+    const td_=today();
     const {data}=await supa.from('boarding_penalties')
       .select('*').eq('student_name',studentName)
       .in('status',['active','pending']).order('infraction_date',{ascending:false});
@@ -1053,7 +1053,7 @@ async function loadStudentPenalties(studentName){
 
 async function loadInfoPenalties(){
   const el=document.getElementById('info-penalties-list');if(!el)return;
-  const today=today();
+  const td_=today();
   const tomorrow=new Date(Date.now()+86400000).toISOString().split('T')[0];
   try{
     const {data}=await supa.from('boarding_penalties')
@@ -1080,15 +1080,15 @@ async function loadInfoPenalties(){
         const m=parseInt((p.penalty_type||'').replace('phone_','').replace('min',''))||0;
         return sum+m;
       },0);
-      const hasOverdue=penalties.some(p=>p.penalty_date<today);
+      const hasOverdue=penalties.some(p=>p.penalty_date<td_);
       return `<div style="border:1px solid ${hasOverdue?'#fca5a5':'#e5e7eb'};border-radius:8px;margin-bottom:8px;overflow:hidden;background:${hasOverdue?'#fff5f5':'#fff'}">
         <div style="padding:8px 12px;background:${hasOverdue?'#fef2f2':'#f8fafc'};border-bottom:1px solid ${hasOverdue?'#fca5a5':'#e5e7eb'};display:flex;align-items:center;justify-content:space-between">
           <span style="font-size:13px;font-weight:700;color:#1a1a1a">${name}</span>
           <span style="font-size:11px;font-weight:700;color:#ef4444">⚠️ ${penalties.filter(p=>p.penalty_type).length} sanction${penalties.filter(p=>p.penalty_type).length!==1?'s':''}</span>
         </div>
         ${penalties.map(p=>{
-          const isPast=p.penalty_date<today;
-          const isToday=p.penalty_date===today;
+          const isPast=p.penalty_date<td_;
+          const isToday=p.penalty_date===td_;
           const dateLabel=isToday?'Today':isPast?'Overdue':p.penalty_date;
           const dateColor=isPast?'#dc2626':isToday?'#d97706':'#475569';
           const lid=p.id;
@@ -1179,13 +1179,13 @@ async function _miniHolRet(name,holiday,btn){
 
 async function boardingMarkDone(id){
   try{
-    const today=today();
+    const td_=today();
     // Fetch penalty details
     const {data:rows}=await supa.from('boarding_penalties').select('id,penalty_date,infraction_date').eq('id',id);
     const p=rows&&rows[0];
     console.log('boardingMarkDone: id=',id,'found=',p);
     if(!p){showToast('Sanction not found','#dc2626');loadInfoPenalties();return;}
-    if(p.penalty_date===today||p.infraction_date===today){
+    if(p.penalty_date===td_||p.infraction_date===td_){
       const {error}=await supa.from('boarding_penalties').delete().eq('id',id);
       if(error)throw error;
       showToast('✓ Sanction removed','#16a34a');
@@ -1217,10 +1217,10 @@ async function boardingRollSanction(id){
 
 async function loadInfoLeaves(){
   const el=document.getElementById('info-leaves-list');if(!el)return;
-  const today=today();
+  const td_=today();
   try{
     const {data}=await supa.from('boarding_leaves').select('*').eq('active',true).order('departure_planned');
-    const active=(data||[]).filter(l=>!l.return_actual&&(!l.return_planned||l.return_planned.split('T')[0]>=today));
+    const active=(data||[]).filter(l=>!l.return_actual&&(!l.return_planned||l.return_planned.split('T')[0]>=td_));
     if(!active.length){el.innerHTML='<span style="color:#aaa">No active leaves.</span>';return;}
     const leaveEmoji={weekend:'🏠',extended:'📅',daytime:'🌅',longterm:'🏥'};
     const fmt=dt=>dt?new Date(dt).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
@@ -1496,7 +1496,7 @@ let _excusedMap={}; // cached for current render cycle
 
 async function loadExcusedMap(){
   const excused={};
-  const today=today();
+  const td_=today();
   const nowMins=new Date().getHours()*60+new Date().getMinutes();
   const toMins=t=>{const[h,m]=t.split(':');return parseInt(h)*60+parseInt(m);};
   const dayName=new Date().toLocaleDateString('en-US',{weekday:'short'}).slice(0,3);
@@ -1510,8 +1510,8 @@ async function loadExcusedMap(){
       if(l.returned_at||l.return_actual)return; // already returned
       const depDate=l.departure_planned?l.departure_planned.split('T')[0]:null;
       const retDate=l.return_planned?l.return_planned.split('T')[0]:null;
-      if(!depDate||depDate>today)return;
-      if(retDate&&retDate<today)return;
+      if(!depDate||depDate>td_)return;
+      if(retDate&&retDate<td_)return;
       const label=leaveLabel[l.leave_type]||'Leave';
       const emoji=leaveEmoji[l.leave_type]||'🏠';
       const _dep=l.departed_at||l.departure_actual;
@@ -1543,9 +1543,9 @@ async function loadExcusedMap(){
     });
   }catch(e){console.warn('Excused schedules error:',e);}
 
-  // 3. One-off activities today active now
+  // 3. One-off activities td_ active now
   try{
-    const {data}=await supa.from('boarding_activity_instances').select('student_name,activity_type,start_time,end_time').eq('date',today);
+    const {data}=await supa.from('boarding_activity_instances').select('student_name,activity_type,start_time,end_time').eq('date',td_);
     (data||[]).forEach(a=>{
       if(nowMins>=toMins(a.start_time)&&nowMins<=toMins(a.end_time)&&!excused[a.student_name]){
         excused[a.student_name]={reason:a.activity_type,emoji:'📌',type:'activity'};
@@ -1626,13 +1626,13 @@ async function boardingAddComment(name){
 }
 
 async function loadBoardingPenalties(){
-  const today=today();
+  const td_=today();
   try{
     const {data}=await supa.from('boarding_penalties')
       .select('student_name,infraction_type,status')
       .in('status',['active','pending'])
       .neq('infraction_type','late_floor')
-      .eq('infraction_date',today);
+      .eq('infraction_date',td_);
     _boardingPenaltyMap={};
     (data||[]).forEach(p=>{
       if(!_boardingPenaltyMap[p.student_name])_boardingPenaltyMap[p.student_name]=[];
@@ -1679,7 +1679,7 @@ async function generateWeekReport(supaClient, students, boarderRooms, hawkingSta
 
   const monday = getMondayOfWeek();
   const weekDates = [0,1,2,3,4].map(i => { const d=new Date(monday); d.setDate(monday.getDate()+i); return d; });
-  const today = new Date(); today.setHours(0,0,0,0);
+  const td_ = new Date(); td_.setHours(0,0,0,0);
   const weekLabel = getCW(monday);
   const yr = monday.getFullYear();
   const DAYS = ['Mon','Tue','Wed','Thu','Fri'];
@@ -1867,7 +1867,7 @@ async function generateWeekReport(supaClient, students, boarderRooms, hawkingSta
 
   // ── CHECKLIST AUTO-TICK ────────────────────────────────────────────────────
   function checklistAnswers(dayKey, dayDate) {
-    if (dayDate > today) return Array(6).fill([null,'']);
+    if (dayDate > td_) return Array(6).fill([null,'']);
     const ss = studentData;
     const lw = ss.filter(s=>s.lateWake[dayKey]).map(s=>s.name);
     const lf = ss.filter(s=>s.lateFloor[dayKey]).map(s=>s.name);
@@ -1961,7 +1961,7 @@ async function generateWeekReport(supaClient, students, boarderRooms, hawkingSta
 
       let dayCells = '';
       DAYS.forEach((day,di) => {
-        const isFuture = weekDates[di] > today;
+        const isFuture = weekDates[di] > td_;
         if (isFuture) { dayCells += '<td class="future"></td>'.repeat(3); return; }
         if (s.onLeave[day]) {
           const v = s.leaveConfirmed[day] ? 'L' : '~';
@@ -2004,7 +2004,7 @@ async function generateWeekReport(supaClient, students, boarderRooms, hawkingSta
   // ── PAGE 2: CHECKLIST ──────────────────────────────────────────────────────
   let checkRows = '';
   DAYS.forEach((day,di) => {
-    const isFuture = weekDates[di] > today;
+    const isFuture = weekDates[di] > td_;
     const answers = checklistAnswers(day, weekDates[di]);
     const futureCls = isFuture ? ' future' : '';
     checkRows += `<tr class="day-hdr-row${futureCls}">
@@ -2107,7 +2107,7 @@ async function exportWeekReportMini(){
 
 
 // ── DAILY SUMMARY VIEW ───────────────────────────────────────────────────────
-let _dsDayOffset = 0; // 0 = today, -1 = yesterday, etc.
+let _dsDayOffset = 0; // 0 = td_, -1 = yesterday, etc.
 
 async function renderDailySummary(containerId, students, boarderStatus, boardingSettings) {
   const el = document.getElementById(containerId);
@@ -2407,8 +2407,8 @@ function renderCalendar(containerId, supaRef) {
   const el = document.getElementById(containerId);
   if (!el) return;
 
-  const today = new Date(); today.setHours(0,0,0,0);
-  const todayISO = today.toISOString().split('T')[0];
+  const td_ = new Date(); td_.setHours(0,0,0,0);
+  const todayISO = td_.toISOString().split('T')[0];
   const monthStart = new Date(_calYear, _calMonth, 1);
   const monthEnd   = new Date(_calYear, _calMonth + 1, 0);
   const firstDay   = (monthStart.getDay() + 6) % 7; // Mon=0
@@ -2954,7 +2954,7 @@ function _regMakeRow(name, idx){
         <span style="font-size:9px;padding:1px 5px;border-radius:4px;border:1px solid ${exc.parents_called?'#16a34a':'#e5e7eb'};color:${exc.parents_called?'#16a34a':'#9ca3af'}" title="Parents called">📞</span>
       </span>`:''}
       ${exc&&exc.returnPlanned&&!exc.returnedAt&&exc.returnPlanned.split('T')[0]===today()?
-        `<span style="font-size:9px;background:#fef9c3;color:#854d0e;padding:1px 6px;border-radius:8px;font-weight:700;display:block;margin-top:2px">📅 Expected back today — call parents</span>`:''}
+        `<span style="font-size:9px;background:#fef9c3;color:#854d0e;padding:1px 6px;border-radius:8px;font-weight:700;display:block;margin-top:2px">📅 Expected back td_ — call parents</span>`:''}
       ${_penBadges}${penaltyBtns}
     </div>
     <div style="display:flex;gap:3px;align-items:center">
@@ -3222,7 +3222,7 @@ async function confirmBoardingReturn(leaveId){
     await supa.from('boarding_leaves').update({
       return_actual:now, returned_at:now, return_confirmed_by:role
     }).eq('id',leaveId);
-    // Mark present in current session + clear excused for today
+    // Mark present in current session + clear excused for td_
     if(studentName){
       const sess=getBoardingCurrentSession();
       // Remove the excused registrations we set on departure, then mark present
@@ -3317,7 +3317,7 @@ async function undoBoardingDeparture(leaveId){
     await supa.from('boarding_leaves').update({
       departure_actual:null, departed_at:null, departure_confirmed_by:null
     }).eq('id',leaveId);
-    // Revert registrations back to unregistered for today
+    // Revert registrations back to unregistered for td_
     if(leave?.student_name){
       await supa.from('boarding_registrations').delete()
         .eq('student_name',leave.student_name).eq('register_date',td);
