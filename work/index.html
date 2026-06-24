@@ -26509,7 +26509,7 @@ async function renderHawkingRegister(el, preloadedMap){
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
         <span style="font-size:9px;color:#d1d5db">fetched ${fetchedAt}</span>
         <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#6b7280;cursor:pointer">
-          <input type="checkbox" ${allHouse?'checked':''} onchange="_regToggleAllHouse(this.checked)" style="accent-color:#c4622d">
+          <input type="checkbox" ${_hwkScope==='all'?'checked':''} onchange="setHwkScope(this.checked?'all':'boarders')" style="accent-color:#c4622d">
           All house
         </label>
       </div>
