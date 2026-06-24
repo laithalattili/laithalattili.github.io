@@ -2282,16 +2282,20 @@ function _dsNav(dir){
 let _cachedHolidays = null;
 
 async function loadHolidaysFromSupa(supaRef) {
-  if (_cachedHolidays) return _cachedHolidays;
-  try {
-    const { data } = await supaRef.from('work_app_data')
-      .select('value').eq('key', 'holidaysData').single();
-    if (data) {
-      let v = data.value;
-      try { v = JSON.parse(v); } catch {}
-      if (Array.isArray(v)) { _cachedHolidays = v; return v; }
-    }
-  } catch(e) { console.warn('Holiday load:', e); }
+  if (_cachedHolidays && _cachedHolidays.length) return _cachedHolidays;
+  // Try work_app_data first, then boarding_settings as fallback
+  for (const [table, key] of [['work_app_data','holidaysData'],['boarding_settings','holidaysData']]) {
+    try {
+      const { data } = await supaRef.from(table)
+        .select('value').eq('key', key).maybeSingle();
+      if (data) {
+        let v = data.value;
+        try { v = JSON.parse(v); } catch {}
+        if (typeof v === 'string') { try { v = JSON.parse(v); } catch {} }
+        if (Array.isArray(v) && v.length) { _cachedHolidays = v; return v; }
+      }
+    } catch(e) { console.warn('Holiday load from '+table+':', e); }
+  }
   return [];
 }
 
