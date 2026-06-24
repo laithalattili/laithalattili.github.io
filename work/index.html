@@ -26351,11 +26351,13 @@ async function renderAwayList(el){
       const retCol2=hasReturned
         ?`<div style="font-size:11px;font-weight:600;color:#7c3aed">↩ ${fmt(hasReturned)}</div><div style="font-size:10px;color:#9ca3af">Done</div>`
         :`<div style="font-size:11px;color:#9ca3af">—</div>`;
-      return `<div style="opacity:${rowOpacity};background:${rowBg};border-bottom:1px solid #f1f5f9;padding:8px 12px">
+      const _isLT=exc?.leave_type==='longterm';
+      const _ltBg=_isLT&&!hasReturned?'#f5f3ff':'';
+      return `<div style="opacity:${rowOpacity};background:${_ltBg||rowBg};border-bottom:1px solid ${_isLT?'#ede9fe':'#f1f5f9'};padding:8px 12px${_isLT?';border-left:3px solid #7c3aed':''}">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
           <span style="font-size:10px;color:#d1d5db;min-width:16px">${i+1}</span>
-          <span style="font-size:13px;font-weight:${hasReturned?'400':'600'};color:${hasReturned?'#9ca3af':'#111'}">${s.name}</span>
-          ${exc?`<span style="font-size:10px;color:${color}">${exc.emoji} ${exc.reason}</span>`:''}
+          <span style="font-size:13px;font-weight:${hasReturned?'400':'600'};color:${_isLT?'#7c3aed':hasReturned?'#9ca3af':'#111'}">${s.name}</span>
+          ${exc?`<span style="font-size:10px;color:${_isLT?'#7c3aed':color}">${exc.emoji} ${exc.reason}</span>`:''}
           ${chkBadges}
           ${hasReturned?'<span style="font-size:10px;background:#ede9fe;color:#7c3aed;padding:1px 7px;border-radius:8px;font-weight:600;margin-left:auto">Returned</span>':''}
         </div>
@@ -32586,8 +32588,8 @@ function _amBoardingRegisterHtml(type,excusedMap){
       const _rawSt=stObj.status||'';
       const _exc=excusedMap[p.name]||null;
       const _leaveState=_exc?.state||null;
-      const _autoExcused=_exc&&(_leaveState==='excused'||_exc.type==='activity');
-      const st=(!_rawSt&&_autoExcused)?'excused':_rawSt;
+      const _autoExcused=_exc&&(_leaveState==='excused'||_exc.type==='activity'||_exc.leave_type==='longterm');
+      const st=_autoExcused?'excused':_rawSt;
       const bg=statBg[st];
       globalIdx++;
       const _safeBrN=p.name.replace(/"/g,"&quot;");
