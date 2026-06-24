@@ -24613,11 +24613,13 @@ function loadHolidays(){
 }
 function saveHolidays(){
   try{localStorage.setItem('holidaysData',JSON.stringify(HOLIDAYS));localStorage.setItem('schoolYear',JSON.stringify(SCHOOL_YEAR));}catch(e){}
-  // Mirror to Supabase so boarding/liaison apps can read holidays
-  supa.from('work_app_data').upsert(
-    {key:'holidays',value:JSON.stringify(HOLIDAYS),updated_at:new Date().toISOString()},
-    {onConflict:'key'}
-  ).then(()=>{},e=>console.warn('Holiday sync:',e));
+  // Mirror to Supabase with BOTH key names so all apps can read it
+  const val=JSON.stringify(HOLIDAYS);
+  const ts=new Date().toISOString();
+  supa.from('work_app_data').upsert([
+    {key:'holidays',value:val,updated_at:ts},
+    {key:'holidaysData',value:val,updated_at:ts}
+  ],{onConflict:'key'}).then(()=>{},e=>console.warn('Holiday sync:',e));
 }
 
 function datesBetween(start,end){
