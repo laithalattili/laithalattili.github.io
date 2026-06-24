@@ -26737,7 +26737,7 @@ function setHwkFilter(f,btn){
     });
   } else if(f==='daily'){
     _dsDayOffset=0;
-    renderDailySummary('hawking-list-content',STUDENTS,HAWKING_STATUS,_boardingSettings||{});
+    renderDailySummary('hawking-list-content',(_hwkScope==='boarders'?STUDENTS.filter(s=>HAWKING_STATUS[s.name]):STUDENTS),HAWKING_STATUS,_boardingSettings||{});
   } else if(f==='away'){
     renderAwayList(el);
   } else if(f==='sanctions'){
@@ -32112,11 +32112,12 @@ async function renderDailySummary(containerId, students, boarderStatus, boarding
   const now = new Date();
   const nowM = now.getHours()*60+now.getMinutes();
 
-  // Target date
-  const target = new Date();
-  target.setDate(target.getDate() + _dsDayOffset);
-  target.setHours(0,0,0,0);
-  const targetISO = target.toISOString().split('T')[0];
+  // Target date — use local timezone not UTC
+  const _tz=(bs&&bs.timezone)||'Asia/Shanghai';
+  const _todayLocalISO=new Date().toLocaleDateString('en-CA',{timeZone:_tz});
+  const _targetD=new Date(_todayLocalISO+'T12:00:00'); // noon local, safe for arithmetic
+  _targetD.setDate(_targetD.getDate()+_dsDayOffset);
+  const targetISO=_targetD.toLocaleDateString('en-CA',{timeZone:_tz});
   const isToday = _dsDayOffset === 0;
 
   // Determine highlighted session
