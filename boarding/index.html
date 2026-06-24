@@ -241,6 +241,7 @@
     <div class="tabs">
       <div class="tab active" onclick="switchTab('register',this)">📋 Register</div>
       <div class="tab" onclick="switchTab('daily',this)">📊 Daily</div>
+      <div class="tab" onclick="switchTab('holiday',this)" id="tab-btn-holiday">🏖️ Holiday</div>
       <div class="tab" onclick="switchTab('calendar',this)">📅 Calendar</div>
       <div class="tab" onclick="switchTab('info',this)">ℹ️ Info</div>
     </div>
@@ -284,6 +285,9 @@
   <div class="tab-content" id="tab-daily">
     <div id="daily-summary-content"></div>
   </div>
+  <div class="tab-content" id="tab-holiday">
+    <div id="holiday-tab-content" style="padding:8px"></div>
+  </div>
   <div class="tab-content" id="tab-calendar">
     <div id="boarding-calendar-content"></div>
   </div>
@@ -325,13 +329,7 @@
         <span style="font-size:10px;color:var(--text3)">Affects the clock display only</span>
       </div>
     </div>
-    <div class="info-card">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 14px 6px;background:var(--bg2);border-bottom:1px solid var(--border)">
-        <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Active Leaves</span>
-        <button onclick="openBoardingAddLeave()" style="font-size:11px;padding:3px 10px;border-radius:5px;background:#c4622d;color:#fff;border:none;cursor:pointer;font-weight:600">+ Add</button>
-      </div>
-      <div id="info-leaves-list" style="padding:8px 14px;font-size:12px;color:var(--text2)">Loading...</div>
-    </div>
+    <!-- Active Leaves moved to Register → Leaves sub-tab and Holiday tab -->
     <div class="info-card">
       <div class="info-card-title">Duty Schedule This Week</div>
       <div id="info-duty-schedule" style="padding:10px 14px;font-size:12px;color:var(--text2)">Loading...</div>
@@ -848,6 +846,8 @@ async function showApp(){
   updateInfoTab();
   loadInfoPenalties();
   updateBoardingTabState();
+  // Check holiday badge on startup
+  setTimeout(()=>{loadHolidaysFromSupa(supa).then(h=>{const u=getUpcomingHoliday(h);const btn=document.getElementById('tab-btn-holiday');if(btn&&u){btn.innerHTML='🏖️ Holiday <span style="background:#f97316;color:#fff;font-size:9px;padding:1px 5px;border-radius:8px;font-weight:700">!</span>';}});},2000);
   setInterval(updateBoardingTabState,60000);
   // Open default tab if not register
   try{
@@ -1110,6 +1110,82 @@ async function loadInfoPenalties(){
   }catch(e){el.innerHTML='<div style="color:#dc2626;font-size:12px">Error loading</div>';}
 }
 
+async function loadHolidayTab(){
+  const el=document.getElementById('holiday-tab-content');
+  if(!el)return;
+  el.innerHTML='<div style="padding:2rem;text-align:center;color:var(--text3);font-size:13px">Loading holidays...</div>';
+  const holidays=await loadHolidaysFromSupa(supa);
+  const upcomingHol=getUpcomingHoliday(holidays);
+  if(!upcomingHol){
+    el.innerHTML='<div style="padding:2rem;text-align:center;color:var(--text3);font-size:13px">No upcoming holidays within 7 days.</div>';
+    // Update tab badge
+    const btn=document.getElementById('tab-btn-holiday');
+    if(btn)btn.textContent='🏖️ Holiday';
+    return;
+  }
+  const boarders=getBoarders().map(s=>typeof s==='string'?s:s.name);
+  let depList=[];
+  try{
+    const{data}=await supa.from('boarding_leaves')
+      .select('student_name,departed_at,departure_actual,returned_at,return_actual,id,form_submitted,parents_called')
+      .eq('leave_type','official_holiday')
+      .gte('departure_planned',upcomingHol.start+'T00:00:00')
+      .lte('departure_planned',upcomingHol.start+'T23:59:59');
+    // Also check non-typed holiday leaves
+    const{data:data2}=await supa.from('boarding_leaves')
+      .select('student_name,departed_at,departure_actual,returned_at,return_actual,id,form_submitted,parents_called')
+      .eq('leave_type','holiday')
+      .gte('departure_planned',upcomingHol.start+'T00:00:00')
+      .lte('departure_planned',upcomingHol.start+'T23:59:59');
+    depList=[...(data||[]),...(data2||[])];
+  }catch(e){console.warn('Holiday dep load:',e);}
+  const depMap={};
+  depList.forEach(d=>{depMap[d.student_name]=d;});
+  const role=_identity?_identity.role:'RT';
+  const notDep=boarders.filter(n=>!(depMap[n]?.departed_at||depMap[n]?.departure_actual)).length;
+  const away=boarders.filter(n=>(depMap[n]?.departed_at||depMap[n]?.departure_actual)&&!(depMap[n]?.returned_at||depMap[n]?.return_actual)).length;
+  const returned=boarders.filter(n=>depMap[n]?.returned_at||depMap[n]?.return_actual).length;
+  // Update tab badge
+  const btn=document.getElementById('tab-btn-holiday');
+  if(btn)btn.innerHTML=`🏖️ Holiday <span style="background:#f97316;color:#fff;font-size:9px;padding:1px 5px;border-radius:8px;font-weight:700">${notDep}</span>`;
+
+  const fmtT=iso=>{if(!iso)return'';try{return new Date(iso).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});}catch{return'';}};
+
+  el.innerHTML=`<div style="background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.25);border-radius:10px;padding:12px;margin-bottom:12px">
+    <div style="font-size:14px;font-weight:800;color:#f97316;margin-bottom:4px">🏖️ ${upcomingHol.name}</div>
+    <div style="font-size:12px;color:#f97316;margin-bottom:8px">${upcomingHol.start} → ${upcomingHol.end}</div>
+    <div style="display:flex;gap:12px;font-size:11px;color:var(--text3);margin-bottom:10px">
+      <span>${notDep} <span style="color:#f97316;font-weight:600">pending</span></span>
+      <span>${away} <span style="color:#22c55e;font-weight:600">away</span></span>
+      <span>${returned} <span style="color:#a78bfa;font-weight:600">returned</span></span>
+    </div>
+    ${boarders.map(name=>{
+      const d=depMap[name];
+      const dep=d?.departed_at||d?.departure_actual;
+      const ret=d?.returned_at||d?.return_actual;
+      const lid=d?.id||'';
+      const fOK=d?.form_submitted;const cOK=d?.parents_called;
+      const isReturned=!!ret;
+      return `<div style="display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);opacity:${isReturned?'0.5':'1'}">
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600;color:${isReturned?'var(--text3)':'#e0e0e0'}">${name}</div>
+          ${dep?`<div style="font-size:10px;color:#22c55e">↑ ${fmtT(dep)}</div>`:''}
+          ${ret?`<div style="font-size:10px;color:#a78bfa">↩ ${fmtT(ret)}</div>`:''}
+        </div>
+        ${lid?`<button onclick="toggleLeaveChecklist('${lid}','form_submitted',${!fOK},supa).then(()=>loadHolidayTab())"
+          style="font-size:10px;padding:2px 5px;border-radius:4px;border:1px solid ${fOK?'#16a34a':'rgba(255,255,255,.15)'};background:${fOK?'rgba(22,163,74,.15)':'transparent'};cursor:pointer;color:${fOK?'#16a34a':'#666'}" title="Form">📋</button>
+        <button onclick="toggleLeaveChecklist('${lid}','parents_called',${!cOK},supa).then(()=>loadHolidayTab())"
+          style="font-size:10px;padding:2px 5px;border-radius:4px;border:1px solid ${cOK?'#16a34a':'rgba(255,255,255,.15)'};background:${cOK?'rgba(22,163,74,.15)':'transparent'};cursor:pointer;color:${cOK?'#16a34a':'#666'}" title="Parents">📞</button>`:''}
+        ${!dep?`<button onclick="_miniHolDep('${name}',${JSON.stringify(upcomingHol).replace(/"/g,"'")},this);setTimeout(loadHolidayTab,800)"
+          style="font-size:12px;padding:4px 12px;border-radius:6px;background:#f97316;color:#fff;border:none;cursor:pointer;font-weight:700">↑ Depart</button>`
+        :ret?`<span style="font-size:10px;color:#a78bfa;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(167,139,250,.1)">↩ Back</span>`
+        :`<button onclick="_miniHolRet('${name}',${JSON.stringify(upcomingHol).replace(/"/g,"'")},this);setTimeout(loadHolidayTab,800)"
+          style="font-size:12px;padding:4px 12px;border-radius:6px;background:#16a34a;color:#fff;border:none;cursor:pointer;font-weight:700">↩ Return</button>`}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
 async function loadHolidayDeparturePanel(){
   const el=document.getElementById('info-holiday-panel');
   if(!el)return;
@@ -1222,7 +1298,7 @@ async function loadInfoLeaves(){
     const {data}=await supa.from('boarding_leaves').select('*').eq('active',true).order('departure_planned');
     const active=(data||[]).filter(l=>!l.return_actual&&(!l.return_planned||l.return_planned.split('T')[0]>=td_));
     if(!active.length){el.innerHTML='<span style="color:#aaa">No active leaves.</span>';return;}
-    const leaveEmoji={weekend:'🏠',extended:'📅',daytime:'🌅',longterm:'🏥'};
+    const leaveEmoji={weekend:'🏠',extended:'📅',daytime:'🌅',longterm:'🔄',official_holiday:'🏖️',medical:'🏥',family:'👨‍👩‍👧',activity:'⚽',holiday:'🌴'};
     const fmt=dt=>dt?new Date(dt).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
     el.innerHTML=active.map(l=>{
       const depAct=l.departure_actual;
@@ -1487,8 +1563,9 @@ function switchTab(id,btn){
   if(sub)sub.style.display=id==='register'?'block':'none';
   if(id==='register'){loadExcusedMap().then(()=>{renderRegister();});}
   if(id==='daily'){_dsDayOffset=0;renderDailySummary('daily-summary-content',getBoarders(),BOARDER_STATUS,BS);}
+  if(id==='holiday'){loadHolidayTab();}
   if(id==='calendar'){_calSupaRef=supa;initLeaveCalendar('boarding-calendar-content',STUDENTS,BOARDER_STATUS,supa);}
-  if(id==='info'){loadInfoLeaves();loadInfoPenalties();loadHolidayDeparturePanel();}
+  if(id==='info'){loadInfoPenalties();loadHolidayDeparturePanel();}
 }
 
 // ── EXCUSED MAP ───────────────────────────────────────────────
@@ -1500,22 +1577,26 @@ async function loadExcusedMap(){
   const nowMins=new Date().getHours()*60+new Date().getMinutes();
   const toMins=t=>{const[h,m]=t.split(':');return parseInt(h)*60+parseInt(m);};
   const dayName=new Date().toLocaleDateString('en-US',{weekday:'short'}).slice(0,3);
-  const leaveLabel={weekend:'Weekend Leave',extended:'Extended Leave',daytime:'Daytime Departure',longterm:'Long-term Leave'};
-  const leaveEmoji={weekend:'🏠',extended:'📅',daytime:'🌅',longterm:'🏥'};
+  const leaveLabel={weekend:'Weekend Leave',extended:'Extended Leave',daytime:'Daytime Departure',longterm:'🔄 Long-term Leave',official_holiday:'🏖️ Official Holiday',medical:'Medical Leave',family:'Family Leave',activity:'Activity',holiday:'Holiday Leave'};
+  const leaveEmoji={weekend:'🏠',extended:'📅',daytime:'🌅',longterm:'🔄',official_holiday:'🏖️',medical:'🏥',family:'👨‍👩‍👧',activity:'⚽',holiday:'🌴'};
 
   // 1. Active leaves — pending_departure or excused
   try{
-    const {data}=await supa.from('boarding_leaves').select('*').eq('active',true);
+    const {data}=await supa.from('boarding_leaves').select('*').neq('active',false);
     (data||[]).forEach(l=>{
       if(l.returned_at||l.return_actual)return; // already returned
       const depDate=l.departure_planned?l.departure_planned.split('T')[0]:null;
       const retDate=l.return_planned?l.return_planned.split('T')[0]:null;
-      if(!depDate||depDate>td_)return;
-      if(retDate&&retDate<td_)return;
+      // Longterm leaves: always active until returned — skip date checks
+      if(l.leave_type!=='longterm'){
+        if(!depDate||depDate>td_)return;
+        if(retDate&&retDate<td_)return;
+      }
       const label=leaveLabel[l.leave_type]||'Leave';
       const emoji=leaveEmoji[l.leave_type]||'🏠';
       const _dep=l.departed_at||l.departure_actual;
-      excused[l.student_name]=_dep?{
+      const _isLT=l.leave_type==='longterm';
+      excused[l.student_name]=(_dep||_isLT)?{
         reason:label,emoji,type:'leave',leaveId:l.id,
         state:'excused',
         departedAt:_dep,
