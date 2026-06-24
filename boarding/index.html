@@ -2396,19 +2396,23 @@ let _cachedHolidays = null;
 
 async function loadHolidaysFromSupa(supaRef) {
   if (_cachedHolidays && _cachedHolidays.length) return _cachedHolidays;
-  // Try work_app_data first, then boarding_settings as fallback
-  for (const [table, key] of [['work_app_data','holidaysData'],['boarding_settings','holidaysData']]) {
+  // Try all possible key names — work app saves to 'holidays' and 'holidaysData'
+  for (const key of ['holidays','holidaysData']) {
     try {
-      const { data } = await supaRef.from(table)
+      const { data } = await supaRef.from('work_app_data')
         .select('value').eq('key', key).maybeSingle();
       if (data) {
         let v = data.value;
         try { v = JSON.parse(v); } catch {}
         if (typeof v === 'string') { try { v = JSON.parse(v); } catch {} }
-        if (Array.isArray(v) && v.length) { _cachedHolidays = v; return v; }
+        if (Array.isArray(v) && v.length) {
+          console.log('Holidays loaded from key:', key, 'count:', v.length);
+          _cachedHolidays = v; return v;
+        }
       }
-    } catch(e) { console.warn('Holiday load from '+table+':', e); }
+    } catch(e) { console.warn('Holiday load key='+key+':', e); }
   }
+  console.warn('No holidays found in Supabase');
   return [];
 }
 
