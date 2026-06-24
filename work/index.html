@@ -1120,7 +1120,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       <button class="hwk-stab" id="hwk-stab-register" onclick="setHwkFilter('register',this)" style="flex:1;padding:10px 4px;background:none;border:none;border-bottom:2px solid transparent;font-size:12px;font-weight:600;cursor:pointer;color:var(--text3);white-space:nowrap;min-width:60px">📋 Register</button>
       <button class="hwk-stab" id="hwk-stab-daily" onclick="setHwkFilter('daily',this)" style="flex:1;padding:10px 4px;background:none;border:none;border-bottom:2px solid transparent;font-size:12px;font-weight:600;cursor:pointer;color:var(--text3);white-space:nowrap;min-width:60px">📊 Daily</button>
       <button class="hwk-stab" id="hwk-stab-away" onclick="setHwkFilter('away',this)" style="flex:1;padding:10px 4px;background:none;border:none;border-bottom:2px solid transparent;font-size:12px;font-weight:600;cursor:pointer;color:var(--text3);white-space:nowrap;min-width:60px">✈️ Away</button>
-      <button class="hwk-stab" id="hwk-stab-sanctions" onclick="setHwkFilter('sanctions',this)" style="flex:1;padding:10px 4px;background:none;border:none;border-bottom:2px solid transparent;font-size:12px;font-weight:600;cursor:pointer;color:var(--text3);white-space:nowrap;min-width:60px">⚠️ Rules</button>
+      <button class="hwk-stab" id="hwk-stab-sanctions" onclick="setHwkFilter('sanctions',this)" style="flex:1;padding:10px 4px;background:none;border:none;border-bottom:2px solid transparent;font-size:12px;font-weight:600;cursor:pointer;color:var(--text3);white-space:nowrap;min-width:60px">⚠️ Sanctions<span id="hwk-sanctions-badge" style="display:none;background:#dc2626;color:#fff;font-size:9px;padding:1px 4px;border-radius:8px;margin-left:3px;font-weight:700"></span></button>
     </div>
     <!-- Scope toggle (All / Boarders) — shown on tutees/register/daily/away -->
     <div id="hwk-scope-bar" style="display:flex;align-items:center;gap:6px;padding:7px 12px;border-bottom:1px solid var(--border);background:var(--bg);flex-wrap:wrap">
@@ -26065,6 +26065,7 @@ const LEVEL_CLASSES=['lv0','lv1','lv2','lv3'];
 
 let _activeListsTab='hawking';
 function setListsTab(tab,btn){
+  if(tab==='hawking')setTimeout(_updateSanctionsBadge,500);
   _activeListsTab=tab;
   document.querySelectorAll('.lists-stab').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
@@ -26101,6 +26102,28 @@ async function _workHolRet(name, holiday, btn){
   _cachedHolidays = null;
   const el=document.getElementById('hawking-list-content');
   if(el) renderAwayList(el);
+}
+
+async function _updateSanctionsBadge(){
+  try{
+    const today_=_todayStr();
+    const{data}=await supa.from('boarding_penalties')
+      .select('id',{count:'exact'}).in('status',['active','pending'])
+      .neq('infraction_type','late_floor');
+    const count=(data||[]).length;
+    const badge=document.getElementById('hwk-sanctions-badge');
+    if(badge){
+      if(count>0){badge.textContent=count;badge.style.display='inline';}
+      else{badge.style.display='none';}
+      // Color tab red if any overdue
+      const {data:od}=await supa.from('boarding_penalties')
+        .select('id').in('status',['active','pending'])
+        .neq('infraction_type','late_floor').lt('penalty_date',today_);
+      const stab=document.getElementById('hwk-stab-sanctions');
+      if(stab&&od?.length>0)badge.style.background='#dc2626';
+      else if(badge)badge.style.background='#d97706';
+    }
+  }catch(e){}
 }
 
 async function renderSanctionsList(el){
@@ -26349,7 +26372,8 @@ async function renderAwayList(el){
 }
 
 async function renderHawkingRegister(el, preloadedMap){
-  const excusedMap=preloadedMap||await getTodayExcusedMap();
+  const excusedMap=preloadedMap||window._cachedExcusedMap||await getTodayExcusedMap();
+  window._cachedExcusedMap=excusedMap; // cache for filter clicks
   // Load today's active penalties for badge display
   const today=new Date().toISOString().split('T')[0];
   let _penaltyMap={};
@@ -26477,9 +26501,9 @@ async function renderHawkingRegister(el, preloadedMap){
         ${excuseTag}${depTimeStr}${depBtn}
         ${isReturnToday(excuseInfo)?`<span style="font-size:10px;background:#fef9c3;color:#854d0e;padding:2px 7px;border-radius:8px;font-weight:700;display:inline-block;margin-top:2px">📅 Expected back today — call parents</span>`:''}
         ${excuseInfo?.leaveId?`<span style="display:inline-flex;gap:3px;margin-top:2px">
-          <span onclick="toggleLeaveChecklist('${excuseInfo.leaveId}','form_submitted',${!excuseInfo.form_submitted},supa).then(()=>{window._lastExcusedMap=null;renderHawkingRegister(document.getElementById('hawking-list-content'),[]);})"
+          <span onclick="toggleLeaveChecklist('${excuseInfo.leaveId}','form_submitted',${!excuseInfo.form_submitted},supa).then(()=>{window._lastExcusedMap=null;window._cachedExcusedMap=null;renderHawkingRegister(document.getElementById('hawking-list-content'),[]);})"
             style="font-size:11px;padding:2px 6px;border-radius:4px;border:1px solid ${excuseInfo.form_submitted?'#16a34a':'#e5e7eb'};background:${excuseInfo.form_submitted?'#f0fdf4':'#fff'};cursor:pointer" title="${excuseInfo.form_submitted?'Form submitted':'Form not submitted'}">📋</span>
-          <span onclick="toggleLeaveChecklist('${excuseInfo.leaveId}','parents_called',${!excuseInfo.parents_called},supa).then(()=>{window._lastExcusedMap=null;renderHawkingRegister(document.getElementById('hawking-list-content'),[]);})"
+          <span onclick="toggleLeaveChecklist('${excuseInfo.leaveId}','parents_called',${!excuseInfo.parents_called},supa).then(()=>{window._lastExcusedMap=null;window._cachedExcusedMap=null;renderHawkingRegister(document.getElementById('hawking-list-content'),[]);})"
             style="font-size:11px;padding:2px 6px;border-radius:4px;border:1px solid ${excuseInfo.parents_called?'#16a34a':'#e5e7eb'};background:${excuseInfo.parents_called?'#f0fdf4':'#fff'};cursor:pointer" title="${excuseInfo.parents_called?'Parents called':'Parents not called'}">📞</span>
         </span>`:''}
         ${penBadges}${excuseInfo?'':timeStr}
@@ -26619,10 +26643,16 @@ function toggleBoarderGrouping(g){
 }
 
 window._regFilter='all';
+window._cachedExcusedMap=null;
 function setRegFilter(f){
   window._regFilter=f;
   const el=document.getElementById('hawking-list-content');
-  if(el)renderHawkingRegister(el);
+  // Use cached excused map if available — no DB re-fetch
+  if(el&&window._cachedExcusedMap){
+    renderHawkingRegister(el, window._cachedExcusedMap);
+  } else if(el){
+    renderHawkingRegister(el);
+  }
 }
 
 function setHwkScope(scope){
@@ -26650,7 +26680,7 @@ function _hwkRenderCurrent(){
     renderHawkingRegister(el);
   } else if(f==='daily'){
     _dsDayOffset=0;
-    renderDailySummary('hawking-list-content',STUDENTS,HAWKING_STATUS,_boardingSettings||{});
+    renderDailySummary('hawking-list-content',(_hwkScope==='boarders'?STUDENTS.filter(s=>HAWKING_STATUS[s.name]):STUDENTS),HAWKING_STATUS,_boardingSettings||{});
   } else if(f==='away'){
     renderAwayList(el);
   } else if(f==='sanctions'){
@@ -32227,7 +32257,7 @@ function _dsNav(dir, containerId, students, boarderStatus, bs) {
   if (typeof _hwkFilter !== 'undefined') {
     _dsDayOffset = Math.min(0, _dsDayOffset + dir);
     const el = document.getElementById('hawking-list-content');
-    if (el) renderDailySummary('hawking-list-content', STUDENTS, HAWKING_STATUS, _boardingSettings||{});
+    if (el) renderDailySummary('hawking-list-content', (_hwkScope==='boarders'?STUDENTS.filter(s=>HAWKING_STATUS[s.name]):STUDENTS), HAWKING_STATUS, _boardingSettings||{});
     return;
   }
   // Boarding app version
@@ -32385,7 +32415,7 @@ async function submitAddLeave(){
     if(error)throw error;
     closeAddLeaveModal();
     showToastMsg('✓ Leave added for '+name,'#16a34a');
-    window._lastExcusedMap=null;
+    window._lastExcusedMap=null;window._cachedExcusedMap=null;
     const el=document.getElementById('hawking-list-content');
     if(el&&_hwkFilter==='register')renderHawkingRegister(el);
     if(el&&_hwkFilter==='away')renderAwayList(el);
@@ -32571,9 +32601,9 @@ function _amBoardingRegisterHtml(type,excusedMap){
           ${(_commentMap[p.name]||[]).length?'<span style="font-size:10px;color:#60a5fa;margin-left:4px">💬</span>':''}
           ${_excTag}${_depBtn}
           ${_exc?.leaveId?`<span style="display:inline-flex;gap:3px;margin-top:2px">
-            <span onclick="toggleLeaveChecklist('${_exc.leaveId}','form_submitted',${!_exc.form_submitted},supa).then(()=>{window._lastExcusedMap=null;_brRefresh();})"
+            <span onclick="toggleLeaveChecklist('${_exc.leaveId}','form_submitted',${!_exc.form_submitted},supa).then(()=>{window._lastExcusedMap=null;window._cachedExcusedMap=null;_brRefresh();})"
               style="font-size:10px;padding:2px 5px;border-radius:4px;border:1px solid ${_exc.form_submitted?'#16a34a':'rgba(255,255,255,.15)'};background:${_exc.form_submitted?'rgba(22,163,74,.15)':'transparent'};cursor:pointer" title="${_exc.form_submitted?'Form submitted':'Form not submitted'}">📋</span>
-            <span onclick="toggleLeaveChecklist('${_exc.leaveId}','parents_called',${!_exc.parents_called},supa).then(()=>{window._lastExcusedMap=null;_brRefresh();})"
+            <span onclick="toggleLeaveChecklist('${_exc.leaveId}','parents_called',${!_exc.parents_called},supa).then(()=>{window._lastExcusedMap=null;window._cachedExcusedMap=null;_brRefresh();})"
               style="font-size:10px;padding:2px 5px;border-radius:4px;border:1px solid ${_exc.parents_called?'#16a34a':'rgba(255,255,255,.15)'};background:${_exc.parents_called?'rgba(22,163,74,.15)':'transparent'};cursor:pointer" title="${_exc.parents_called?'Parents called':'Parents not called'}">📞</span>
           </span>`:''}
         </div>
