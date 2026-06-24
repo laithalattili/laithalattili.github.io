@@ -1,4 +1,4 @@
-const CACHE = 'hawking-liaison-v6';
+const CACHE = 'hawking-liaison-v7';
 const ASSETS = ['./', './index.html'];
 // Note: icons cached separately so missing icons don't break SW install
 
