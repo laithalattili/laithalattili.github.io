@@ -1157,6 +1157,7 @@ async function _loadLeavesSection(el, upcomingHol){
           <div style="flex:1">
             <div style="font-size:13px;font-weight:600;color:${isReturned?'#9ca3af':'#111'}">${name}</div>
             ${dep?`<div style="font-size:10px;color:#22c55e">↑ ${fmtT(dep)}</div>`:''}
+            ${upcomingHol&&!ret?`<div style="font-size:10px;color:#9ca3af">→ ${upcomingHol.end} (planned return)</div>`:''}
             ${ret?`<div style="font-size:10px;color:#a78bfa">↩ ${fmtT(ret)}</div>`:''}
           </div>
           ${lid?`<button onclick="toggleLeaveChecklist('${lid}','form_submitted',${!fOK},supa).then(()=>loadHolidayTab())"
@@ -1178,8 +1179,11 @@ async function _loadLeavesSection(el, upcomingHol){
   try{
     const td_=today();
     const{data}=await supa.from('boarding_leaves').select('*').neq('active',false).order('created_at',{ascending:false}).limit(50);
+    const holidayTypes=['holiday','official_holiday'];
     const active=(data||[]).filter(l=>{
       if(l.returned_at||l.return_actual)return false;
+      // Exclude holiday leaves if already shown in the panel above
+      if(upcomingHol&&holidayTypes.includes(l.leave_type))return false;
       if(l.leave_type==='longterm')return true;
       const dep=l.departure_planned?l.departure_planned.split('T')[0]:null;
       const ret=l.return_planned?l.return_planned.split('T')[0]:null;
@@ -1189,25 +1193,50 @@ async function _loadLeavesSection(el, upcomingHol){
     });
     const typeEmoji={weekend:'🏠',medical:'🏥',family:'👨‍👩‍👧',activity:'⚽',holiday:'🌴',official_holiday:'🏖️',longterm:'🔄'};
     const fmtD=iso=>{if(!iso)return'';try{return new Date(iso).toLocaleDateString('en-GB',{day:'numeric',month:'short'});}catch{return'';}};
+    const ltLeaves=active.filter(l=>l.leave_type==='longterm');
+    const regLeaves=active.filter(l=>l.leave_type!=='longterm');
     if(active.length){
-      leavesHtml='<div style="margin-top:4px"><div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;padding:8px 0 4px">Active Leaves ('+active.length+')</div>';
-      leavesHtml+=active.map(l=>{
-        const dep=l.departed_at||l.departure_actual;
-        const retP=l.return_planned;
-        const isLT=l.leave_type==='longterm';
-        const isRetToday=retP&&retP.split('T')[0]===td_;
-        const lid=l.id;
-        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06)">
-          <span style="font-size:16px">${typeEmoji[l.leave_type]||'📋'}</span>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:13px;font-weight:600;color:#111">${l.student_name}</div>
-            <div style="font-size:10px;color:#6b7280">${isLT?'Long-term':dep?'↑ '+fmtD(dep):retP?'From: '+fmtD(l.departure_planned):'Pending'}</div>
-            ${isRetToday?'<div style="font-size:10px;color:#f59e0b;font-weight:700">📅 Expected back today — call parents</div>':''}
-          </div>
-          ${(dep||isLT)&&!l.returned_at&&!l.return_actual?`<button onclick="confirmBoardingReturn('${lid}');setTimeout(loadHolidayTab,800)" style="font-size:11px;padding:3px 9px;border-radius:5px;background:#16a34a;color:#fff;border:none;cursor:pointer;font-weight:600">↩ Back</button>`:''}
-          ${!dep&&!isLT?`<button onclick="confirmBoardingDeparture('${lid}');setTimeout(loadHolidayTab,800)" style="font-size:11px;padding:3px 9px;border-radius:5px;background:#f97316;color:#fff;border:none;cursor:pointer;font-weight:600">↑ Depart</button>`:''}
-        </div>`;
-      }).join('');
+      leavesHtml='<div style="margin-top:8px">';
+      // Longterm section — purple tinted
+      if(ltLeaves.length){
+        leavesHtml+=`<div style="background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.3);border-radius:8px;padding:10px 12px;margin-bottom:8px">
+          <div style="font-size:11px;font-weight:700;color:#a78bfa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">🔄 Long-term Leave (${ltLeaves.length})</div>`;
+        leavesHtml+=ltLeaves.map(l=>{
+          const lid=l.id;
+          const retP=l.return_planned;
+          const isRetToday=retP&&retP.split('T')[0]===td_;
+          return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(124,58,237,.15)">
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:700;color:#c4b5fd">${l.student_name}</div>
+              <div style="font-size:10px;color:#9ca3af">${retP?'→ '+fmtD(retP)+' (planned return)':'Indefinite — no return date'}</div>
+              ${isRetToday?'<div style="font-size:10px;color:#f59e0b;font-weight:700">📅 Expected back today</div>':''}
+            </div>
+            <button onclick="confirmBoardingReturn('${lid}');setTimeout(loadSubLeaves,800)" style="font-size:11px;padding:3px 9px;border-radius:5px;background:#16a34a;color:#fff;border:none;cursor:pointer;font-weight:600">↩ Back</button>
+          </div>`;
+        }).join('');
+        leavesHtml+='</div>';
+      }
+      // Regular leaves section
+      if(regLeaves.length){
+        leavesHtml+='<div><div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;padding:6px 0 4px">Other Leaves ('+regLeaves.length+')</div>';
+        leavesHtml+=regLeaves.map(l=>{
+          const dep=l.departed_at||l.departure_actual;
+          const retP=l.return_planned;
+          const isRetToday=retP&&retP.split('T')[0]===td_;
+          const lid=l.id;
+          return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06)">
+            <span style="font-size:15px">${typeEmoji[l.leave_type]||'📋'}</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:600;color:#e0e0e0">${l.student_name}</div>
+              <div style="font-size:10px;color:#888">${dep?'↑ '+fmtD(dep):'Pending'}${retP?' → '+fmtD(retP):''}</div>
+              ${isRetToday?'<div style="font-size:10px;color:#f59e0b;font-weight:700">📅 Expected back today</div>':''}
+            </div>
+            ${dep&&!l.returned_at?`<button onclick="confirmBoardingReturn('${lid}');setTimeout(loadSubLeaves,800)" style="font-size:11px;padding:3px 9px;border-radius:5px;background:#16a34a;color:#fff;border:none;cursor:pointer;font-weight:600">↩ Back</button>`:''}
+            ${!dep?`<button onclick="confirmBoardingDeparture('${lid}');setTimeout(loadSubLeaves,800)" style="font-size:11px;padding:3px 9px;border-radius:5px;background:#f97316;color:#fff;border:none;cursor:pointer;font-weight:600">↑ Depart</button>`:''}
+          </div>`;
+        }).join('');
+        leavesHtml+='</div>';
+      }
       leavesHtml+='</div>';
     }
   }catch(e){leavesHtml='<div style="color:#ef4444;font-size:12px;padding:8px">Error: '+e.message+'</div>';}
