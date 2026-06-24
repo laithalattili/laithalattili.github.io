@@ -1043,7 +1043,7 @@ async function saveBoardingAddLeave(){
 async function loadStudentPenalties(studentName){
   // Returns active/pending penalties for a student
   try{
-    const today=new Date().toISOString().split('T')[0];
+    const today=today();
     const {data}=await supa.from('boarding_penalties')
       .select('*').eq('student_name',studentName)
       .in('status',['active','pending']).order('infraction_date',{ascending:false});
@@ -1053,7 +1053,7 @@ async function loadStudentPenalties(studentName){
 
 async function loadInfoPenalties(){
   const el=document.getElementById('info-penalties-list');if(!el)return;
-  const today=new Date().toISOString().split('T')[0];
+  const today=today();
   const tomorrow=new Date(Date.now()+86400000).toISOString().split('T')[0];
   try{
     const {data}=await supa.from('boarding_penalties')
@@ -1179,7 +1179,7 @@ async function _miniHolRet(name,holiday,btn){
 
 async function boardingMarkDone(id){
   try{
-    const today=new Date().toISOString().split('T')[0];
+    const today=today();
     // Fetch penalty details
     const {data:rows}=await supa.from('boarding_penalties').select('id,penalty_date,infraction_date').eq('id',id);
     const p=rows&&rows[0];
@@ -1217,7 +1217,7 @@ async function boardingRollSanction(id){
 
 async function loadInfoLeaves(){
   const el=document.getElementById('info-leaves-list');if(!el)return;
-  const today=new Date().toISOString().split('T')[0];
+  const today=today();
   try{
     const {data}=await supa.from('boarding_leaves').select('*').eq('active',true).order('departure_planned');
     const active=(data||[]).filter(l=>!l.return_actual&&(!l.return_planned||l.return_planned.split('T')[0]>=today));
@@ -1373,13 +1373,51 @@ async function loadSubLeaves(){
   if(!el)return;
   el.innerHTML='<div style="padding:1rem;text-align:center;color:var(--text3);font-size:13px">Loading...</div>';
   const today_=today();
+  // Holiday departure panel at top
+  let holHtml='';
+  try{
+    const holidays=await loadHolidaysFromSupa(supa);
+    const upcomingHol=getUpcomingHoliday(holidays);
+    if(upcomingHol){
+      const boarders=getBoarders().map(s=>typeof s==='string'?s:s.name);
+      const {data:depData}=await supa.from('boarding_leaves')
+        .select('student_name,departed_at,returned_at,id,form_submitted,parents_called')
+        .eq('leave_type','holiday')
+        .gte('departure_planned',upcomingHol.start+'T00:00:00')
+        .lte('departure_planned',upcomingHol.start+'T23:59:59');
+      const depMap={};(depData||[]).forEach(d=>{depMap[d.student_name]=d;});
+      const role=_identity?_identity.role:'RT';
+      const notDep=boarders.filter(n=>!depMap[n]?.departed_at).length;
+      holHtml=`<div style="background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.3);border-radius:8px;padding:10px 12px;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:700;color:#f97316;margin-bottom:6px">🏖️ ${upcomingHol.name} · ${upcomingHol.start} → ${upcomingHol.end}</div>
+        <div style="font-size:10px;color:#aaa;margin-bottom:8px">${notDep} not yet departed</div>
+        ${boarders.map(name=>{
+          const d=depMap[name];
+          const hasDep=d?.departed_at;const hasRet=d?.returned_at;const lid=d?.id||'';
+          const fOK=d?.form_submitted;const cOK=d?.parents_called;
+          return `<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06)">
+            <span style="flex:1;font-size:13px;color:#e0e0e0;font-weight:500">${name}</span>
+            ${lid?`<span onclick="toggleLeaveChecklist('${lid}','form_submitted',${!fOK},supa).then(()=>loadSubLeaves())"
+              style="font-size:10px;padding:1px 5px;border-radius:4px;border:1px solid ${fOK?'#16a34a':'#333'};color:${fOK?'#16a34a':'#666'};cursor:pointer">📋</span>
+            <span onclick="toggleLeaveChecklist('${lid}','parents_called',${!cOK},supa).then(()=>loadSubLeaves())"
+              style="font-size:10px;padding:1px 5px;border-radius:4px;border:1px solid ${cOK?'#16a34a':'#333'};color:${cOK?'#16a34a':'#666'};cursor:pointer">📞</span>`:''}
+            ${!hasDep?`<button onclick="_miniHolDep('${name}',${JSON.stringify(upcomingHol).replace(/"/g,"'")},this)"
+              style="font-size:11px;padding:2px 8px;border-radius:5px;background:#f97316;color:#fff;border:none;cursor:pointer;font-weight:600">↑ Depart</button>`
+            :hasRet?`<span style="font-size:10px;color:#a78bfa;font-weight:600">↩ Back</span>`
+            :`<button onclick="_miniHolRet('${name}',${JSON.stringify(upcomingHol).replace(/"/g,"'")},this)"
+              style="font-size:11px;padding:2px 8px;border-radius:5px;background:#16a34a;color:#fff;border:none;cursor:pointer;font-weight:600">↩ Return</button>`}
+          </div>`;
+        }).join('')}
+      </div>`;
+    }
+  }catch(e){console.warn('Holiday panel:',e);}
   try{
     const {data}=await supa.from('boarding_leaves')
       .select('*').neq('active',false).order('departure_planned',{ascending:false}).limit(50);
     if(!data||!data.length){el.innerHTML='<div style="padding:2rem;text-align:center;color:var(--text3);font-size:13px">No leaves.</div>';return;}
     const typeEmoji={weekend:'🏠',medical:'🏥',family:'👨‍👩‍👧',activity:'⚽',holiday:'🌴',longterm:'📅'};
     const fmtDT=iso=>{if(!iso)return'—';try{const d=new Date(iso);return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}catch{return iso;}};
-    el.innerHTML=data.map(l=>{
+    el.innerHTML=holHtml+data.map(l=>{
       const dep=l.departed_at||l.departure_actual;
       const ret=l.returned_at||l.return_actual;
       const retPlan=l.return_planned;
@@ -1458,7 +1496,7 @@ let _excusedMap={}; // cached for current render cycle
 
 async function loadExcusedMap(){
   const excused={};
-  const today=new Date().toISOString().split('T')[0];
+  const today=today();
   const nowMins=new Date().getHours()*60+new Date().getMinutes();
   const toMins=t=>{const[h,m]=t.split(':');return parseInt(h)*60+parseInt(m);};
   const dayName=new Date().toLocaleDateString('en-US',{weekday:'short'}).slice(0,3);
@@ -1520,7 +1558,11 @@ async function loadExcusedMap(){
 }
 
 // ── REGISTER ──────────────────────────────────────────────────
-function today(){return new Date().toISOString().split('T')[0];}
+function today(){
+  // Use local timezone (Asia/Shanghai by default) not UTC
+  const tz=BS.timezone||'Asia/Shanghai';
+  return new Date().toLocaleDateString('en-CA',{timeZone:tz}); // en-CA gives YYYY-MM-DD
+}
 
 let _boardingPenaltyMap={};
 let _boardingNurseMap={};
@@ -1584,7 +1626,7 @@ async function boardingAddComment(name){
 }
 
 async function loadBoardingPenalties(){
-  const today=new Date().toISOString().split('T')[0];
+  const today=today();
   try{
     const {data}=await supa.from('boarding_penalties')
       .select('student_name,infraction_type,status')
@@ -2079,11 +2121,12 @@ async function renderDailySummary(containerId, students, boarderStatus, boarding
   const now = new Date();
   const nowM = now.getHours()*60+now.getMinutes();
 
-  // Target date
-  const target = new Date();
-  target.setDate(target.getDate() + _dsDayOffset);
-  target.setHours(0,0,0,0);
-  const targetISO = target.toISOString().split('T')[0];
+  // Target date — use local timezone not UTC
+  const _tz=(bs&&bs.timezone)||'Asia/Shanghai';
+  const _todayLocalISO=new Date().toLocaleDateString('en-CA',{timeZone:_tz});
+  const _targetD=new Date(_todayLocalISO+'T12:00:00'); // noon local, safe for arithmetic
+  _targetD.setDate(_targetD.getDate()+_dsDayOffset);
+  const targetISO=_targetD.toLocaleDateString('en-CA',{timeZone:_tz});
   const isToday = _dsDayOffset === 0;
 
   // Determine highlighted session
@@ -3298,15 +3341,13 @@ async function confirmBoardingDeparture(leaveId){
     await supa.from('boarding_leaves').update({
       departure_actual:now, departed_at:now, departure_confirmed_by:role
     }).eq('id',leaveId);
-    // Sync to registrations: mark excused for all today's sessions
+    // Mark excused only for current session — don't pre-fill future sessions
     if(leave?.student_name){
-      for(const sess of ['morning','prep','hoob']){
-        await supa.from('boarding_registrations').upsert({
-          student_name:leave.student_name, register_date:td, session_type:sess,
-          status:'excused', updated_by:role, updated_at:now
-        },{onConflict:'student_name,register_date,session_type'});
-      }
-      // Update local state
+      const sess=getBoardingCurrentSession();
+      await supa.from('boarding_registrations').upsert({
+        student_name:leave.student_name, register_date:td, session_type:sess,
+        status:'excused', updated_by:role, updated_at:now
+      },{onConflict:'student_name,register_date,session_type'});
       _brState[leave.student_name]={...(_brState[leave.student_name]||{}),status:'excused',updatedAt:now};
     }
     showToast('↑ Departure confirmed','#d97706');
