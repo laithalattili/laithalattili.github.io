@@ -956,7 +956,10 @@ function initBudgetOrder(){
   S.budgetOrder=S.budgetOrder.filter(function(k){return S.budgets.hasOwnProperty(k);});
 }
 function getBudgetOrder(){
+  if(!S.budgets||!Object.keys(S.budgets).length)return [];
   initBudgetOrder();
+  // Safety: if budgetOrder is still empty after init, fall back to Object.keys
+  if(!S.budgetOrder||!S.budgetOrder.length)return Object.keys(S.budgets);
   return S.budgetOrder;
 }
 function initCatColors(){
@@ -1290,7 +1293,6 @@ function loadState(){
     if(Array.isArray(d.wishlistItems))wishlistItems=d.wishlistItems;
     if(d.commitGroupState&&typeof d.commitGroupState==='object')commitGroupState=d.commitGroupState;
   if(d.catColors&&typeof d.catColors==='object'){S.catColors=d.catColors;CAT_COLORS=S.catColors;}
-    if(d.catColors&&typeof d.catColors==='object'){S.catColors=d.catColors;CAT_COLORS=S.catColors;}
     if(Array.isArray(d.budgetOrder))S.budgetOrder=d.budgetOrder;
     // Migrate: default-pin nawal and mortgage
     settlements.forEach(function(s){
