@@ -26416,7 +26416,7 @@ async function renderHawkingRegister(el, preloadedMap){
     let st=(_brState[p.name]||{}).status||'unregistered';
     const _exc=excusedMap[p.name];
     const _leaveState=_exc?.state||null;
-    if(_exc&&(_leaveState==='excused'||_exc.type==='activity'))st='excused';
+    if(_exc&&(_leaveState==='excused'||_exc.type==='activity'||_exc.leave_type==='longterm'))st='excused';
     else if(st==='unregistered'&&_exc)st='excused';
     counts[st]=(counts[st]||0)+1;
   });
@@ -26433,7 +26433,8 @@ async function renderHawkingRegister(el, preloadedMap){
   });
   let rows='';
   filteredPeople.forEach((p,i)=>{
-    const stObj=_brState[p.name]||{};
+    // Use merged state (all sessions) so morning registrations show during prep
+    const stObj=(_brStateMerged[p.name]||_brState[p.name])||{};
     let st=stObj.status||'unregistered';
     const excuseInfo=excusedMap[p.name]||null;
     const leaveState=excuseInfo?.state||null; // 'pending_departure'|'excused'|null
@@ -32463,7 +32464,7 @@ let _brStates={}; // all sessions {session:{name:{status,...}}}
 let _brCurrentSession='prep';
 let _brCollapsed=false;
 let _brRealtimeSub=null;
-let _brToday=()=>new Date().toISOString().split('T')[0];
+let _brToday=()=>new Date().toLocaleDateString('en-CA',{timeZone:(_boardingSettings&&_boardingSettings.timezone)||'Asia/Shanghai'});
 
 async function _brLoadToday(){
   try{
@@ -32482,6 +32483,16 @@ async function _brLoadToday(){
       };
     });
     _brState=_brStates[_brCurrentSession]||{};
+    // For the Lists register: merge all sessions, pick most recent registration per student
+    _brStateMerged={};
+    Object.entries(_brStates).forEach(([sess,students])=>{
+      Object.entries(students).forEach(([name,data])=>{
+        const existing=_brStateMerged[name];
+        if(!existing||(data.updatedAt&&(!existing.updatedAt||data.updatedAt>existing.updatedAt))){
+          _brStateMerged[name]={...data,session:sess};
+        }
+      });
+    });
     _brRerender();
     _brRefreshListsTab();
   }catch(e){console.warn('BR load error',e);}
