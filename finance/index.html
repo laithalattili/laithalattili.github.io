@@ -947,6 +947,18 @@ var CAT_COLORS_DEFAULTS={'Food & dining':'#e07b54','Transport':'#5d9fd4','Taobao
 // CAT_COLORS is a live proxy into S.catColors so it persists and syncs across devices.
 // Always access via this variable — never read S.catColors directly.
 var CAT_COLORS=CAT_COLORS_DEFAULTS;
+function initBudgetOrder(){
+  // Build S.budgetOrder from existing S.budgets if not present or out of sync
+  if(!Array.isArray(S.budgetOrder))S.budgetOrder=[];
+  // Add any keys in S.budgets not yet in order
+  Object.keys(S.budgets).forEach(function(k){if(S.budgetOrder.indexOf(k)<0)S.budgetOrder.push(k);});
+  // Remove any order entries no longer in S.budgets
+  S.budgetOrder=S.budgetOrder.filter(function(k){return S.budgets.hasOwnProperty(k);});
+}
+function getBudgetOrder(){
+  initBudgetOrder();
+  return S.budgetOrder;
+}
 function initCatColors(){
   if(!S.catColors)S.catColors=Object.assign({},CAT_COLORS_DEFAULTS);
   // Merge defaults for any missing keys (new built-in categories)
@@ -1213,7 +1225,7 @@ function autosave(){
   if(typeof _whatIfActive!=="undefined"&&_whatIfActive)return;
   // Stamp a new version immediately so startup pull won't overwrite this data
   var newVer=Date.now();
-  try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState,catColors:S.catColors}));}catch(e){console.warn('save',e);}
+  try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState,catColors:S.catColors,budgetOrder:S.budgetOrder}));}catch(e){console.warn('save',e);}
   if(typeof sbSchedulePush==='function')sbSchedulePush(newVer);
 }
 function loadState(){
@@ -1279,6 +1291,7 @@ function loadState(){
     if(d.commitGroupState&&typeof d.commitGroupState==='object')commitGroupState=d.commitGroupState;
   if(d.catColors&&typeof d.catColors==='object'){S.catColors=d.catColors;CAT_COLORS=S.catColors;}
     if(d.catColors&&typeof d.catColors==='object'){S.catColors=d.catColors;CAT_COLORS=S.catColors;}
+    if(Array.isArray(d.budgetOrder))S.budgetOrder=d.budgetOrder;
     // Migrate: default-pin nawal and mortgage
     settlements.forEach(function(s){
       if(s.pinnedHome===undefined){s.pinnedHome=(s.id==='nawal'||s.id==='mortgage');}
@@ -3120,23 +3133,59 @@ function switchStreamsTab(tab){
 }
 function renderBudgetSettingsLS(){
   try{migrateBudgets();}catch(e){}
+  initBudgetOrder();
   var bs=document.getElementById('budget-settings-ls');
   if(!bs)return;
   var CURS=['RMB','JOD','GBP','USD','EUR'];
   safeArr(S.customCurrencies).forEach(function(cc){if(CURS.indexOf(cc.code)<0)CURS.push(cc.code);});
-  var cats=Object.keys(S.budgets||{});
+  var cats=getBudgetOrder();
   if(!cats.length){
     bs.innerHTML='<div style="font-size:13px;color:var(--ink3);padding:8px 0">No categories yet. Add one below.</div>';
     return;
   }
   bs.innerHTML='';
+  var dragSrc=null;
   cats.forEach(function(cat){
     var bAmt=getBudgetAmount(cat);
     var bCur=getBudgetCurrency(cat);
     var bAcct=getBudgetAccount(cat);
     var bCol=CAT_COLORS[cat]||'#aaaaaa';
     var row=document.createElement('div');
+    row.dataset.cat=cat;
+    row.draggable=true;
     row.style.cssText='display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:.5px solid var(--brd);flex-wrap:wrap';
+    // Drag handle
+    var handle=document.createElement('span');
+    handle.textContent='⠿';
+    handle.title='Drag to reorder';
+    handle.style.cssText='cursor:grab;color:var(--ink4);font-size:16px;flex-shrink:0;user-select:none;padding:0 2px';
+    row.addEventListener('dragstart',function(e){
+      dragSrc=row;
+      e.dataTransfer.effectAllowed='move';
+      e.dataTransfer.setData('text/plain',cat);
+      setTimeout(function(){row.style.opacity='0.4';},0);
+    });
+    row.addEventListener('dragend',function(){
+      row.style.opacity='';
+      bs.querySelectorAll('[data-cat]').forEach(function(r){r.style.borderTop='';});
+    });
+    row.addEventListener('dragover',function(e){
+      e.preventDefault();e.dataTransfer.dropEffect='move';
+      bs.querySelectorAll('[data-cat]').forEach(function(r){r.style.borderTop='';});
+      if(row!==dragSrc)row.style.borderTop='2px solid var(--accent,#c4622d)';
+    });
+    row.addEventListener('drop',function(e){
+      e.preventDefault();
+      if(!dragSrc||dragSrc===row)return;
+      var srcCat=dragSrc.dataset.cat;
+      var tgtCat=row.dataset.cat;
+      var si=S.budgetOrder.indexOf(srcCat);
+      var ti=S.budgetOrder.indexOf(tgtCat);
+      if(si<0||ti<0)return;
+      S.budgetOrder.splice(si,1);
+      S.budgetOrder.splice(ti,0,srcCat);
+      autosave();renderBudgetSettingsLS();
+    });
     // Colour
     var colorInp=document.createElement('input');colorInp.type='color';colorInp.value=bCol;
     colorInp.title='Category colour';
@@ -3151,6 +3200,7 @@ function renderBudgetSettingsLS(){
       var col2=CAT_COLORS[ct];var bud2=S.budgets[ct];
       delete CAT_COLORS[ct];delete S.budgets[ct];
       CAT_COLORS[n]=col2;S.budgets[n]=bud2;
+      if(Array.isArray(S.budgetOrder)){var oi=S.budgetOrder.indexOf(ct);if(oi>=0)S.budgetOrder[oi]=n;}
       if(S.selectedCat===ct)S.selectedCat=n;
       autosave();renderBudgetSettingsLS();renderCatGrid();
     };})(cat);
@@ -3160,7 +3210,7 @@ function renderBudgetSettingsLS(){
     budInp.onchange=(function(ct){return function(){
       if(!S.budgets[ct]||typeof S.budgets[ct]==='number')S.budgets[ct]={amount:0,currency:'RMB',account:'boc'};
       S.budgets[ct].amount=parseFloat(this.value)||0;autosave();
-    };})(cat);
+    };})(ct);
     // Currency
     var curSel=document.createElement('select');curSel.style.cssText='font-size:12px;width:65px';curSel.title='Currency';
     CURS.forEach(function(cur){var o=document.createElement('option');o.value=cur;o.textContent=cur;if(bCur===cur)o.selected=true;curSel.appendChild(o);});
@@ -3183,7 +3233,7 @@ function renderBudgetSettingsLS(){
     // Delete
     var delBtn=document.createElement('button');delBtn.className='btn btn-xs btn-d';delBtn.textContent='Del';
     delBtn.onclick=(function(ct){return function(){deleteCategory(ct);};})(cat);
-    row.appendChild(colorInp);row.appendChild(nameInp);row.appendChild(budInp);row.appendChild(curSel);row.appendChild(acctSel);row.appendChild(delBtn);
+    row.appendChild(handle);row.appendChild(colorInp);row.appendChild(nameInp);row.appendChild(budInp);row.appendChild(curSel);row.appendChild(acctSel);row.appendChild(delBtn);
     bs.appendChild(row);
   });
 }
@@ -3406,6 +3456,7 @@ function addCategory(){
   if(!name)return;
   CAT_COLORS[name]=color;
   S.budgets[name]={amount:budget,currency:currency,account:account};
+  initBudgetOrder();if(S.budgetOrder.indexOf(name)<0)S.budgetOrder.push(name);
   document.getElementById('new-cat-name').value='';
   document.getElementById('new-cat-budget').value='';
   autosave();renderBudgetSettingsLS();renderCatGrid();renderLogCurToggle();
@@ -3413,7 +3464,8 @@ function addCategory(){
 function deleteCategory(name){
   if(Object.keys(S.budgets).length<=1)return alert('Cannot delete all categories.');
   delete CAT_COLORS[name];delete S.budgets[name];
-  if(S.selectedCat===name)S.selectedCat=Object.keys(S.budgets)[0]||'Other';
+  if(Array.isArray(S.budgetOrder))S.budgetOrder=S.budgetOrder.filter(function(k){return k!==name;});
+  if(S.selectedCat===name)S.selectedCat=(S.budgetOrder&&S.budgetOrder[0])||Object.keys(S.budgets)[0]||'Other';
   autosave();renderBudgetSettingsLS();renderCatGrid();
 }
 function renderBudgetSettings(){
@@ -4207,6 +4259,7 @@ document.addEventListener('DOMContentLoaded',function(){
   });
   migrateBudgets();
   initCatColors();
+  initBudgetOrder();
   // Auto-link discretionary stream to all budget categories if not yet linked
   var discSt=streams.find(function(s){return s.id==='discretionary';});
   if(discSt&&(!Array.isArray(discSt.linkedBudgetCats)||discSt.linkedBudgetCats.length===0)){
@@ -4214,7 +4267,7 @@ document.addEventListener('DOMContentLoaded',function(){
     salFixed=true;
   }
   if(salFixed){
-    try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState,catColors:S.catColors}));}catch(e){console.warn('migration save',e);}
+    try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState,catColors:S.catColors,budgetOrder:S.budgetOrder}));}catch(e){console.warn('migration save',e);}
   }
   document.querySelectorAll('.nav-item[data-view],.bi[data-view],.bi-log[data-view]').forEach(function(el){el.addEventListener('click',function(){showView(el.dataset.view);});});
   var ld=document.getElementById('log-date');if(ld)ld.value=today().toISOString().split('T')[0];
@@ -4286,7 +4339,7 @@ function sbBuildPayload(){
       snapshots:safeArr(S.snapshots),tickState:tickState,
       parentSkips:parentSkips,confirmedDebits:confirmedDebits,
       openMonths:openMonths,wishlistItems:wishlistItems,
-      commitGroupState:commitGroupState,catColors:S.catColors
+      commitGroupState:commitGroupState,catColors:S.catColors,budgetOrder:S.budgetOrder
     }
   };
 }
@@ -4312,7 +4365,7 @@ function sbApplyRemote(remote){
   if(Array.isArray(d.wishlistItems))wishlistItems=d.wishlistItems;
   if(d.commitGroupState&&typeof d.commitGroupState==='object')commitGroupState=d.commitGroupState;
   if(d.catColors&&typeof d.catColors==='object'){S.catColors=d.catColors;CAT_COLORS=S.catColors;}
-  try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState,catColors:S.catColors}));}catch(ex){console.warn('save',ex);}
+  try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState,catColors:S.catColors,budgetOrder:S.budgetOrder}));}catch(ex){console.warn('save',ex);}
   return true;
 }
 
