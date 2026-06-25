@@ -30958,22 +30958,17 @@ async function getTodayExcusedMap(){
       if(l.returned_at||l.return_actual)return; // skip if already returned
       const depPlannedDate=l.departure_planned?l.departure_planned.split('T')[0]:null;
       const retPlannedDate=l.return_planned?l.return_planned.split('T')[0]:null;
-      // Longterm leaves: always active until returned (no date check needed)
-      if(l.leave_type==='longterm'){
-        // Already returned check above handles exit
-      } else {
-        // Is this leave relevant today?
+      // Longterm: always active. If departed_at set: bypass planned date check
+      const depActual=l.departed_at||l.departure_actual;
+      if(l.leave_type!=='longterm'&&!depActual){
+        // Only apply date range check if student hasn't actually departed yet
         const leaveStartsOnOrBeforeToday=depPlannedDate&&depPlannedDate<=today;
         const leaveEndsOnOrAfterToday=!retPlannedDate||retPlannedDate>=today;
         if(!leaveStartsOnOrBeforeToday||!leaveEndsOnOrAfterToday)return;
       }
       const label=leaveLabel[l.leave_type]||'Leave';
       const emoji=leaveEmoji[l.leave_type]||'🏠';
-      // Check both column name variants for compatibility
-      const depActual = l.departed_at || l.departure_actual;
-      const retActual = l.returned_at || l.return_actual;
-      if(retActual) return; // already returned — skip
-      // Longterm leaves are always excused regardless of departure confirmation
+      // Departed or longterm = always excused
       const isLongterm=l.leave_type==='longterm';
       if(depActual||isLongterm){
         excused[l.student_name]={
@@ -32340,6 +32335,22 @@ async function confirmHolidayDeparture(studentName, holiday, supaRef, role) {
         parents_called: false,
       });
     }
+    // Write to registrations so register shows excused immediately
+    try{
+      const td2=_todayStr();
+      const sess=getCurrentSession();
+      await supaRef.from('boarding_registrations').upsert({
+        student_name:studentName,register_date:td2,session_type:sess,
+        status:'excused',updated_by:role||'HSM',updated_at:now
+      },{onConflict:'student_name,register_date,session_type'});
+      if(typeof _brState!=='undefined'&&_brState)
+        _brState[studentName]={...(_brState[studentName]||{}),status:'excused',updatedAt:now};
+      if(typeof _brStateMerged!=='undefined'&&_brStateMerged)
+        _brStateMerged[studentName]={...(_brStateMerged[studentName]||{}),status:'excused',session:sess,updatedAt:now};
+      if(window._lastExcusedMap) window._lastExcusedMap[studentName]={
+        ...(window._lastExcusedMap[studentName]||{}),state:'excused',departedAt:now,leave_type:'holiday'
+      };
+    }catch(e){console.warn('Reg sync:',e);}
     return true;
   } catch(e) {
     console.error('Holiday departure error:', e);
