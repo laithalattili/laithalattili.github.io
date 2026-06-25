@@ -26438,8 +26438,8 @@ async function renderHawkingRegister(el, preloadedMap){
     const excuseInfo=excusedMap[p.name]||null;
     const leaveState=excuseInfo?.state||null; // 'pending_departure'|'excused'|null
     // If student has confirmed departure, override their status to show they're away
-    const autoExcused=excuseInfo&&(leaveState==='excused'||(excuseInfo.type==='activity'));
-    // Departed students always show as away — overrides even a 'present' registration
+    const autoExcused=excuseInfo&&(leaveState==='excused'||(excuseInfo.type==='activity')||excuseInfo.leave_type==='longterm');
+    // Departed/longterm always show as excused — overrides even a 'present' registration
     const effectiveSt=autoExcused?'excused':st;
     const col=statColor[effectiveSt];
     const bg=statBg[effectiveSt];
