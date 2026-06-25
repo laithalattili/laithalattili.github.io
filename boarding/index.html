@@ -1690,14 +1690,20 @@ async function loadBoardingPenalties(){
 async function loadRegister(){
   const session=getBoardingCurrentSession();
   try{
+    // Load ALL sessions for today — not just current
     const {data}=await supa.from('boarding_registrations')
       .select('student_name,status,updated_at,updated_by,session_type,late_wake,late_floor,late_sleep')
-      .eq('register_date',today()).eq('session_type',session);
-    _brState={};
+      .eq('register_date',today());
+    // Store all sessions
+    _brStatesAll={morning:{},prep:{},hoob:{}};
     (data||[]).forEach(r=>{
-      _brState[r.student_name]={status:r.status,updatedAt:r.updated_at,updatedBy:r.updated_by,
+      const s=r.session_type||session;
+      if(!_brStatesAll[s])_brStatesAll[s]={};
+      _brStatesAll[s][r.student_name]={status:r.status,updatedAt:r.updated_at,updatedBy:r.updated_by,
         lateWake:r.late_wake,lateFloor:r.late_floor,lateSleep:r.late_sleep};
     });
+    // Current session state
+    _brState=_brStatesAll[session]||{};
   }catch(e){console.warn('Register load error',e);}
   await Promise.all([loadExcusedMap(), loadBoardingPenalties(), loadBoardingNurseMap(), loadBoardingCommentMap()]);
   renderRegister();
