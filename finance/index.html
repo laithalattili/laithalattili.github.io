@@ -943,7 +943,16 @@ function updateClock(){
 var MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 var MNAMES=['January','February','March','April','May','June','July','August','September','October','November','December'];
 var OZ_TO_G=31.1035;
-var CAT_COLORS={'Food & dining':'#e07b54','Transport':'#5d9fd4','Taobao / shopping':'#9b6fd4','Entertainment':'#e8b84b','Personal care':'#4db89e','Protein & supplements':'#6bcb77','Phone & mobile':'#8fa0c0','AI services':'#c78acd','Holiday':'#f2a65a','Gifts':'#e98f9f','Health':'#5bbfb5','Cat':'#f4a261','Other':'#aaa'};
+var CAT_COLORS_DEFAULTS={'Food & dining':'#e07b54','Transport':'#5d9fd4','Taobao / shopping':'#9b6fd4','Entertainment':'#e8b84b','Personal care':'#4db89e','Protein & supplements':'#6bcb77','Phone & mobile':'#8fa0c0','AI services':'#c78acd','Holiday':'#f2a65a','Gifts':'#e98f9f','Health':'#5bbfb5','Cat':'#f4a261','Other':'#aaa'};
+// CAT_COLORS is a live proxy into S.catColors so it persists and syncs across devices.
+// Always access via this variable — never read S.catColors directly.
+var CAT_COLORS=CAT_COLORS_DEFAULTS;
+function initCatColors(){
+  if(!S.catColors)S.catColors=Object.assign({},CAT_COLORS_DEFAULTS);
+  // Merge defaults for any missing keys (new built-in categories)
+  Object.keys(CAT_COLORS_DEFAULTS).forEach(function(k){if(!S.catColors[k])S.catColors[k]=CAT_COLORS_DEFAULTS[k];});
+  CAT_COLORS=S.catColors;
+}
 
 // ═══ STATE ═══
 var S={
@@ -1204,7 +1213,7 @@ function autosave(){
   if(typeof _whatIfActive!=="undefined"&&_whatIfActive)return;
   // Stamp a new version immediately so startup pull won't overwrite this data
   var newVer=Date.now();
-  try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState}));}catch(e){console.warn('save',e);}
+  try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState,catColors:S.catColors}));}catch(e){console.warn('save',e);}
   if(typeof sbSchedulePush==='function')sbSchedulePush(newVer);
 }
 function loadState(){
@@ -1268,6 +1277,8 @@ function loadState(){
     if(d.openMonths&&typeof d.openMonths==='object')openMonths=d.openMonths;
     if(Array.isArray(d.wishlistItems))wishlistItems=d.wishlistItems;
     if(d.commitGroupState&&typeof d.commitGroupState==='object')commitGroupState=d.commitGroupState;
+  if(d.catColors&&typeof d.catColors==='object'){S.catColors=d.catColors;CAT_COLORS=S.catColors;}
+    if(d.catColors&&typeof d.catColors==='object'){S.catColors=d.catColors;CAT_COLORS=S.catColors;}
     // Migrate: default-pin nawal and mortgage
     settlements.forEach(function(s){
       if(s.pinnedHome===undefined){s.pinnedHome=(s.id==='nawal'||s.id==='mortgage');}
@@ -2871,7 +2882,7 @@ function deleteMotelEntry(sid,pid){if(!confirm('Remove?'))return;var s=settlemen
 
 // ═══ HOLIDAYS ═══
 var holOpenState={};
-function addHoliday(){var id='h'+Date.now();holidays.push({id:id,label:'New holiday',start:'2027-06-01',end:'2027-06-14',items:[],destinations:'',account:'boc',userAdded:true});holOpenState[id]=true;autosave();renderHolidays();}
+function addHoliday(){var id='h'+Date.now();holidays.push({id:id,label:'New holiday',start:'2027-06-01',end:'2027-06-14',items:[],destinations:'',account:'boc',userAdded:true});holOpenState[id]=true;holidays.sort(function(a,b){return new Date(a.start)-new Date(b.start);});autosave();renderHolidays();}
 function removeHoliday(id){if(!confirm('Remove this holiday?'))return;holidays=holidays.filter(function(h){return h.id!==id;});delete holOpenState[id];autosave();renderHolidays();}
 function holDays(h){return Math.round((new Date(h.end)-new Date(h.start))/86400000)+1;}
 function holItemTotal(item){if(item.type==='daily'||item.type==='hotel')return n2(item.amount*(item.nights||1));return n2(item.amount);}
@@ -2937,7 +2948,7 @@ function renderHolidays(){
     // Date range (editable for all holidays)
     var dr=document.createElement('div');dr.className='ig-row';dr.style.marginBottom='10px';
     var sIg=document.createElement('div');sIg.className='ig';var sL=document.createElement('label');sL.textContent='Start';sIg.appendChild(sL);
-    var sI=document.createElement('input');sI.type='date';sI.value=h.start;sI.onchange=(function(hobj){return function(){hobj.start=this.value;autosave();};})(h);sIg.appendChild(sI);
+    var sI=document.createElement('input');sI.type='date';sI.value=h.start;sI.onchange=(function(hobj){return function(){hobj.start=this.value;holidays.sort(function(a,b){return new Date(a.start)-new Date(b.start);});autosave();renderHolidays();};})(h);sIg.appendChild(sI);
     var eIg=document.createElement('div');eIg.className='ig';var eL=document.createElement('label');eL.textContent='End';eIg.appendChild(eL);
     var eI=document.createElement('input');eI.type='date';eI.value=h.end;eI.onchange=(function(hobj){return function(){hobj.end=this.value;autosave();};})(h);eIg.appendChild(eI);
     dr.appendChild(sIg);dr.appendChild(eIg);body.appendChild(dr);
@@ -4195,6 +4206,7 @@ document.addEventListener('DOMContentLoaded',function(){
     if(s.id==='flight-allow'&&!s.isCommitment){s.isCommitment=true;salFixed=true;}
   });
   migrateBudgets();
+  initCatColors();
   // Auto-link discretionary stream to all budget categories if not yet linked
   var discSt=streams.find(function(s){return s.id==='discretionary';});
   if(discSt&&(!Array.isArray(discSt.linkedBudgetCats)||discSt.linkedBudgetCats.length===0)){
@@ -4202,7 +4214,7 @@ document.addEventListener('DOMContentLoaded',function(){
     salFixed=true;
   }
   if(salFixed){
-    try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState}));}catch(e){console.warn('migration save',e);}
+    try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState,catColors:S.catColors}));}catch(e){console.warn('migration save',e);}
   }
   document.querySelectorAll('.nav-item[data-view],.bi[data-view],.bi-log[data-view]').forEach(function(el){el.addEventListener('click',function(){showView(el.dataset.view);});});
   var ld=document.getElementById('log-date');if(ld)ld.value=today().toISOString().split('T')[0];
@@ -4274,7 +4286,7 @@ function sbBuildPayload(){
       snapshots:safeArr(S.snapshots),tickState:tickState,
       parentSkips:parentSkips,confirmedDebits:confirmedDebits,
       openMonths:openMonths,wishlistItems:wishlistItems,
-      commitGroupState:commitGroupState
+      commitGroupState:commitGroupState,catColors:S.catColors
     }
   };
 }
@@ -4299,7 +4311,8 @@ function sbApplyRemote(remote){
   if(d.openMonths)openMonths=d.openMonths;
   if(Array.isArray(d.wishlistItems))wishlistItems=d.wishlistItems;
   if(d.commitGroupState&&typeof d.commitGroupState==='object')commitGroupState=d.commitGroupState;
-  try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState}));}catch(ex){console.warn('save',ex);}
+  if(d.catColors&&typeof d.catColors==='object'){S.catColors=d.catColors;CAT_COLORS=S.catColors;}
+  try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState,catColors:S.catColors}));}catch(ex){console.warn('save',ex);}
   return true;
 }
 
