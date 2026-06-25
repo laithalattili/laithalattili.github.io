@@ -32633,6 +32633,7 @@ function _amBoardingRegisterHtml(type,excusedMap){
       const _leaveState=_exc?.state||null;
       const _autoExcused=_exc&&(_leaveState==='excused'||_exc.type==='activity'||_exc.leave_type==='longterm');
       const st=_autoExcused?'excused':_rawSt;
+      if(_exc)console.log('[LIVE EXC]',p.name,'exc:',JSON.stringify({state:_exc.state,type:_exc.type,leave_type:_exc.leave_type,auto:_autoExcused,st}));
       const bg=statBg[st];
       globalIdx++;
       const _safeBrN=p.name.replace(/"/g,"&quot;");
