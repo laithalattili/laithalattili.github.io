@@ -3156,7 +3156,6 @@ function renderRegister(){
   let html='';
   let totalIdx=0;
 
-  console.log('[RT REG] people count:',people.length,'_regScope:',_regScope,'BOARDER_STATUS keys:',Object.keys(BOARDER_STATUS).length,'STUDENTS:',STUDENTS.length);
   if(_regGroup==='grade'){
     const grades=['G7','G8','G9','G10','G11','G12','Unknown'];
     const gradeMap={};
@@ -3165,7 +3164,6 @@ function renderRegister(){
       if(!gradeMap[gr])gradeMap[gr]=[];
       gradeMap[gr].push(name);
     });
-    console.log('[RT REG] gradeMap:',JSON.stringify(Object.fromEntries(Object.entries(gradeMap).map(([k,v])=>[k,v.length]))));
     grades.forEach(gr=>{
       const names=gradeMap[gr];
       if(!names||!names.length)return;
