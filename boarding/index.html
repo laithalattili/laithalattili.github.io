@@ -1442,7 +1442,7 @@ function switchTab(id,btn){
   document.getElementById('tab-'+id).classList.add('active');
   const sub=document.getElementById('reg-sticky-sub');
   if(sub)sub.style.display=id==='register'?'block':'none';
-  if(id==='register'){window._bRegFilter='all';loadExcusedMap().then(()=>{renderRegister();});}
+  if(id==='register'){window._bRegFilter='all';loadRegister();}
   if(id==='daily'){_dsDayOffset=0;renderDailySummary('daily-summary-content',getBoarders(),BOARDER_STATUS,BS);}
   if(id==='calendar'){_calSupaRef=supa;initLeaveCalendar('boarding-calendar-content',STUDENTS,BOARDER_STATUS,supa);}
   if(id==='info'){loadInfoPenalties();loadHolidayDeparturePanel();}
