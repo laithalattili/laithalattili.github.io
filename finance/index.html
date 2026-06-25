@@ -3212,7 +3212,7 @@ function renderBudgetSettingsLS(){
     budInp.onchange=(function(ct){return function(){
       if(!S.budgets[ct]||typeof S.budgets[ct]==='number')S.budgets[ct]={amount:0,currency:'RMB',account:'boc'};
       S.budgets[ct].amount=parseFloat(this.value)||0;autosave();
-    };})(ct);
+    };})(cat);
     // Currency
     var curSel=document.createElement('select');curSel.style.cssText='font-size:12px;width:65px';curSel.title='Currency';
     CURS.forEach(function(cur){var o=document.createElement('option');o.value=cur;o.textContent=cur;if(bCur===cur)o.selected=true;curSel.appendChild(o);});
@@ -3507,7 +3507,7 @@ function renderBudgetSettings(){
     acctSel.onchange=(function(ct){return function(){if(!S.budgets[ct]||typeof S.budgets[ct]==='number')S.budgets[ct]={amount:getBudgetAmount(ct),currency:getBudgetCurrency(ct),account:'boc'};S.budgets[ct].account=this.value;autosave();};})(cat);
     var delBtn=document.createElement('button');delBtn.className='btn btn-xs btn-d';delBtn.textContent='Del';
     delBtn.onclick=(function(ct){return function(){deleteCategory(ct);};})(cat);
-    row.appendChild(colorInp);row.appendChild(nameInp);row.appendChild(budInp);row.appendChild(curSel);row.appendChild(acctSel);row.appendChild(delBtn);
+    row.appendChild(handle);row.appendChild(colorInp);row.appendChild(nameInp);row.appendChild(budInp);row.appendChild(curSel);row.appendChild(acctSel);row.appendChild(delBtn);
     bs.appendChild(row);
   });
 }
