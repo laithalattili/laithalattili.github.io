@@ -30697,7 +30697,14 @@ async function _undoDeparture(id){
       if(ctx){
         const cust=getCustomForWeek(ctx.offset,ctx.slotIdx,ctx.dayName);
         if(cust&&(cust.boarding_register||cust.house_register)){
-          body.innerHTML=_amBoardingRegisterHtml(cust.boarding_register?'boarding':'house',window._lastExcusedMap||{});
+          const _bType=cust.boarding_register?'boarding':'house';
+          // Always get fresh excused map for boarding register
+          getTodayExcusedMap().then(m=>{
+            window._lastExcusedMap=m;
+            if(body&&_amOpen) body.innerHTML=_amBoardingRegisterHtml(_bType,m);
+          });
+          // Show loading state immediately
+          body.innerHTML=_amBoardingRegisterHtml(_bType,window._lastExcusedMap||{});
         }
       }
     }
@@ -30751,7 +30758,14 @@ async function confirmDeparture(id){
       if(ctx){
         const cust=getCustomForWeek(ctx.offset,ctx.slotIdx,ctx.dayName);
         if(cust&&(cust.boarding_register||cust.house_register)){
-          body.innerHTML=_amBoardingRegisterHtml(cust.boarding_register?'boarding':'house',window._lastExcusedMap||{});
+          const _bType=cust.boarding_register?'boarding':'house';
+          // Always get fresh excused map for boarding register
+          getTodayExcusedMap().then(m=>{
+            window._lastExcusedMap=m;
+            if(body&&_amOpen) body.innerHTML=_amBoardingRegisterHtml(_bType,m);
+          });
+          // Show loading state immediately
+          body.innerHTML=_amBoardingRegisterHtml(_bType,window._lastExcusedMap||{});
         }
       }
     }
@@ -30810,7 +30824,14 @@ async function confirmReturn(id){
       if(ctx){
         const cust=getCustomForWeek(ctx.offset,ctx.slotIdx,ctx.dayName);
         if(cust&&(cust.boarding_register||cust.house_register)){
-          body.innerHTML=_amBoardingRegisterHtml(cust.boarding_register?'boarding':'house',window._lastExcusedMap||{});
+          const _bType=cust.boarding_register?'boarding':'house';
+          // Always get fresh excused map for boarding register
+          getTodayExcusedMap().then(m=>{
+            window._lastExcusedMap=m;
+            if(body&&_amOpen) body.innerHTML=_amBoardingRegisterHtml(_bType,m);
+          });
+          // Show loading state immediately
+          body.innerHTML=_amBoardingRegisterHtml(_bType,window._lastExcusedMap||{});
         }
       }
     }
