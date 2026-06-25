@@ -1295,41 +1295,51 @@ async function loadRegister(){
   const el=document.getElementById('tab-register');
   el.innerHTML='<div class="loading">Loading register...</div>';
   const td=today();
-  const data=await(await supa('boarding_registrations')).get(`register_date=eq.${td}&order=student_name`);
 
-  const sessions={morning:[],prep:[],hoob:[]};
-  const allNames=new Set();
+  // Load registrations and longterm leaves in parallel
+  const [regData, ltData]=await Promise.all([
+    (await supa('boarding_registrations')).get(`register_date=eq.${td}&order=student_name`),
+    (await supa('boarding_leaves')).get('leave_type=eq.longterm&active=neq.false')
+  ]);
+
+  // Build longterm excused set
+  const longtermExcused=new Set();
+  (ltData||[]).forEach(l=>{
+    if(!l.returned_at&&!l.return_actual) longtermExcused.add(l.student_name);
+  });
+
   const byName={};
-  data.forEach(r=>{
-    allNames.add(r.student_name);
+  (regData||[]).forEach(r=>{
     if(!byName[r.student_name])byName[r.student_name]={};
     byName[r.student_name][r.session_type]={status:r.status,updated_at:r.updated_at};
   });
 
-  // Filter to boarders only
-  const boarderNames=new Set(Object.keys(_lBoarderStatus).filter(n=>{
+  // All boarders (not just those with registrations today)
+  const boarderNames=Object.keys(_lBoarderStatus).filter(n=>{
     const v=_lBoarderStatus[n];
     return v===true||(v&&v.boarder===true);
-  }));
+  }).sort();
 
   const sessionLabel={morning:'🌅 Morning Clearance',prep:'📚 Evening Prep',hoob:'🌙 Heads on Beds'};
   let html='<div class="card"><div class="card-title" style="padding-bottom:8px">Boarders Register — '+new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short'})+'</div>';
 
-  const boarderNamesInData=[...allNames].filter(n=>boarderNames.has(n));
-  if(!boarderNamesInData.length){html+='<div class="empty">No boarder registrations today.</div></div>';el.innerHTML=html;return;}
+  if(!boarderNames.length){html+='<div class="empty">No boarders found.</div></div>';el.innerHTML=html;return;}
 
   ['morning','prep','hoob'].forEach(sess=>{
     html+=`<div class="card-title" style="background:#f8fafc;padding:6px 14px;font-size:10px">${sessionLabel[sess]}</div>`;
-    boarderNamesInData.sort().forEach(name=>{
-      const st=((byName[name]||{})[sess]||{}).status||'';
-      const cls=st==='present'?'stat-p':st==='absent'?'stat-a':st==='excused'?'stat-e':st==='l'?'stat-l':'stat-blank';
-      const sym=st==='present'?'✓':st==='absent'?'✗':st==='excused'?'~':st==='l'?'L':'·';
+    boarderNames.forEach(name=>{
+      const isLT=longtermExcused.has(name);
+      const rawSt=((byName[name]||{})[sess]||{}).status||'';
+      // Longterm always shows as excused regardless of registration
+      const st=isLT?'excused':rawSt;
+      const cls=st==='present'?'stat-p':st==='absent'?'stat-a':st==='excused'?'stat-e':'stat-blank';
+      const sym=st==='present'?'✓':st==='absent'?'✗':st==='excused'?'~':'·';
       const reg=byName[name]?.[sess];
-      // Show last updated time (not staff name)
       const updTime=reg?.updated_at?new Date(reg.updated_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'';
-      html+=`<div class="reg-item">
-        <span class="reg-name">${name}</span>
-        <span style="flex:1;font-size:10px;color:#bbb;text-align:right;padding-right:6px">${updTime}</span>
+      const ltBadge=isLT?'<span style="font-size:9px;color:#7c3aed;margin-left:4px">🔄</span>':'';
+      html+=`<div class="reg-item" style="${isLT?'background:#faf5ff':''}">
+        <span class="reg-name">${name}${ltBadge}</span>
+        <span style="flex:1;font-size:10px;color:#bbb;text-align:right;padding-right:6px">${isLT?'Long-term':updTime}</span>
         <span class="reg-stat ${cls}">${sym}</span>
       </div>`;
     });
