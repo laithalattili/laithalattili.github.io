@@ -32633,7 +32633,6 @@ function _amBoardingRegisterHtml(type,excusedMap){
       const _leaveState=_exc?.state||null;
       const _autoExcused=_exc&&(_leaveState==='excused'||_exc.type==='activity'||_exc.leave_type==='longterm');
       const st=_autoExcused?'excused':_rawSt;
-      if(_exc)console.log('[LIVE EXC]',p.name,'exc:',JSON.stringify({state:_exc.state,type:_exc.type,leave_type:_exc.leave_type,auto:_autoExcused,st}));
       const bg=statBg[st];
       globalIdx++;
       const _safeBrN=p.name.replace(/"/g,"&quot;");
@@ -33326,8 +33325,15 @@ function amRender(){
       const _brType=_custSlot2.boarding_register?'boarding':'house';
       const _brWrapper=document.createElement('div');
       _brWrapper.setAttribute('data-br-section',_brType);
-      _brWrapper.innerHTML=_amBoardingRegisterHtml(_brType,window._lastExcusedMap||{});
+      // Show loading placeholder immediately
+      _brWrapper.innerHTML='<div style="padding:1rem;text-align:center;color:#555;font-size:12px">Loading register...</div>';
       body.appendChild(_brWrapper);
+      // Fetch fresh excused map then render
+      getTodayExcusedMap().then(m=>{
+        window._lastExcusedMap=m;
+        window._cachedExcusedMap=m;
+        _brWrapper.innerHTML=_amBoardingRegisterHtml(_brType,m);
+      });
     }
   } else {
     // Tick only — update numbers without rebuilding DOM
