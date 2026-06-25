@@ -1449,6 +1449,45 @@ function switchTab(id,btn){
   _updateBoardingStarBtn();
 }
 
+
+function _updateBoardingStarBtn(){
+  try{
+    const def=JSON.parse(localStorage.getItem('boardingDefault')||'{}');
+    const btn=document.getElementById('b-star-btn');
+    if(!btn)return;
+    const isDefault=def.tab===_bCurrentTab&&def.regSub===_bRegSub;
+    btn.style.color=isDefault?'#f59e0b':'#888';
+    btn.title=isDefault?'Default tab (tap to clear)':'Set as default tab';
+  }catch(e){}
+}
+
+function setBoardingDefaultTab(){
+  try{
+    const def=JSON.parse(localStorage.getItem('boardingDefault')||'{}');
+    const isDefault=def.tab===_bCurrentTab&&def.regSub===_bRegSub;
+    if(isDefault){
+      localStorage.removeItem('boardingDefault');
+    } else {
+      localStorage.setItem('boardingDefault',JSON.stringify({tab:_bCurrentTab,regSub:_bRegSub}));
+    }
+    _updateBoardingStarBtn();
+  }catch(e){}
+}
+
+function _applyBoardingDefault(){
+  try{
+    const def=JSON.parse(localStorage.getItem('boardingDefault')||'{}');
+    if(def.tab){
+      const btn=document.querySelector(`.tab[onclick*="'${def.tab}'"]`);
+      if(btn)switchTab(def.tab,btn);
+      if(def.tab==='register'&&def.regSub){
+        const rBtn=document.getElementById('rsub-'+def.regSub);
+        if(rBtn)switchRegSub(def.regSub,rBtn);
+      }
+    }
+  }catch(e){}
+}
+
 function switchRegSub(sub, btn){
   _bRegSub = sub;
   if(sub==='register') window._bRegFilter='all'; // reset filter
