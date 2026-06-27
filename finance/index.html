@@ -1337,9 +1337,9 @@ function resolveStreamAmount(s){
 }
 function initDefaultSettlements(){
   settlements=[
-    {id:'nawal',name:'Settlement',type:'divorce',totalJOD:0,currency:'JOD',phases:[],payments:[],active:true,note:'',divFundAccount:'arab',pinnedHome:true},
-    {id:'mortgage',name:'Apartment mortgage',type:'mortgage',totalJOD:0,currency:'JOD',phases:[{id:'mp1',monthly:0,currency:'JOD',account:'arab',startMon:1,startYr:2026,endMon:12,endYr:2028}],payments:[],active:true,note:'',pinnedHome:true},
-    {id:'motel',name:'Investment',type:'investment',totalJOD:0,currency:'JOD',phases:[],payments:[],active:true,note:'',pinnedHome:false}
+    {id:'nawal',name:'Settlement',type:'divorce',totalJOD:0,totalCurrency:'JOD',currency:'JOD',phases:[],payments:[],active:true,note:'',divFundAccount:'arab',pinnedHome:true},
+    {id:'mortgage',name:'Apartment mortgage',type:'mortgage',totalJOD:0,totalCurrency:'JOD',currency:'JOD',phases:[{id:'mp1',monthly:0,currency:'JOD',account:'arab',startMon:1,startYr:2026,endMon:12,endYr:2028}],payments:[],active:true,note:'',pinnedHome:true},
+    {id:'motel',name:'Investment',type:'investment',totalJOD:0,totalCurrency:'JOD',currency:'JOD',phases:[],payments:[],active:true,note:'',pinnedHome:false}
   ];
 }
 function initDefaultGold(){goldPieces=[];}
@@ -1402,6 +1402,8 @@ function settleLeft(s){
 }
 function settlePct(s){var t=s.totalJOD||0;if(!t)return 0;var paid=s.type==='mortgage'?n2(t-settleLeft(s)):settlePaid(s);return Math.round(Math.min(100,paid/t*100));}
 function settlePlannedFuture(s){
+function fmtSettleTotal(s){var cur=s.totalCurrency||'JOD';var amt=s.totalJOD||0;if(cur==='JOD')return fJOD(amt);if(cur==='RMB')return fRMB(amt);if(cur==='GBP')return fGBP(amt);return amt.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+cur;}
+function fmtSettleAmt(amt,s){var cur=s.totalCurrency||'JOD';if(cur==='JOD')return fJOD(amt);if(cur==='RMB')return fRMB(amt);if(cur==='GBP')return fGBP(amt);return amt.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+cur;}
   var now=today();var total=0;
   safeArr(s.phases).forEach(function(ph){var start=new Date(ph.startYr,ph.startMon-1,1);var end=new Date(ph.endYr,ph.endMon-1,1);for(var d=new Date(Math.max(now.getTime(),start.getTime()));d<=end;d.setMonth(d.getMonth()+1)){var amt=(ph.currency==='RMB')?n2(ph.monthly/S.jod2rmb):ph.monthly;total+=amt;}});
   safeArr(oneoffEvents).forEach(function(ev){if(ev.settleId===s.id&&ev.type==='expense'){var evDate=new Date(ev.year,ev.month-1,1);if(evDate>now)total+=toJOD(ev.amount,ev.currency);}});
@@ -2736,7 +2738,7 @@ function renderSettlementPins(){
     if(isMotel){
       valDiv.style.color='var(--grn)';
       valDiv.textContent='+'+fJOD(received);
-      var subDiv=document.createElement('div');subDiv.className='settle-pin-pct';subDiv.textContent='of '+fJOD(s.totalJOD)+' invested';
+      var subDiv=document.createElement('div');subDiv.className='settle-pin-pct';subDiv.textContent='of '+fmtSettleTotal(s)+' invested';
       card.appendChild(valDiv);card.appendChild(subDiv);
     } else {
       valDiv.textContent=fJOD(left);
@@ -2754,7 +2756,7 @@ function renderSettlementPins(){
 // ═══ SETTLEMENT ═══
 function addSettlement(){
   var id='s'+Date.now();
-  settlements.push({id:id,name:'New settlement',type:'divorce',totalJOD:0,currency:'JOD',phases:[],payments:[],active:true,note:'',divFundAccount:'arab',pinnedHome:false});
+  settlements.push({id:id,name:'New settlement',type:'divorce',totalJOD:0,totalCurrency:'JOD',currency:'JOD',phases:[],payments:[],active:true,note:'',divFundAccount:'arab',pinnedHome:false});
   currentStab=id;autosave();renderSettlement();
 }
 function deleteSettlement(sid){
@@ -2765,7 +2767,7 @@ function deleteSettlement(sid){
 }
 function updateSettleField(sid,key,val){
   var s=settlements.find(function(x){return x.id===sid;});if(!s)return;
-  s[key]=(['totalJOD','gbpAmount'].indexOf(key)>=0)?parseFloat(val)||0:val;
+  s[key]=(['totalJOD','gbpAmount'].indexOf(key)>=0)?parseFloat(val)||0:(key==='totalCurrency'?val:val);
   autosave();renderSettlement();
 }
 function renderSettleEditPanel(s,container){
@@ -2785,7 +2787,14 @@ function renderSettleEditPanel(s,container){
   r1.appendChild(mkIg('Type',typeSel));
   var totInp=mkInp('number',s.totalJOD||0);
   totInp.onchange=(function(sid){return function(){updateSettleField(sid,'totalJOD',this.value);};})(s.id);
-  r1.appendChild(mkIg('Total (JOD)',totInp));
+  var totCurSel=document.createElement('select');totCurSel.style.cssText='font-size:12px;width:70px;margin-top:2px';
+  var totCurs=['JOD','RMB','GBP','USD','EUR'];
+  safeArr(S.customCurrencies).forEach(function(cc){if(totCurs.indexOf(cc.code)<0)totCurs.push(cc.code);});
+  totCurs.forEach(function(cur){var o=document.createElement('option');o.value=cur;o.textContent=cur;if((s.totalCurrency||'JOD')===cur)o.selected=true;totCurSel.appendChild(o);});
+  totCurSel.onchange=(function(sid){return function(){updateSettleField(sid,'totalCurrency',this.value);};})(s.id);
+  var totWrap=document.createElement('div');totWrap.style.cssText='display:flex;gap:5px;align-items:center';
+  totWrap.appendChild(totInp);totWrap.appendChild(totCurSel);
+  r1.appendChild(mkIg('Total',totWrap));
   var acctSel=document.createElement('select');
   [{v:'arab',l:'Arab Bank (JOD)'},{v:'rmb',l:'BOC (RMB)'}].forEach(function(opt){
     var o=document.createElement('option');o.value=opt.v;o.textContent=opt.l;if((s.divFundAccount||'arab')===opt.v)o.selected=true;acctSel.appendChild(o);
@@ -2833,17 +2842,17 @@ function renderGenericSettle(s,container){
   var paid=settlePaid(s),left=settleLeft(s),pct=settlePct(s),planned=settlePlannedFuture(s);
   var plannedPct=Math.round(Math.min(100,planned/Math.max(1,left)*100));
   var hero=document.createElement('div');hero.style.cssText='background:var(--surf);border:.5px solid var(--brd);border-radius:var(--rlg);padding:18px;margin-bottom:10px';
-  var isGBP=s.currency==='GBP';var fmtTotal=isGBP?fGBP(s.gbpAmount||0)+' ('+fJOD(s.totalJOD)+')':fJOD(s.totalJOD);
+  var fmtTotal=fmtSettleTotal(s);
   var leftLabel=s.type==='mortgage'?'Still to pay (remaining installments)':'Remaining to pay';
-  hero.innerHTML='<div class="hc-label">'+leftLabel+'</div><div style="font-size:30px;font-weight:700;font-family:var(--mono);letter-spacing:-.04em;color:var(--red);margin-bottom:4px">'+fJOD(left)+'</div><div style="font-size:12px;color:var(--ink3)">of '+fmtTotal+' total</div>';
+  hero.innerHTML='<div class="hc-label">'+leftLabel+'</div><div style="font-size:30px;font-weight:700;font-family:var(--mono);letter-spacing:-.04em;color:var(--red);margin-bottom:4px">'+fmtSettleAmt(left,s)+'</div><div style="font-size:12px;color:var(--ink3)">of '+fmtTotal+' total</div>';
   container.appendChild(hero);
   var hg=document.createElement('div');hg.className='hg';
   var paidLabel=s.type==='mortgage'?'Paid (projected)':fJOD(paid);
-  hg.innerHTML='<div class="hc a-grn"><div class="hc-label">'+( s.type==='mortgage'?'Paid so far':'Paid so far')+'</div><div class="hc-val" style="font-size:15px">'+(s.type==='mortgage'?fJOD(n2(s.totalJOD-left)):fJOD(paid))+'</div></div><div class="hc a-blu"><div class="hc-label">Planned future</div><div class="hc-val" style="font-size:15px">'+fJOD(planned)+'</div></div><div class="hc '+(projectedPayoffLabel(s)==='Jan 2029'||plannedPct>=100?'a-grn':'a-amb')+'"><div class="hc-label">Projected done</div><div class="hc-val" style="font-size:13px">'+projectedPayoffLabel(s)+'</div></div>';
+  hg.innerHTML='<div class="hc a-grn"><div class="hc-label">'+( s.type==='mortgage'?'Paid so far':'Paid so far')+'</div><div class="hc-val" style="font-size:15px">'+(s.type==='mortgage'?fmtSettleAmt(n2(s.totalJOD-left),s):fmtSettleAmt(paid,s))+'</div></div><div class="hc a-blu"><div class="hc-label">Planned future</div><div class="hc-val" style="font-size:15px">'+fmtSettleAmt(planned,s)+'</div></div>'<div class="hc '+(projectedPayoffLabel(s)==='Jan 2029'||plannedPct>=100?'a-grn':'a-amb')+'"><div class="hc-label">Projected done</div><div class="hc-val" style="font-size:13px">'+projectedPayoffLabel(s)+'</div></div>';
   container.appendChild(hg);
   // Progress bars
   var barWrap=document.createElement('div');barWrap.className='card';
-  barWrap.innerHTML='<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="color:var(--ink3)">Paid off</span><span style="font-weight:600;color:var(--blu)">'+pct+'%</span></div><div class="prog-track-lg" onclick="toggleHistoryPanel(\'hist-'+s.id+'\')" title="Click to show payment history"><div class="payoff-fill" style="width:'+pct+'%"></div></div><div style="font-size:11px;color:var(--ink3);margin-top:2px;margin-bottom:8px">Click bar to show/hide history</div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="color:var(--ink3)">Planned covers</span><span style="font-weight:600;color:'+(plannedPct>=100?'var(--grn)':'var(--amb)')+'">'+plannedPct+'% of remaining ('+fJOD(planned)+')</span></div><div class="prog-track"><div class="prog-fill" style="width:'+plannedPct+'%;background:'+(plannedPct>=100?'var(--grn)':'var(--amb)')+'"></div></div>'+(plannedPct<100&&left>0?'<div style="font-size:11px;color:var(--amb);margin-top:3px">'+fJOD(Math.max(0,left-planned))+' still unplanned</div>':'<div style="font-size:11px;color:var(--grn);margin-top:3px">Full balance covered by plan.</div>');
+  barWrap.innerHTML='<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="color:var(--ink3)">Paid off</span><span style="font-weight:600;color:var(--blu)">'+pct+'%</span></div><div class="prog-track-lg" onclick="toggleHistoryPanel(\'hist-'+s.id+'\')" title="Click to show payment history"><div class="payoff-fill" style="width:'+pct+'%"></div></div><div style="font-size:11px;color:var(--ink3);margin-top:2px;margin-bottom:8px">Click bar to show/hide history</div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="color:var(--ink3)">Planned covers</span><span style="font-weight:600;color:'+(plannedPct>=100?'var(--grn)':'var(--amb)')+'">'+plannedPct+'% of remaining ('+fJOD(planned)+')</span></div><div class="prog-track"><div class="prog-fill" style="width:'+plannedPct+'%;background:'+(plannedPct>=100?'var(--grn)':'var(--amb)')+'"></div></div>'+(plannedPct<100&&left>0?'<div style="font-size:11px;color:var(--amb);margin-top:3px">'+fmtSettleAmt(Math.max(0,left-planned),s)+' still unplanned</div>':'<div style="font-size:11px;color:var(--grn);margin-top:3px">Full balance covered by plan.</div>');
   container.appendChild(barWrap);
   // Payment history (hidden by default, revealed via bar click)
   var histWrap=document.createElement('div');histWrap.id='hist-'+s.id;histWrap.style.display='none';
