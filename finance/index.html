@@ -2848,7 +2848,7 @@ function renderGenericSettle(s,container){
   container.appendChild(hero);
   var hg=document.createElement('div');hg.className='hg';
   var paidLabel=s.type==='mortgage'?'Paid (projected)':fJOD(paid);
-  hg.innerHTML='<div class="hc a-grn"><div class="hc-label">'+( s.type==='mortgage'?'Paid so far':'Paid so far')+'</div><div class="hc-val" style="font-size:15px">'+(s.type==='mortgage'?fmtSettleAmt(n2(s.totalJOD-left),s):fmtSettleAmt(paid,s))+'</div></div><div class="hc a-blu"><div class="hc-label">Planned future</div><div class="hc-val" style="font-size:15px">'+fmtSettleAmt(planned,s)+'</div></div>'<div class="hc '+(projectedPayoffLabel(s)==='Jan 2029'||plannedPct>=100?'a-grn':'a-amb')+'"><div class="hc-label">Projected done</div><div class="hc-val" style="font-size:13px">'+projectedPayoffLabel(s)+'</div></div>';
+  hg.innerHTML='<div class="hc a-grn"><div class="hc-label">'+( s.type==='mortgage'?'Paid so far':'Paid so far')+'</div><div class="hc-val" style="font-size:15px">'+(s.type==='mortgage'?fmtSettleAmt(n2(s.totalJOD-left),s):fmtSettleAmt(paid,s))+'</div></div><div class="hc a-blu"><div class="hc-label">Planned future</div><div class="hc-val" style="font-size:15px">'+fmtSettleAmt(planned,s)+'</div></div><div class="hc '+(projectedPayoffLabel(s)==='Jan 2029'||plannedPct>=100?'a-grn':'a-amb')+'"><div class="hc-label">Projected done</div><div class="hc-val" style="font-size:13px">'+projectedPayoffLabel(s)+'</div></div>';
   container.appendChild(hg);
   // Progress bars
   var barWrap=document.createElement('div');barWrap.className='card';
