@@ -1691,7 +1691,20 @@ function renderDashboard(){
   var totalBudget=Object.keys(S.budgets).reduce(function(a,cat){return a+toRMB(getBudgetAmount(cat),getBudgetCurrency(cat));},0);var totalSpent=mExp.reduce(function(a,e){return a+toRMB(e.amount,e.currency);},0);
   var btEl=document.getElementById('dash-budget-total');if(btEl)btEl.innerHTML='<span class="mono '+(totalSpent>totalBudget?'neg':'')+'" style="font-size:17px;font-weight:700">'+fRMB(totalSpent)+'</span> <span class="mut">/ '+fRMB(totalBudget)+'</span>';
   var bbEl=document.getElementById('dash-budget-bars');if(bbEl){bbEl.innerHTML='';Object.entries(S.budgets).forEach(function(e){var cat=e[0];var budget=getBudgetAmount(cat);var cur=getBudgetCurrency(cat);var spent=mExp.filter(function(x){return x.category===cat;}).reduce(function(a,x){return a+toTarget(x.amount,x.currency,cur);},0);var pct=Math.min(100,Math.round(spent/(budget||1)*100));var col=pct>90?'var(--red)':pct>70?'var(--amb)':'var(--grn)';var fmtFn=cur==='JOD'?fJOD:cur==='GBP'?fGBP:fRMB;var row=document.createElement('div');row.style.marginBottom='8px';row.innerHTML='<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px"><span style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:'+(CAT_COLORS[cat]||'#aaa')+';display:inline-block"></span>'+cat+'</span><span class="mono">'+fmtFn(spent)+' / '+fmtFn(budget)+' '+cur+'</span></div><div class="prog-track"><div class="prog-fill" style="width:'+pct+'%;background:'+col+'"></div></div>';bbEl.appendChild(row);});}
-  var sp=S.rmbSurplus||0;var spEl=document.getElementById('dash-surplus');if(spEl)spEl.innerHTML=sp>0?'<div class="surplus-bar"><div style="font-size:12px;font-weight:600;color:var(--grn)">Unspent surplus from last month</div><div style="font-size:17px;font-weight:700;font-family:var(--mono);color:var(--grn)">'+fRMB(sp)+'</div></div>':'';
+  var sp=S.rmbSurplus||0;var spEl=document.getElementById('dash-surplus');
+  if(spEl){
+    if(sp>0){
+      spEl.innerHTML='<div class="surplus-bar" style="flex-wrap:wrap;gap:8px">'+
+        '<div><div style="font-size:12px;font-weight:600;color:var(--grn)">Unspent surplus this month</div>'+
+        '<div style="font-size:17px;font-weight:700;font-family:var(--mono);color:var(--grn)">'+fRMB(sp)+'</div></div>'+
+        '<div style="display:flex;gap:6px;align-items:center">'+
+        '<button class="btn btn-xs" style="background:var(--grn-bg);color:var(--grn);border-color:var(--grn-mid)" onclick="addSurplusToPool()">+ Add to pool</button>'+
+        '<button class="btn btn-xs btn-d" onclick="resetSurplusPool()">Reset pool</button>'+
+        '</div></div>';
+    } else {
+      spEl.innerHTML='';
+    }
+  }
   var up=[];var in30=new Date(now.getTime()+30*86400000);
   holidays.forEach(function(h){var prep=new Date(new Date(h.start).getTime()-21*86400000);if(prep>=now&&prep<=in30)up.push({l:'Book: '+h.label,d:prep,t:'tg-o'});});
   up.sort(function(a,b){return a.d-b.d;});
@@ -1701,7 +1714,22 @@ function renderDashboard(){
 // ═══ LOG ═══
 function renderCatGrid(){var cg=document.getElementById('cat-grid');if(!cg)return;cg.innerHTML='';Object.keys(CAT_COLORS).forEach(function(cat){var btn=document.createElement('div');btn.className='cat-btn'+(S.selectedCat===cat?' sel':'');var dot=document.createElement('div');dot.className='cat-dot';dot.style.background=CAT_COLORS[cat];btn.appendChild(dot);var lbl=document.createElement('span');lbl.textContent=cat;btn.appendChild(lbl);btn.onclick=function(){S.selectedCat=cat;renderCatGrid();};cg.appendChild(btn);});}
 function submitExp(){var amt=parseFloat(document.getElementById('log-amt').value);if(!amt||amt<=0)return alert('Enter a valid amount.');var entry={id:Date.now(),amount:amt,currency:S.logCur,category:S.selectedCat,date:document.getElementById('log-date').value||today().toISOString().split('T')[0],note:document.getElementById('log-note').value};if(editingExpId!==null){var i=expenses.findIndex(function(e){return e.id===editingExpId;});if(i>-1)expenses[i]=entry;editingExpId=null;}else expenses.unshift(entry);document.getElementById('log-amt').value='';document.getElementById('log-note').value='';updateSurplus();autosave();renderLog();renderLogMonthlySummary();}
-function updateSurplus(){var now=today();var mExp=expenses.filter(function(e){var d=new Date(e.date);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();});var spent=mExp.reduce(function(a,e){return a+toRMB(e.amount,e.currency);},0);var budget=Object.keys(S.budgets).reduce(function(a,cat){return a+toRMB(getBudgetAmount(cat),getBudgetCurrency(cat));},0);S.rmbSurplus=n2(Math.max(0,budget-spent));}
+function updateSurplus(){var now=today();var mExp=expenses.filter(function(e){var d=new Date(e.date);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();});var spent=mExp.reduce(function(a,e){return a+toRMB(e.amount,e.currency);},0);var budget=Object.keys(S.budgets).filter(function(c){return c!=='__surplus__';}).reduce(function(a,cat){return a+toRMB(getBudgetAmount(cat),getBudgetCurrency(cat));},0);S.rmbSurplus=n2(Math.max(0,budget-spent));}
+function addSurplusToPool(){
+  var sp=S.rmbSurplus||0;
+  if(sp<=0)return;
+  if(!S.budgets['__surplus__'])S.budgets['__surplus__']={amount:0,currency:'RMB',account:'boc'};
+  S.budgets['__surplus__'].amount=n2((S.budgets['__surplus__'].amount||0)+sp);
+  if(!Array.isArray(S.budgetOrder))S.budgetOrder=Object.keys(S.budgets);
+  if(S.budgetOrder.indexOf('__surplus__')<0)S.budgetOrder.push('__surplus__');
+  autosave();renderBudgetSettingsLS();renderDash();
+  alert('Added '+fRMB(sp)+' to your Surplus pool. New pool: '+fRMB(S.budgets['__surplus__'].amount));
+}
+function resetSurplusPool(){
+  if(!confirm('Reset the surplus pool to zero?'))return;
+  if(S.budgets['__surplus__'])S.budgets['__surplus__'].amount=0;
+  autosave();renderBudgetSettingsLS();renderDash();
+}
 function deleteExp(id){
   expenses=expenses.filter(function(e){return e.id!==id;});
   updateSurplus();autosave();renderLog();
@@ -3148,14 +3176,16 @@ function renderBudgetSettingsLS(){
   bs.innerHTML='';
   var dragSrc=null;
   cats.forEach(function(cat){
+    var isSurplusPool=(cat==='__surplus__');
     var bAmt=getBudgetAmount(cat);
     var bCur=getBudgetCurrency(cat);
     var bAcct=getBudgetAccount(cat);
     var bCol=CAT_COLORS[cat]||'#aaaaaa';
     var row=document.createElement('div');
     row.dataset.cat=cat;
-    row.draggable=true;
-    row.style.cssText='display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:.5px solid var(--brd);flex-wrap:wrap';
+    row.draggable=!isSurplusPool;
+    row.style.cssText='display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:.5px solid var(--brd);flex-wrap:wrap'+(isSurplusPool?';background:var(--grn-bg);border-radius:var(--r);padding:10px 12px;margin-bottom:4px':'');
+    if(!isSurplusPool){
     // Drag handle
     var handle=document.createElement('span');
     handle.textContent='⠿';
@@ -3188,7 +3218,14 @@ function renderBudgetSettingsLS(){
       S.budgetOrder.splice(ti,0,srcCat);
       autosave();renderBudgetSettingsLS();
     });
-    // Colour
+    } // end drag block
+    // Label for surplus pool, colour input for normal
+    if(isSurplusPool){
+      var poolLabel=document.createElement('span');
+      poolLabel.textContent='🏦 Surplus Pool';
+      poolLabel.style.cssText='font-size:13px;font-weight:700;color:var(--grn);flex:1.5';
+      row.appendChild(poolLabel);
+    } else {
     var colorInp=document.createElement('input');colorInp.type='color';colorInp.value=bCol;
     colorInp.title='Category colour';
     colorInp.style.cssText='width:28px;height:28px;padding:2px;border:none;border-radius:5px;cursor:pointer;flex-shrink:0';
@@ -3206,6 +3243,7 @@ function renderBudgetSettingsLS(){
       if(S.selectedCat===ct)S.selectedCat=n;
       autosave();renderBudgetSettingsLS();renderCatGrid();
     };})(cat);
+    } // end else (not surplus pool) for colour+name
     // Budget amount
     var budInp=document.createElement('input');budInp.type='number';budInp.value=bAmt;budInp.min='0';
     budInp.style.cssText='width:80px;font-size:13px';budInp.title='Monthly budget';
@@ -3232,10 +3270,14 @@ function renderBudgetSettingsLS(){
       if(!S.budgets[ct]||typeof S.budgets[ct]==='number')S.budgets[ct]={amount:getBudgetAmount(ct),currency:getBudgetCurrency(ct),account:'boc'};
       S.budgets[ct].account=this.value;autosave();
     };})(cat);
-    // Delete
-    var delBtn=document.createElement('button');delBtn.className='btn btn-xs btn-d';delBtn.textContent='Del';
-    delBtn.onclick=(function(ct){return function(){deleteCategory(ct);};})(cat);
-    row.appendChild(handle);row.appendChild(colorInp);row.appendChild(nameInp);row.appendChild(budInp);row.appendChild(curSel);row.appendChild(acctSel);row.appendChild(delBtn);
+    // Delete — not shown for surplus pool
+    if(!isSurplusPool){
+      var delBtn=document.createElement('button');delBtn.className='btn btn-xs btn-d';delBtn.textContent='Del';
+      delBtn.onclick=(function(ct){return function(){deleteCategory(ct);};})(cat);
+      row.appendChild(handle);row.appendChild(colorInp);row.appendChild(nameInp);row.appendChild(budInp);row.appendChild(curSel);row.appendChild(acctSel);row.appendChild(delBtn);
+    } else {
+      row.appendChild(budInp);row.appendChild(curSel);row.appendChild(acctSel);
+    }
     bs.appendChild(row);
   });
 }
