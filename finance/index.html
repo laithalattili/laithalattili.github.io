@@ -3305,6 +3305,16 @@ function renderHolidays(){
         '<div style="font-size:11px;margin-top:3px;color:'+(over?'var(--red)':'var(--grn)')+'">'+(over?'Over by '+n2(spent-bd.total):n2(bd.total-spent)+' remaining')+' '+bd.currency+'</div>';
       body.appendChild(progDiv);
     }
+    // Save button — explicit save to avoid sync overwrites
+    var saveBar=document.createElement('div');saveBar.style.cssText='padding:10px 0 4px;display:flex;justify-content:flex-end';
+    var saveBtn=document.createElement('button');saveBtn.className='btn btn-sm btn-p';saveBtn.textContent='Save holiday';
+    saveBtn.onclick=(function(hobj){return function(){
+      autosave();
+      sbPushNow();
+      saveBtn.textContent='✓ Saved';saveBtn.style.background='var(--grn)';
+      setTimeout(function(){saveBtn.textContent='Save holiday';saveBtn.style.background='';},2000);
+    };})(h);
+    saveBar.appendChild(saveBtn);body.appendChild(saveBar);
     block.appendChild(body);hp.appendChild(block);
   });
 }
