@@ -540,6 +540,7 @@ input:focus,select:focus{border-color:var(--ink)}
   <button class="btn" onclick="cancelEdit()" id="log-cancel" style="display:none;width:100%;justify-content:center;margin-top:7px">&#10005; Cancel Edit</button>
   <div id="log-favourites" style="margin-top:9px"></div>
   <div class="sec-label" style="margin-top:14px">Category</div>
+  <div id="log-hol-bar" style="margin-bottom:9px"></div>
   <div class="cat-grid" id="cat-grid"></div>
   <div class="ig" style="margin-bottom:11px"><label>Note (optional)</label><input type="text" id="log-note" placeholder="e.g. lunch, Taobao, taxi&hellip;"/></div>
   <div class="sec-label" style="margin-top:18px">Recent entries</div>
@@ -967,6 +968,32 @@ function initCatColors(){
   // Merge defaults for any missing keys (new built-in categories)
   Object.keys(CAT_COLORS_DEFAULTS).forEach(function(k){if(!S.catColors[k])S.catColors[k]=CAT_COLORS_DEFAULTS[k];});
   CAT_COLORS=S.catColors;
+}
+function syncHolidayBudgets(){
+  // Inject active holiday daily budgets as special budget categories
+  // Remove any expired ones
+  var activeKeys=[];
+  getActiveHolidays().forEach(function(h){
+    var key='__hol-'+h.id+'__';
+    activeKeys.push(key);
+    var bd=holDailyBudgetTotal(h);
+    if(!S.budgets[key]){
+      S.budgets[key]={amount:bd.total,currency:bd.currency,account:'boc',isHoliday:true,holId:h.id,holLabel:h.label};
+      if(!Array.isArray(S.budgetOrder))S.budgetOrder=[];
+      if(S.budgetOrder.indexOf(key)<0)S.budgetOrder.unshift(key); // add at top
+    }
+    if(!S.catColors[key])S.catColors[key]='#f2a65a';
+    CAT_COLORS[key]='#f2a65a';
+  });
+  // Remove holiday budgets for holidays that are no longer active
+  Object.keys(S.budgets).forEach(function(k){
+    if(k.indexOf('__hol-')===0&&activeKeys.indexOf(k)<0){
+      delete S.budgets[k];
+      delete S.catColors[k];
+      delete CAT_COLORS[k];
+      if(Array.isArray(S.budgetOrder))S.budgetOrder=S.budgetOrder.filter(function(x){return x!==k;});
+    }
+  });
 }
 
 // ═══ STATE ═══
@@ -1673,27 +1700,34 @@ function buildProjection(){
       if(w.currency==='JOD'){if(!isPrePaid)jodOut+=w.amount;jodItems.push({l:'\uD83D\uDED2 '+w.name,v:'-'+fJOD(w.amount),c:'neg',streamId:wTickId,isWishlist:true,wlId:w.id,prePaid:isPrePaid});}
       else{if(!isPrePaid)rmbOut+=w.amount;rmbItems.push({l:'\uD83D\uDED2 '+w.name,v:'-'+fRMB(w.amount),c:'neg',streamId:wTickId,isWishlist:true,wlId:w.id,prePaid:isPrePaid});}
     });
-    // Holidays — check prePaidIds
+    // Holidays — one-off items (flight/hotel/other) appear in their payMonth
+    // daily items are handled via injected budget categories, not projection lines
     var holThisMonth=[];
     safeArr(holidays).forEach(function(h){
       if(holIsPast(h))return;
-      var pm=holPrepMonth(h);
-      if(pm.yr===yr&&pm.mo===mo){
-        var jodTotal=0,rmbTotal=0;
-        safeArr(h.items).forEach(function(item){
-          var amt=holItemTotal(item);
-          var acct=item.account||h.account||'boc';
-          if(acct==='arab'||acct==='cash-jod'){jodTotal+=toJOD(amt,item.currency||'JOD');}
-          else{rmbTotal+=toRMB(amt,item.currency||'RMB');}
-        });
-        if(jodTotal>0||rmbTotal>0){
-          holThisMonth.push(h.label);
-          var holTickId='hol-'+h.id;
-          var holPrePaid=prePaidIds.indexOf(holTickId)>=0;
-          if(jodTotal>0){if(!holPrePaid)jodOut+=n2(jodTotal);jodItems.push({l:'\u2708 '+h.label+' (trip)',v:'-'+fJOD(n2(jodTotal)),c:'neg',isHoliday:true,holId:h.id,streamId:holTickId,prePaid:holPrePaid});}
-          if(rmbTotal>0){if(!holPrePaid)rmbOut+=n2(rmbTotal);rmbItems.push({l:'\u2708 '+h.label+' (trip)',v:'-'+fRMB(n2(rmbTotal)),c:'neg',isHoliday:true,holId:h.id,streamId:holTickId,prePaid:holPrePaid});}
+      if(!h.start)return;
+      var holStart=new Date(h.start);
+      safeArr(h.items).forEach(function(item){
+        if(item.type==='daily')return;
+        var itemYr=item.payYr||holStart.getFullYear();
+        var itemMo=item.payMo||(holStart.getMonth()+1);
+        if(itemYr!==yr||itemMo!==mo)return;
+        var amt=holItemTotal(item);
+        if(!amt)return;
+        var acct=item.account||h.account||'boc';
+        var tickId='holitem-'+h.id+'-'+item.id;
+        var isPrePaid=prePaidIds.indexOf(tickId)>=0;
+        if(holThisMonth.indexOf(h.label)<0)holThisMonth.push(h.label);
+        if(acct==='arab'||acct==='cash-jod'){
+          var jodAmt=toJOD(amt,item.currency||'JOD');
+          if(!isPrePaid)jodOut+=jodAmt;
+          jodItems.push({l:'✈ '+h.label+': '+item.label,v:'-'+fJOD(jodAmt),c:'neg',isHoliday:true,holId:h.id,holItemId:item.id,streamId:tickId,prePaid:isPrePaid});
+        } else {
+          var rmbAmt=toRMB(amt,item.currency||'RMB');
+          if(!isPrePaid)rmbOut+=rmbAmt;
+          rmbItems.push({l:'✈ '+h.label+': '+item.label,v:'-'+fRMB(rmbAmt),c:'neg',isHoliday:true,holId:h.id,holItemId:item.id,streamId:tickId,prePaid:isPrePaid});
         }
-      }
+      });
     });
     jodBal=n2(jodBal+jodIn-jodOut); rmbBal=n2(rmbBal+rmbIn-rmbOut);
     // Compute carry-over unpaid totals for this month (past months only)
@@ -1792,7 +1826,7 @@ function renderDashboard(){
   var mExp=expenses.filter(function(e){var d2=new Date(e.date);return d2.getMonth()===now.getMonth()&&d2.getFullYear()===now.getFullYear();});
   var totalBudget=Object.keys(S.budgets).reduce(function(a,cat){return a+toRMB(getBudgetAmount(cat),getBudgetCurrency(cat));},0);var totalSpent=mExp.reduce(function(a,e){return a+toRMB(e.amount,e.currency);},0);
   var btEl=document.getElementById('dash-budget-total');if(btEl)btEl.innerHTML='<span class="mono '+(totalSpent>totalBudget?'neg':'')+'" style="font-size:17px;font-weight:700">'+fRMB(totalSpent)+'</span> <span class="mut">/ '+fRMB(totalBudget)+'</span>';
-  var bbEl=document.getElementById('dash-budget-bars');if(bbEl){bbEl.innerHTML='';Object.entries(S.budgets).forEach(function(e){var cat=e[0];var budget=getBudgetAmount(cat);var cur=getBudgetCurrency(cat);var spent=mExp.filter(function(x){return x.category===cat;}).reduce(function(a,x){return a+toTarget(x.amount,x.currency,cur);},0);var pct=Math.min(100,Math.round(spent/(budget||1)*100));var col=pct>90?'var(--red)':pct>70?'var(--amb)':'var(--grn)';var fmtFn=cur==='JOD'?fJOD:cur==='GBP'?fGBP:fRMB;var row=document.createElement('div');row.style.marginBottom='8px';row.innerHTML='<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px"><span style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:'+(CAT_COLORS[cat]||'#aaa')+';display:inline-block"></span>'+cat+'</span><span class="mono">'+fmtFn(spent)+' / '+fmtFn(budget)+' '+cur+'</span></div><div class="prog-track"><div class="prog-fill" style="width:'+pct+'%;background:'+col+'"></div></div>';bbEl.appendChild(row);});}
+  var bbEl=document.getElementById('dash-budget-bars');if(bbEl){bbEl.innerHTML='';Object.entries(S.budgets).forEach(function(e){var cat=e[0];if(cat==='__surplus__'||cat.indexOf('__hol-')===0)return;var budget=getBudgetAmount(cat);var cur=getBudgetCurrency(cat);var spent=mExp.filter(function(x){return x.category===cat;}).reduce(function(a,x){return a+toTarget(x.amount,x.currency,cur);},0);var pct=Math.min(100,Math.round(spent/(budget||1)*100));var col=pct>90?'var(--red)':pct>70?'var(--amb)':'var(--grn)';var fmtFn=cur==='JOD'?fJOD:cur==='GBP'?fGBP:fRMB;var row=document.createElement('div');row.style.marginBottom='8px';row.innerHTML='<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px"><span style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:'+(CAT_COLORS[cat]||'#aaa')+';display:inline-block"></span>'+cat+'</span><span class="mono">'+fmtFn(spent)+' / '+fmtFn(budget)+' '+cur+'</span></div><div class="prog-track"><div class="prog-fill" style="width:'+pct+'%;background:'+col+'"></div></div>';bbEl.appendChild(row);});}
   var sp=S.rmbSurplus||0;var spEl=document.getElementById('dash-surplus');
   if(spEl){
     if(sp>0){
@@ -1814,7 +1848,22 @@ function renderDashboard(){
 }
 
 // ═══ LOG ═══
-function renderCatGrid(){var cg=document.getElementById('cat-grid');if(!cg)return;cg.innerHTML='';Object.keys(CAT_COLORS).forEach(function(cat){var btn=document.createElement('div');btn.className='cat-btn'+(S.selectedCat===cat?' sel':'');var dot=document.createElement('div');dot.className='cat-dot';dot.style.background=CAT_COLORS[cat];btn.appendChild(dot);var lbl=document.createElement('span');lbl.textContent=cat;btn.appendChild(lbl);btn.onclick=function(){S.selectedCat=cat;renderCatGrid();};cg.appendChild(btn);});}
+function renderCatGrid(){
+  var cg=document.getElementById('cat-grid');if(!cg)return;cg.innerHTML='';
+  // Build list: normal budget categories + active holiday categories, exclude surplus
+  var cats=getBudgetOrder().filter(function(c){return c!=='__surplus__';});
+  cats.forEach(function(cat){
+    var isHol=cat.indexOf('__hol-')===0;
+    var holData=isHol?S.budgets[cat]:null;
+    var displayName=isHol?(holData?'✈ '+holData.holLabel:cat):cat;
+    var color=isHol?'#f2a65a':(CAT_COLORS[cat]||'#aaa');
+    var btn=document.createElement('div');btn.className='cat-btn'+(S.selectedCat===cat?' sel':'');
+    var dot=document.createElement('div');dot.className='cat-dot';dot.style.background=color;btn.appendChild(dot);
+    var lbl=document.createElement('span');lbl.textContent=displayName;btn.appendChild(lbl);
+    btn.onclick=function(){S.selectedCat=cat;renderCatGrid();};
+    cg.appendChild(btn);
+  });
+}
 function submitExp(){var amt=parseFloat(document.getElementById('log-amt').value);if(!amt||amt<=0)return alert('Enter a valid amount.');var entry={id:Date.now(),amount:amt,currency:S.logCur,category:S.selectedCat,date:document.getElementById('log-date').value||today().toISOString().split('T')[0],note:document.getElementById('log-note').value};if(editingExpId!==null){var i=expenses.findIndex(function(e){return e.id===editingExpId;});if(i>-1)expenses[i]=entry;editingExpId=null;}else expenses.unshift(entry);document.getElementById('log-amt').value='';document.getElementById('log-note').value='';updateSurplus();autosave();renderLog();renderLogMonthlySummary();}
 function updateSurplus(){var now=today();var mExp=expenses.filter(function(e){var d=new Date(e.date);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();});var spent=mExp.reduce(function(a,e){return a+toRMB(e.amount,e.currency);},0);var budget=Object.keys(S.budgets).filter(function(c){return c!=='__surplus__';}).reduce(function(a,cat){return a+toRMB(getBudgetAmount(cat),getBudgetCurrency(cat));},0);S.rmbSurplus=n2(Math.max(0,budget-spent));}
 function addSurplusToPool(){
@@ -1920,9 +1969,27 @@ function renderLogMonthlySummary(){
     +'</div>'
     +'</div>';
 }
+function renderLogHolBar(){
+  var el=document.getElementById('log-hol-bar');if(!el)return;
+  el.innerHTML='';
+  var active=getActiveHolidays();if(!active.length)return;
+  active.forEach(function(h){
+    var bd=holDailyBudgetTotal(h);
+    var spent=holDailyBudgetSpent(h);
+    var pct=bd.total>0?Math.min(100,Math.round(spent/bd.total*100)):0;
+    var over=spent>bd.total;
+    var bar=document.createElement('div');
+    bar.style.cssText='background:var(--surf);border:.5px solid #f2a65a;border-radius:var(--r);padding:9px;margin-bottom:6px';
+    bar.innerHTML='<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#f2a65a;margin-bottom:4px"><span>✈ '+h.label+'</span><span style="color:'+(over?'var(--red)':'var(--ink3)')+'">'+n2(spent)+' / '+bd.total+' '+bd.currency+'</span></div>'+
+      '<div style="background:var(--brd);border-radius:3px;height:6px;overflow:hidden"><div style="height:100%;border-radius:3px;width:'+pct+'%;background:'+(over?'var(--red)':'#f2a65a')+'"></div></div>'+
+      '<div style="font-size:10px;margin-top:2px;color:'+(over?'var(--red)':'var(--ink3)')+'">'+(over?'⚠ Over by '+n2(spent-bd.total):(n2(bd.total-spent)+' remaining'))+' '+bd.currency+'</div>';
+    el.appendChild(bar);
+  });
+}
 function renderLog(){
   var ld=document.getElementById('log-date');if(ld&&!ld.value)ld.value=today().toISOString().split('T')[0];
   renderLogMonthlySummary();
+  renderLogHolBar();
   renderLogFavourites();
   renderLogCurToggle();
   renderCatGrid();
@@ -2027,16 +2094,22 @@ function getCommitItems(){
   var parentSt=streams.find(function(s){return s.isParents&&s.isCommitment;});
   if(parentSt&&streamDueInMonth(parentSt,yr,mo)){var pr=getParentForMonth(yr,mo);items.push({id:'parents',name:pr+' this month',amount:getStreamAmount(parentSt,yr,mo),currency:parentSt.currency,type:'out',method:'transfer',note:'Alternating Mother/Father'});}
   settlements.forEach(function(s){if(!s.active)return;var phAmt=settlePhaseAmount(s,yr,mo);if(phAmt>0){var ph3=safeArr(s.phases).find(function(p){var inR=(yr>p.startYr||(yr===p.startYr&&mo>=p.startMon))&&(yr<p.endYr||(yr===p.endYr&&mo<=p.endMon));return inR;});var fromAcct=ph3?ph3.account:(s.divFundAccount||'arab');var dispAmt=(fromAcct==='rmb'||fromAcct==='boc')?n2(phAmt*S.jod2rmb):phAmt;var dispCur=(fromAcct==='rmb'||fromAcct==='boc')?'RMB':'JOD';items.push({id:'settle-'+s.id,name:s.name.split('-')[0].trim()+' payment',amount:dispAmt,currency:dispCur,type:'out',method:'settlement',note:fJOD(phAmt)+' JOD'+(fromAcct==='rmb'||fromAcct==='boc'?' from BOC':'')});}settleOneoffs(s,yr,mo).filter(function(ev){return ev.type==='expense';}).forEach(function(ev){items.push({id:'settle-ev-'+ev.id,name:(ev.label||s.name)+' - one-off',amount:ev.amount,currency:ev.currency,type:'out',method:'settlement',note:'One-off'});});});
-  // Holidays — show in prep month (21 days before trip)
+  // Holidays — each one-off item appears in its specified payMonth
   safeArr(holidays).forEach(function(h){
     if(holIsPast(h))return;
-    var pm=holPrepMonth(h);
-    if(pm.yr===yr&&pm.mo===mo){
-      var tot=holTotalByCur(h);
-      var firstCur=Object.keys(tot)[0]||'RMB';
-      var firstAmt=tot[firstCur]||0;
-      items.push({id:'hol-'+h.id,name:'\u2708 '+h.label,amount:firstAmt,currency:firstCur,type:'out',method:'holiday',note:'Trip budget \u2014 '+Object.entries(tot).map(function(e){return e[1]+' '+e[0];}).join(' + ')});
-    }
+    if(!h.start)return;
+    var holStart=new Date(h.start);
+    safeArr(h.items).forEach(function(item){
+      if(item.type==='daily')return;
+      var itemYr=item.payYr||holStart.getFullYear();
+      var itemMo=item.payMo||(holStart.getMonth()+1);
+      if(itemYr!==yr||itemMo!==mo)return;
+      var amt=holItemTotal(item);
+      if(!amt)return;
+      var acct=item.account||h.account||'boc';
+      var cur=(acct==='arab'||acct==='cash-jod')?(item.currency||'JOD'):(item.currency||'RMB');
+      items.push({id:'holitem-'+h.id+'-'+item.id,name:'✈ '+h.label+': '+item.label,amount:amt,currency:cur,type:'out',method:'holiday',note:h.label+' — '+item.type});
+    });
   });
   // Wishlist scheduled items for this month
   safeArr(wishlistItems).filter(function(w){return w.scheduledYr===yr&&w.scheduledMo===mo;}).forEach(function(w){
@@ -3058,6 +3131,28 @@ function removeHoliday(id){if(!confirm('Remove this holiday?'))return;holidays=h
 function holDays(h){return Math.round((new Date(h.end)-new Date(h.start))/86400000)+1;}
 function holItemTotal(item){if(item.type==='daily'||item.type==='hotel')return n2(item.amount*(item.nights||1));return n2(item.amount);}
 function holTotalByCur(h){var t={};safeArr(h.items).forEach(function(item){var c=item.currency||'RMB';t[c]=(t[c]||0)+holItemTotal(item);});return t;}
+function holIsActive(h){
+  // Returns true if today is within the holiday dates
+  if(!h.start||!h.end)return false;
+  var now=today();var start=new Date(h.start);var end=new Date(h.end);
+  return now>=start&&now<=end;
+}
+function holDailyBudgetTotal(h){
+  // Total daily budget for a holiday in its currency
+  var total=0;var cur='RMB';
+  safeArr(h.items).forEach(function(item){
+    if(item.type==='daily'){total+=holItemTotal(item);cur=item.currency||'RMB';}
+  });
+  return {total:n2(total),currency:cur};
+}
+function holDailyBudgetSpent(h){
+  // Sum of expenses logged against this holiday's budget category
+  var catKey='__hol-'+h.id+'__';
+  return n2(safeArr(expenses).filter(function(e){return e.category===catKey;}).reduce(function(a,e){return a+toRMB(e.amount,e.currency);},0));
+}
+function getActiveHolidays(){
+  return safeArr(holidays).filter(function(h){return holIsActive(h)&&safeArr(h.items).some(function(i){return i.type==='daily';});});
+}
 function holIsPast(h){return new Date(h.end)<today();}
 function holToggleAll(){
   var anyOpen=holidays.some(function(h){return holOpenState[h.id];});
@@ -3147,6 +3242,19 @@ function renderHolidays(){
     var sumDiv=document.createElement('div');sumDiv.id='hsum-'+h.id;sumDiv.style.cssText='background:var(--bg);border-radius:var(--r);padding:9px;margin-top:5px';
     Object.entries(holTotalByCur(h)).forEach(function(e){sumDiv.innerHTML+='<div class="m-tr"><span class="m-tr-l">Total '+e[0]+'</span><span class="m-tr-v pos">'+e[1].toLocaleString()+' '+e[0]+'</span></div>';});
     body.appendChild(sumDiv);
+    // Progress bar for active holidays with daily budget
+    if(holIsActive(h)&&safeArr(h.items).some(function(i){return i.type==='daily';})){
+      var bd=holDailyBudgetTotal(h);
+      var spent=holDailyBudgetSpent(h);
+      var pct=bd.total>0?Math.min(100,Math.round(spent/bd.total*100)):0;
+      var over=spent>bd.total;
+      var progDiv=document.createElement('div');progDiv.style.cssText='background:var(--surf);border:.5px solid var(--brd);border-radius:var(--r);padding:10px;margin-top:6px';
+      progDiv.innerHTML='<div style="font-size:12px;font-weight:700;color:#f2a65a;margin-bottom:6px">✈ Daily Budget Progress</div>'+
+        '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span>Spent: '+n2(spent)+' '+bd.currency+'</span><span style="color:'+(over?'var(--red)':'var(--ink3)')+'">Budget: '+bd.total+' '+bd.currency+'</span></div>'+
+        '<div style="background:var(--brd);border-radius:3px;height:8px;overflow:hidden"><div style="height:100%;border-radius:3px;width:'+pct+'%;background:'+(over?'var(--red)':'#f2a65a')+'"></div></div>'+
+        '<div style="font-size:11px;margin-top:3px;color:'+(over?'var(--red)':'var(--grn)')+'">'+(over?'Over by '+n2(spent-bd.total):n2(bd.total-spent)+' remaining')+' '+bd.currency+'</div>';
+      body.appendChild(progDiv);
+    }
     block.appendChild(body);hp.appendChild(block);
   });
 }
@@ -3169,6 +3277,19 @@ function buildHolItemDiv(h,item){
   acctS.onchange=(function(itm,cs){return function(){itm.account=this.value;var defCur=holDefaultCurrency(this.value);itm.currency=defCur;cs.value=defCur;autosave();};})(item,cS);
   row.appendChild(mkI('Label',lI));row.appendChild(mkI('Amount',aI));row.appendChild(mkI('Account',acctS));row.appendChild(mkI('Currency',cS));
   if(item.type==='hotel'||item.type==='daily'){var nI=document.createElement('input');nI.type='number';nI.value=item.nights||1;nI.style.width='60px';nI.onchange=function(){item.nights=parseInt(this.value,10)||1;autosave();};row.appendChild(mkI(item.type==='hotel'?'Nights':'Days',nI));}
+  // Pay month picker for one-off types (flight, hotel, other) — determines when it appears in commitments/projection
+  if(item.type==='flight'||item.type==='hotel'||item.type==='other'){
+    var pmWrap=document.createElement('div');pmWrap.style.cssText='display:flex;gap:4px;align-items:center';
+    var pmMoSel=document.createElement('select');pmMoSel.style.cssText='font-size:12px;width:70px';
+    var pmYrInp=document.createElement('input');pmYrInp.type='number';pmYrInp.style.cssText='width:62px;font-size:12px';
+    var holStartDate=new Date(h.start);
+    ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].forEach(function(m,i){var o=document.createElement('option');o.value=i+1;o.textContent=m;if((item.payMo||holStartDate.getMonth()+1)===i+1)o.selected=true;pmMoSel.appendChild(o);});
+    pmYrInp.value=item.payYr||holStartDate.getFullYear();
+    pmMoSel.onchange=(function(itm){return function(){itm.payMo=parseInt(this.value,10);autosave();};})(item);
+    pmYrInp.onchange=(function(itm){return function(){itm.payYr=parseInt(this.value,10)||new Date(h.start).getFullYear();autosave();};})(item);
+    pmWrap.appendChild(pmMoSel);pmWrap.appendChild(pmYrInp);
+    row.appendChild(mkI('Pay month',pmWrap));
+  }
   iDiv.appendChild(row);
   var foot=document.createElement('div');foot.id='hfoot-'+item.id;foot.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-top:5px';
   var typeTag=document.createElement('span');typeTag.className='tag tg-n';typeTag.textContent=item.type;foot.appendChild(typeTag);
@@ -3305,13 +3426,15 @@ function renderBudgetSettingsLS(){
   var dragSrc=null;
   cats.forEach(function(cat){
     var isSurplusPool=(cat==='__surplus__');
+    var isHolidayBudget=cat.indexOf('__hol-')===0;
+    var holBudgetData=isHolidayBudget?S.budgets[cat]:null;
     var bAmt=getBudgetAmount(cat);
     var bCur=getBudgetCurrency(cat);
     var bAcct=getBudgetAccount(cat);
     var bCol=CAT_COLORS[cat]||'#aaaaaa';
     var row=document.createElement('div');
     row.dataset.cat=cat;
-    row.draggable=!isSurplusPool;
+    row.draggable=!isSurplusPool&&!isHolidayBudget;
     row.style.cssText='display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:.5px solid var(--brd);flex-wrap:wrap'+(isSurplusPool?';background:var(--grn-bg);border-radius:var(--r);padding:10px 12px;margin-bottom:4px':'');
     if(!isSurplusPool){
     // Drag handle
@@ -3353,6 +3476,22 @@ function renderBudgetSettingsLS(){
       poolLabel.textContent='🏦 Surplus Pool';
       poolLabel.style.cssText='font-size:13px;font-weight:700;color:var(--grn);flex:1.5';
       row.appendChild(poolLabel);
+    } else if(isHolidayBudget){
+      var holLabel=document.createElement('span');
+      holLabel.textContent='✈ '+(holBudgetData?holBudgetData.holLabel:'Holiday')+' Budget';
+      holLabel.style.cssText='font-size:13px;font-weight:700;color:#f2a65a;flex:1.5';
+      var holSpent=holBudgetData?holDailyBudgetSpent({id:holBudgetData.holId}):0;
+      var holTotal=bAmt||0;
+      var holPct=holTotal>0?Math.min(100,Math.round(holSpent/holTotal*100)):0;
+      var holOver=holSpent>holTotal;
+      var holBarWrap=document.createElement('div');holBarWrap.style.cssText='flex:2;display:flex;flex-direction:column;gap:2px';
+      var holBarTrack=document.createElement('div');holBarTrack.style.cssText='background:var(--brd);border-radius:3px;height:6px;overflow:hidden';
+      var holBarFill=document.createElement('div');holBarFill.style.cssText='height:100%;border-radius:3px;width:'+holPct+'%;background:'+(holOver?'var(--red)':'#f2a65a');
+      holBarTrack.appendChild(holBarFill);holBarWrap.appendChild(holBarTrack);
+      var holBarLbl=document.createElement('div');holBarLbl.style.cssText='font-size:10px;color:'+(holOver?'var(--red)':'var(--ink3)');
+      holBarLbl.textContent=(holOver?'Over by '+(holSpent-holTotal).toFixed(0):((holTotal-holSpent).toFixed(0)+' left'))+' '+bCur;
+      holBarWrap.appendChild(holBarLbl);
+      row.appendChild(holLabel);row.appendChild(holBarWrap);
     } else {
     var colorInp=document.createElement('input');colorInp.type='color';colorInp.value=bCol;
     colorInp.title='Category colour';
@@ -3399,11 +3538,11 @@ function renderBudgetSettingsLS(){
       S.budgets[ct].account=this.value;autosave();
     };})(cat);
     // Delete — not shown for surplus pool
-    if(!isSurplusPool){
+    if(!isSurplusPool&&!isHolidayBudget){
       var delBtn=document.createElement('button');delBtn.className='btn btn-xs btn-d';delBtn.textContent='Del';
       delBtn.onclick=(function(ct){return function(){deleteCategory(ct);};})(cat);
       row.appendChild(handle);row.appendChild(colorInp);row.appendChild(nameInp);row.appendChild(budInp);row.appendChild(curSel);row.appendChild(acctSel);row.appendChild(delBtn);
-    } else {
+    } else if(isSurplusPool){
       row.appendChild(budInp);row.appendChild(curSel);row.appendChild(acctSel);
     }
     bs.appendChild(row);
@@ -4431,6 +4570,7 @@ document.addEventListener('DOMContentLoaded',function(){
   });
   migrateBudgets();
   initCatColors();
+  syncHolidayBudgets();
   initBudgetOrder();
   // Auto-link discretionary stream to all budget categories if not yet linked
   var discSt=streams.find(function(s){return s.id==='discretionary';});
