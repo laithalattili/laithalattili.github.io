@@ -1402,13 +1402,14 @@ function settleLeft(s){
 }
 function settlePct(s){var t=s.totalJOD||0;if(!t)return 0;var paid=s.type==='mortgage'?n2(t-settleLeft(s)):settlePaid(s);return Math.round(Math.min(100,paid/t*100));}
 function settlePlannedFuture(s){
-function fmtSettleTotal(s){var cur=s.totalCurrency||'JOD';var amt=s.totalJOD||0;if(cur==='JOD')return fJOD(amt);if(cur==='RMB')return fRMB(amt);if(cur==='GBP')return fGBP(amt);return amt.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+cur;}
-function fmtSettleAmt(amt,s){var cur=s.totalCurrency||'JOD';if(cur==='JOD')return fJOD(amt);if(cur==='RMB')return fRMB(amt);if(cur==='GBP')return fGBP(amt);return amt.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+cur;}
   var now=today();var total=0;
   safeArr(s.phases).forEach(function(ph){var start=new Date(ph.startYr,ph.startMon-1,1);var end=new Date(ph.endYr,ph.endMon-1,1);for(var d=new Date(Math.max(now.getTime(),start.getTime()));d<=end;d.setMonth(d.getMonth()+1)){var amt=(ph.currency==='RMB')?n2(ph.monthly/S.jod2rmb):ph.monthly;total+=amt;}});
   safeArr(oneoffEvents).forEach(function(ev){if(ev.settleId===s.id&&ev.type==='expense'){var evDate=new Date(ev.year,ev.month-1,1);if(evDate>now)total+=toJOD(ev.amount,ev.currency);}});
   return n2(total);
 }
+function fmtSettleTotal(s){var cur=s.totalCurrency||'JOD';var amt=s.totalJOD||0;if(cur==='JOD')return fJOD(amt);if(cur==='RMB')return fRMB(amt);if(cur==='GBP')return fGBP(amt);return amt.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+cur;}
+function fmtSettleAmt(amt,s){var cur=s.totalCurrency||'JOD';if(cur==='JOD')return fJOD(amt);if(cur==='RMB')return fRMB(amt);if(cur==='GBP')return fGBP(amt);return amt.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+cur;}
+
 function settlePhaseAmount(s,yr,mo){
   var total=0;
   safeArr(s.phases).forEach(function(ph){
