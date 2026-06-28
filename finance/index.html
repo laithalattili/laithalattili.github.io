@@ -1422,7 +1422,6 @@ function settlePhaseAmount(s,yr,mo){
 }
 function settleOneoffs(s,yr,mo){return safeArr(oneoffEvents).filter(function(ev){return ev.settleId===s.id&&ev.year===yr&&ev.month===mo;});}
 function projectedPayoffLabel(s){
-  if(s.type==='mortgage')return 'Jan 2029';
   var proj=buildProjection();var cum=settlePaid(s);
   for(var i=0;i<proj.length;i++){var r=proj[i];cum+=settlePhaseAmount(s,r.yr,r.mo);if(cum>=s.totalJOD)return r.label;}
   return 'Beyond '+S.projMonths+' months';
@@ -1542,7 +1541,7 @@ function buildProjection(){
     }
     // Settlement phases — check prePaidIds
     settlements.forEach(function(s){
-      if(!s.active||s.type==='investment'||s.type==='mortgage')return;
+      if(!s.active||s.type==='investment')return;
       var phAmt=settlePhaseAmount(s,yr,mo);
       if(phAmt>0){
         var settleTickId='settle-'+s.id;
@@ -4535,12 +4534,7 @@ function sbStartRealtime(){
           var changed=sbApplyRemote(remote);
           if(changed){
             sbSetStatus('Live update at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
-            // Don't re-render if user is actively typing in an input/textarea
-            var active=document.activeElement;
-            var isTyping=active&&(active.tagName==='INPUT'||active.tagName==='TEXTAREA'||active.tagName==='SELECT');
-            if(isTyping){
-              // Queue the render for when user leaves the field
-              safeShowView(currentPage);
+            safeShowView(currentPage);
           }
         }
       }catch(e){console.warn('[RT] message error',e);}
