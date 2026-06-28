@@ -1397,7 +1397,20 @@ function getStreamAmount(st,yr,mo){
 function getStreamsForMonth(yr,mo){return streams.filter(function(st){return streamDueInMonth(st,yr,mo);});}
 
 // ═══ SETTLEMENT HELPERS ═══
-function settlePaid(s){return safeArr(s.payments).filter(function(p){return p.status!=='no-payment';}).reduce(function(a,p){return a+(p.amtJOD||0);},0);}
+function settlePaid(s){
+  var rate=settleFxRate(s);
+  var base=s.totalCurrency||'JOD';
+  return n2(safeArr(s.payments).filter(function(p){return p.status!=='no-payment';}).reduce(function(a,p){
+    var cur=p.currency||'JOD';
+    var raw=p.amtRaw!=null?p.amtRaw:(p.amtJOD||0);
+    var amt;
+    if(cur===base){amt=raw;}
+    else if(base==='JOD'&&cur==='RMB'){amt=n2(raw/rate);}
+    else if(base==='RMB'&&cur==='JOD'){amt=n2(raw*rate);}
+    else{amt=p.amtJOD||0;}
+    return a+amt;
+  },0));
+}
 function settleLeft(s){
   // Always: total minus what has actually been paid (ticked in Commitments)
   return Math.max(0,n2((s.totalJOD||0)-settlePaid(s)));
@@ -1405,8 +1418,33 @@ function settleLeft(s){
 function settlePct(s){var t=s.totalJOD||0;if(!t)return 0;var paid=s.type==='mortgage'?n2(t-settleLeft(s)):settlePaid(s);return Math.round(Math.min(100,paid/t*100));}
 function settlePlannedFuture(s){
   var now=today();var total=0;
-  safeArr(s.phases).forEach(function(ph){var start=new Date(ph.startYr,ph.startMon-1,1);var end=new Date(ph.endYr,ph.endMon-1,1);for(var d=new Date(Math.max(now.getTime(),start.getTime()));d<=end;d.setMonth(d.getMonth()+1)){var amt=(ph.currency==='RMB')?n2(ph.monthly/S.jod2rmb):ph.monthly;total+=amt;}});
-  safeArr(oneoffEvents).forEach(function(ev){if(ev.settleId===s.id&&ev.type==='expense'){var evDate=new Date(ev.year,ev.month-1,1);if(evDate>now)total+=toJOD(ev.amount,ev.currency);}});
+  var rate=settleFxRate(s); // settlement's fixed rate: base→alt (e.g. JOD→RMB)
+  var base=s.totalCurrency||'JOD';
+  safeArr(s.phases).forEach(function(ph){
+    var start=new Date(ph.startYr,ph.startMon-1,1);
+    var end=new Date(ph.endYr,ph.endMon-1,1);
+    for(var d=new Date(Math.max(now.getTime(),start.getTime()));d<=end;d.setMonth(d.getMonth()+1)){
+      var amt;
+      if(ph.currency===base){amt=ph.monthly;}
+      else if(base==='JOD'&&ph.currency==='RMB'){amt=n2(ph.monthly/rate);}
+      else if(base==='RMB'&&ph.currency==='JOD'){amt=n2(ph.monthly*rate);}
+      else{amt=toJOD(ph.monthly,ph.currency);}
+      total+=amt;
+    }
+  });
+  safeArr(oneoffEvents).forEach(function(ev){
+    if(ev.settleId===s.id&&ev.type==='expense'){
+      var evDate=new Date(ev.year,ev.month-1,1);
+      if(evDate>now){
+        var amt;
+        if(ev.currency===base){amt=ev.amount;}
+        else if(base==='JOD'&&ev.currency==='RMB'){amt=n2(ev.amount/rate);}
+        else if(base==='RMB'&&ev.currency==='JOD'){amt=n2(ev.amount*rate);}
+        else{amt=toJOD(ev.amount,ev.currency);}
+        total+=amt;
+      }
+    }
+  });
   return n2(total);
 }
 function settleAltCur(s){
@@ -1462,9 +1500,18 @@ function fmtSettleAmt(amt,s){var cur=s.totalCurrency||'JOD';if(cur==='JOD')retur
 
 function settlePhaseAmount(s,yr,mo){
   var total=0;
+  var rate=settleFxRate(s);
+  var base=s.totalCurrency||'JOD';
   safeArr(s.phases).forEach(function(ph){
     var inRange=(yr>ph.startYr||(yr===ph.startYr&&mo>=ph.startMon))&&(yr<ph.endYr||(yr===ph.endYr&&mo<=ph.endMon));
-    if(inRange){var amt=(ph.currency==='RMB')?n2(ph.monthly/S.jod2rmb):ph.monthly;total+=amt;}
+    if(inRange){
+      var amt;
+      if(ph.currency===base){amt=ph.monthly;}
+      else if(base==='JOD'&&ph.currency==='RMB'){amt=n2(ph.monthly/rate);}
+      else if(base==='RMB'&&ph.currency==='JOD'){amt=n2(ph.monthly*rate);}
+      else{amt=toJOD(ph.monthly,ph.currency);}
+      total+=amt;
+    }
   });
   return n2(total);
 }
@@ -2901,6 +2948,7 @@ function renderSettlement(){
 }
 function renderGenericSettle(s,container){
   var paid=settlePaid(s),left=settleLeft(s),pct=settlePct(s),planned=settlePlannedFuture(s);
+  console.log('[SETTLE]',s.name,'totalJOD=',s.totalJOD,'totalCurrency=',s.totalCurrency,'settleFxRate=',settleFxRate(s),'paid=',paid,'left=',left,'planned=',planned,'settleCurView=',s.settleCurView);
   var plannedPct=Math.round(Math.min(100,planned/Math.max(1,left)*100));
   // Currency toggle
   var baseCur=s.totalCurrency||'JOD';var altCur=settleAltCur(s);var isAlt=(s.settleCurView==='alt');
