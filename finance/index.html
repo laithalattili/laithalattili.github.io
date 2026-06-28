@@ -1348,6 +1348,8 @@ function initDefaultHolidays(){holidays=[{id:'oct26',label:'October National Day
 
 // ═══ NAV ═══
 var PAGE_TITLES={dashboard:'Dashboard',log:'Daily Log',commitments:'Commitments',projection:'Projection',monthlookup:'Month Lookup',settlement:'Settlement',holidays:'Holidays',networth:'Net Worth',assets:'Assets',calendar:'Calendar',streams:'Life Setup',settings:'Settings',history:'History',wishlist:'Wishlist'};
+function isUserTyping(){var a=document.activeElement;return a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.tagName==='SELECT');}
+function safeShowView(v){if(isUserTyping()){document.activeElement.addEventListener('blur',function(){showView(v);},{once:true});}else{showView(v);}}
 function showView(v){
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
   document.querySelectorAll('.nav-item,.bi,.bi-log').forEach(function(n){n.classList.remove('active');});
@@ -4345,12 +4347,14 @@ document.addEventListener('DOMContentLoaded',function(){
   setTimeout(function(){if(typeof sbInitSync==='function')sbInitSync();},500);
   // Pull when user returns to tab (only if no pending local changes)
   document.addEventListener('visibilitychange',function(){
-    if(!document.hidden&&!_sbDirty&&typeof sbPullNow==='function')sbPullNow();
+    if(!document.hidden&&!_sbDirty&&typeof sbPullNow==='function'){
+      sbPull().then(function(changed){if(changed)safeShowView(currentPage);});
+    }
   });
   // Poll for remote changes every 30 seconds
   setInterval(function(){
     if(!_whatIfActive&&!_sbDirty&&typeof sbPull==='function'){
-      sbPull().then(function(changed){if(changed)showView(currentPage);});
+      sbPull().then(function(changed){if(changed)safeShowView(currentPage);});
     }
   },30000);
 });
@@ -4536,10 +4540,7 @@ function sbStartRealtime(){
             var isTyping=active&&(active.tagName==='INPUT'||active.tagName==='TEXTAREA'||active.tagName==='SELECT');
             if(isTyping){
               // Queue the render for when user leaves the field
-              active.addEventListener('blur',function(){showView(currentPage);},{once:true});
-            } else {
-              showView(currentPage);
-            }
+              safeShowView(currentPage);
           }
         }
       }catch(e){console.warn('[RT] message error',e);}
