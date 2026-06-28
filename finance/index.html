@@ -198,7 +198,7 @@ input:focus,select:focus{border-color:var(--ink)}
 .m-name{font-size:13px;font-weight:700;margin-bottom:3px}
 .m-bal-row{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
 .m-bal-pill{font-size:11px;font-weight:700;font-family:var(--mono);padding:2px 7px;border-radius:5px}
-.m-bal-jod{background:var(--grn-bg);color:var(--grn)}.m-bal-jod.low{background:var(--red-bg);color:var(--red)}
+.m-bal-jod{background:var(--grn-bg);color:var(--grn)}.m-bal-jod.low{background:var(--red-bg);color:var(--red)}.m-bal-jod.negative{background:var(--red);color:#fff;font-weight:800}.m-bal-rmb.negative{background:var(--red);color:#fff;font-weight:800}.m-block.has-negative{border-left:3px solid var(--red)}
 .m-bal-rmb{background:var(--blu-bg);color:var(--blu)}
 .m-bal-total{font-size:10px;font-family:var(--mono);color:var(--ink3);cursor:pointer;padding:2px 7px;border-radius:5px;border:.5px dashed var(--brd2)}
 .m-bal-total:hover{color:var(--ink)}
@@ -2509,10 +2509,13 @@ function renderProjection(){
     if(isCurrent)block.style.cssText='border:.5px solid var(--grn-mid);box-shadow:0 0 0 2px rgba(33,154,69,.15)';
     var head=document.createElement('div');head.className='m-head'+(isOpen?' open-head':'');head.id='mhead-'+idx;
     head.onclick=function(e){if(e.target.classList&&e.target.classList.contains('m-bal-total'))return;openMonths[idx]=!openMonths[idx];autosave();var mb=document.getElementById('mbody-'+idx);var mh=document.getElementById('mhead-'+idx);if(mb)mb.classList.toggle('open',!!openMonths[idx]);if(mh)mh.classList.toggle('open-head',!!openMonths[idx]);};
-    var jodPillClass='m-bal-pill m-bal-jod'+(row.belowReserve?' low':'');
+    var jodNeg=row.jodBal<0;var rmbNeg=row.rmbBal<0;
+    var jodPillClass='m-bal-pill m-bal-jod'+(jodNeg?' negative':(row.belowReserve?' low':''));
+    var rmbPillClass='m-bal-pill m-bal-rmb'+(rmbNeg?' negative':'');
+    if(jodNeg||rmbNeg)block.classList.add('has-negative');
     var curLabel=isCurrent?' <span style="font-size:10px;background:var(--grn-bg);color:var(--grn);padding:1px 5px;border-radius:4px;font-weight:700">NOW</span>':'';
     head.innerHTML='<div class="m-head-l"><div class="m-name">'+row.label+curLabel+'</div>'+
-      '<div class="m-bal-row"><span class="'+jodPillClass+'">JOD '+fJOD(row.jodBal).replace(' JOD','')+'</span><span class="m-bal-pill m-bal-rmb">'+fRMB(row.rmbBal)+'</span>'+resPills+'<span class="m-bal-total" onclick="event.stopPropagation();toggleCombinedCur()" title="Click to switch currency">='+totalDisp+'</span></div><div class="m-chips">'+chips+'</div></div>';
+      '<div class="m-bal-row"><span class="'+jodPillClass+'">JOD '+fJOD(row.jodBal).replace(' JOD','')+'</span><span class="'+rmbPillClass+'">'+fRMB(row.rmbBal)+'</span>'+resPills+'<span class="m-bal-total" onclick="event.stopPropagation();toggleCombinedCur()" title="Click to switch currency">='+totalDisp+'</span></div><div class="m-chips">'+chips+'</div></div>';
     block.appendChild(head);
     var body=document.createElement('div');body.className='m-body'+(isOpen?' open':'');body.id='mbody-'+idx;
     // Two columns with income/expense separation
