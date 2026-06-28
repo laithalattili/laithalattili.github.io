@@ -1703,8 +1703,54 @@ function buildProjection(){
       else{if(!isPrePaid)rmbOut+=w.amount;rmbItems.push({l:'\uD83D\uDED2 '+w.name,v:'-'+fRMB(w.amount),c:'neg',streamId:wTickId,isWishlist:true,wlId:w.id,prePaid:isPrePaid});}
     });
     // Holidays — one-off items (flight/hotel/other) appear in their payMonth
-    // daily items are handled via injected budget categories, not projection lines
+    // daily items split proportionally across months
     var holThisMonth=[];
+    // Daily budget: split across holiday months proportionally by days
+    safeArr(holidays).forEach(function(h){
+      if(holIsPast(h))return;
+      if(!h.start||!h.end)return;
+      var holStart=new Date(h.start);
+      var holEnd=new Date(h.end);
+      // Get daily items total per day
+      var dailyItems=safeArr(h.items).filter(function(i){return i.type==='daily';});
+      if(dailyItems.length){
+        // Total daily budget across all daily items (in their currencies, convert to JOD)
+        var dailyTotalJOD=dailyItems.reduce(function(a,item){return a+toJOD(holItemTotal(item)/Math.max(1,item.nights||1),item.currency||'RMB');},0);
+        // How many days of this holiday fall in this projection month?
+        var monthStart=new Date(yr,mo-1,1);
+        var monthEnd=new Date(yr,mo,0); // last day of month
+        var overlapStart=new Date(Math.max(holStart.getTime(),monthStart.getTime()));
+        var overlapEnd=new Date(Math.min(holEnd.getTime(),monthEnd.getTime()));
+        // For current month, start from today if holiday already started
+        if(i===0&&holStart<=now)overlapStart=new Date(Math.max(now.getTime(),monthStart.getTime()));
+        var overlapDays=Math.max(0,Math.round((overlapEnd-overlapStart)/(86400000))+1);
+        if(overlapDays>0){
+          var monthDailyJOD=n2(dailyTotalJOD*overlapDays);
+          // For active holiday, subtract what's already spent
+          var isCurrentlyActive=holStart<=now&&holEnd>=now;
+          if(i===0&&isCurrentlyActive){
+            var spentJOD=toJOD(holDailyBudgetSpent(h),dailyItems[0].currency||'RMB');
+            monthDailyJOD=n2(Math.max(0,monthDailyJOD-spentJOD));
+          }
+          if(monthDailyJOD>0){
+            var holTickId='holday-'+h.id+'-'+yr+'-'+mo;
+            var isPrePaid=prePaidIds.indexOf(holTickId)>=0;
+            if(holThisMonth.indexOf(h.label)<0)holThisMonth.push(h.label);
+            // Use account of first daily item
+            var acct=dailyItems[0].account||h.account||'boc';
+            if(acct==='arab'||acct==='cash-jod'){
+              if(!isPrePaid)jodOut+=monthDailyJOD;
+              jodItems.push({l:'✈ '+h.label+' (daily)',v:'-'+fJOD(monthDailyJOD),c:'neg',streamId:holTickId,prePaid:isPrePaid});
+            } else {
+              var monthDailyRMB=n2(monthDailyJOD*S.jod2rmb);
+              if(!isPrePaid)rmbOut+=monthDailyRMB;
+              rmbItems.push({l:'✈ '+h.label+' (daily)',v:'-'+fRMB(monthDailyRMB),c:'neg',streamId:holTickId,prePaid:isPrePaid});
+            }
+          }
+        }
+      }
+    });
+    // One-off items appear in their payMonth
     safeArr(holidays).forEach(function(h){
       if(holIsPast(h))return;
       if(!h.start)return;
