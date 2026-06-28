@@ -1397,7 +1397,7 @@ function getStreamsForMonth(yr,mo){return streams.filter(function(st){return str
 // ═══ SETTLEMENT HELPERS ═══
 function settlePaid(s){return safeArr(s.payments).filter(function(p){return p.status!=='no-payment';}).reduce(function(a,p){return a+(p.amtJOD||0);},0);}
 function settleLeft(s){
-  if(s.type==='mortgage'){var now=today();var end=new Date(2028,11,1);var mLeft=Math.max(0,(end.getFullYear()-now.getFullYear())*12+(end.getMonth()-now.getMonth()));var mPh=safeArr(s.phases)[0];var mAmt=mPh?mPh.monthly:0;return n2(mLeft*mAmt);}
+  // Always: total minus what has actually been paid (ticked in Commitments)
   return Math.max(0,n2((s.totalJOD||0)-settlePaid(s)));
 }
 function settlePct(s){var t=s.totalJOD||0;if(!t)return 0;var paid=s.type==='mortgage'?n2(t-settleLeft(s)):settlePaid(s);return Math.round(Math.min(100,paid/t*100));}
@@ -4522,7 +4522,15 @@ function sbStartRealtime(){
           var changed=sbApplyRemote(remote);
           if(changed){
             sbSetStatus('Live update at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
-            showView(currentPage);
+            // Don't re-render if user is actively typing in an input/textarea
+            var active=document.activeElement;
+            var isTyping=active&&(active.tagName==='INPUT'||active.tagName==='TEXTAREA'||active.tagName==='SELECT');
+            if(isTyping){
+              // Queue the render for when user leaves the field
+              active.addEventListener('blur',function(){showView(currentPage);},{once:true});
+            } else {
+              showView(currentPage);
+            }
           }
         }
       }catch(e){console.warn('[RT] message error',e);}
@@ -4543,7 +4551,7 @@ function sbStartRealtime(){
 function sbInitSync(){
   sbSetStatus('Connecting...','busy');
   // Pull once on startup to get latest data
-  sbPull().then(function(changed){if(changed)showView(currentPage);});
+  sbPull().then(function(changed){if(changed){var active=document.activeElement;var isTyping=active&&(active.tagName==='INPUT'||active.tagName==='TEXTAREA'||active.tagName==='SELECT');if(isTyping){active.addEventListener('blur',function(){showView(currentPage);},{once:true});}else{showView(currentPage);}}});
   // Then start realtime for instant cross-device updates
   sbStartRealtime();
 }
