@@ -4668,6 +4668,7 @@ var _sbPushTimer=null;
 var _sbSyncing=false;
 var _sbDirty=false;
 var _sbLastLocalChange=0; // timestamp of last local edit
+var _sbLastPushedVer=0; // version of last successful push
 var _sbDeviceId=null;
 var _sbRealtimeSocket=null;
 var _sbRealtimeRef=1;
@@ -4711,9 +4712,13 @@ function sbBuildPayload(){
 
 function sbApplyRemote(remote){
   // Apply remote data to in-memory state. Called from pull and realtime.
-  // Block applies for 5 seconds after any local change to avoid push/pull race
+  // Block applies if we have pending local changes
   if(_sbDirty)return false;
-  if(_sbLastLocalChange&&Date.now()-_sbLastLocalChange<5000)return false;
+  // Block if this is our own push echoing back (same or older version)
+  var remoteVer=remote.version||0;
+  if(remoteVer&&remoteVer<=_sbLastPushedVer)return false;
+  // Block for 3 seconds after any local change
+  if(_sbLastLocalChange&&Date.now()-_sbLastLocalChange<3000)return false;
   var d=remote.data;
   if(!d)return false;
   if(d.S&&typeof d.S==='object')Object.assign(S,d.S);
@@ -4752,6 +4757,7 @@ async function sbPush(preStampedVer){
       body:JSON.stringify({id:SB_ROW_ID,data:payload,updated_at:new Date().toISOString()})
     });
     if(!res.ok){var e=await res.text();throw new Error('HTTP '+res.status+': '+e.slice(0,120));}
+    _sbLastPushedVer=payload.version;
     sbSetStatus('Synced at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
   }catch(e){
     console.warn('SB push:',e.message);
