@@ -4788,6 +4788,8 @@ async function sbPush(preStampedVer){
   try{
     var payload=sbBuildPayload();
     if(preStampedVer)payload.version=preStampedVer;
+    _sbLastPushedVer=payload.version; // block echoes immediately, even if push fails
+    _sbLastLocalChange=Date.now();
     var res=await fetch(SB_URL+'/rest/v1/'+SB_TABLE,{
       method:'POST',
       headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'resolution=merge-duplicates,return=representation'},
@@ -4805,6 +4807,8 @@ async function sbPush(preStampedVer){
 
 async function sbPull(){
   if(_sbSyncing)return false;
+  // Don't pull if we recently pushed — avoid overwriting our own data
+  if(_sbLastLocalChange&&Date.now()-_sbLastLocalChange<5000)return false;
   _sbSyncing=true;
   sbSetStatus('Fetching...','busy');
   try{
@@ -4879,6 +4883,9 @@ function sbStartRealtime(){
           // Ignore changes pushed by this device to avoid overwriting in-flight edits
           if(remote.deviceId===sbDeviceId())return;
           if(_sbDirty)return;
+          var remoteVer2=remote.version||0;
+          if(remoteVer2&&remoteVer2<=_sbLastPushedVer)return;
+          if(_sbLastLocalChange&&Date.now()-_sbLastLocalChange<5000)return;
           var changed=sbApplyRemote(remote);
           if(changed){
             sbSetStatus('Live update at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
