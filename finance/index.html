@@ -2449,18 +2449,34 @@ function renderSalaryPhases(container){
     var none=document.createElement('div');none.style.cssText='font-size:11px;color:var(--ink4);margin-bottom:4px';none.textContent='No phase overrides. All months use the global mode.';container.appendChild(none);return;
   }
   phases.forEach(function(p){
-    var row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:7px;margin-bottom:5px;font-size:12px;flex-wrap:wrap;padding:5px;background:var(--surf2);border-radius:var(--r)';
-    var rangeStr='';
-    if(p.fromYr!==undefined){
-      rangeStr=MONTHS[(p.fromMo-1)]+' '+p.fromYr+' \u2192 '+MONTHS[(p.toMo-1)]+' '+p.toYr;
-    } else {
-      rangeStr=MONTHS[(p.mo-1)]+' '+p.yr+' (single month)';
-    }
+    var wrap=document.createElement('div');wrap.style.cssText='margin-bottom:6px;background:var(--surf2);border-radius:var(--r);padding:6px 8px';
+    var row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:7px;font-size:12px;flex-wrap:wrap';
+    var rangeStr=p.fromYr!==undefined?MONTHS[(p.fromMo-1)]+' '+p.fromYr+' → '+MONTHS[(p.toMo-1)]+' '+p.toYr:MONTHS[(p.mo-1)]+' '+p.yr+' (single month)';
     var lbl=document.createElement('span');lbl.style.cssText='font-family:var(--mono);font-weight:700;flex:1';lbl.textContent=rangeStr;
     var tag=document.createElement('span');tag.className='tag '+(p.mode==='split'?'tg-g':'tg-b');tag.textContent=p.mode==='split'?'Split':'All RMB';
+    var editBtn=document.createElement('button');editBtn.className='btn btn-xs';editBtn.textContent='Edit';
     var del=document.createElement('button');del.className='btn btn-xs btn-d';del.textContent='Del';
-    del.onclick=(function(pid,cont){return function(){S.salaryPhases=safeArr(S.salaryPhases).filter(function(x){return x.id!==pid;});autosave();renderSalaryPhases(cont);};})(p.id,container);
-    row.appendChild(lbl);row.appendChild(tag);row.appendChild(del);container.appendChild(row);
+    del.onclick=(function(pid,cont){return function(){S.salaryPhases=safeArr(S.salaryPhases).filter(function(x){return x.id!==pid;});autosave();sbPushNow();renderSalaryPhases(cont);};})(p.id,container);
+    row.appendChild(lbl);row.appendChild(tag);row.appendChild(editBtn);row.appendChild(del);wrap.appendChild(row);
+    var form=document.createElement('div');form.style.cssText='display:none;margin-top:8px;padding-top:8px;border-top:.5px solid var(--brd)';
+    var mkMS=function(val){var s=document.createElement('select');s.style.cssText='font-size:12px;width:75px';MONTHS.forEach(function(m,i){var o=document.createElement('option');o.value=i+1;o.textContent=m;if(val===i+1)o.selected=true;s.appendChild(o);});return s;};
+    var mkYI=function(val){var i=document.createElement('input');i.type='number';i.value=val;i.style.cssText='width:65px;font-size:12px';return i;};
+    var fmMo=mkMS(p.fromMo||p.mo);var fmYr=mkYI(p.fromYr||p.yr);
+    var toMo=mkMS(p.toMo||p.mo);var toYr=mkYI(p.toYr||p.yr);
+    var modeSel=document.createElement('select');modeSel.style.cssText='font-size:12px';
+    [{v:'split',l:'Split'},{v:'full_rmb',l:'All RMB'}].forEach(function(opt){var o=document.createElement('option');o.value=opt.v;o.textContent=opt.l;if(p.mode===opt.v)o.selected=true;modeSel.appendChild(o);});
+    var fmRow=document.createElement('div');fmRow.style.cssText='display:flex;gap:5px;align-items:center;flex-wrap:wrap;font-size:12px;margin-bottom:6px';
+    ['From',fmMo,fmYr,'To',toMo,toYr,'Mode',modeSel].forEach(function(x){if(typeof x==='string'){var s=document.createElement('span');s.textContent=x;s.style.color='var(--ink3)';fmRow.appendChild(s);}else{fmRow.appendChild(x);}});
+    var saveBtn=document.createElement('button');saveBtn.className='btn btn-xs btn-p';saveBtn.textContent='Save';
+    saveBtn.onclick=(function(ph,fmMo,fmYr,toMo,toYr,modeSel,cont){return function(){
+      ph.fromMo=parseInt(fmMo.value,10);ph.fromYr=parseInt(fmYr.value,10);
+      ph.toMo=parseInt(toMo.value,10);ph.toYr=parseInt(toYr.value,10);
+      ph.mode=modeSel.value;delete ph.yr;delete ph.mo;
+      autosave();sbPushNow();renderSalaryPhases(cont);
+    };})(p,fmMo,fmYr,toMo,toYr,modeSel,container);
+    form.appendChild(fmRow);form.appendChild(saveBtn);wrap.appendChild(form);
+    editBtn.onclick=function(){form.style.display=form.style.display==='none'?'block':'none';};
+    container.appendChild(wrap);
   });
 }
 
@@ -2576,7 +2592,7 @@ function renderProjection(){
     if(fromYr*12+fromMo>toYr*12+toMo){alert('From must be before To.');return;}
     S.salaryPhases=safeArr(S.salaryPhases);
     S.salaryPhases.push({id:'sp'+Date.now(),fromYr:fromYr,fromMo:fromMo,toYr:toYr,toMo:toMo,mode:mode});
-    autosave();renderSalaryPhases(phasesList);
+    autosave();sbPushNow();renderSalaryPhases(phasesList);
   };
   var fromLbl=document.createElement('span');fromLbl.style.cssText='font-size:11px;color:var(--ink3);align-self:center';fromLbl.textContent='From';
   var toLbl=document.createElement('span');toLbl.style.cssText='font-size:11px;color:var(--ink3);align-self:center';toLbl.textContent='To';
