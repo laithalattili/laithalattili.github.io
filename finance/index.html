@@ -1898,6 +1898,15 @@ function toggleTick(id){
       if(prev.currency==='JOD')S.arab=n2(S.arab-prev.amount);else S.boc=n2(S.boc-prev.amount);
     }
     delete confirmedDebits[cKey][id];
+    // Also remove the auto-recorded settlement payment for this commitment
+    var settleId=id.indexOf('settle-')===0?id.slice(7):null;
+    if(settleId){
+      var st=settlements.find(function(x){return x.id===settleId;});
+      if(st){
+        var monLabel=MNAMES[commitMon.month-1]+' '+commitMon.year+' (auto)';
+        st.payments=safeArr(st.payments).filter(function(p){return !(p.autoRecorded&&p.note===monLabel);});
+      }
+    }
   }
   autosave();renderCommitments();if(currentPage==='dashboard')renderDashboard();
   // Sync wishlist bought state when a wl- tick changes
