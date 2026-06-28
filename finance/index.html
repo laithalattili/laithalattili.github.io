@@ -1546,8 +1546,10 @@ function buildProjection(){
       if(phAmt>0){
         var settleTickId='settle-'+s.id;
         var isPrePaid=prePaidIds.indexOf(settleTickId)>=0;
-        var fromAcct=s.divFundAccount||'rmb';
-        if(fromAcct==='rmb'){
+        // For mortgage: use the phase's own account field; for others: use divFundAccount
+        var ph=safeArr(s.phases).find(function(p){var inRange=(yr>p.startYr||(yr===p.startYr&&mo>=p.startMon))&&(yr<p.endYr||(yr===p.endYr&&mo<=p.endMon));return inRange;});
+        var fromAcct=s.type==='mortgage'?(ph?ph.account:'arab'):(s.divFundAccount||'rmb');
+        if(fromAcct==='rmb'||fromAcct==='boc'){
           if(!isPrePaid)rmbOut+=phAmt*S.jod2rmb;
           rmbItems.push({l:s.name.split('-')[0].trim(),v:'-'+fRMB(phAmt*S.jod2rmb),c:'neg',sub:fJOD(phAmt),streamId:settleTickId,prePaid:isPrePaid});
         } else {
@@ -1874,30 +1876,17 @@ function toggleTick(id){
   if(!wasOn&&item){
     if(!isFuture){
       // Current/past month: deduct/credit from actual balance
-      if(item.type==='out'){
-        if(item.currency==='JOD'){S.arab=n2(S.arab-item.amount);}
-        else{S.boc=n2(S.boc-item.amount);}
-        confirmedDebits[cKey][id]={amount:item.amount,currency:item.currency,type:'out'};
-      } else {
-        if(item.currency==='JOD'){S.arab=n2(S.arab+item.amount);}
-        else{S.boc=n2(S.boc+item.amount);}
-        confirmedDebits[cKey][id]={amount:item.amount,currency:item.currency,type:'in'};
-      }
+      // Balance is manually managed only — ticking just records confirmation
+      confirmedDebits[cKey][id]={amount:item.amount,currency:item.currency,type:item.type};
       // Auto-record settlement payments for current month only
       settlements.forEach(function(s){
         var phAmt=settlePhaseAmount(s,commitMon.year,commitMon.month);
-        if(phAmt>0&&id==='settle-'+s.id){var fromAcct=s.divFundAccount||'rmb';var amtRaw=fromAcct==='rmb'?n2(phAmt*S.jod2rmb):phAmt;s.payments=safeArr(s.payments);s.payments.push({id:Date.now(),amtJOD:phAmt,amtRaw:amtRaw,currency:fromAcct==='rmb'?'RMB':'JOD',date:today().toISOString().split('T')[0],note:MNAMES[commitMon.month-1]+' '+commitMon.year+' (auto)',type:'regular',autoRecorded:true});}
+        if(phAmt>0&&id==='settle-'+s.id){var ph2=safeArr(s.phases).find(function(p){var inR=(commitMon.year>p.startYr||(commitMon.year===p.startYr&&commitMon.month>=p.startMon))&&(commitMon.year<p.endYr||(commitMon.year===p.endYr&&commitMon.month<=p.endMon));return inR;});var fromAcct=s.type==='mortgage'?(ph2?ph2.account:'arab'):(s.divFundAccount||'rmb');var amtRaw=(fromAcct==='rmb'||fromAcct==='boc')?n2(phAmt*S.jod2rmb):phAmt;s.payments=safeArr(s.payments);s.payments.push({id:Date.now(),amtJOD:phAmt,amtRaw:amtRaw,currency:(fromAcct==='rmb'||fromAcct==='boc')?'RMB':'JOD',date:today().toISOString().split('T')[0],note:MNAMES[commitMon.month-1]+' '+commitMon.year+' (auto)',type:'regular',autoRecorded:true});}
       });
     }
     // Future month: just mark as pre-paid (projection will exclude it)
   } else if(wasOn&&item&&!isFuture&&confirmedDebits[cKey]&&confirmedDebits[cKey][id]){
-    // Unticking current month: reverse the deduction
-    var prev=confirmedDebits[cKey][id];
-    if(prev.type==='out'){
-      if(prev.currency==='JOD')S.arab=n2(S.arab+prev.amount);else S.boc=n2(S.boc+prev.amount);
-    } else {
-      if(prev.currency==='JOD')S.arab=n2(S.arab-prev.amount);else S.boc=n2(S.boc-prev.amount);
-    }
+    // Just remove the confirmation record — balance is manually managed
     delete confirmedDebits[cKey][id];
     // Also remove the auto-recorded settlement payment for this commitment
     var settleId=id.indexOf('settle-')===0?id.slice(7):null;
