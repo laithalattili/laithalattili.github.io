@@ -971,7 +971,8 @@ function initCatColors(){
 }
 function syncHolidayBudgets(){
   // Inject active holiday daily budgets as special budget categories
-  // Remove any expired ones
+  try{
+  if(!S||!S.budgets||!Array.isArray(holidays))return;
   var activeKeys=[];
   getActiveHolidays().forEach(function(h){
     var key='__hol-'+h.id+'__';
@@ -994,6 +995,7 @@ function syncHolidayBudgets(){
       if(Array.isArray(S.budgetOrder))S.budgetOrder=S.budgetOrder.filter(function(x){return x!==k;});
     }
   });
+  }catch(e){console.warn('syncHolidayBudgets:',e);}
 }
 
 // ═══ STATE ═══
@@ -1851,6 +1853,7 @@ function renderDashboard(){
 function renderCatGrid(){
   var cg=document.getElementById('cat-grid');if(!cg)return;cg.innerHTML='';
   // Build list: normal budget categories + active holiday categories, exclude surplus
+  try{syncHolidayBudgets();}catch(e){}
   var cats=getBudgetOrder().filter(function(c){return c!=='__surplus__';});
   cats.forEach(function(cat){
     var isHol=cat.indexOf('__hol-')===0;
@@ -3148,6 +3151,7 @@ function holDailyBudgetTotal(h){
 function holDailyBudgetSpent(h){
   // Sum of expenses logged against this holiday's budget category
   var catKey='__hol-'+h.id+'__';
+  if(!Array.isArray(expenses))return 0;
   return n2(safeArr(expenses).filter(function(e){return e.category===catKey;}).reduce(function(a,e){return a+toRMB(e.amount,e.currency);},0));
 }
 function getActiveHolidays(){
@@ -4666,8 +4670,6 @@ function sbApplyRemote(remote){
   if(Array.isArray(d.streams))streams=d.streams;
   if(Array.isArray(d.streamOverrides))streamOverrides=d.streamOverrides;
   if(Array.isArray(d.settlements)){
-    var divSr=d.settlements.find(function(x){return x.id==='nawal';});
-    if(divSr)console.log('[APPLY] divorce divFundAccount=',divSr.divFundAccount,'phases[0].account=',divSr.phases&&divSr.phases[0]&&divSr.phases[0].account);
     settlements=d.settlements;
   }
   if(Array.isArray(d.goldPieces))goldPieces=d.goldPieces;
@@ -4693,8 +4695,6 @@ async function sbPush(preStampedVer){
   sbSetStatus('Pushing...','busy');
   try{
     var payload=sbBuildPayload();
-    var divS=payload.data.settlements.find(function(x){return x.id==='nawal';});
-    if(divS)console.log('[PUSH] divorce divFundAccount=',divS.divFundAccount,'phases[0].account=',divS.phases&&divS.phases[0]&&divS.phases[0].account);
     if(preStampedVer)payload.version=preStampedVer;
     var res=await fetch(SB_URL+'/rest/v1/'+SB_TABLE,{
       method:'POST',
