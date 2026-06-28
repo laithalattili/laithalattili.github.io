@@ -4621,6 +4621,7 @@ var SB_ROW_ID='laith';
 var _sbPushTimer=null;
 var _sbSyncing=false;
 var _sbDirty=false;
+var _sbLastLocalChange=0; // timestamp of last local edit
 var _sbDeviceId=null;
 var _sbRealtimeSocket=null;
 var _sbRealtimeRef=1;
@@ -4664,6 +4665,9 @@ function sbBuildPayload(){
 
 function sbApplyRemote(remote){
   // Apply remote data to in-memory state. Called from pull and realtime.
+  // Block applies for 5 seconds after any local change to avoid push/pull race
+  if(_sbDirty)return false;
+  if(_sbLastLocalChange&&Date.now()-_sbLastLocalChange<5000)return false;
   var d=remote.data;
   if(!d)return false;
   if(d.S&&typeof d.S==='object')Object.assign(S,d.S);
@@ -4740,6 +4744,7 @@ async function sbPull(){
 
 function sbSchedulePush(preStampedVer){
   _sbDirty=true;
+  _sbLastLocalChange=Date.now();
   clearTimeout(_sbPushTimer);
   _sbPushTimer=setTimeout(async function(){
     await sbPush(preStampedVer);
