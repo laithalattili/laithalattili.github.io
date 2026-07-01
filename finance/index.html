@@ -4680,17 +4680,9 @@ document.addEventListener('DOMContentLoaded',function(){
   // Supabase sync: pull on startup
   setTimeout(function(){if(typeof sbInitSync==='function')sbInitSync();},500);
   // Pull when user returns to tab (only if no pending local changes)
-  document.addEventListener('visibilitychange',function(){
-    if(!document.hidden&&!_sbDirty&&typeof sbPullNow==='function'){
-      sbPull().then(function(changed){if(changed)safeShowView(currentPage);});
-    }
-  });
-  // Poll for remote changes every 30 seconds
-  setInterval(function(){
-    if(!_whatIfActive&&!_sbDirty&&typeof sbPull==='function'){
-      sbPull().then(function(changed){if(changed)safeShowView(currentPage);});
-    }
-  },30000);
+  // visibilitychange pull disabled — realtime reconnects automatically on tab focus
+  // Poll disabled — Supabase Realtime handles cross-device sync instantly
+  // Polling was causing data revert races with the push/echo cycle
 });
 
 
