@@ -1482,7 +1482,7 @@ function settlePlannedFuture(s){
       if(ph.currency===base){amt=ph.monthly;}
       else if(base==='JOD'&&ph.currency==='RMB'){amt=n2(ph.monthly/rate);}
       else if(base==='RMB'&&ph.currency==='JOD'){amt=n2(ph.monthly*rate);}
-      else{amt=toJOD(ph.monthly,ph.currency);}
+      else{var altC2=settleAltCur(s);if(ph.currency===altC2){amt=n2(ph.monthly/rate);}else{amt=n2(toJOD(ph.monthly,ph.currency)/toJOD(1,base));}}
       total+=amt;
       mo++;if(mo>12){mo=1;yr++;}
     }
@@ -2681,7 +2681,7 @@ function renderProjection(){
     if(jodNeg||rmbNeg)block.classList.add('has-negative');
     var curLabel=isCurrent?' <span style="font-size:10px;background:var(--grn-bg);color:var(--grn);padding:1px 5px;border-radius:4px;font-weight:700">NOW</span>':'';
     head.innerHTML='<div class="m-head-l"><div class="m-name">'+row.label+curLabel+'</div>'+
-      '<div class="m-bal-row"><span class="'+jodPillClass+'">JOD '+fJOD(row.jodBal).replace(' JOD','')+'</span><span class="'+rmbPillClass+'">'+fRMB(row.rmbBal)+'</span>'+resPills+'<span class="m-bal-total" onclick="event.stopPropagation();toggleCombinedCur()" title="Click to switch currency">='+totalDisp+'</span></div><div class="m-chips">'+chips+'</div></div>';
+      '<div class="m-bal-row"><span class="'+jodPillClass+'">JOD '+fJOD(row.jodBal).replace(' JOD','')+'</span><span class="'+rmbPillClass+'">'+fRMB(row.rmbBal)+'</span>'+resPills+'<span class="'+totalClass+'" onclick="event.stopPropagation();toggleCombinedCur()" title="Click to switch currency">='+totalDisp+'</span></div><div class="m-chips">'+chips+'</div></div>';
     block.appendChild(head);
     var body=document.createElement('div');body.className='m-body'+(isOpen?' open':'');body.id='mbody-'+idx;
     // Two columns with income/expense separation
@@ -2780,9 +2780,10 @@ function renderProjection(){
     var curOpts='<option value="JOD">JOD</option><option value="RMB">RMB</option>';
     safeArr(S.customCurrencies).forEach(function(cc){curOpts+='<option value="'+cc.code+'">'+cc.code+'</option>';});
     ief.innerHTML='<div class="ig-row"><div class="ig" style="flex:2"><label>Label</label><input type="text" id="iev-l-'+idx+'" placeholder="e.g. Extra payment"/></div><div class="ig"><label>Amount</label><input type="number" id="iev-a-'+idx+'" placeholder="0"/></div><div class="ig"><label>Currency</label><select id="iev-c-'+idx+'">'+curOpts+'</select></div><div class="ig"><label>Type</label><select id="iev-t-'+idx+'"><option value="expense">Expense</option><option value="income">Income</option></select></div></div><div style="display:flex;gap:7px" id="ief-btns-'+idx+'"></div>';
-    var iefBtns=document.getElementById('ief-btns-'+idx);
-    if(iefBtns){var addB2=document.createElement('button');addB2.className='btn btn-sm btn-p';addB2.textContent='Add';addB2.onclick=(function(ii,yr2,mo2){return function(){addInlineEv(ii,yr2,mo2);};})(idx,row.yr,row.mo);var canB2=document.createElement('button');canB2.className='btn btn-sm';canB2.textContent='Cancel';canB2.onclick=(function(ii){return function(){inlineEvForms[ii]=false;var el=document.getElementById('ief-'+ii);if(el)el.style.display='none';};})(idx);iefBtns.appendChild(addB2);iefBtns.appendChild(canB2);}
+    // Append ief to DOM first so getElementById can find the buttons container
     body.appendChild(ief);
+    var iefBtns=document.getElementById('ief-btns-'+idx);
+    if(iefBtns){var addB2=document.createElement('button');addB2.className='btn btn-sm btn-p';addB2.textContent='Add';addB2.onclick=(function(ii,yr2,mo2){return function(){addInlineEv(ii,yr2,mo2);sbPushNow();};})(idx,row.yr,row.mo);var canB2=document.createElement('button');canB2.className='btn btn-sm';canB2.textContent='Cancel';canB2.onclick=(function(ii){return function(){inlineEvForms[ii]=false;var el=document.getElementById('ief-'+ii);if(el)el.style.display='none';};})(idx);iefBtns.appendChild(addB2);iefBtns.appendChild(canB2);}
     block.appendChild(body);pm.appendChild(block);
   });
   // Bottom controls — delete last month (less accessible, at the bottom)
@@ -3165,7 +3166,13 @@ function renderGenericSettle(s,container){
     function mkPhIg(lbl,el){var ig=document.createElement('div');ig.className='ig';var l=document.createElement('label');l.textContent=lbl;ig.appendChild(l);ig.appendChild(el);return ig;}
     var amtInp=document.createElement('input');amtInp.type='number';amtInp.value=ph.monthly;amtInp.onchange=(function(sid,phid){return function(){updatePhase(sid,phid,'monthly',this.value);};})(s.id,ph.id);phForm.appendChild(mkPhIg('Monthly amount',amtInp));
     // Currency - auto-selects based on account
-    var curSel=document.createElement('select');['JOD','RMB'].forEach(function(c){var o=document.createElement('option');o.value=c;o.textContent=c;if(ph.currency===c)o.selected=true;curSel.appendChild(o);});curSel.onchange=(function(sid,phid){return function(){updatePhase(sid,phid,'currency',this.value);};})(s.id,ph.id);phForm.appendChild(mkPhIg('Currency',curSel));
+    var curSel=document.createElement('select');
+    var phaseCurs=['JOD','RMB','GBP','USD','EUR'];
+    var baseCurr=s.totalCurrency||'JOD';
+    if(phaseCurs.indexOf(baseCurr)<0)phaseCurs.unshift(baseCurr);
+    safeArr(S.customCurrencies).forEach(function(cc){if(phaseCurs.indexOf(cc.code)<0)phaseCurs.push(cc.code);});
+    phaseCurs.forEach(function(c){var o=document.createElement('option');o.value=c;o.textContent=c;if(ph.currency===c)o.selected=true;curSel.appendChild(o);});
+    curSel.onchange=(function(sid,phid){return function(){updatePhase(sid,phid,'currency',this.value);};})(s.id,ph.id);phForm.appendChild(mkPhIg('Currency',curSel));
     // Account - auto-sets currency
     var acctSel=document.createElement('select');[{v:'arab',l:'Arab Bank (JOD)'},{v:'rmb',l:'BOC China (RMB)'}].forEach(function(opt){var o=document.createElement('option');o.value=opt.v;o.textContent=opt.l;if(ph.account===opt.v)o.selected=true;acctSel.appendChild(o);});
     acctSel.onchange=(function(sid,phid,cs){return function(){updatePhase(sid,phid,'account',this.value);if(this.value==='arab'){cs.value='JOD';updatePhase(sid,phid,'currency','JOD');}else{cs.value='RMB';updatePhase(sid,phid,'currency','RMB');};};})(s.id,ph.id,curSel);
