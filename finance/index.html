@@ -1821,7 +1821,8 @@ function renderDashboard(){
   if(projEl){
     projEl.innerHTML='';
     var proj=buildProjection();
-    var nowRow=proj.find(function(r){return r.yr===nowYr&&r.mo===nowMo;});
+    var nowYr2=yr,nowMo2=mo;
+    var nowRow=proj.find(function(r){return r.yr===nowYr2&&r.mo===nowMo2;});
     var tm=S.targetMonth||{};
     var tmRow=tm.yr&&tm.mo?proj.find(function(r){return r.yr===tm.yr&&r.mo===tm.mo;}):null;
     var MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -1840,7 +1841,7 @@ function renderDashboard(){
       td.onclick=function(){toggleCombinedCur();renderDashboard();};d2.appendChild(td);
       return d2;
     }
-    if(nowRow)projEl.appendChild(mkProjRow(nowRow,MN[nowMo-1]+' '+nowYr));
+    if(nowRow)projEl.appendChild(mkProjRow(nowRow,MN[nowMo2-1]+' '+nowYr2));
     // Target month row
     var tmWrap=document.createElement('div');
     tmWrap.style.cssText='padding:8px 10px;background:var(--surf);border-radius:var(--r);margin-bottom:8px;border:.5px dashed var(--brd2)';
@@ -1848,9 +1849,9 @@ function renderDashboard(){
     var tmLbl=document.createElement('span');tmLbl.style.cssText='font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em';tmLbl.textContent='Target:';
     var tmMo=document.createElement('select');tmMo.style.cssText='font-size:11px;padding:2px 3px;border-radius:3px';
     MN.forEach(function(m,i){var o=document.createElement('option');o.value=i+1;o.textContent=m;if(tm.mo===i+1)o.selected=true;tmMo.appendChild(o);});
-    var tmYr=document.createElement('input');tmYr.type='number';tmYr.value=tm.yr||nowYr+1;tmYr.style.cssText='width:56px;font-size:11px;padding:2px 3px;border-radius:3px';
+    var tmYr=document.createElement('input');tmYr.type='number';tmYr.value=tm.yr||nowYr2+1;tmYr.style.cssText='width:56px;font-size:11px;padding:2px 3px;border-radius:3px';
     var tmSet=document.createElement('button');tmSet.className='btn btn-xs btn-p';tmSet.textContent='Set';
-    tmSet.onclick=function(){S.targetMonth={yr:parseInt(tmYr.value)||nowYr+1,mo:parseInt(tmMo.value)};autosave();renderDashboard();};
+    tmSet.onclick=function(){S.targetMonth={yr:parseInt(tmYr.value)||nowYr2+1,mo:parseInt(tmMo.value)};autosave();renderDashboard();};
     tmCtrl.appendChild(tmLbl);tmCtrl.appendChild(tmMo);tmCtrl.appendChild(tmYr);tmCtrl.appendChild(tmSet);tmWrap.appendChild(tmCtrl);
     if(tmRow){
       var tmGrid=document.createElement('div');
