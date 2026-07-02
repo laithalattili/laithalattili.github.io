@@ -1263,7 +1263,20 @@ function autosave(){
 function makeSaveBtn(label){
   var btn=document.createElement('button');btn.className='btn btn-sm btn-p';btn.textContent=label||'Save';
   btn.style.cssText='margin-top:8px';
-  btn.onclick=function(){autosave();sbPushNow();btn.textContent='✓ Saved';btn.style.background='var(--grn)';setTimeout(function(){btn.textContent=label||'Save';btn.style.background='';},2000);};
+  btn.onclick=function(){
+    autosave();
+    console.log('[SAVE] Pushing... syncStatus=',JSON.stringify(sbSyncStatus()));
+    _sbSyncing=false; // force-unlock before push
+    sbPush().then(function(){
+      console.log('[SAVE] Push complete. syncStatus=',JSON.stringify(sbSyncStatus()));
+      btn.textContent='✓ Saved';btn.style.background='var(--grn)';
+      setTimeout(function(){btn.textContent=label||'Save';btn.style.background='';},2000);
+    }).catch(function(e){
+      console.error('[SAVE] Push failed:',e);
+      btn.textContent='⚠ Failed';btn.style.background='var(--red)';
+      setTimeout(function(){btn.textContent=label||'Save';btn.style.background='';},3000);
+    });
+  };
   return btn;
 }
 function loadState(){
@@ -4793,9 +4806,14 @@ async function sbPush(preStampedVer){
   }catch(e){
     console.warn('SB push:',e.message);
     sbSetStatus('Push failed: '+e.message,'err');
+    _sbSyncing=false;
+    return;
   }
   _sbSyncing=false;
 }
+
+// Expose a status check
+function sbSyncStatus(){return {syncing:_sbSyncing,dirty:_sbDirty,lastPushed:_sbLastPushedVer,lastChange:_sbLastLocalChange};}
 
 async function sbPull(){
   if(_sbSyncing)return false;
@@ -4837,7 +4855,7 @@ function sbSchedulePush(preStampedVer){
   },500);
 }
 
-function sbPushNow(){clearTimeout(_sbPushTimer);_sbDirty=false;sbPush();}
+function sbPushNow(){clearTimeout(_sbPushTimer);_sbDirty=false;_sbSyncing=false;sbPush();}
 function sbPullNow(){sbPull().then(function(changed){if(changed)showView(currentPage);});}
 
 // ─── Supabase Realtime via WebSocket ───────────────────────────────────────
