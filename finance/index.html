@@ -3142,7 +3142,18 @@ function renderGenericSettle(s,container){
   container.appendChild(hg);
   // Progress bars
   var barWrap=document.createElement('div');barWrap.className='card';
-  barWrap.innerHTML='<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="color:var(--ink3)">Paid off</span><span style="font-weight:600;color:var(--blu)">'+pct+'%</span></div><div class="prog-track-lg" onclick="toggleHistoryPanel(\'hist-'+s.id+'\')" title="Click to show payment history"><div class="payoff-fill" style="width:'+pct+'%"></div></div><div style="font-size:11px;color:var(--ink3);margin-top:2px;margin-bottom:8px">Click bar to show/hide history</div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="color:var(--ink3)">Planned covers</span><span style="font-weight:600;color:'+(plannedPct>=100?'var(--grn)':'var(--amb)')+'">'+plannedPct+'% of remaining ('+fJOD(planned)+')</span></div><div class="prog-track"><div class="prog-fill" style="width:'+plannedPct+'%;background:'+(plannedPct>=100?'var(--grn)':'var(--amb)')+'"></div></div>'+(plannedPct<100&&left>0?'<div style="font-size:11px;color:var(--amb);margin-top:3px">'+fmtSettleAmtInView(Math.max(0,left-planned),s)+' still unplanned</div>':'<div style="font-size:11px;color:var(--grn);margin-top:3px">Full balance covered by plan.</div>');
+  var overPlanned=planned>left;
+  var overAmt=overPlanned?n2(planned-left):0;
+  var planLabel=(Math.min(100,plannedPct))+'% of remaining ('+fmtSettleAmtInView(Math.min(planned,left),s)+')'+(overPlanned?' — +'+fmtSettleAmtInView(overAmt,s)+' over total':'');
+  var planBarHTML='<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="color:var(--ink3)">Planned covers</span><span style="font-weight:600;color:'+(overPlanned?'var(--amb)':plannedPct>=100?'var(--grn)':'var(--amb)')+'">'+planLabel+'</span></div>';
+  if(overPlanned){
+    planBarHTML+='<div class="prog-track" style="position:relative"><div class="prog-fill" style="width:100%;background:var(--grn)"></div></div>'+
+      '<div style="font-size:11px;color:var(--amb);margin-top:4px;font-weight:600">⚠ Plan exceeds total by '+fmtSettleAmtInView(overAmt,s)+' — consider adjusting phases.</div>';
+  } else {
+    planBarHTML+='<div class="prog-track"><div class="prog-fill" style="width:'+plannedPct+'%;background:'+(plannedPct>=100?'var(--grn)':'var(--amb)')+'"></div></div>';
+    planBarHTML+=(plannedPct<100&&left>0?'<div style="font-size:11px;color:var(--amb);margin-top:3px">'+fmtSettleAmtInView(Math.max(0,left-planned),s)+' still unplanned</div>':'<div style="font-size:11px;color:var(--grn);margin-top:3px">Full balance covered by plan.</div>');
+  }
+  barWrap.innerHTML='<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="color:var(--ink3)">Paid off</span><span style="font-weight:600;color:var(--blu)">'+pct+'%</span></div><div class="prog-track-lg" onclick="toggleHistoryPanel(\'hist-'+s.id+'\')" title="Click to show payment history"><div class="payoff-fill" style="width:'+pct+'%"></div></div><div style="font-size:11px;color:var(--ink3);margin-top:2px;margin-bottom:8px">Click bar to show/hide history</div>'+planBarHTML;
   container.appendChild(barWrap);
   // Payment history (hidden by default, revealed via bar click)
   var histWrap=document.createElement('div');histWrap.id='hist-'+s.id;histWrap.style.display='none';
