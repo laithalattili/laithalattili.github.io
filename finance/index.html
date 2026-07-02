@@ -114,6 +114,7 @@ html,body{height:100%;font-family:var(--f);background:var(--bg);color:var(--ink)
 @media(max-width:720px){
   .sticky-bar{left:0}
   .sidebar{transform:translateX(-100%);top:var(--sticky-h)}.sidebar.mob-open{transform:translateX(0)}
+  #sticky-log-wrap{display:none!important}
   .sidebar nav{padding-bottom:calc(70px + env(safe-area-inset-bottom))!important}
   .sb-overlay.mob-open{display:block}.main-area{margin-left:0}
   .mob-topbar{display:flex}.bottom-nav{display:block}
@@ -453,6 +454,9 @@ input:focus,select:focus{border-color:var(--ink)}
       </div>
     </div>
   </div>
+  <div id="sticky-log-wrap" style="position:absolute;left:50%;transform:translateX(-50%)">
+    <button class="sbar-btn" onclick="showView('log')" id="sticky-log-btn" title="Daily Log" style="font-size:13px;font-weight:700;padding:4px 14px;border-radius:20px;border:.5px solid var(--brd2);background:var(--surf2);color:var(--ink2);display:flex;align-items:center;gap:5px"><i class="ti ti-receipt-2" style="font-size:14px"></i> Log</button>
+  </div>
   <div class="sticky-actions">
     <div id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:var(--ink4);cursor:pointer;flex-shrink:0;transition:background .3s" title="Sync status" onclick="showView('settings')"></div>
     <button class="sbar-btn" id="whatif-btn" onclick="toggleWhatIf()" title="What-if sandbox mode">&#128270;</button>
@@ -471,7 +475,6 @@ input:focus,select:focus{border-color:var(--ink)}
   <nav style="flex:1;overflow-y:auto;padding-bottom:8px">
     <div class="sb-sec">Daily</div>
     <div class="nav-item active" data-view="dashboard"><i class="ti ti-layout-dashboard"></i> Dashboard</div>
-    <div class="nav-item nav-log" data-view="log"><i class="ti ti-receipt-2"></i> Daily Log</div>
     <div class="nav-item" data-view="commitments"><i class="ti ti-checks"></i> Commitments</div>
     <div class="sb-sec">Planning</div>
     <div class="nav-item" data-view="projection"><i class="ti ti-trending-up"></i> Projection</div>
@@ -518,6 +521,7 @@ input:focus,select:focus{border-color:var(--ink)}
   <div id="dash-section-obligations">
     <div id="dash-settlement-pins"></div>
   </div>
+  <div id="dash-target-month"></div>
   <div id="dash-reorder-btn" style="text-align:right;margin-bottom:6px"></div>
   <div class="card">
     <div class="card-hd"><div class="card-title">This month &middot; budget</div><div id="dash-budget-total"></div></div>
@@ -1017,6 +1021,7 @@ var S={
   schoolYearStart:8, // August = school year start
   // Salary routing
   salaryMode:'split',
+  targetMonth:{yr:null,mo:null},
   salaryPhases:[],
   salaryRMBFull:0,
   // Log
@@ -1419,7 +1424,7 @@ function syncCurButtons(){
 function openMob(){document.getElementById('sidebar').classList.add('mob-open');document.getElementById('sb-overlay').classList.add('mob-open');}
 function closeMob(){document.getElementById('sidebar').classList.remove('mob-open');document.getElementById('sb-overlay').classList.remove('mob-open');}
 function setDefaultToCurrentPage(){S.defaultPage=currentPage;autosave();updateStickyBar();var dl=document.getElementById('default-label');if(dl)dl.textContent=PAGE_TITLES[currentPage];}
-function updateStickyBar(){var sb=document.getElementById('sticky-star');if(!sb)return;sb.classList.toggle('starred',currentPage===S.defaultPage);sb.textContent=currentPage===S.defaultPage?'\u2605 Default':'\u2606 Default';}
+function updateStickyBar(){var sb=document.getElementById('sticky-star');if(!sb)return;sb.classList.toggle('starred',currentPage===S.defaultPage);sb.textContent=currentPage===S.defaultPage?'\u2605 Default':'\u2606 Default';var lb=document.getElementById('sticky-log-btn');if(lb){lb.style.background=currentPage==='log'?'var(--accent)':'var(--surf2)';lb.style.color=currentPage==='log'?'#fff':'var(--ink2)';}}
 
 // ═══ STREAM HELPERS ═══
 function streamActiveInMonth(st,yr,mo){
@@ -1840,6 +1845,60 @@ function deleteLastMonth(){
 }
 
 // ═══ DASHBOARD ═══
+function renderTargetMonth(){
+  var el=document.getElementById('dash-target-month');if(!el)return;
+  var tm=S.targetMonth||{};
+  var now=today();
+  var MONTHS_SHORT=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  // Edit controls
+  var editDiv=document.createElement('div');editDiv.style.cssText='display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap';
+  var lbl=document.createElement('span');lbl.style.cssText='font-size:12px;font-weight:700;color:var(--ink2)';lbl.textContent='Target month:';
+  var moSel=document.createElement('select');moSel.style.cssText='font-size:12px;width:70px';
+  MONTHS_SHORT.forEach(function(m,i){var o=document.createElement('option');o.value=i+1;o.textContent=m;if(tm.mo===i+1)o.selected=true;moSel.appendChild(o);});
+  var yrInp=document.createElement('input');yrInp.type='number';yrInp.value=tm.yr||now.getFullYear()+1;yrInp.style.cssText='width:65px;font-size:12px';
+  var setBtn=document.createElement('button');setBtn.className='btn btn-xs btn-p';setBtn.textContent='Set';
+  setBtn.onclick=function(){S.targetMonth={yr:parseInt(yrInp.value)||now.getFullYear()+1,mo:parseInt(moSel.value)};autosave();renderTargetMonth();};
+  editDiv.appendChild(lbl);editDiv.appendChild(moSel);editDiv.appendChild(yrInp);editDiv.appendChild(setBtn);
+
+  if(!tm.yr||!tm.mo){el.innerHTML='';el.appendChild(editDiv);return;}
+
+  // Find that month in projection
+  var proj=buildProjection();
+  var row=proj.find(function(r){return r.yr===tm.yr&&r.mo===tm.mo;});
+  if(!row){
+    el.innerHTML='';
+    var noCard=document.createElement('div');noCard.className='card';
+    noCard.appendChild(editDiv);
+    var noMsg=document.createElement('div');noMsg.style.cssText='font-size:12px;color:var(--ink3)';noMsg.textContent=MONTHS_SHORT[tm.mo-1]+' '+tm.yr+' is beyond the projection range.';
+    noCard.appendChild(noMsg);el.appendChild(noCard);return;
+  }
+
+  var c=S.globalCur||'JOD';
+  var reserveTotalJOD=cashTotalJOD();
+  var totalJOD=row.jodBal+(row.rmbBal/S.jod2rmb)+reserveTotalJOD;
+  var totalNeg=totalJOD<0;
+  var jodNeg=row.jodBal<0;var rmbNeg=row.rmbBal<0;
+  var fmtTotal=c==='JOD'?fJOD(totalJOD):fRMB(totalJOD*S.jod2rmb);
+
+  var card=document.createElement('div');card.className='card';
+  card.appendChild(editDiv);
+  var titleDiv=document.createElement('div');titleDiv.style.cssText='font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px';
+  titleDiv.textContent='By '+MONTHS_SHORT[tm.mo-1]+' '+tm.yr;card.appendChild(titleDiv);
+  var hg=document.createElement('div');hg.className='hg';
+  var mkPill=function(val,neg,label){
+    var d=document.createElement('div');d.className='hc';
+    d.innerHTML='<div class="hc-label">'+label+'</div><div class="hc-val" style="font-size:15px;color:'+(neg?'var(--red)':'var(--grn)')+'">'+val+'</div>';
+    return d;
+  };
+  hg.appendChild(mkPill(fJOD(row.jodBal),jodNeg,'Arab Bank (JOD)'));
+  hg.appendChild(mkPill(fRMB(row.rmbBal),rmbNeg,'BOC (RMB)'));
+  card.appendChild(hg);
+  var totalDiv=document.createElement('div');
+  totalDiv.style.cssText='margin-top:8px;padding:8px 12px;border-radius:var(--r);font-family:var(--mono);font-weight:800;font-size:18px;text-align:center;'+(totalNeg?'background:var(--red);color:#fff':'background:var(--grn-bg);color:var(--grn)');
+  totalDiv.textContent=(totalNeg?'⚠ ':'✔ ')+(c==='JOD'?fJOD(totalJOD):fRMB(totalJOD*S.jod2rmb))+' total';
+  card.appendChild(totalDiv);
+  el.innerHTML='';el.appendChild(card);
+}
 function renderDashboard(){
   syncCurButtons();
   var gEl=document.getElementById('dash-greet');if(gEl)gEl.textContent=greeting()+' (age '+calcAge()+')';
@@ -1958,7 +2017,8 @@ function resetSurplusPool(){
 }
 function deleteExp(id){
   expenses=expenses.filter(function(e){return e.id!==id;});
-  updateSurplus();autosave();renderLog();
+  updateSurplus();
+  renderTargetMonth();autosave();renderLog();
 }
 function editExp(id){
   var e=expenses.find(function(x){return x.id===id;});if(!e)return;
@@ -3144,11 +3204,16 @@ function renderGenericSettle(s,container){
   var barWrap=document.createElement('div');barWrap.className='card';
   var overPlanned=planned>left;
   var overAmt=overPlanned?n2(planned-left):0;
-  var planLabel=(Math.min(100,plannedPct))+'% of remaining ('+fmtSettleAmtInView(Math.min(planned,left),s)+')'+(overPlanned?' — +'+fmtSettleAmtInView(overAmt,s)+' over total':'');
+  var planLabel=(Math.min(100,plannedPct))+'% of remaining ('+fmtSettleAmtInView(Math.min(planned,left),s)+')';
   var planBarHTML='<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="color:var(--ink3)">Planned covers</span><span style="font-weight:600;color:'+(overPlanned?'var(--amb)':plannedPct>=100?'var(--grn)':'var(--amb)')+'">'+planLabel+'</span></div>';
   if(overPlanned){
-    planBarHTML+='<div class="prog-track" style="position:relative"><div class="prog-fill" style="width:100%;background:var(--grn)"></div></div>'+
-      '<div style="font-size:11px;color:var(--amb);margin-top:4px;font-weight:600">⚠ Plan exceeds total by '+fmtSettleAmtInView(overAmt,s)+' — consider adjusting phases.</div>';
+    // Bar: green 100% with amber overflow segment appended
+    var overBarPct=Math.round(Math.min(overAmt/left*50,40)); // cap visual overflow at 40% extra width
+    planBarHTML+='<div style="display:flex;align-items:stretch;gap:2px">'+
+      '<div class="prog-track" style="flex:1"><div class="prog-fill" style="width:100%;background:var(--grn)"></div></div>'+
+      '<div style="background:var(--amb);border-radius:3px;height:6px;width:'+overBarPct+'px;flex-shrink:0"></div>'+
+      '</div>'+
+      '<div style="font-size:11px;color:var(--amb);margin-top:3px">+'+fmtSettleAmtInView(overAmt,s)+' over total</div>';
   } else {
     planBarHTML+='<div class="prog-track"><div class="prog-fill" style="width:'+plannedPct+'%;background:'+(plannedPct>=100?'var(--grn)':'var(--amb)')+'"></div></div>';
     planBarHTML+=(plannedPct<100&&left>0?'<div style="font-size:11px;color:var(--amb);margin-top:3px">'+fmtSettleAmtInView(Math.max(0,left-planned),s)+' still unplanned</div>':'<div style="font-size:11px;color:var(--grn);margin-top:3px">Full balance covered by plan.</div>');
