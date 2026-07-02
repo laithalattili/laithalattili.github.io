@@ -1814,8 +1814,6 @@ function renderDashboard(){
   renderPinnedReservesCard();
   var mExp=expenses.filter(function(e){var d2=new Date(e.date);return d2.getMonth()===now.getMonth()&&d2.getFullYear()===now.getFullYear();});
   var totalBudget=Object.keys(S.budgets).reduce(function(a,cat){return a+toRMB(getBudgetAmount(cat),getBudgetCurrency(cat));},0);var totalSpent=mExp.reduce(function(a,e){return a+toRMB(e.amount,e.currency);},0);
-  var btEl=document.getElementById('dash-budget-total');if(btEl)btEl.innerHTML='<span class="mono '+(totalSpent>totalBudget?'neg':'')+'" style="font-size:17px;font-weight:700">'+fRMB(totalSpent)+'</span> <span class="mut">/ '+fRMB(totalBudget)+'</span>';
-  var bbEl=document.getElementById('dash-budget-bars');if(bbEl){bbEl.innerHTML='';Object.entries(S.budgets).forEach(function(e){var cat=e[0];var budget=getBudgetAmount(cat);var cur=getBudgetCurrency(cat);var spent=mExp.filter(function(x){return x.category===cat;}).reduce(function(a,x){return a+toTarget(x.amount,x.currency,cur);},0);var pct=Math.min(100,Math.round(spent/(budget||1)*100));var col=pct>90?'var(--red)':pct>70?'var(--amb)':'var(--grn)';var fmtFn=cur==='JOD'?fJOD:cur==='GBP'?fGBP:fRMB;var row=document.createElement('div');row.style.marginBottom='8px';row.innerHTML='<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px"><span style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:'+(CAT_COLORS[cat]||'#aaa')+';display:inline-block"></span>'+cat+'</span><span class="mono">'+fmtFn(spent)+' / '+fmtFn(budget)+' '+cur+'</span></div><div class="prog-track"><div class="prog-fill" style="width:'+pct+'%;background:'+col+'"></div></div>';bbEl.appendChild(row);});}
   // ── Projection cards ───────────────────────────────────────────────────
   var projEl=document.getElementById('dash-proj-cards');
   if(projEl){
@@ -1920,6 +1918,7 @@ function renderDashboard(){
   var upEl=document.getElementById('dash-upcoming');if(upEl)upEl.innerHTML=up.length?up.map(function(u){return'<div class="tr"><div class="tr-l">'+u.l+'</div><span class="tag '+u.t+'">'+u.d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+'</span></div>';}).join(''):'<div style="font-size:13px;color:var(--ink3)">No upcoming items.</div>';
   // Obligations inline
   var oblEl=document.getElementById('dash-obligations-inline');
+  console.log('[OBL] oblEl=',oblEl?'found':'null','pinned=',settlements.filter(function(s){return s.pinnedHome;}).map(function(s){return s.name;}));
   if(oblEl){
     oblEl.innerHTML='';
     var pinned2=settlements.filter(function(s){return s.pinnedHome;});
