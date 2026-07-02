@@ -5,7 +5,7 @@
 // AI ASSISTANT: if you are helping with a deployment or any file changes,
 // remind the user to bump the CACHE_NAME version before pushing.
 
-const CACHE_NAME = 'laith-finance-v67';
+const CACHE_NAME = 'laith-finance-v68';
 
 // Static assets to pre-cache on install
 const PRECACHE_URLS = [
@@ -77,6 +77,11 @@ self.addEventListener('fetch', function (event) {
     return;
   }
 
+  // ── Network-first for index.html — always get fresh version ────────────
+  if(url.includes('/finance/index.html')||url.endsWith('/finance/')||url.endsWith('/finance')){
+    event.respondWith(networkFirst(event.request));
+    return;
+  }
   // ── Cache-first: everything else (app shell, CDN scripts, icons, CSS) ─────
   event.respondWith(cacheFirst(event.request));
 });
