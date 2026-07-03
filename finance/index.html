@@ -1425,18 +1425,28 @@ function settleLeft(s){
 function settlePct(s){var t=s.totalJOD||0;if(!t)return 0;var paid=s.type==='mortgage'?n2(t-settleLeft(s)):settlePaid(s);return Math.round(Math.min(100,paid/t*100));}
 function settlePlannedFuture(s){
   var now=today();var total=0;
-  var rate=settleFxRate(s); // settlement's fixed rate: base→alt (e.g. JOD→RMB)
+  var rate=settleFxRate(s);
   var base=s.totalCurrency||'JOD';
+  var nowYr=now.getFullYear(),nowMo=now.getMonth()+1;
   safeArr(s.phases).forEach(function(ph){
-    var start=new Date(ph.startYr,ph.startMon-1,1);
-    var end=new Date(ph.endYr,ph.endMon-1,1);
-    for(var d=new Date(Math.max(now.getTime(),start.getTime()));d<=end;d.setMonth(d.getMonth()+1)){
+    // Use month-level comparison so current month is included
+    var startYr=ph.startYr,startMo=ph.startMon;
+    var endYr=ph.endYr,endMo=ph.endMon;
+    if(startYr*12+startMo < nowYr*12+nowMo){startYr=nowYr;startMo=nowMo;}
+    for(var yr=startYr,mo=startMo;;){
+      if(yr*12+mo > endYr*12+endMo)break;
       var amt;
       if(ph.currency===base){amt=ph.monthly;}
       else if(base==='JOD'&&ph.currency==='RMB'){amt=n2(ph.monthly/rate);}
       else if(base==='RMB'&&ph.currency==='JOD'){amt=n2(ph.monthly*rate);}
-      else{amt=toJOD(ph.monthly,ph.currency);}
+      else{
+        // Other currency (e.g. GBP): use settlement's fixed rate
+        var altC=settleAltCur(s);
+        if(ph.currency===altC){amt=n2(ph.monthly/rate);}
+        else{amt=n2(toJOD(ph.monthly,ph.currency)/Math.max(0.001,toJOD(1,base)));}
+      }
       total+=amt;
+      mo++;if(mo>12){mo=1;yr++;}
     }
   });
   safeArr(oneoffEvents).forEach(function(ev){
