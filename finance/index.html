@@ -1956,6 +1956,23 @@ function renderDashboard(){
 // ═══ LOG ═══
 function renderCatGrid(){var cg=document.getElementById('cat-grid');if(!cg)return;cg.innerHTML='';Object.keys(CAT_COLORS).forEach(function(cat){var btn=document.createElement('div');btn.className='cat-btn'+(S.selectedCat===cat?' sel':'');var dot=document.createElement('div');dot.className='cat-dot';dot.style.background=CAT_COLORS[cat];btn.appendChild(dot);var lbl=document.createElement('span');lbl.textContent=cat;btn.appendChild(lbl);btn.onclick=function(){S.selectedCat=cat;renderCatGrid();};cg.appendChild(btn);});}
 function submitExp(){var amt=parseFloat(document.getElementById('log-amt').value);if(!amt||amt<=0)return alert('Enter a valid amount.');var entry={id:Date.now(),amount:amt,currency:S.logCur,category:S.selectedCat,date:document.getElementById('log-date').value||today().toISOString().split('T')[0],note:document.getElementById('log-note').value};if(editingExpId!==null){var i=expenses.findIndex(function(e){return e.id===editingExpId;});if(i>-1)expenses[i]=entry;editingExpId=null;}else expenses.unshift(entry);document.getElementById('log-amt').value='';document.getElementById('log-note').value='';updateSurplus();autosave();renderLog();renderLogMonthlySummary();}
+async function pushFinanceSummary(){
+  try{
+    var now=today();
+    var yr=now.getFullYear(),mo=now.getMonth()+1;
+    var monthKey=yr+'-'+(mo<10?'0':'')+mo;
+    // Calculate total budget and spent in RMB (primary currency)
+    var mExp=expenses.filter(function(e){var d=new Date(e.date);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();});
+    var budgetTotal=Object.keys(S.budgets||{}).filter(function(c){return c!=='__surplus__'&&c.indexOf('__hol-')<0;}).reduce(function(a,cat){return a+toRMB(getBudgetAmount(cat),getBudgetCurrency(cat));},0);
+    var spentTotal=mExp.reduce(function(a,e){return a+toRMB(e.amount,e.currency);},0);
+    var payload={month:monthKey,budget_total:n2(budgetTotal),spent_total:n2(spentTotal),currency:'RMB',updated_at:new Date().toISOString()};
+    await fetch(SB_URL+'/rest/v1/omni_finance_summary',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'resolution=merge-duplicates'},
+      body:JSON.stringify(payload)
+    });
+  }catch(e){console.warn('pushFinanceSummary:',e);}
+}
 function updateSurplus(){
   var now=today();
   var mExp=expenses.filter(function(e){var d=new Date(e.date);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();});
@@ -4796,6 +4813,7 @@ function sbSchedulePush(preStampedVer){
   clearTimeout(_sbPushTimer);
   _sbPushTimer=setTimeout(async function(){
     await sbPush(preStampedVer);
+    pushFinanceSummary();
     _sbDirty=false;
   },500);
 }
