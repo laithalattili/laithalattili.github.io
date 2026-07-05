@@ -2979,11 +2979,15 @@ function renderMonthLookup(){
   // Flows
   var jodInItems=row.jodItems.filter(function(it){return it.c==='pos'&&!it.bold&&!it.isBalance;});
   var jodOutItems=row.jodItems.filter(function(it){return it.c==='neg'&&!it.bold&&!it.isBalance;});
+  // True net = sum of all items including prePaid (ticked) ones
+  function sumItems(items,sign){return n2(items.filter(function(it){return it.c===sign;}).reduce(function(a,it){var v=parseFloat((it.v||'0').replace(/[^0-9.-]/g,''));return a+(isNaN(v)?0:v);},0));}
+  var trueJodNet=n2(sumItems(row.jodItems,'pos')-sumItems(row.jodItems,'neg'));
+  var trueRmbNet=n2(sumItems(row.rmbItems,'pos')-sumItems(row.rmbItems,'neg'));
   var jodCard=document.createElement('div');jodCard.className='card';jodCard.style.marginBottom='8px';
   jodCard.innerHTML='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--grn);margin-bottom:7px">'+S.arabLabel+' Flows</div>';
   if(jodInItems.length){jodCard.innerHTML+='<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--grn);margin-bottom:3px">Income</div>'+jodInItems.map(function(it){return'<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:.5px solid var(--brd);font-size:12px"><span>'+it.l+'</span><span class="mono pos">'+it.v+'</span></div>';}).join('');}
   if(jodOutItems.length){jodCard.innerHTML+='<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--red);margin:6px 0 3px">Outflows</div>'+jodOutItems.map(function(it){return'<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:.5px solid var(--brd);font-size:12px"><span>'+it.l+'</span><span class="mono neg">'+it.v+'</span></div>';}).join('');}
-  jodCard.innerHTML+='<div style="background:var(--grn-bg);border-radius:var(--r);padding:6px 9px;margin-top:6px;display:flex;justify-content:space-between"><span style="font-weight:700;color:var(--grn);font-size:12px">Net JOD</span><span class="mono" style="font-weight:700;color:'+(row.jodNet>=0?'var(--grn)':'var(--red)')+';">'+(row.jodNet>=0?'+':'')+fJOD(row.jodNet)+'</span></div>';
+  jodCard.innerHTML+='<div style="background:var(--grn-bg);border-radius:var(--r);padding:6px 9px;margin-top:6px;display:flex;justify-content:space-between"><span style="font-weight:700;color:var(--grn);font-size:12px">Net JOD</span><span class="mono" style="font-weight:700;color:'+(trueJodNet>=0?'var(--grn)':'var(--red)')+';">'+(trueJodNet>=0?'+':'')+fJOD(trueJodNet)+'</span></div>';
   out.appendChild(jodCard);
   var rmbInItems=row.rmbItems.filter(function(it){return it.c==='pos'&&!it.bold&&!it.isBalance;});
   var rmbOutItems=row.rmbItems.filter(function(it){return it.c==='neg'&&!it.bold&&!it.isBalance;});
@@ -2991,7 +2995,7 @@ function renderMonthLookup(){
   rmbCard.innerHTML='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--blu);margin-bottom:7px">'+S.bocLabel+' Flows</div>';
   if(rmbInItems.length){rmbCard.innerHTML+='<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--grn);margin-bottom:3px">Income</div>'+rmbInItems.map(function(it){return'<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:.5px solid var(--brd);font-size:12px"><span>'+it.l+'</span><span class="mono pos">'+it.v+'</span></div>';}).join('');}
   if(rmbOutItems.length){rmbCard.innerHTML+='<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--red);margin:6px 0 3px">Outflows</div>'+rmbOutItems.map(function(it){return'<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:.5px solid var(--brd);font-size:12px"><span>'+it.l+'</span><span class="mono neg">'+it.v+'</span></div>';}).join('');}
-  rmbCard.innerHTML+='<div style="background:var(--blu-bg);border-radius:var(--r);padding:6px 9px;margin-top:6px;display:flex;justify-content:space-between"><span style="font-weight:700;color:var(--blu);font-size:12px">Net RMB</span><span class="mono" style="font-weight:700;color:'+(row.rmbNet>=0?'var(--grn)':'var(--red)')+';">'+(row.rmbNet>=0?'+':'')+fRMB(row.rmbNet)+'</span></div>';
+  rmbCard.innerHTML+='<div style="background:var(--blu-bg);border-radius:var(--r);padding:6px 9px;margin-top:6px;display:flex;justify-content:space-between"><span style="font-weight:700;color:var(--blu);font-size:12px">Net RMB</span><span class="mono" style="font-weight:700;color:'+(trueRmbNet>=0?'var(--grn)':'var(--red)')+';">'+(trueRmbNet>=0?'+':'')+fRMB(trueRmbNet)+'</span></div>';
   out.appendChild(rmbCard);
   if(row.belowReserve){var belowAlert=document.createElement('div');belowAlert.className='alert al-d';belowAlert.textContent='Arab Bank below reserve this month.';out.appendChild(belowAlert);}
 }
