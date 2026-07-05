@@ -1587,6 +1587,7 @@ function buildProjection(){
     var d=new Date(now.getFullYear(),now.getMonth()+i,1);
     var yr=d.getFullYear(),mo=d.getMonth()+1;
     var jodIn=0,jodOut=0,rmbIn=0,rmbOut=0;
+    var trueJodIn=0,trueJodOut=0,trueRmbIn=0,trueRmbOut=0; // includes prePaid
     var jodItems=[],rmbItems=[];
     var monthStreams=getStreamsForMonth(yr,mo);
     var monthMode=getSalaryModeForMonth(yr,mo);
@@ -1598,15 +1599,16 @@ function buildProjection(){
       var salRecRMB=isIncomeReceived(salRMB.id,yr,mo);
       if(monthMode==='split'){
         var jodAmt=salJOD?salJOD.amount:0;
-        if(!salRecJOD){jodIn+=jodAmt;jodItems.push({l:salJOD.name,v:'+'+fJOD(jodAmt),c:'pos',streamId:salJOD.id});}
-        else{jodItems.push({l:salJOD.name,v:'+'+fJOD(jodAmt),c:'pos',streamId:salJOD.id,received:true});}
+        if(!salRecJOD){jodIn+=jodAmt;trueJodIn+=jodAmt;jodItems.push({l:salJOD.name,v:'+'+fJOD(jodAmt),c:'pos',streamId:salJOD.id});}
+        else{trueJodIn+=jodAmt;jodItems.push({l:salJOD.name,v:'+'+fJOD(jodAmt),c:'pos',streamId:salJOD.id,received:true});}
         var rmbAmt=salRMB?resolveStreamAmount(salRMB):0;
-        if(!salRecRMB){rmbIn+=rmbAmt;rmbItems.push({l:salRMB.name,v:'+'+fRMB(rmbAmt),c:'pos',streamId:salRMB.id});}
-        else{rmbItems.push({l:salRMB.name,v:'+'+fRMB(rmbAmt),c:'pos',streamId:salRMB.id,received:true});}
+        if(!salRecRMB){rmbIn+=rmbAmt;trueRmbIn+=rmbAmt;rmbItems.push({l:salRMB.name,v:'+'+fRMB(rmbAmt),c:'pos',streamId:salRMB.id});}
+        else{trueRmbIn+=rmbAmt;rmbItems.push({l:salRMB.name,v:'+'+fRMB(rmbAmt),c:'pos',streamId:salRMB.id,received:true});}
       } else {
         // full_rmb: all salary goes to BOC as RMB
         var fullAmt=S.salaryRMBFull||n2((salJOD?resolveStreamAmount(salJOD):0)*S.jod2rmb+(salRMB?resolveStreamAmount(salRMB):0));
         if(!salRecRMB){rmbIn+=fullAmt;rmbItems.push({l:'Salary (All RMB)',v:'+'+fRMB(fullAmt),c:'pos',streamId:salRMB.id});}
+        trueRmbIn+=fullAmt;
         else{rmbItems.push({l:'Salary (All RMB)',v:'+'+fRMB(fullAmt),c:'pos',streamId:salRMB.id,received:true});}
       }
     }
@@ -1636,11 +1638,11 @@ function buildProjection(){
       var isModified=streamOverrides.some(function(o){return o.streamId===st.id&&o.yr===yr&&o.mo===mo;});
       var isPrePaid=prePaidIds.indexOf(st.id)>=0;
       if(st.type==='income'){
-        if(st.currency==='JOD'){if(!isPrePaid)jodIn+=amt;jodItems.push({l:st.name,v:'+'+fJOD(amt),c:'pos',mod:isModified,streamId:st.id,prePaid:isPrePaid});}
-        else{if(!isPrePaid)rmbIn+=amt;rmbItems.push({l:st.name,v:'+'+fRMB(amt),c:'pos',mod:isModified,streamId:st.id,prePaid:isPrePaid});}
+        if(st.currency==='JOD'){if(!isPrePaid)jodIn+=amt;trueJodIn+=amt;jodItems.push({l:st.name,v:'+'+fJOD(amt),c:'pos',mod:isModified,streamId:st.id,prePaid:isPrePaid});}
+        else{if(!isPrePaid)rmbIn+=amt;trueRmbIn+=amt;rmbItems.push({l:st.name,v:'+'+fRMB(amt),c:'pos',mod:isModified,streamId:st.id,prePaid:isPrePaid});}
       }else{
-        if(st.currency==='JOD'){if(!isPrePaid)jodOut+=amt;jodItems.push({l:st.name,v:'-'+fJOD(amt),c:'neg',mod:isModified,streamId:st.id,prePaid:isPrePaid});}
-        else{if(!isPrePaid)rmbOut+=amt;rmbItems.push({l:st.name,v:'-'+fRMB(amt),c:'neg',mod:isModified,streamId:st.id,prePaid:isPrePaid});}
+        if(st.currency==='JOD'){if(!isPrePaid)jodOut+=amt;trueJodOut+=amt;jodItems.push({l:st.name,v:'-'+fJOD(amt),c:'neg',mod:isModified,streamId:st.id,prePaid:isPrePaid});}
+        else{if(!isPrePaid)rmbOut+=amt;trueRmbOut+=amt;rmbItems.push({l:st.name,v:'-'+fRMB(amt),c:'neg',mod:isModified,streamId:st.id,prePaid:isPrePaid});}
       }
     });
     // Parents — also check prePaid
@@ -1649,6 +1651,7 @@ function buildProjection(){
       var pAmt=getStreamAmount(parentSt,yr,mo);var pr=getParentForMonth(yr,mo);
       var parentsPrePaid=prePaidIds.indexOf('parents')>=0;
       if(!parentsPrePaid)jodOut+=pAmt;
+      trueJodOut+=pAmt;
       jodItems.push({l:'Parents - '+pr,v:'-'+fJOD(pAmt),c:'neg',mod:false,streamId:'parents',prePaid:parentsPrePaid});
     }
     // Settlement phases — check prePaidIds
@@ -1752,7 +1755,7 @@ function buildProjection(){
     jodItems.push({l:'Arab Bank balance',v:fJOD(jodBal),c:jodBal>=getArabReserve()?'pos':'neg',bold:true,isBalance:true});
     rmbItems.push({l:'Net BOC',v:(rmbIn-rmbOut>=0?'+':'')+fRMB(rmbIn-rmbOut),c:rmbIn>=rmbOut?'pos':'neg',bold:true});
     rmbItems.push({l:'BOC balance',v:fRMB(rmbBal),c:rmbBal>0?'pos':'neg',bold:true,isBalance:true});
-    rows.push({yr:yr,mo:mo,label:MONTHS[mo-1]+' '+yr,jodBal:jodBal,rmbBal:rmbBal,jodNet:n2(jodIn-jodOut),rmbNet:n2(rmbIn-rmbOut),jodItems:jodItems,rmbItems:rmbItems,belowReserve:jodBal<getArabReserve(),bocLow:rmbBal<getBocReserve(),holidays:holThisMonth,prePaid:prePaidIds.length>0,carryJOD:carryJOD,carryRMB:carryRMB});
+    rows.push({yr:yr,mo:mo,label:MONTHS[mo-1]+' '+yr,jodBal:jodBal,rmbBal:rmbBal,jodNet:n2(jodIn-jodOut),rmbNet:n2(rmbIn-rmbOut),trueJodNet:n2(trueJodIn-trueJodOut),trueRmbNet:n2(trueRmbIn-trueRmbOut),jodItems:jodItems,rmbItems:rmbItems,belowReserve:jodBal<getArabReserve(),bocLow:rmbBal<getBocReserve(),holidays:holThisMonth,prePaid:prePaidIds.length>0,carryJOD:carryJOD,carryRMB:carryRMB});
   }
   return rows;
 }
@@ -2996,10 +2999,9 @@ function renderMonthLookup(){
   // Flows
   var jodInItems=row.jodItems.filter(function(it){return it.c==='pos'&&!it.bold&&!it.isBalance;});
   var jodOutItems=row.jodItems.filter(function(it){return it.c==='neg'&&!it.bold&&!it.isBalance;});
-  // True net = sum of all items including prePaid (ticked) ones
-  function sumItems(items,sign){return n2(items.filter(function(it){return it.c===sign;}).reduce(function(a,it){var v=parseFloat((it.v||'0').replace(/[^0-9.-]/g,''));return a+(isNaN(v)?0:v);},0));}
-  var trueJodNet=n2(sumItems(row.jodItems,'pos')-sumItems(row.jodItems,'neg'));
-  var trueRmbNet=n2(sumItems(row.rmbItems,'pos')-sumItems(row.rmbItems,'neg'));
+  // True net including prePaid items (from buildProjection trueJodNet/trueRmbNet)
+  var trueJodNet=row.trueJodNet!=null?row.trueJodNet:row.jodNet;
+  var trueRmbNet=row.trueRmbNet!=null?row.trueRmbNet:row.rmbNet;
   var jodCard=document.createElement('div');jodCard.className='card';jodCard.style.marginBottom='8px';
   jodCard.innerHTML='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--grn);margin-bottom:7px">'+S.arabLabel+' Flows</div>';
   if(jodInItems.length){jodCard.innerHTML+='<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--grn);margin-bottom:3px">Income</div>'+jodInItems.map(function(it){return'<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:.5px solid var(--brd);font-size:12px"><span>'+it.l+'</span><span class="mono pos">'+it.v+'</span></div>';}).join('');}
