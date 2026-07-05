@@ -191,7 +191,7 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
 .slot.now .slot-tr{font-size:12px;color:var(--acc3)}
 .slot.now .slot-lbl{font-size:15px;font-weight:700;color:var(--tx)}
 .slot.now .slot-hdr{padding:.52rem .7rem}
-.slot.now .slot-now-bar{height:3px;background:linear-gradient(90deg,var(--acc),var(--acc3));border-radius:2px;animation:now-pulse 2s ease-in-out infinite}
+.slot.now .slot-now-bar{height:5px;background:linear-gradient(90deg,var(--acc),var(--acc3));border-radius:3px;animation:now-pulse 2s ease-in-out infinite}
 @keyframes now-pulse{0%,100%{opacity:.7}50%{opacity:1}}
 .slot.nxt{border-color:var(--bd2)}
 .slot-hdr{display:flex;align-items:center;gap:6px;padding:.38rem .7rem}
@@ -322,7 +322,7 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
 .live-now-lbl{font-size:9px;color:#444;text-transform:uppercase;letter-spacing:.06em}
 .live-now-end{font-size:13px;color:#555;font-weight:500}
 .live-prog-wrap{padding:0 1rem .5rem;flex-shrink:0}
-.live-prog-bg{height:4px;background:#222;border-radius:2px;overflow:hidden}
+.live-prog-bg{height:7px;background:#222;border-radius:4px;overflow:hidden}
 .live-prog-fill{height:100%;border-radius:2px;background:#3b82f6;transition:width .8s ease}
 .live-prog-fill.ahead{background:#22c55e}.live-prog-fill.behind{background:#f97316}.live-prog-fill.late{background:#ef4444}
 .live-prog-times{display:flex;justify-content:space-between;font-size:10px;color:#444;margin-bottom:4px}
@@ -375,7 +375,7 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
 .gl-rest-val.set-rest{color:#60a5fa}
 .gl-rest-val.ex-rest{color:#d47040}
 .gl-rest-val.done-rest{color:#256640}
-.gl-rest-bg{flex:1;height:4px;background:#1a1a1a;border-radius:2px;overflow:hidden}
+.gl-rest-bg{flex:1;height:6px;background:#1a1a1a;border-radius:3px;overflow:hidden}
 .gl-rest-fill{height:100%;border-radius:2px;transition:width .5s linear}
 .gl-rest-fill.set-fill{background:#3b82f6}
 .gl-rest-fill.ex-fill{background:#d47040}
@@ -485,7 +485,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
           <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx4);margin-bottom:.35rem">Now</div>
           <div id="dc-now-main" style="font-size:17px;font-weight:700;color:var(--tx);display:flex;align-items:center;gap:8px">–</div>
           <div id="dc-now-time" style="font-family:var(--mono);font-size:11px;color:var(--tx4);margin-top:2px"></div>
-          <div id="dc-now-bar" style="height:3px;background:var(--bd);border-radius:2px;margin-top:.5rem;overflow:hidden">
+          <div id="dc-now-bar" style="height:7px;background:var(--bd);border-radius:4px;margin-top:.6rem;overflow:hidden">
             <div id="dc-now-prog" style="height:100%;background:var(--acc);border-radius:2px;transition:width .5s"></div>
           </div>
           <div id="dc-next-block" style="margin-top:.55rem;padding-top:.5rem;border-top:1px solid var(--bd);display:flex;align-items:center;gap:6px">
@@ -505,6 +505,12 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
         <div style="background:var(--sur);border-radius:12px;padding:.75rem .9rem;border:1px solid var(--bd)">
           <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx4);margin-bottom:.5rem">Habits</div>
           <div id="dc-habits-row" style="display:flex;gap:.6rem;flex-wrap:wrap"></div>
+        </div>
+
+        <!-- FINANCE CARD -->
+        <div id="dc-finance-card" style="background:var(--sur);border-radius:12px;padding:.75rem .9rem;border:1px solid var(--bd)">
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx4);margin-bottom:.4rem">Budget this month</div>
+          <div id="dc-finance-main" style="color:var(--tx4);font-size:12px">Loading...</div>
         </div>
 
         <!-- READING CARD -->
@@ -3200,7 +3206,7 @@ async function renderDash(){
       const pct=total>0?Math.min(100,Math.round(cur/total*100)):0;
       const rPct=total>0&&reviewAt>0?Math.round(reviewAt/total*100):0;
       const barHtml=total>0?`<div style="margin:.45rem 0 .3rem">
-        <div style="height:6px;background:var(--bd);border-radius:3px;overflow:hidden;position:relative">
+        <div style="height:8px;background:var(--bd);border-radius:4px;overflow:hidden;position:relative">
           <div style="height:100%;width:${pct}%;background:var(--acc);border-radius:3px"></div>
           ${rPct>0&&rPct<100?`<div style="position:absolute;top:0;left:${rPct}%;width:1.5px;height:100%;background:rgba(255,255,255,.7)"></div>`:''}
         </div>
@@ -3231,6 +3237,33 @@ async function renderDash(){
         ${runtime?`<div style="font-family:var(--mono);font-size:11px;color:var(--tx4);margin-top:2px">${runtime}</div>`:''}
         <div style="margin-top:.35rem;font-size:11px;font-weight:700;color:${done?'var(--ok)':'var(--acc)'}">${done?'✓ Watched':'Planned today'}</div>`;
     }else fc.style.display='none';
+  }
+
+  // ── FINANCE budget bar ────────────────────────────────────────────────────
+  const fc2=el('dc-finance-main');
+  if(fc2&&_OK){
+    try{
+      const now2=new Date();
+      const monthStr=now2.getFullYear()+'-'+String(now2.getMonth()+1).padStart(2,'0');
+      const{data:fin}=await supaFrom('omni_finance_summary').select('*').eq('month',monthStr).maybeSingle();
+      if(fin&&fin.budget_total>0){
+        const pct=Math.min(100,Math.round(fin.spent_total/fin.budget_total*100));
+        const surplus=fin.budget_total-fin.spent_total;
+        const over=surplus<0;
+        const barColor=pct>90?'var(--er,#c00)':pct>70?'var(--wa,#e08000)':'var(--ok,#3a8)';
+        fc2.innerHTML=`
+          <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--tx2);margin-bottom:5px">
+            <span>${fin.currency||''} ${fin.spent_total?.toLocaleString()} spent</span>
+            <span style="color:${over?'var(--er,#c00)':'var(--ok,#3a8)'};font-weight:700">${over?'Over by':'Surplus'} ${Math.abs(surplus).toLocaleString()}</span>
+          </div>
+          <div style="height:8px;background:var(--bd);border-radius:4px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${barColor};border-radius:4px;transition:width .5s"></div>
+          </div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--tx4);margin-top:3px">${pct}% of ${fin.budget_total?.toLocaleString()} budget</div>`;
+      }else{
+        fc2.innerHTML='<span style="color:var(--tx4);font-size:12px">No budget data yet</span>';
+      }
+    }catch(e){fc2.innerHTML='<span style="color:var(--tx4);font-size:12px">–</span>';}
   }
 
   // ── OUTFIT ─────────────────────────────────────────────────────────────────
