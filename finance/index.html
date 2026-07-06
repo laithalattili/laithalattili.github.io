@@ -2333,8 +2333,9 @@ function toggleTick(id){
 }
 function tickAll(){getCommitItems().forEach(function(c){if(!tickState[tickKey(c.id)])toggleTick(c.id);});renderCommitments();}
 function untickAll(){getCommitItems().forEach(function(c){tickState[tickKey(c.id)]=false;});autosave();renderCommitments();}
-function getCommitItems(){
-  var yr=commitMon.year,mo=commitMon.month,items=[];
+function getCommitItemsForMonth(pyr,pmo){return getCommitItems(pyr,pmo);}
+function getCommitItems(pyr,pmo){
+  var yr=pyr!=null?pyr:commitMon.year,mo=pmo!=null?pmo:commitMon.month,items=[];
   var monthMode=getSalaryModeForMonth(yr,mo);
   streams.filter(function(s){return s.isCommitment&&streamDueInMonth(s,yr,mo)&&!s.isParents;}).forEach(function(s){
     var ov=streamOverrides.find(function(o){return o.streamId===s.id&&o.yr===yr&&o.mo===mo;});
@@ -2354,6 +2355,7 @@ function getCommitItems(){
   settlements.forEach(function(s){if(!s.active)return;var phAmt=settlePhaseAmount(s,yr,mo);if(phAmt>0){var ph3=safeArr(s.phases).find(function(p){var inR=(yr>p.startYr||(yr===p.startYr&&mo>=p.startMon))&&(yr<p.endYr||(yr===p.endYr&&mo<=p.endMon));return inR;});var fromAcct=ph3?ph3.account:(s.divFundAccount||'arab');var dispAmt=(fromAcct==='rmb'||fromAcct==='boc')?n2(phAmt*S.jod2rmb):phAmt;var dispCur=(fromAcct==='rmb'||fromAcct==='boc')?'RMB':'JOD';items.push({id:'settle-'+s.id,name:s.name.split('-')[0].trim()+' payment',amount:dispAmt,currency:dispCur,type:'out',method:'settlement',note:fJOD(phAmt)+' JOD'+(fromAcct==='rmb'||fromAcct==='boc'?' from BOC':'')});}settleOneoffs(s,yr,mo).filter(function(ev){return ev.type==='expense';}).forEach(function(ev){items.push({id:'settle-ev-'+ev.id,name:(ev.label||s.name)+' - one-off',amount:ev.amount,currency:ev.currency,type:'out',method:'settlement',note:'One-off'});});});
 
   // Holidays — daily budget shows in commitments for each active month
+  try{
   safeArr(holidays).forEach(function(h){
     if(holIsPast(h))return;
     if(!h.start||!h.end)return;
@@ -2403,10 +2405,31 @@ function getCommitItems(){
       });
     });
   });
+  }catch(e){console.error('[COMMIT] holiday grouping error:',e);}
   safeArr(wishlistItems).filter(function(w){return w.scheduledYr===yr&&w.scheduledMo===mo;}).forEach(function(w){items.push({id:'wl-'+w.id,name:'\uD83D\uDED2 '+w.name,amount:w.amount,currency:w.currency,type:'out',method:'wishlist',note:w.note||'Wishlist item'});});
   return items;
 }
 
+function getCarryOverItems(yr,mo){
+  // Returns unpaid commitment items from past months (not yet ticked)
+  var carry=[];
+  var now2=today();
+  for(var ci=1;ci<=24;ci++){
+    var cMo=mo-ci,cYr=yr;while(cMo<1){cMo+=12;cYr--;}
+    if(cYr<2024)break;
+    var lastDayC=new Date(cYr,cMo,0);
+    if(now2<=lastDayC)continue; // only past months
+    var cItems=getCommitItemsForMonth(cYr,cMo);
+    if(!cItems.length)break;
+    cItems.forEach(function(item){
+      var cKey=cYr+'-'+cMo+'-'+item.id;
+      if(!tickState[cKey]&&item.type==='out'){
+        carry.push(Object.assign({},item,{origYr:cYr,origMo:cMo,origId:item.id,carryLabel:MNAMES[cMo-1]+' '+cYr}));
+      }
+    });
+  }
+  return carry;
+}
 function renderCommitments(){
   var clEl=document.getElementById('commit-label');if(clEl)clEl.textContent=MNAMES[commitMon.month-1]+' '+commitMon.year;
   var yr=commitMon.year,mo=commitMon.month;
