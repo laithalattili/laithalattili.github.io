@@ -3251,15 +3251,36 @@ async function renderDash(){
         const surplus=fin.budget_total-fin.spent_total;
         const over=surplus<0;
         const barColor=pct>90?'var(--er,#c00)':pct>70?'var(--wa,#e08000)':'var(--ok,#3a8)';
+        // Holiday budget section
+        const hasHoliday=fin.holiday_budget>0;
+        const hPct=hasHoliday?Math.min(100,Math.round(fin.holiday_spent/fin.holiday_budget*100)):0;
+        const hSurplus=hasHoliday?fin.holiday_budget-fin.holiday_spent:0;
+        const hOver=hSurplus<0;
+        const hBarColor=hPct>90?'var(--er,#c00)':hPct>70?'var(--wa,#e08000)':'var(--ok,#3a8)';
+        const cur=fin.currency||'RMB';
+        const hCur=fin.holiday_currency||cur;
         fc2.innerHTML=`
-          <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--tx2);margin-bottom:5px">
-            <span>${fin.currency||''} ${fin.spent_total?.toLocaleString()} spent</span>
-            <span style="color:${over?'var(--er,#c00)':'var(--ok,#3a8)'};font-weight:700">${over?'Over by':'Surplus'} ${Math.abs(surplus).toLocaleString()}</span>
+          <div style="margin-bottom:.5rem">
+            <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--tx2);margin-bottom:4px">
+              <span>${cur} ${fin.spent_total?.toLocaleString()} spent</span>
+              <span style="color:${over?'var(--er,#c00)':'var(--ok,#3a8)'};font-weight:700">${over?'▲':'▼'} ${Math.abs(surplus).toLocaleString()}</span>
+            </div>
+            <div style="height:8px;background:var(--bd);border-radius:4px;overflow:hidden">
+              <div style="height:100%;width:${pct}%;background:${barColor};border-radius:4px;transition:width .5s"></div>
+            </div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--tx4);margin-top:3px">${pct}% of ${cur} ${fin.budget_total?.toLocaleString()}</div>
           </div>
-          <div style="height:8px;background:var(--bd);border-radius:4px;overflow:hidden">
-            <div style="height:100%;width:${pct}%;background:${barColor};border-radius:4px;transition:width .5s"></div>
-          </div>
-          <div style="font-family:var(--mono);font-size:10px;color:var(--tx4);margin-top:3px">${pct}% of ${fin.budget_total?.toLocaleString()} budget</div>`;
+          ${hasHoliday?`<div style="padding-top:.45rem;border-top:1px solid var(--bd)">
+            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx4);margin-bottom:4px">Holiday budget</div>
+            <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--tx2);margin-bottom:4px">
+              <span>${hCur} ${fin.holiday_spent?.toLocaleString()} spent</span>
+              <span style="color:${hOver?'var(--er,#c00)':'var(--ok,#3a8)'};font-weight:700">${hOver?'▲':'▼'} ${Math.abs(hSurplus).toLocaleString()}</span>
+            </div>
+            <div style="height:8px;background:var(--bd);border-radius:4px;overflow:hidden">
+              <div style="height:100%;width:${hPct}%;background:${hBarColor};border-radius:4px;transition:width .5s"></div>
+            </div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--tx4);margin-top:3px">${hPct}% of ${hCur} ${fin.holiday_budget?.toLocaleString()}</div>
+          </div>`:''}`;
       }else{
         fc2.innerHTML='<span style="color:var(--tx4);font-size:12px">No budget data yet</span>';
       }
