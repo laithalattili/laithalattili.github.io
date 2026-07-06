@@ -3436,19 +3436,24 @@ function holDays(h){return Math.round((new Date(h.end)-new Date(h.start))/864000
 function holItemTotal(item){if(item.type==='daily'||item.type==='hotel')return n2(item.amount*(item.nights||1));return n2(item.amount);}
 function holTotalByCur(h){var t={};safeArr(h.items).forEach(function(item){var c=item.currency||'RMB';t[c]=(t[c]||0)+holItemTotal(item);});return t;}
 function holIsPast(h){return new Date(h.end)<today();}
+function parseLocalDate(str){
+  // Parse YYYY-MM-DD as a local date (avoids UTC timezone shift)
+  if(!str)return null;
+  var p=String(str).split('-');
+  return new Date(parseInt(p[0],10),parseInt(p[1],10)-1,parseInt(p[2],10));
+}
 function holidayDaysInMonth(yr,mo){
-  // Returns count of days in this month that fall within any active/future holiday
-  var monthStart=new Date(yr,mo-1,1);var monthEnd=new Date(yr,mo,0);
-  var daysInMonth=monthEnd.getDate();
-  var holidayDays=0;
+  // Returns count of days in this month that fall within any holiday (local-date safe)
+  var daysInMonth=new Date(yr,mo,0).getDate();
   var covered={};
   safeArr(holidays).forEach(function(h){
     if(!h.start||!h.end)return;
-    var hs=new Date(h.start);var he=new Date(h.end);
-    var oStart=new Date(Math.max(hs.getTime(),monthStart.getTime()));
-    var oEnd=new Date(Math.min(he.getTime(),monthEnd.getTime()));
-    if(oEnd>=oStart){
-      for(var d=new Date(oStart);d<=oEnd;d.setDate(d.getDate()+1)){covered[d.getDate()]=true;}
+    var hs=parseLocalDate(h.start);var he=parseLocalDate(h.end);
+    if(!hs||!he)return;
+    // Iterate each day of this month, check if within holiday range
+    for(var day=1;day<=daysInMonth;day++){
+      var d=new Date(yr,mo-1,day);
+      if(d>=hs&&d<=he)covered[day]=true;
     }
   });
   return {holidayDays:Object.keys(covered).length,totalDays:daysInMonth};
