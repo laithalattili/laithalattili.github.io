@@ -1652,6 +1652,10 @@ function buildProjection(){
         return;
       }
       amt=getStreamAmount(st,yr,mo);
+      // Budget-linked expense streams scale down during holidays (you're not incurring home costs)
+      if(st.type==='expense'&&safeArr(st.linkedBudgetCats).length>0){
+        amt=n2(amt*nonHolidayFraction(yr,mo));
+      }
       var isModified=streamOverrides.some(function(o){return o.streamId===st.id&&o.yr===yr&&o.mo===mo;});
       var isPrePaid=prePaidIds.indexOf(st.id)>=0;
       if(st.type==='income'){
@@ -2036,11 +2040,32 @@ async function pushFinanceSummary(){
     var now=today();
     var yr=now.getFullYear(),mo=now.getMonth()+1;
     var monthKey=yr+'-'+(mo<10?'0':'')+mo;
-    // Calculate total budget and spent in RMB (primary currency)
     var mExp=expenses.filter(function(e){var d=new Date(e.date);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();});
-    var budgetTotal=Object.keys(S.budgets||{}).filter(function(c){return c!=='__surplus__'&&c.indexOf('__hol-')<0;}).reduce(function(a,cat){return a+toRMB(getBudgetAmount(cat),getBudgetCurrency(cat));},0);
-    var spentTotal=mExp.reduce(function(a,e){return a+toRMB(e.amount,e.currency);},0);
-    var payload={month:monthKey,budget_total:n2(budgetTotal),spent_total:n2(spentTotal),currency:'RMB',updated_at:new Date().toISOString()};
+    // Normal budget per currency
+    var budgetByCur={},spentByCur={};
+    Object.keys(S.budgets||{}).filter(function(c){return c!=='__surplus__'&&c.indexOf('__hol-')<0;}).forEach(function(cat){
+      var cur=getBudgetCurrency(cat);
+      budgetByCur[cur]=(budgetByCur[cur]||0)+getBudgetAmount(cat);
+    });
+    mExp.forEach(function(e){if(S.budgets&&S.budgets[e.category]&&e.category.indexOf('__hol-')<0&&e.category!=='__surplus__'){spentByCur[e.currency]=(spentByCur[e.currency]||0)+e.amount;}});
+    // Holiday budget (active holidays)
+    var holBudget=0,holSpent=0,holCur='RMB';
+    getActiveHolidays().forEach(function(h){var bd=holDailyBudgetTotal(h);holBudget+=bd.total;holCur=bd.currency;holSpent+=holDailyBudgetSpent(h);});
+    // Primary (RMB) totals for backward compat
+    var budgetTotal=Object.keys(budgetByCur).reduce(function(a,c){return a+toRMB(budgetByCur[c],c);},0);
+    var spentTotal=Object.keys(spentByCur).reduce(function(a,c){return a+toRMB(spentByCur[c],c);},0);
+    var payload={
+      month:monthKey,
+      budget_total:n2(budgetTotal),
+      spent_total:n2(spentTotal),
+      currency:'RMB',
+      budget_by_currency:JSON.stringify(budgetByCur),
+      spent_by_currency:JSON.stringify(spentByCur),
+      holiday_budget:n2(holBudget),
+      holiday_spent:n2(holSpent),
+      holiday_currency:holCur,
+      updated_at:new Date().toISOString()
+    };
     await fetch(SB_URL+'/rest/v1/omni_finance_summary',{
       method:'POST',
       headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'resolution=merge-duplicates'},
@@ -2318,6 +2343,8 @@ function getCommitItems(){
     if(s.isSalaryJOD){amt=monthMode==='split'?(s.amount||0):0;if(amt===0)return;}
     else if(s.isSalaryRMB){amt=monthMode==='split'?resolveStreamAmount(s):(S.salaryRMBFull||resolveStreamAmount(s));}
     else{amt=ov?ov.amount:resolveStreamAmount(s);}
+    // Budget-linked expense streams scale down during holidays
+    if(s.type==='expense'&&safeArr(s.linkedBudgetCats).length>0){amt=n2(amt*nonHolidayFraction(yr,mo));}
     var isModified=!!ov&&!s.isSalaryJOD&&!s.isSalaryRMB;
     var ovNote=ov?ov.note||'':'';
     items.push({id:s.id,name:s.name,amount:amt,currency:s.currency,type:s.type==='income'?'in':'out',method:s.commitMethod||'auto',note:s.note||'',modified:isModified,ovNote:ovNote,defaultAmt:resolveStreamAmount(s)});
@@ -2325,84 +2352,7 @@ function getCommitItems(){
   var parentSt=streams.find(function(s){return s.isParents&&s.isCommitment;});
   if(parentSt&&streamDueInMonth(parentSt,yr,mo)){var pr=getParentForMonth(yr,mo);items.push({id:'parents',name:pr+' this month',amount:getStreamAmount(parentSt,yr,mo),currency:parentSt.currency,type:'out',method:'transfer',note:'Alternating Mother/Father'});}
   settlements.forEach(function(s){if(!s.active)return;var phAmt=settlePhaseAmount(s,yr,mo);if(phAmt>0){var ph3=safeArr(s.phases).find(function(p){var inR=(yr>p.startYr||(yr===p.startYr&&mo>=p.startMon))&&(yr<p.endYr||(yr===p.endYr&&mo<=p.endMon));return inR;});var fromAcct=ph3?ph3.account:(s.divFundAccount||'arab');var dispAmt=(fromAcct==='rmb'||fromAcct==='boc')?n2(phAmt*S.jod2rmb):phAmt;var dispCur=(fromAcct==='rmb'||fromAcct==='boc')?'RMB':'JOD';items.push({id:'settle-'+s.id,name:s.name.split('-')[0].trim()+' payment',amount:dispAmt,currency:dispCur,type:'out',method:'settlement',note:fJOD(phAmt)+' JOD'+(fromAcct==='rmb'||fromAcct==='boc'?' from BOC':'')});}settleOneoffs(s,yr,mo).filter(function(ev){return ev.type==='expense';}).forEach(function(ev){items.push({id:'settle-ev-'+ev.id,name:(ev.label||s.name)+' - one-off',amount:ev.amount,currency:ev.currency,type:'out',method:'settlement',note:'One-off'});});});
-  // Holidays — show in prep month (21 days before trip)
-  safeArr(holidays).forEach(function(h){
-    if(holIsPast(h))return;
-    var pm=holPrepMonth(h);
-    if(pm.yr===yr&&pm.mo===mo){
-      var tot=holTotalByCur(h);
-      var firstCur=Object.keys(tot)[0]||'RMB';
-      var firstAmt=tot[firstCur]||0;
-      items.push({id:'hol-'+h.id,name:'\u2708 '+h.label,amount:firstAmt,currency:firstCur,type:'out',method:'holiday',note:'Trip budget \u2014 '+Object.entries(tot).map(function(e){return e[1]+' '+e[0];}).join(' + ')});
-    }
-  });
-  // Wishlist scheduled items for this month
-  safeArr(wishlistItems).filter(function(w){return w.scheduledYr===yr&&w.scheduledMo===mo;}).forEach(function(w){
-    items.push({id:'wl-'+w.id,name:'\uD83D\uDED2 '+w.name,amount:w.amount,currency:w.currency,type:'out',method:'wishlist',note:w.note||'Wishlist item'});
-  });
-  return items;
-}
-// ─── Commit group state helpers ───
-function cgOpen(key,def){return key in commitGroupState?commitGroupState[key]:(def!==undefined?def:true);}
-function cgToggle(key,def){commitGroupState[key]=!cgOpen(key,def);autosave();renderCommitments();}
-function commitToggleAll(){
-  // If any cat is collapsed, expand all. Otherwise collapse all.
-  var cats=['cat-out','cat-in','cat-carry'];
-  var subs=['sub-transfer','sub-app','sub-settlement','sub-auto','sub-holiday','sub-wishlist','sub-income','sub-carry'];
-  var anyCollapsed=cats.some(function(k){return !cgOpen(k,true);})||subs.some(function(k){return !cgOpen(k,true);});
-  var newState=anyCollapsed;
-  cats.concat(subs).forEach(function(k){commitGroupState[k]=newState;});
-  autosave();renderCommitments();
-  var btn=document.getElementById('cc-expand-btn');
-  if(btn)btn.textContent=newState?'\u8645 Collapse all':'\u8645 Expand all';
-}
 
-// ─── Carry-over: all unticked items from every month that has fully ended ───
-function getCarryOverItems(yr,mo){
-  var now=today();
-  var results=[];
-  // Walk backwards month by month from (yr,mo-1)
-  for(var i=1; i<=24; i++){
-    var pMo=mo-i; var pYr=yr;
-    while(pMo<1){pMo+=12;pYr--;}
-    // Stop if that month hasn't ended yet
-    var lastDay=new Date(pYr,pMo,0);
-    if(now<=lastDay) continue;
-    // Stop before app existed
-    if(pYr<2024) break;
-    var prevItems=getCommitItemsForMonth(pYr,pMo);
-    if(!prevItems.length) break;
-    prevItems.forEach(function(item){
-      var pKey=pYr+'-'+pMo+'-'+item.id;
-      if(!tickState[pKey]){
-        results.push(Object.assign({},item,{
-          carriedFrom:MNAMES[pMo-1]+' '+pYr,
-          origYr:pYr,origMo:pMo,
-          id:'carry-'+pYr+'-'+pMo+'-'+item.id,
-          origId:item.id
-        }));
-      }
-    });
-  }
-  return results;
-}
-
-// Extracted: getCommitItems but for any month (used by carry-over)
-function getCommitItemsForMonth(yr,mo){
-  var items=[];
-  var monthMode=getSalaryModeForMonth(yr,mo);
-  streams.filter(function(s){return s.isCommitment&&streamDueInMonth(s,yr,mo)&&!s.isParents;}).forEach(function(s){
-    var ov=streamOverrides.find(function(o){return o.streamId===s.id&&o.yr===yr&&o.mo===mo;});
-    var amt;
-    if(s.isSalaryJOD){amt=monthMode==='split'?(s.amount||0):0;if(amt===0)return;}
-    else if(s.isSalaryRMB){amt=monthMode==='split'?resolveStreamAmount(s):(S.salaryRMBFull||resolveStreamAmount(s));}
-    else{amt=ov?ov.amount:resolveStreamAmount(s);}
-    var isModified=!!ov&&!s.isSalaryJOD&&!s.isSalaryRMB;
-    items.push({id:s.id,name:s.name,amount:amt,currency:s.currency,type:s.type==='income'?'in':'out',method:s.commitMethod||'auto',note:s.note||'',modified:isModified,defaultAmt:resolveStreamAmount(s)});
-  });
-  var parentSt=streams.find(function(s){return s.isParents&&s.isCommitment;});
-  if(parentSt&&streamDueInMonth(parentSt,yr,mo)){var pr=getParentForMonth(yr,mo);items.push({id:'parents',name:pr+' this month',amount:getStreamAmount(parentSt,yr,mo),currency:parentSt.currency,type:'out',method:'transfer',note:'Alternating Mother/Father'});}
-  settlements.forEach(function(s){if(!s.active)return;var phAmt=settlePhaseAmount(s,yr,mo);if(phAmt>0){var fromAcct=s.divFundAccount||'rmb';var dispAmt=fromAcct==='rmb'?n2(phAmt*S.jod2rmb):phAmt;var dispCur=fromAcct==='rmb'?'RMB':'JOD';items.push({id:'settle-'+s.id,name:s.name.split('-')[0].trim()+' payment',amount:dispAmt,currency:dispCur,type:'out',method:'settlement',note:fJOD(phAmt)+' JOD'+(fromAcct==='rmb'?' from BOC':'')});}});
   // Holidays — daily budget shows in commitments for each active month
   safeArr(holidays).forEach(function(h){
     if(holIsPast(h))return;
@@ -3415,12 +3365,38 @@ function holDays(h){return Math.round((new Date(h.end)-new Date(h.start))/864000
 function holItemTotal(item){if(item.type==='daily'||item.type==='hotel')return n2(item.amount*(item.nights||1));return n2(item.amount);}
 function holTotalByCur(h){var t={};safeArr(h.items).forEach(function(item){var c=item.currency||'RMB';t[c]=(t[c]||0)+holItemTotal(item);});return t;}
 function holIsPast(h){return new Date(h.end)<today();}
+function holidayDaysInMonth(yr,mo){
+  // Returns count of days in this month that fall within any active/future holiday
+  var monthStart=new Date(yr,mo-1,1);var monthEnd=new Date(yr,mo,0);
+  var daysInMonth=monthEnd.getDate();
+  var holidayDays=0;
+  var covered={};
+  safeArr(holidays).forEach(function(h){
+    if(!h.start||!h.end)return;
+    var hs=new Date(h.start);var he=new Date(h.end);
+    var oStart=new Date(Math.max(hs.getTime(),monthStart.getTime()));
+    var oEnd=new Date(Math.min(he.getTime(),monthEnd.getTime()));
+    if(oEnd>=oStart){
+      for(var d=new Date(oStart);d<=oEnd;d.setDate(d.getDate()+1)){covered[d.getDate()]=true;}
+    }
+  });
+  return {holidayDays:Object.keys(covered).length,totalDays:daysInMonth};
+}
+function nonHolidayFraction(yr,mo){
+  var hd=holidayDaysInMonth(yr,mo);
+  if(hd.totalDays<=0)return 1;
+  return Math.max(0,(hd.totalDays-hd.holidayDays)/hd.totalDays);
+}
 function holItemPayMonth(h,item){
   // Returns {yr,mo} for when a one-off item should be paid (daysBefore holiday start)
   var start=new Date(h.start);
   var db=item.daysBefore!=null?item.daysBefore:30;
   var payDate=new Date(start.getTime()-db*86400000);
-  return {yr:payDate.getFullYear(),mo:payDate.getMonth()+1};
+  var pyYr=payDate.getFullYear(),pyMo=payDate.getMonth()+1;
+  // If pay month is in the past, roll forward to current month (still needs paying)
+  var now=today();var nowYr=now.getFullYear(),nowMo=now.getMonth()+1;
+  if(pyYr*12+pyMo < nowYr*12+nowMo){pyYr=nowYr;pyMo=nowMo;}
+  return {yr:pyYr,mo:pyMo};
 }
 function holIsActive(h){
   if(!h.start||!h.end)return false;
