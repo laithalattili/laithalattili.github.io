@@ -1238,6 +1238,22 @@ function autosave(){
   try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState,catColors:S.catColors,budgetOrder:S.budgetOrder}));}catch(e){console.warn('save',e);}
   if(typeof sbSchedulePush==='function')sbSchedulePush(newVer);
 }
+function makeSaveBtn(label){
+  var btn=document.createElement('button');btn.className='btn btn-sm btn-p';btn.textContent=label||'Save';
+  btn.style.cssText='margin-top:8px';
+  btn.onclick=function(){
+    autosave();
+    _sbSyncing=false;
+    sbPush().then(function(){
+      btn.textContent='✓ Saved';btn.style.background='var(--grn)';
+      setTimeout(function(){btn.textContent=label||'Save';btn.style.background='';},2000);
+    }).catch(function(){
+      btn.textContent='⚠ Failed';btn.style.background='var(--red)';
+      setTimeout(function(){btn.textContent=label||'Save';btn.style.background='';},3000);
+    });
+  };
+  return btn;
+}
 function loadState(){
   try{
     var raw=localStorage.getItem('lf_data');
@@ -3134,7 +3150,11 @@ function renderSettleEditPanel(s,container){
   var actR=document.createElement('div');actR.style.cssText='display:flex;align-items:center;gap:6px;margin-top:4px';actR.appendChild(actChk);actR.appendChild(Object.assign(document.createElement('span'),{style:'font-size:13px',textContent:'Yes'}));actIg.appendChild(actR);r2.appendChild(actIg);
   panel.appendChild(r2);
   var delBtn=document.createElement('button');delBtn.className='btn btn-sm btn-d';delBtn.style.marginTop='6px';delBtn.textContent='Delete this settlement';
-  delBtn.onclick=(function(sid){return function(){deleteSettlement(sid);};})(s.id);panel.appendChild(delBtn);
+  delBtn.onclick=(function(sid){return function(){deleteSettlement(sid);};})(s.id);
+  var settSaveRow=document.createElement('div');settSaveRow.style.cssText='display:flex;gap:8px;align-items:center;margin-top:8px';
+  settSaveRow.appendChild(makeSaveBtn('Save settings'));
+  settSaveRow.appendChild(delBtn);
+  panel.appendChild(settSaveRow);
   container.appendChild(panel);
 }
 function renderSettlement(){
@@ -3230,6 +3250,7 @@ function renderGenericSettle(s,container){
     }
     pb.appendChild(dateRow);
     var phSum=document.createElement('div');phSum.style.cssText='font-size:12px;color:var(--ink3);margin-top:4px';phSum.textContent=(isOneOff?'One payment of ':mons+' months x ')+(ph.currency==='RMB'?fRMB(ph.monthly):fJOD(ph.monthly))+(isOneOff?'':' = '+fJOD(phTotal)+' JOD total');pb.appendChild(phSum);
+    pb.appendChild(makeSaveBtn('Save phase'));
     container.appendChild(pb);
   });
   var addPhBtn=document.createElement('button');addPhBtn.className='btn btn-sm';addPhBtn.textContent='+ Add phase';addPhBtn.style.marginBottom='12px';addPhBtn.onclick=function(){addPhase(s.id);};container.appendChild(addPhBtn);
@@ -4885,6 +4906,8 @@ function sbInitSync(){
   sbPull().then(function(changed){if(changed){var active=document.activeElement;var isTyping=active&&(active.tagName==='INPUT'||active.tagName==='TEXTAREA'||active.tagName==='SELECT');if(isTyping){active.addEventListener('blur',function(){showView(currentPage);},{once:true});}else{showView(currentPage);}}});
   // Then start realtime for instant cross-device updates
   sbStartRealtime();
+  // Push finance summary on startup so Omni always has fresh data
+  setTimeout(pushFinanceSummary, 2000);
 }
 
 </script>
