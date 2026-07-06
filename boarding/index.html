@@ -1052,7 +1052,7 @@ async function loadStudentPenalties(studentName){
 async function loadInfoPenalties(){
   const el=document.getElementById('info-penalties-list');if(!el)return;
   const td_=today();
-  const tomorrow=new Date(Date.now()+86400000).toISOString().split('T')[0];
+  const tomorrow=(()=>{const d=new Date(today()+'T12:00:00');d.setDate(d.getDate()+1);return d.toLocaleDateString('en-CA');})();
   try{
     const {data}=await supa.from('boarding_penalties')
       .select('*').in('status',['active','pending'])
@@ -1341,7 +1341,7 @@ async function boardingMarkDone(id){
 
 async function boardingRollSanction(id){
   try{
-    const tomorrow=new Date(Date.now()+86400000).toISOString().split('T')[0];
+    const tomorrow=(()=>{const d=new Date(today()+'T12:00:00');d.setDate(d.getDate()+1);return d.toLocaleDateString('en-CA');})();
     await supa.from('boarding_penalties').update({penalty_date:tomorrow}).eq('id',id);
     showToast('→ Moved to tomorrow','#6b7280');
     await loadBoardingPenalties();
@@ -1354,8 +1354,8 @@ async function loadInfoLeaves(){
   const el=document.getElementById('info-leaves-list');if(!el)return;
   const td_=today();
   try{
-    const {data}=await supa.from('boarding_leaves').select('*').eq('active',true).order('departure_planned');
-    const active=(data||[]).filter(l=>!l.return_actual&&(!l.return_planned||l.return_planned.split('T')[0]>=td_));
+    const {data}=await supa.from('boarding_leaves').select('*').neq('active',false).order('departure_planned');
+    const active=(data||[]).filter(l=>!(l.returned_at||l.return_actual)&&(l.leave_type==='longterm'||!l.return_planned||l.return_planned.split('T')[0]>=td_));
     if(!active.length){el.innerHTML='<span style="color:#aaa">No active leaves.</span>';return;}
     const leaveEmoji={weekend:'🏠',extended:'📅',daytime:'🌅',longterm:'🔄',official_holiday:'🏖️',medical:'🏥',family:'👨‍👩‍👧',activity:'⚽',holiday:'🌴'};
     const fmt=dt=>dt?new Date(dt).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
@@ -1767,7 +1767,7 @@ async function generateWeekReport(supaClient, students, boarderRooms, hawkingSta
     return 'CW ' + (1 + Math.round(((t-w1)/86400000 - 3 + ((w1.getDay()+6)%7))/7));
   }
   function fmt(d) { return d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}); }
-  function fmtISO(d) { return d.toISOString().split('T')[0]; }
+  function fmtISO(d) { return d.toLocaleDateString('en-CA'); }
 
   const monday = getMondayOfWeek();
   const weekDates = [0,1,2,3,4].map(i => { const d=new Date(monday); d.setDate(monday.getDate()+i); return d; });
@@ -2469,7 +2469,7 @@ async function confirmHolidayReturn(studentName, holiday, supaRef) {
       .gte('departure_planned', holiday.start + 'T00:00:00');
     if (existing && existing.length) {
       await supaRef.from('boarding_leaves')
-        .update({ returned_at: now })
+        .update({ returned_at: now, return_actual: now })
         .eq('id', existing[0].id);
       return true;
     }
@@ -2508,8 +2508,8 @@ async function initLeaveCalendar(containerId, students, boarderStatus, supaRef) 
 async function loadCalendarLeaves(supaRef) {
   try {
     // Load 3 months around current
-    const from = new Date(_calYear, _calMonth - 1, 1).toISOString().split('T')[0];
-    const to   = new Date(_calYear, _calMonth + 2, 0).toISOString().split('T')[0];
+    const from = new Date(_calYear, _calMonth - 1, 1).toLocaleDateString('en-CA');
+    const to   = new Date(_calYear, _calMonth + 2, 0).toLocaleDateString('en-CA');
     const { data } = await supaRef.from('boarding_leaves')
       .select('id,student_name,leave_type,departure_planned,return_planned,departed_at,returned_at,active')
       .gte('departure_planned', from + 'T00:00:00')
@@ -2523,7 +2523,7 @@ function renderCalendar(containerId, supaRef) {
   if (!el) return;
 
   const td_ = new Date(); td_.setHours(0,0,0,0);
-  const todayISO = td_.toISOString().split('T')[0];
+  const todayISO = td_.toLocaleDateString('en-CA');
   const monthStart = new Date(_calYear, _calMonth, 1);
   const monthEnd   = new Date(_calYear, _calMonth + 1, 0);
   const firstDay   = (monthStart.getDay() + 6) % 7; // Mon=0
@@ -2550,7 +2550,7 @@ function renderCalendar(containerId, supaRef) {
     const end   = retPlanned ? new Date(retPlanned + 'T00:00:00') : new Date(depPlanned + 'T00:00:00');
     const cur   = new Date(start);
     while (cur <= end) {
-      const iso = cur.toISOString().split('T')[0];
+      const iso = cur.toLocaleDateString('en-CA');
       if (!dayLeaves[iso]) dayLeaves[iso] = [];
       dayLeaves[iso].push({ name: l.student_name, type: l.leave_type, confirmed, id: l.id });
       cur.setDate(cur.getDate() + 1);
@@ -2774,7 +2774,7 @@ function openGateMsg(opts={}) {
         <div style="display:flex;gap:8px">
           <div style="flex:1">
             <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">DATE</label>
-            <input id="gm-date" type="date" value="${now.toISOString().split('T')[0]}" oninput="updateGateMsg()"
+            <input id="gm-date" type="date" value="${today()}" oninput="updateGateMsg()"
               style="width:100%;background:#2c2c2e;border:1px solid #444;border-radius:8px;color:#fff;font-size:13px;padding:8px 10px">
           </div>
           <div style="flex:1">
@@ -3394,10 +3394,10 @@ function toggleBoardingPenalty(name, field){
         await supa.from('boarding_penalties')
           .delete().eq('student_name',name).eq('infraction_date',td).eq('infraction_type',infraction);
         if(!cur){
-          let penDate=field==='lateSleep'?new Date(Date.now()+86400000).toISOString().split('T')[0]:td;
+          let penDate=field==='lateSleep'?(()=>{const d=new Date(today()+'T12:00:00');d.setDate(d.getDate()+1);return d.toLocaleDateString('en-CA');})():td;
           const {data:conflict}=await supa.from('boarding_penalties')
             .select('id').eq('student_name',name).eq('penalty_date',penDate).in('status',['active','pending']);
-          if(conflict&&conflict.length){const d=new Date(penDate);d.setDate(d.getDate()+1);penDate=d.toISOString().split('T')[0];}
+          if(conflict&&conflict.length){const d=new Date(penDate+'T12:00:00');d.setDate(d.getDate()+1);penDate=d.toLocaleDateString('en-CA');}
           await supa.from('boarding_penalties').insert({
             student_name:name,infraction_type:infraction,infraction_date:td,
             penalty_type:'phone_'+penMins+'min',penalty_date:penDate,
