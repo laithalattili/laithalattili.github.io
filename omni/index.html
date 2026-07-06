@@ -3148,7 +3148,7 @@ async function renderDash(){
   if(nextTime)nextTime.textContent=nxtSlot?nxtSlot.time:'';
 
   // ── TASKS block ────────────────────────────────────────────────────────────
-  const tasks=(typeof getTasksFor==='function'?getTasksFor(0):[]).filter(t=>!t.done);
+  const tasks=(typeof getTasksFor==='function'?getTasksFor(0):[]).filter(t=>!t.done&&!(_isHoliday()&&t.src==='work'));
   const tr=el('dc-tasks-rows');
   if(tr){
     if(!tasks.length){tr.innerHTML='<span style="color:var(--ok);font-size:13px;font-weight:700">All clear ✓</span>';
