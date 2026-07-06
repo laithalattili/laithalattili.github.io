@@ -2087,7 +2087,8 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
 
     <div class="modal-btns">
       <button class="modal-btn cancel" onclick="closeEditModal()">Cancel</button>
-      <button class="modal-btn reset-slot" onclick="resetSlot()">Reset</button>
+      <button class="modal-btn reset-slot" onclick="clearSlot()" title="Remove everything — slot becomes free" style="color:#dc2626">🗑 Clear</button>
+      <button class="modal-btn reset-slot" onclick="resetSlot()" title="Remove this week's change — back to weekly default">Reset</button>
       <button class="modal-btn save" onclick="saveSlot()">Save</button>
     </div>
   </div>
@@ -2365,7 +2366,7 @@ const supa=supabase.createClient(SUPA_URL,SUPA_KEY);
 const SUPA_TABLE='work_app_data';
 
 // Keys that should sync to Supabase (everything important)
-const SYNC_KEYS=['settings','tutors','students','archived','mcState','ttCustom',
+const SYNC_KEYS=['settings','tutors','students','archived','mcState','ttCustom','ttDefaults',
   'slotNotes','calCustomEvents','hawkingStatus','classData','classLeave','pointsLog',
   'boarderRooms','hwkCollapseState','nightDuties','fridayDuties','fridayTermRange',
   'linksData','holidaysData','schoolYear','tutorMeetings','globalDefault',
@@ -23077,8 +23078,28 @@ function firstName(n){return(n||'').split(' ')[0];}
 
 // ── PERSISTENCE ───────────────────────────────────────
 const mcState={};
-function saveState(){try{localStorage.setItem('mcState',JSON.stringify(mcState));localStorage.setItem('ttCustom',JSON.stringify(ttCustom));supaSave('ttCustom',JSON.stringify(ttCustom));}catch(e){}}
-function loadState(){try{const mc=localStorage.getItem('mcState');if(mc)Object.assign(mcState,JSON.parse(mc));const tc=localStorage.getItem('ttCustom');if(tc)Object.assign(ttCustom,JSON.parse(tc));}catch(e){}}
+function saveState(){try{localStorage.setItem('mcState',JSON.stringify(mcState));localStorage.setItem('ttCustom',JSON.stringify(ttCustom));supaSave('ttCustom',JSON.stringify(ttCustom));localStorage.setItem('ttDefaults',JSON.stringify(ttDefaults));supaSave('ttDefaults',JSON.stringify(ttDefaults));}catch(e){}}
+function loadState(){
+  try{
+    const mc=localStorage.getItem('mcState');if(mc)Object.assign(mcState,JSON.parse(mc));
+    const tc=localStorage.getItem('ttCustom');if(tc)Object.assign(ttCustom,JSON.parse(tc));
+    const td=localStorage.getItem('ttDefaults');if(td)Object.assign(ttDefaults,JSON.parse(td));
+    // One-time migration: move recur='weekly' entries from ttCustom → ttDefaults
+    let migrated=false;
+    Object.entries(ttCustom).forEach(([key,val])=>{
+      if(val&&val.recur==='weekly'){
+        const p=key.split('_');
+        if(p.length>=3){
+          const dKey=p[1]+'_'+p[2]; // slot_day
+          if(!ttDefaults[dKey]){ttDefaults[dKey]={...val};delete ttDefaults[dKey].recur;delete ttDefaults[dKey].placedWeek;}
+          delete ttCustom[key];
+          migrated=true;
+        }
+      }
+    });
+    if(migrated){saveState();console.log('Migrated weekly entries to ttDefaults');}
+  }catch(e){}
+}
 function saveTask(id,cb){try{localStorage.setItem('task_'+id,cb.checked?'1':'0');}catch(e){}const t=document.getElementById(id+'-text');if(t)t.classList.toggle('done',cb.checked);}
 function loadTasks(ids){ids.forEach(id=>{try{if(localStorage.getItem('task_'+id)==='1'){const cb=document.getElementById(id);if(cb){cb.checked=true;const t=document.getElementById(id+'-text');if(t)t.classList.add('done');}}}catch(e){}});}
 function checkTaskReset(){try{const now=new Date(),w=Math.floor((now-new Date('2026-01-05'))/(7*864e5)),stored=localStorage.getItem('task_reset_week');if(stored!==String(w)){['p1','p2','p3','p4','p5'].forEach(id=>localStorage.removeItem('task_'+id));localStorage.setItem('task_reset_week',String(w));}}catch(e){}}
@@ -23222,7 +23243,8 @@ function getPersonalSlotsForDay(dayName,dateStr){
 }
 let ttWeekOffset=0;
 let ttEditMode=false;
-let ttCustom={};
+let ttCustom={};   // week-specific overrides: key 'absWeek_slot_day' (once/biweekly)
+let ttDefaults={}; // weekly defaults per slot: key 'slot_day' — what Reset returns to
 let ttView='full';
 let ttShowAll=false;
 let tdDayOffset=0;
@@ -23322,31 +23344,28 @@ function getEffectiveSlots(){
 }
 
 function getCustomForWeek(offset,slotIdx,day){
-  // 1. Direct key match (the exact week this was placed)
-  const directKey=offset+'_'+slotIdx+'_'+day;
-  const direct=ttCustom[directKey];
-  if(direct){
-    // "once" events only show on their placed week
-    // If recur is 'once' (or missing), only show if key's week matches current offset
-    const placedW=parseInt(directKey.split('_')[0]);
-    if(!direct.recur||direct.recur==='once'){
-      return placedW===offset?direct:null;
-    }
-    return direct;
+  const absW=getWeekNumber(offset);
+  // 1. This week's override (once event) — absolute week key
+  const direct=ttCustom[absW+'_'+slotIdx+'_'+day];
+  if(direct)return direct;
+  // 1b. Legacy relative-offset key ('once' only shows on its placed week)
+  const legacy=ttCustom[offset+'_'+slotIdx+'_'+day];
+  if(legacy){
+    if(!legacy.recur||legacy.recur==='once'){
+      const pw=legacy.placedWeek??offset;
+      if(pw===offset)return legacy;
+    } else return legacy;
   }
-  // 2. Search for recurring entries that apply to this offset
+  // 2. Biweekly entries (alternate weeks from placement)
   for(const[key,val]of Object.entries(ttCustom)){
-    if(!val)continue;
-    // Skip non-recurring entries entirely
-    if(!val.recur||val.recur==='once')continue;
-    const parts=key.split('_');
-    if(parts.length<3)continue;
-    const placedWeek=parseInt(parts[0]),si=parseInt(parts[1]),d=parts[2];
-    if(si===slotIdx&&d===day){
-      if(val.recur==='weekly')return val;
-      if(val.recur==='biweekly'&&Math.abs(offset-placedWeek)%2===0)return val;
-    }
+    if(!val||val.recur!=='biweekly')continue;
+    const p=key.split('_');
+    if(p.length<3)continue;
+    if(parseInt(p[1])===slotIdx&&p[2]===day&&Math.abs(absW-parseInt(p[0]))%2===0)return val;
   }
+  // 3. Weekly default for this slot — what the slot IS by default
+  const def=ttDefaults[slotIdx+'_'+day];
+  if(def)return {...def,recur:'weekly'};
   return null;
 }
 
@@ -23437,7 +23456,7 @@ function _lpEnd(e){
 }
 function openEditModal(slotIdx,day,_bypassEditMode){
   if(!ttEditMode&&!_bypassEditMode)return;
-  editSlotInfo={slotIdx,day,week:ttWeekOffset};
+  editSlotInfo={slotIdx,day,week:ttWeekOffset,absWeek:getWeekNumber(ttWeekOffset)};
   const custom=getCustomForWeek(ttWeekOffset,slotIdx,day);
   const base=SLOTS[slotIdx][day];
   const cur=custom||base;
@@ -23453,16 +23472,25 @@ function openEditModal(slotIdx,day,_bypassEditMode){
   if(cat==='abs'||cat==='zpl')cat='support';
   if(cat==='c1'||cat==='c2'||cat==='c3')cat='go';
   document.getElementById('edit-cat').value=cat;
-  document.getElementById('edit-type').value=cat;
+  // Don't overwrite edit-type with 'empty' — keep actual tp so color is preserved
+  if(cat!=='empty') document.getElementById('edit-type').value=cat;
   _renderEditCatChips(cat);
   // Label suggestions: class names first, then history
   _populateLabelSuggestions(label);
-  const recur=custom?custom.recur:'once';
+  const recur=custom?custom.recur:'weekly';
   document.getElementById('edit-recur').value=recur;
   document.querySelectorAll('.recur-btn').forEach(b=>b.classList.remove('active'));
   const rb=document.getElementById('rb-'+recur);if(rb)rb.classList.add('active');
   const emtEl=document.getElementById('edit-modal-title');if(emtEl)emtEl.textContent=getSlotTime(slotIdx)+' — '+day;
-  const emsEl=document.getElementById('edit-modal-sub');if(emsEl)emsEl.textContent='W'+getWeekNumber(ttWeekOffset)+' · '+day;
+  const emsEl=document.getElementById('edit-modal-sub');
+  if(emsEl){
+    const _hasOverride=!!(ttCustom[getWeekNumber(ttWeekOffset)+'_'+slotIdx+'_'+day]||ttCustom[ttWeekOffset+'_'+slotIdx+'_'+day]);
+    const _hasDefault=!!ttDefaults[slotIdx+'_'+day];
+    let _badge='';
+    if(_hasOverride)_badge=' <span style="font-size:10px;background:#ede9fe;color:#5b21b6;border:1px solid #c4b5fd;border-radius:8px;padding:1px 7px">✏️ This week only</span>';
+    else if(_hasDefault)_badge=' <span style="font-size:10px;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;border-radius:8px;padding:1px 7px">📌 Weekly default</span>';
+    emsEl.innerHTML='W'+getWeekNumber(ttWeekOffset)+' · '+day+_badge;
+  }
   const dayOverride=document.getElementById('edit-day-override');
   if(dayOverride)dayOverride.value='';
   const timeOverride=document.getElementById('edit-time-override');
@@ -23639,6 +23667,8 @@ function selectEditCat(cat){
 function editLabelInput(val){
   _populateLabelSuggestions(val);
   const trimmed=val.trim();
+  // If label is cleared, don't change the type - preserve current swatch selection
+  if(!trimmed) return;
   // If label matches a tutor name — set tmtg type
   const matchedTutor=TUTORS.find(t=>t.name.toLowerCase().includes(trimmed.toLowerCase())||trimmed.toLowerCase().includes(t.name.split(' ')[0].toLowerCase()));
   if(matchedTutor&&trimmed.length>=3){
@@ -23715,7 +23745,8 @@ function quickSlot(label,tp){
 }
 function saveSlot(){
   if(!editSlotInfo)return;
-  const{slotIdx,week}=editSlotInfo;
+  const{slotIdx,week,absWeek}=editSlotInfo;
+  const _weekKey=absWeek??week; // use absolute week number for keys
   const dayOverrideEl=document.getElementById('edit-day-override');
   const targetDay=dayOverrideEl&&dayOverrideEl.value?dayOverrideEl.value:editSlotInfo.day;
   const timeOverrideEl=document.getElementById('edit-time-override');
@@ -23745,20 +23776,31 @@ function saveSlot(){
   const _depOn=document.getElementById('edit-dep-toggle')?.checked;
   const _depMins=_depOn?parseInt(document.getElementById('edit-dep-mins')?.value||'0')||null:null;
   const _depSens=_depOn?(document.querySelector('input[name="dep-sensitivity"]:checked')?.value||null):null;
-  const evtData={l:document.getElementById('edit-label').value||'',tp:document.getElementById('edit-type').value||'free',cat:catVal,recur:document.getElementById('edit-recur').value||'once',placedWeek:week,endSlotIdx,customStartTime,customEndTime,boarding_register,house_register,...(_depOn&&_depMins?{travel_mins:_depMins,sensitivity:_depSens}:{travel_mins:null,sensitivity:null})};
+  const _rawTp=document.getElementById('edit-type').value||'free';
+  const evtData={l:document.getElementById('edit-label').value||'',tp:(_rawTp==='empty'?'free':_rawTp),cat:catVal,recur:document.getElementById('edit-recur').value||'once',placedWeek:week,endSlotIdx,customStartTime,customEndTime,boarding_register,house_register,...(_depOn&&_depMins?{travel_mins:_depMins,sensitivity:_depSens}:{travel_mins:null,sensitivity:null})};
   // Record label history for quick-fill suggestions
   _saveLabelHistory(evtData.l,evtData.tp,catVal);
-  // Save for each slot in range
+  // Route by recurrence: weekly → ttDefaults (the slot's default state);
+  // once/biweekly → ttCustom (week-specific overrides)
+  const _recurVal=evtData.recur||'once';
+  const _writeEntry=(slotI,data)=>{
+    if(_recurVal==='weekly'){
+      const dk=slotI+'_'+targetDay;
+      const dData={...data};delete dData.recur;delete dData.placedWeek;
+      ttDefaults[dk]=dData;
+      // Remove any once-override for this week so the new default shows immediately
+      delete ttCustom[_weekKey+'_'+slotI+'_'+targetDay];
+    } else {
+      ttCustom[_weekKey+'_'+slotI+'_'+targetDay]=data;
+    }
+  };
   if(endSlotIdx&&endSlotIdx>targetSlot){
-    // First clear any old entries for this day in range
     for(let i=targetSlot;i<=endSlotIdx;i++){
-      const k=week+'_'+i+'_'+targetDay;
-      // Only set if not already a different custom event
-      if(i===targetSlot)ttCustom[k]={...evtData,isSpanStart:true};
-      else ttCustom[k]={...evtData,isSpanContinue:true,spanStart:targetSlot};
+      if(i===targetSlot)_writeEntry(i,{...evtData,isSpanStart:true});
+      else _writeEntry(i,{...evtData,isSpanContinue:true,spanStart:targetSlot});
     }
   } else {
-    ttCustom[week+'_'+targetSlot+'_'+targetDay]=evtData;
+    _writeEntry(targetSlot,evtData);
   }
   // Record tutor meeting if type is tmtg
   if(evtData.tp==='tmtg'){
@@ -23771,9 +23813,26 @@ function saveSlot(){
   saveState();closeEditModal();renderTimetable();
 }
 function resetSlot(){
+  // Reset = remove this week's override only → slot returns to its weekly default
   if(!editSlotInfo)return;
-  const{slotIdx,day}=editSlotInfo;
+  const{slotIdx,day,week,absWeek}=editSlotInfo;
+  const wk=absWeek??week;
+  delete ttCustom[wk+'_'+slotIdx+'_'+day];
+  delete ttCustom[week+'_'+slotIdx+'_'+day]; // legacy relative key too
+  saveState();closeEditModal();renderTimetable();
+}
+
+function clearSlot(){
+  // Clear = remove override AND weekly default → slot becomes free (green, empty)
+  if(!editSlotInfo)return;
+  if(!confirm('Clear this slot completely? It will become a free slot.'))return;
+  const{slotIdx,day,week,absWeek}=editSlotInfo;
+  const wk=absWeek??week;
+  delete ttCustom[wk+'_'+slotIdx+'_'+day];
+  delete ttCustom[week+'_'+slotIdx+'_'+day];
+  // Remove all other week overrides for this slot too
   Object.keys(ttCustom).forEach(k=>{const p=k.split('_');if(p.length>=3&&parseInt(p[1])===slotIdx&&p[2]===day)delete ttCustom[k];});
+  delete ttDefaults[slotIdx+'_'+day];
   saveState();closeEditModal();renderTimetable();
 }
 
