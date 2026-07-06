@@ -3267,7 +3267,10 @@ async function renderDash(){
         const hOver=hSurplus<0;
         const hBarColor=hPct>90?'var(--er,#c00)':hPct>70?'var(--wa,#e08000)':'var(--ok,#3a8)';
         // Which budget is "active" (highlighted + bigger)
-        const holidayActive=hasHoliday&&onHoliday;
+        // Hybrid: auto-detect if today is within holiday date range, OR holiday toggle is on
+        const todayISO=(()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
+        const inHolidayDates=fin.holiday_start&&fin.holiday_end&&todayISO>=fin.holiday_start&&todayISO<=fin.holiday_end;
+        const holidayActive=hasHoliday&&(inHolidayDates||_isHoliday());
         // Renderers
         const bigBar=(label,curr,spent,total,p,surp,ov,bcol)=>`
           <div style="margin-bottom:${hasHoliday?'.6rem':'0'}">
