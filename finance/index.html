@@ -3352,7 +3352,7 @@ function renderHolidays(){
     // Date range (editable for all holidays)
     var dr=document.createElement('div');dr.className='ig-row';dr.style.marginBottom='10px';
     var sIg=document.createElement('div');sIg.className='ig';var sL=document.createElement('label');sL.textContent='Start';sIg.appendChild(sL);
-    var sI=document.createElement('input');sI.type='date';sI.value=h.start;sI.onchange=(function(hobj){return function(){hobj.start=this.value;holidays.sort(function(a,b){return new Date(a.start)-new Date(b.start);});autosave();renderHolidays();};})(h);sIg.appendChild(sI);
+    var sI=document.createElement('input');sI.type='date';sI.value=h.start;sI.onchange=(function(hobj){return function(){hobj.start=this.value;holidays.sort(function(a,b){return new Date(a.start)-new Date(b.start);});autosave();};})(h);sIg.appendChild(sI);
     var eIg=document.createElement('div');eIg.className='ig';var eL=document.createElement('label');eL.textContent='End';eIg.appendChild(eL);
     var eI=document.createElement('input');eI.type='date';eI.value=h.end;eI.onchange=(function(hobj){return function(){hobj.end=this.value;autosave();};})(h);eIg.appendChild(eI);
     dr.appendChild(sIg);dr.appendChild(eIg);body.appendChild(dr);
@@ -3380,6 +3380,10 @@ function renderHolidays(){
     var sumDiv=document.createElement('div');sumDiv.id='hsum-'+h.id;sumDiv.style.cssText='background:var(--bg);border-radius:var(--r);padding:9px;margin-top:5px';
     Object.entries(holTotalByCur(h)).forEach(function(e){sumDiv.innerHTML+='<div class="m-tr"><span class="m-tr-l">Total '+e[0]+'</span><span class="m-tr-v pos">'+e[1].toLocaleString()+' '+e[0]+'</span></div>';});
     body.appendChild(sumDiv);
+    // Save button
+    var holSaveBar=document.createElement('div');holSaveBar.style.cssText='padding:10px 0 4px;display:flex;justify-content:flex-end';
+    holSaveBar.appendChild(makeSaveBtn('Save holiday'));
+    body.appendChild(holSaveBar);
     block.appendChild(body);hp.appendChild(block);
   });
 }
