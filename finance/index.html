@@ -1608,8 +1608,8 @@ function buildProjection(){
         // full_rmb: all salary goes to BOC as RMB
         var fullAmt=S.salaryRMBFull||n2((salJOD?resolveStreamAmount(salJOD):0)*S.jod2rmb+(salRMB?resolveStreamAmount(salRMB):0));
         if(!salRecRMB){rmbIn+=fullAmt;rmbItems.push({l:'Salary (All RMB)',v:'+'+fRMB(fullAmt),c:'pos',streamId:salRMB.id});}
-        trueRmbIn+=fullAmt;
         else{rmbItems.push({l:'Salary (All RMB)',v:'+'+fRMB(fullAmt),c:'pos',streamId:salRMB.id,received:true});}
+        trueRmbIn+=fullAmt;
       }
     }
     // Remove salary streams from monthStreams so they aren't double-counted
