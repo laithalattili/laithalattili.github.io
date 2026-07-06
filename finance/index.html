@@ -1930,6 +1930,11 @@ function renderDashboard(){
       return d2;
     }
     if(nowRow)projEl.appendChild(mkProjRow(nowRow,MN[nowMo2-1]+' '+nowYr2,true));
+    // Vertical arrow from now to target
+    var arrowDiv=document.createElement('div');
+    arrowDiv.style.cssText='display:flex;justify-content:center;align-items:center;height:18px;margin:1px 0';
+    arrowDiv.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;color:var(--ink4)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg></div>';
+    projEl.appendChild(arrowDiv);
     // Target month row
     var tmWrap=document.createElement('div');
     tmWrap.style.cssText='padding:8px 10px;background:var(--surf);border-radius:var(--r);margin-bottom:8px;border:.5px dashed var(--brd2)';
@@ -2033,7 +2038,8 @@ function renderDashboard(){
 }
 
 // ═══ LOG ═══
-function renderCatGrid(){var cg=document.getElementById('cat-grid');if(!cg)return;cg.innerHTML='';Object.keys(CAT_COLORS).forEach(function(cat){var btn=document.createElement('div');btn.className='cat-btn'+(S.selectedCat===cat?' sel':'');var dot=document.createElement('div');dot.className='cat-dot';dot.style.background=CAT_COLORS[cat];btn.appendChild(dot);var lbl=document.createElement('span');lbl.textContent=cat;btn.appendChild(lbl);btn.onclick=function(){S.selectedCat=cat;renderCatGrid();};cg.appendChild(btn);});}
+function catDisplayName(cat){if(cat==='__surplus__')return 'Surplus';if(cat&&cat.indexOf('__hol-')===0){var b=S.budgets&&S.budgets[cat];return b&&b.holLabel?('✈ '+b.holLabel):'✈ Holiday';}return cat;}
+function renderCatGrid(){var cg=document.getElementById('cat-grid');if(!cg)return;cg.innerHTML='';Object.keys(CAT_COLORS).forEach(function(cat){var btn=document.createElement('div');btn.className='cat-btn'+(S.selectedCat===cat?' sel':'');var dot=document.createElement('div');dot.className='cat-dot';dot.style.background=CAT_COLORS[cat];btn.appendChild(dot);var lbl=document.createElement('span');lbl.textContent=catDisplayName(cat);btn.appendChild(lbl);btn.onclick=function(){S.selectedCat=cat;renderCatGrid();};cg.appendChild(btn);});}
 function submitExp(){var amt=parseFloat(document.getElementById('log-amt').value);if(!amt||amt<=0)return alert('Enter a valid amount.');var entry={id:Date.now(),amount:amt,currency:S.logCur,category:S.selectedCat,date:document.getElementById('log-date').value||today().toISOString().split('T')[0],note:document.getElementById('log-note').value};if(editingExpId!==null){var i=expenses.findIndex(function(e){return e.id===editingExpId;});if(i>-1)expenses[i]=entry;editingExpId=null;}else expenses.unshift(entry);document.getElementById('log-amt').value='';document.getElementById('log-note').value='';updateSurplus();autosave();renderLog();renderLogMonthlySummary();}
 async function pushFinanceSummary(){
   try{
@@ -2041,12 +2047,25 @@ async function pushFinanceSummary(){
     var yr=now.getFullYear(),mo=now.getMonth()+1;
     var monthKey=yr+'-'+(mo<10?'0':'')+mo;
     var mExp=expenses.filter(function(e){var d=new Date(e.date);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();});
-    // Normal budget per currency
+    // Budget per currency = budget-linked commitment streams (prorated for holidays),
+    // matching what Commitments shows for e.g. China living expenses
     var budgetByCur={},spentByCur={};
-    Object.keys(S.budgets||{}).filter(function(c){return c!=='__surplus__'&&c.indexOf('__hol-')<0;}).forEach(function(cat){
-      var cur=getBudgetCurrency(cat);
-      budgetByCur[cur]=(budgetByCur[cur]||0)+getBudgetAmount(cat);
+    var frac=nonHolidayFraction(yr,mo);
+    safeArr(streams).forEach(function(s){
+      if(s.type!=='expense')return;
+      if(!safeArr(s.linkedBudgetCats).length)return;
+      if(!streamDueInMonth(s,yr,mo))return;
+      var amt=resolveStreamAmount(s);
+      amt=n2(amt*frac); // prorate during holidays
+      budgetByCur[s.currency]=(budgetByCur[s.currency]||0)+amt;
     });
+    // Fallback: if no linked streams, use raw budget categories (prorated)
+    if(!Object.keys(budgetByCur).length){
+      Object.keys(S.budgets||{}).filter(function(c){return c!=='__surplus__'&&c.indexOf('__hol-')<0;}).forEach(function(cat){
+        var cur=getBudgetCurrency(cat);
+        budgetByCur[cur]=(budgetByCur[cur]||0)+n2(getBudgetAmount(cat)*frac);
+      });
+    }
     mExp.forEach(function(e){if(S.budgets&&S.budgets[e.category]&&e.category.indexOf('__hol-')<0&&e.category!=='__surplus__'){spentByCur[e.currency]=(spentByCur[e.currency]||0)+e.amount;}});
     // Holiday budget (active holidays)
     var holBudget=0,holSpent=0,holCur='RMB';
@@ -3069,7 +3088,7 @@ function renderMonthLookup(){
   if(isCurrent){
     var actualCard=document.createElement('div');actualCard.className='card';actualCard.style.cssText='margin-bottom:8px;border-left:3px solid var(--blu)';
     var actLbl=document.createElement('div');actLbl.style.cssText='font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin-bottom:8px';actLbl.textContent="Today's actual balances";
-    var actRow=document.createElement('div');actRow.style.cssText='display:flex;gap:10px;flex-wrap:wrap';
+    var actRow=document.createElement('div');actRow.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:8px';
     var arabSpan=document.createElement('div');arabSpan.innerHTML='<div style="font-size:9px;color:var(--grn);font-weight:700;text-transform:uppercase">'+S.arabLabel+'</div><div style="font-size:18px;font-weight:700;font-family:var(--mono);color:'+(S.arab>=getArabReserve()?'var(--grn)':'var(--red)')+'">'+fJOD(S.arab)+'</div>';
     var bocSpan=document.createElement('div');bocSpan.innerHTML='<div style="font-size:9px;color:var(--blu);font-weight:700;text-transform:uppercase">'+S.bocLabel+'</div><div style="font-size:18px;font-weight:700;font-family:var(--mono);color:var(--blu)">'+fRMB(S.boc)+'</div>';
     actRow.appendChild(arabSpan);actRow.appendChild(bocSpan);
