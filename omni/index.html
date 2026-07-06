@@ -3251,7 +3251,7 @@ async function renderDash(){
       const now2=new Date();
       const monthStr=now2.getFullYear()+'-'+String(now2.getMonth()+1).padStart(2,'0');
       const{data:fin}=await supaFrom('omni_finance_summary').select('*').eq('month',monthStr).maybeSingle();
-      if(fin&&fin.budget_total>0){
+      if(fin&&(fin.budget_total>0||fin.holiday_budget>0)){
         const cur=fin.currency||'RMB';
         const hCur=fin.holiday_currency||cur;
         const hasHoliday=fin.holiday_budget>0;
@@ -3296,9 +3296,13 @@ async function renderDash(){
             </div>
             <div style="font-family:var(--mono);font-size:10px;color:var(--tx4);margin-top:3px">${p}% of ${curr} ${total?.toLocaleString()}</div>
           </div>`;
-        if(holidayActive){
-          // Holiday big, monthly small
-          fc2.innerHTML=bigBar('🏖️ Holiday',hCur,fin.holiday_spent,fin.holiday_budget,hPct,hSurplus,hOver,hBarColor)+smallBar('This month',cur,fin.spent_total,fin.budget_total,pct,surplus,over,barColor);
+        const monthlyZero=!(fin.budget_total>0);
+        if(holidayActive||monthlyZero){
+          // Holiday big; monthly shown as note if 0, or small bar if it has a budget
+          const monthlyPart=monthlyZero
+            ?`<div style="padding-top:.45rem;border-top:1px solid var(--bd);font-size:11px;color:var(--tx4)">Monthly budget is ${cur} 0 — full month on holiday</div>`
+            :smallBar('This month',cur,fin.spent_total,fin.budget_total,pct,surplus,over,barColor);
+          fc2.innerHTML=(hasHoliday?bigBar('🏖️ Holiday',hCur,fin.holiday_spent,fin.holiday_budget,hPct,hSurplus,hOver,hBarColor):'')+monthlyPart;
         }else{
           // Monthly big, holiday small (if exists)
           fc2.innerHTML=bigBar('This month',cur,fin.spent_total,fin.budget_total,pct,surplus,over,barColor)+(hasHoliday?smallBar('🏖️ Holiday',hCur,fin.holiday_spent,fin.holiday_budget,hPct,hSurplus,hOver,hBarColor):'');
