@@ -463,7 +463,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
         <div class="hdr-date" id="hdr-date">–</div>
       </div>
       <div class="hdr-r">
-        <button class="hbtn hbtn-live" id="btn-live" onclick="_hdrFlash()" title="Live mode / Audio">⚡</button><button class="hbtn" id="btn-star" onclick="setDefault()" title="Set default">⭐</button>
+        <button class="hbtn" id="btn-star" onclick="setDefault()" title="Set default">⭐</button>
         <button class="hbtn" id="btn-wake" onclick="toggleWake()" title="Screen on">☀️</button>
         <button class="hbtn" id="btn-holiday" onclick="toggleHoliday()" title="Holiday mode">🏖️</button>
         <button class="hbtn" onclick="lockApp()" title="Lock">🔒</button>
@@ -2029,7 +2029,7 @@ function _renderDayNow(){
       const catMap2={};WCATS.forEach(c=>{catMap2[c.id]=c;});
       const workByCat={};const workUncat=[];const personal=[];
       // Gym tasks belong in habits section only, not in tasks
-      unsched.forEach(t=>{if(t.src==='omni'){personal.push(t);}else if(t.src==='work'){const cid=t._t?.cat||t._t?.category||'';if(cid&&catMap2[cid]){if(!workByCat[cid])workByCat[cid]=[];workByCat[cid].push(t);}else workUncat.push(t);}});
+      unsched.forEach(t=>{if(t.src==='omni'){personal.push(t);}else if(t.src==='work'){if(_isHoliday())return;const cid=t._t?.cat||t._t?.category||'';if(cid&&catMap2[cid]){if(!workByCat[cid])workByCat[cid]=[];workByCat[cid].push(t);}else workUncat.push(t);}});
       if(personal.length){const pDone=personal.filter(t=>t.done).length;const pTotal=personal.length;const pAllDone=pDone===pTotal;const pKey='omni_cat_col_personal';const pCol=localStorage.getItem(pKey)==='1';th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid #b8582844"><div style="padding:.3rem .7rem;background:${pAllDone?'rgba(184,88,40,.15)':'rgba(184,88,40,.07)'};border-bottom:${pCol?'none':'1px solid rgba(184,88,40,.15)'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('personal')"><span style="width:8px;height:8px;border-radius:50%;background:var(--acc);flex-shrink:0"></span><span style="font-size:10px;font-weight:700;color:var(--acc);flex:1;text-transform:uppercase;letter-spacing:.06em">Personal</span><span style="font-size:10px;color:${pAllDone?'var(--ok)':'var(--tx4)'}">${pAllDone?'✓ All done':''+pDone+'/'+pTotal}</span><span style="font-size:9px;color:var(--tx4);margin-left:3px">${pCol?'▶':'▼'}</span></div>`;if(!pCol){personal.forEach(t=>{const isGym=t.src==='gym';const u=t.tier===2&&t.urg;const m=isGym?(t.gymDone?'Logged ✓':'Tap gym tab'):t.tier===1?'Today':t.tier===2?(u?'⚠ Last day':'Window'):'Sticky';const ttime2=t._t?.taskTime;const cbFn=isGym?"switchTab('gym')":"toggleDone('"+t.dk+"',this);setTimeout(renderDay,50)";const icon=t.done?'✓':isGym?'🏋️':'';const iconSize=isGym&&!t.done?15:11;const editBtn=isGym?'':'<button onclick="openEditTask(\'' +t.id+'\')" style="font-size:12px;color:var(--tx4);background:none;border:none;padding:0 2px">✎</button>';th+=`<div class="task-row t${t.tier}${u?' urg':''}"><div class="task-cb${t.done?' on':''}" onclick="${cbFn}">${(t.done||isGym)?'<span style="font-size:'+iconSize+'px">'+icon+'</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}"> ${t.text}${ttime2?' <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">📌 '+ttime2+'</span>':''}</div><div class="task-meta">${m}</div></div>${editBtn}</div>`;});}th+=`</div>`;}
       WCATS.forEach(cat=>{const cts=workByCat[cat.id];if(!cts?.length)return;const catDone=cts.filter(t=>t.done).length;const catTotal=cts.length;const allCatDone=catDone===catTotal;const catColKey='omni_cat_col_'+cat.id;const catCol2=localStorage.getItem(catColKey)==='1';th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid ${cat.color}44"><div style="padding:.3rem .7rem;background:${allCatDone?cat.color+'22':cat.color+'12'};border-bottom:${catCol2?'none':'1px solid '+cat.color+'22'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('${cat.id}')"><span style="width:8px;height:8px;border-radius:50%;background:${cat.color};flex-shrink:0"></span><span style="font-size:10px;font-weight:700;color:${cat.color};flex:1;text-transform:uppercase;letter-spacing:.06em">${cat.name}</span><span style="font-size:10px;color:${allCatDone?'var(--ok)':'var(--tx4)'}">${allCatDone?'✓ All done':''+catDone+'/'+catTotal}</span><span style="font-size:9px;color:var(--tx4);margin-left:3px">${catCol2?'▶':'▼'}</span></div>`;if(!catCol2){cts.forEach(t=>{const u=t.tier===2&&t.urg;const ttime=t._t?.taskTime;th+=`<div class="task-row t${t.tier}${u?' urg':''}"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}${ttime?' <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">📌 '+ttime+'</span>':''}</div><div class="task-meta">${u?'⚠ Last day':t.tier===1?'Today':t.tier===2?'This week':'Ongoing'}</div></div></div>`;});}th+=`</div>`;});
       if(workUncat.length){const ucDone=workUncat.filter(t=>t.done).length;const ucTotal=workUncat.length;const ucAllDone=ucDone===ucTotal;const ucKey='omni_cat_col_other';const ucCol=localStorage.getItem(ucKey)==='1';th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid var(--bd)"><div style="padding:.3rem .7rem;background:${ucAllDone?'var(--bg3)':'var(--bg2)'};border-bottom:${ucCol?'none':'1px solid var(--bd)'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('other')"><span style="width:8px;height:8px;border-radius:50%;background:var(--tx4);flex-shrink:0"></span><span style="font-size:10px;font-weight:700;color:var(--tx3);flex:1;text-transform:uppercase;letter-spacing:.06em">Other</span><span style="font-size:10px;color:${ucAllDone?'var(--ok)':'var(--tx4)'}">${ucAllDone?'✓ All done':''+ucDone+'/'+ucTotal}</span><span style="font-size:9px;color:var(--tx4);margin-left:3px">${ucCol?'▶':'▼'}</span></div>`;if(!ucCol){workUncat.forEach(t=>{const u=t.tier===2&&t.urg;const ttime=t._t?.taskTime;th+=`<div class="task-row t${t.tier}${u?' urg':''} src-work"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}${ttime?' <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">📌 '+ttime+'</span>':''}</div><div class="task-meta">Work · ${u?'⚠ Last day':t.tier===1?'Today':t.tier===2?'Window':'Ongoing'}</div></div></div>`;});}th+=`</div>`;}
@@ -4432,11 +4432,11 @@ function _fmtCd(remMins){
 }
 function openLive(){
   if(_curTab==='gym'&&_todayType()&&!_hasSessToday()){openGymLivePicker(_todayType());return;}
-  _liveOpen=true;_liveShowStart=false;el('live-overlay').classList.add('on');el('btn-live').classList.add('active');
+  _liveOpen=true;_liveShowStart=false;el('live-overlay').classList.add('on');el('btn-live-main')?.classList.add('active');
   _liveRender();if(_liveInterval)clearInterval(_liveInterval);_liveInterval=setInterval(_liveTick,500);
 }
 function closeLive(){
-  _liveOpen=false;el('live-overlay').classList.remove('on');el('btn-live').classList.remove('active');
+  _liveOpen=false;el('live-overlay').classList.remove('on');el('btn-live-main')?.classList.remove('active');
   if(_liveInterval){clearInterval(_liveInterval);_liveInterval=null;}
   if(_liveFrozen)toggleFreeze();if(_liveWake){try{_liveWake.release();}catch(e){}_liveWake=null;}
 }
@@ -4539,11 +4539,11 @@ function openGymLive(type){
   _gymLiveSessType=type;const exs=_exForType(type);
   _gymLiveExs=exs.map(ex=>({id:ex.id,name:ex.name,type,sets:REPSCHEME.map((r,i)=>({num:i+1,reps:r,weight:_lastW(ex.id)||'',done:false}))}));
   _gymLiveRestType=null;_gymLiveRestEndMs=0;_gymLiveRestBeepDone=false;_gymLiveStartMs=Date.now();_gymLiveExpandedEx=-1;
-  _gymLiveOpen=true;el('live-overlay').classList.add('on');el('btn-live').classList.add('active');
+  _gymLiveOpen=true;el('live-overlay').classList.add('on');el('btn-live-main')?.classList.add('active');
   _gymLiveRender();if(_gymLiveInterval)clearInterval(_gymLiveInterval);_gymLiveInterval=setInterval(_gymLiveTick,500);
 }
 function closeGymLive(){
-  _gymLiveOpen=false;el('live-overlay').classList.remove('on');el('btn-live').classList.remove('active');
+  _gymLiveOpen=false;el('live-overlay').classList.remove('on');el('btn-live-main')?.classList.remove('active');
   if(_gymLiveInterval){clearInterval(_gymLiveInterval);_gymLiveInterval=null;}
 }
 function glToggleEx(ei){_gymLiveExpandedEx=(_gymLiveExpandedEx===ei)?-1:ei;_gymLiveRender();}
