@@ -353,6 +353,7 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
 /* LIVE BUTTON in header */
 .hbtn-live{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.12)}
 .hbtn-live.active{background:rgba(184,88,40,.2);border-color:var(--acc);color:var(--acc3)}
+#btn-holiday.active{background:rgba(80,160,220,.2);border-color:#4a90d0;color:#6ab0e0}
 
 /* ── GYM LIVE ── */
 .gl-ex-block{margin:.35rem .8rem;border:1px solid #1e1e1e;border-radius:10px;overflow:hidden;transition:border-color .2s}
@@ -464,6 +465,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
       <div class="hdr-r">
         <button class="hbtn hbtn-live" id="btn-live" onclick="_hdrFlash()" title="Live mode / Audio">⚡</button><button class="hbtn" id="btn-star" onclick="setDefault()" title="Set default">⭐</button>
         <button class="hbtn" id="btn-wake" onclick="toggleWake()" title="Screen on">☀️</button>
+        <button class="hbtn" id="btn-holiday" onclick="toggleHoliday()" title="Holiday mode">🏖️</button>
         <button class="hbtn" onclick="lockApp()" title="Lock">🔒</button>
         <button class="hbtn" onclick="openSettings()" title="Settings">⚙️</button>
       </div>
@@ -1795,6 +1797,7 @@ function _renderDayNow(){
   _todayPS.forEach(ps=>{if(ps.start_time)_psMap[ps.start_time]=ps;});
   // Build unified work events using spec algorithm
   const _personalEvts=_todayPS.filter(ps=>!!ps.start_time).map(ps=>({time:ps.start_time,end:ps.end_time||'',endTime:ps.end_time||'',label:ps.title,tp:'personal',idx:-1,src:'personal',psId:ps.id,ps}));
+  const _holiday=_isHoliday();
   const skippedSlots=new Set();
   const _workEvts=[];
   // Build Work app index → WSLOTS index map
@@ -1837,7 +1840,7 @@ function _renderDayNow(){
     // Skip free work slots covered by a personal event's time range
     const _slotM2=t2m(realStart);
     const _psCover=_personalEvts.some(function(p){var ps=t2m(p.time),pe=t2m(p.end||p.endTime||'00:00');return pe>0&&_slotM2>=ps&&_slotM2<pe;});
-    if(!_psCover||tp!=='free')_workEvts.push({time:realStart,end:realEnd,endTime:realEnd,label,tp,idx:ii,src:'work'});
+    if((!_psCover||tp!=='free')&&!(_holiday&&!['free','sleep'].includes(tp)))_workEvts.push({time:realStart,end:realEnd,endTime:realEnd,label,tp,idx:ii,src:'work'});
   }
   // Add overnight sleep slots when night mode on
   if(showNight){
@@ -1902,7 +1905,9 @@ function _renderDayNow(){
     ? `<div style="display:flex;flex-wrap:wrap;gap:4px;padding:.25rem .6rem .35rem">${commitSlots.map(s=>`<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${catCol(s.tp)}22;color:${catCol(s.tp)};border:1px solid ${catCol(s.tp)}44"><b>${s.time}</b> ${s.label}</span>`).join('')}</div>`
     : `<div style="padding:.25rem .6rem;font-size:11px;color:var(--tx4);font-style:italic">Free day</div>`;
 
-  let slotsHtml=`<div style="display:flex;align-items:center;justify-content:space-between;padding:.3rem .6rem .1rem"><div class="sec-lbl" style="padding:0">Timetable</div><button onclick="toggleSlotsCol()" style="font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:2px 8px">${slotsCol?'Expand ↓':'Collapse ↑'}</button></div>`;
+  let slotsHtml=_holiday
+    ? `<div style="display:flex;align-items:center;justify-content:space-between;padding:.3rem .6rem .1rem"><div class="sec-lbl" style="padding:0;color:#4a90d0">🏖️ Holiday</div></div>`
+    : `<div style="display:flex;align-items:center;justify-content:space-between;padding:.3rem .6rem .1rem"><div class="sec-lbl" style="padding:0">Timetable</div><button onclick="toggleSlotsCol()" style="font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:2px 8px">${slotsCol?'Expand ↓':'Collapse ↑'}</button></div>`;
 
   if(slotsCol){
     slotsHtml+=collapsedSummary;
@@ -3933,6 +3938,22 @@ async function deletePersonalSlot(){
   }catch(e){showToast('Delete failed');console.error(e);}
 }
 
+
+
+// ── HOLIDAY MODE ──────────────────────────────────────────────────────────────
+function _isHoliday(){return localStorage.getItem('omni_holiday')==='1';}
+function toggleHoliday(){
+  const on=!_isHoliday();
+  localStorage.setItem('omni_holiday',on?'1':'0');
+  _refreshHolidayBtn();
+  showToast(on?'🏖️ Holiday mode on':'Holiday mode off');
+  renderDay();
+  if(_curTab==='dashboard')renderDash();
+}
+function _refreshHolidayBtn(){
+  const b=document.getElementById('btn-holiday');
+  if(b)b.classList.toggle('active',_isHoliday());
+}
 
 // ── DEPARTURE TIMING ──────────────────────────────────────────────────────────
 // Departure categories — fully user-editable, seeded with defaults on first load
