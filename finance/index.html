@@ -1749,30 +1749,42 @@ function buildProjection(){
         }
       }
     });
-    // One-off items in their payMonth
+    // One-off items grouped by TYPE, each lump appearing in its pay month (daysBefore)
     safeArr(holidays).forEach(function(h){
       if(holIsPast(h))return;
       if(!h.start)return;
-      var holStart=new Date(h.start);
-      safeArr(h.items).forEach(function(item){
-        if(item.type==='daily')return;
-        var itemYr=item.payYr||holStart.getFullYear();
-        var itemMo=item.payMo||(holStart.getMonth()+1);
-        if(itemYr!==yr||itemMo!==mo)return;
-        var amt=holItemTotal(item);if(!amt)return;
-        var acct=item.account||h.account||'boc';
-        var tickId='holitem-'+h.id+'-'+item.id;
-        var isPrePaid=prePaidIds.indexOf(tickId)>=0;
-        if(holThisMonth.indexOf(h.label)<0)holThisMonth.push(h.label);
-        if(acct==='arab'||acct==='cash-jod'){
-          var jodAmt=toJOD(amt,item.currency||'JOD');
-          if(!isPrePaid)jodOut+=jodAmt;
-          jodItems.push({l:'✈ '+h.label+': '+item.label,v:'-'+fJOD(jodAmt),c:'neg',isHoliday:true,holId:h.id,streamId:tickId,prePaid:isPrePaid});
-        } else {
-          var rmbAmt=toRMB(amt,item.currency||'RMB');
-          if(!isPrePaid)rmbOut+=rmbAmt;
-          rmbItems.push({l:'✈ '+h.label+': '+item.label,v:'-'+fRMB(rmbAmt),c:'neg',isHoliday:true,holId:h.id,streamId:tickId,prePaid:isPrePaid});
-        }
+      // Group one-off items by type
+      var byType={flight:[],hotel:[],other:[]};
+      safeArr(h.items).forEach(function(item){if(item.type!=='daily'&&byType[item.type])byType[item.type].push(item);});
+      var typeLabels={flight:'Flights',hotel:'Hotels',other:'Other'};
+      Object.keys(byType).forEach(function(typ){
+        var items2=byType[typ];if(!items2.length)return;
+        // Group these items further by their pay month (they may differ if daysBefore differs)
+        var byMonth={};
+        items2.forEach(function(item){
+          var pm=holItemPayMonth(h,item);
+          var key=pm.yr+'-'+pm.mo;
+          if(!byMonth[key])byMonth[key]={yr:pm.yr,mo:pm.mo,jod:0,rmb:0,acct:item.account||h.account||'boc'};
+          var amt=holItemTotal(item);
+          var acct=item.account||h.account||'boc';
+          if(acct==='arab'||acct==='cash-jod')byMonth[key].jod+=toJOD(amt,item.currency||'JOD');
+          else byMonth[key].rmb+=toRMB(amt,item.currency||'RMB');
+        });
+        Object.keys(byMonth).forEach(function(key){
+          var grp=byMonth[key];
+          if(grp.yr!==yr||grp.mo!==mo)return;
+          var tickId='holgrp-'+h.id+'-'+typ+'-'+key;
+          var isPrePaid=prePaidIds.indexOf(tickId)>=0;
+          if(holThisMonth.indexOf(h.label)<0)holThisMonth.push(h.label);
+          if(grp.jod>0){
+            if(!isPrePaid)jodOut+=n2(grp.jod);
+            jodItems.push({l:'✈ '+h.label+': '+typeLabels[typ],v:'-'+fJOD(n2(grp.jod)),c:'neg',isHoliday:true,holId:h.id,streamId:tickId,prePaid:isPrePaid});
+          }
+          if(grp.rmb>0){
+            if(!isPrePaid)rmbOut+=n2(grp.rmb);
+            rmbItems.push({l:'✈ '+h.label+': '+typeLabels[typ],v:'-'+fRMB(n2(grp.rmb)),c:'neg',isHoliday:true,holId:h.id,streamId:tickId,prePaid:isPrePaid});
+          }
+        });
       });
     });
     // Surplus lump: show in next month (i===1)
@@ -2413,20 +2425,32 @@ function getCommitItemsForMonth(yr,mo){
       }
     }
   });
-  // Holidays — each one-off item appears in its payMonth
+  // Holidays — one-off items grouped by TYPE, each lump in its pay month
   safeArr(holidays).forEach(function(h){
     if(holIsPast(h))return;
     if(!h.start)return;
-    var holStart=new Date(h.start);
-    safeArr(h.items).forEach(function(item){
-      if(item.type==='daily')return;
-      var itemYr=item.payYr||holStart.getFullYear();
-      var itemMo=item.payMo||(holStart.getMonth()+1);
-      if(itemYr!==yr||itemMo!==mo)return;
-      var amt=holItemTotal(item);if(!amt)return;
-      var acct=item.account||h.account||'boc';
-      var cur=(acct==='arab'||acct==='cash-jod')?(item.currency||'JOD'):(item.currency||'RMB');
-      items.push({id:'holitem-'+h.id+'-'+item.id,name:'✈ '+h.label+': '+item.label,amount:amt,currency:cur,type:'out',method:'holiday',note:h.label+' — '+item.type});
+    var byType={flight:[],hotel:[],other:[]};
+    safeArr(h.items).forEach(function(item){if(item.type!=='daily'&&byType[item.type])byType[item.type].push(item);});
+    var typeLabels={flight:'Flights',hotel:'Hotels',other:'Other'};
+    Object.keys(byType).forEach(function(typ){
+      var items2=byType[typ];if(!items2.length)return;
+      var byMonth={};
+      items2.forEach(function(item){
+        var pm=holItemPayMonth(h,item);
+        var key=pm.yr+'-'+pm.mo;
+        if(!byMonth[key])byMonth[key]={yr:pm.yr,mo:pm.mo,jod:0,rmb:0};
+        var amt=holItemTotal(item);
+        var acct=item.account||h.account||'boc';
+        if(acct==='arab'||acct==='cash-jod')byMonth[key].jod+=toJOD(amt,item.currency||'JOD');
+        else byMonth[key].rmb+=toRMB(amt,item.currency||'RMB');
+      });
+      Object.keys(byMonth).forEach(function(key){
+        var grp=byMonth[key];
+        if(grp.yr!==yr||grp.mo!==mo)return;
+        var tickId='holgrp-'+h.id+'-'+typ+'-'+key;
+        if(grp.jod>0)items.push({id:tickId,name:'✈ '+h.label+': '+typeLabels[typ],amount:n2(grp.jod),currency:'JOD',type:'out',method:'holiday',note:h.label+' — '+typ});
+        else if(grp.rmb>0)items.push({id:tickId,name:'✈ '+h.label+': '+typeLabels[typ],amount:n2(grp.rmb),currency:'RMB',type:'out',method:'holiday',note:h.label+' — '+typ});
+      });
     });
   });
   safeArr(wishlistItems).filter(function(w){return w.scheduledYr===yr&&w.scheduledMo===mo;}).forEach(function(w){items.push({id:'wl-'+w.id,name:'\uD83D\uDED2 '+w.name,amount:w.amount,currency:w.currency,type:'out',method:'wishlist',note:w.note||'Wishlist item'});});
@@ -3391,6 +3415,13 @@ function holDays(h){return Math.round((new Date(h.end)-new Date(h.start))/864000
 function holItemTotal(item){if(item.type==='daily'||item.type==='hotel')return n2(item.amount*(item.nights||1));return n2(item.amount);}
 function holTotalByCur(h){var t={};safeArr(h.items).forEach(function(item){var c=item.currency||'RMB';t[c]=(t[c]||0)+holItemTotal(item);});return t;}
 function holIsPast(h){return new Date(h.end)<today();}
+function holItemPayMonth(h,item){
+  // Returns {yr,mo} for when a one-off item should be paid (daysBefore holiday start)
+  var start=new Date(h.start);
+  var db=item.daysBefore!=null?item.daysBefore:30;
+  var payDate=new Date(start.getTime()-db*86400000);
+  return {yr:payDate.getFullYear(),mo:payDate.getMonth()+1};
+}
 function holIsActive(h){
   if(!h.start||!h.end)return false;
   var now=today();var start=new Date(h.start);var end=new Date(h.end);
@@ -3552,6 +3583,12 @@ function buildHolItemDiv(h,item){
   acctS.onchange=(function(itm,cs){return function(){itm.account=this.value;var defCur=holDefaultCurrency(this.value);itm.currency=defCur;cs.value=defCur;autosave();};})(item,cS);
   row.appendChild(mkI('Label',lI));row.appendChild(mkI('Amount',aI));row.appendChild(mkI('Account',acctS));row.appendChild(mkI('Currency',cS));
   if(item.type==='hotel'||item.type==='daily'){var nI=document.createElement('input');nI.type='number';nI.value=item.nights||1;nI.style.width='60px';nI.onchange=function(){item.nights=parseInt(this.value,10)||1;autosave();};row.appendChild(mkI(item.type==='hotel'?'Nights':'Days',nI));}
+  // Days-before-holiday field for one-off items (flight/hotel/other)
+  if(item.type==='flight'||item.type==='hotel'||item.type==='other'){
+    var dbI=document.createElement('input');dbI.type='number';dbI.value=(item.daysBefore!=null?item.daysBefore:30);dbI.style.width='70px';
+    dbI.onchange=function(){item.daysBefore=parseInt(this.value,10);if(isNaN(item.daysBefore))item.daysBefore=0;autosave();};
+    row.appendChild(mkI('Pay days before',dbI));
+  }
   iDiv.appendChild(row);
   var foot=document.createElement('div');foot.id='hfoot-'+item.id;foot.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-top:5px';
   var typeTag=document.createElement('span');typeTag.className='tag tg-n';typeTag.textContent=item.type;foot.appendChild(typeTag);
