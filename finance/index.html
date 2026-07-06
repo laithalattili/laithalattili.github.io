@@ -2167,6 +2167,23 @@ function renderLogMonthlySummary(){
     +'</div>'
     +'</div>';
 }
+function renderLogHolBar(){
+  var el=document.getElementById('log-hol-bar');if(!el)return;
+  el.innerHTML='';
+  var active=getActiveHolidays();if(!active.length)return;
+  active.forEach(function(h){
+    var bd=holDailyBudgetTotal(h);
+    var spent=holDailyBudgetSpent(h);
+    var pct=bd.total>0?Math.min(100,Math.round(spent/bd.total*100)):0;
+    var over=spent>bd.total;
+    var bar=document.createElement('div');
+    bar.style.cssText='background:var(--surf2);border:.5px solid #f2a65a;border-radius:var(--r);padding:9px;margin-bottom:6px';
+    bar.innerHTML='<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#f2a65a;margin-bottom:4px"><span>✈ '+h.label+'</span><span style="color:'+(over?'var(--red)':'var(--ink3)')+'">'+n2(spent)+' / '+bd.total+' '+bd.currency+'</span></div>'+
+      '<div style="background:var(--brd);border-radius:3px;height:6px;overflow:hidden"><div style="height:100%;border-radius:3px;width:'+pct+'%;background:'+(over?'var(--red)':'#f2a65a')+'"></div></div>'+
+      '<div style="font-size:10px;margin-top:2px;color:'+(over?'var(--red)':'var(--ink3)')+'">'+( over?'⚠ Over by '+n2(spent-bd.total):(n2(bd.total-spent)+' remaining'))+' '+bd.currency+'</div>';
+    el.appendChild(bar);
+  });
+}
 function renderLogBudgetBars(){
   var el=document.getElementById('log-budget-bars');if(!el)return;
   var now2=today();
@@ -2190,6 +2207,7 @@ function renderLogBudgetBars(){
 function renderLog(){
   var ld=document.getElementById('log-date');if(ld&&!ld.value)ld.value=today().toISOString().split('T')[0];
   renderLogMonthlySummary();
+  renderLogHolBar();
   renderLogBudgetBars();
   renderLogFavourites();
   renderLogCurToggle();
@@ -2373,6 +2391,28 @@ function getCommitItemsForMonth(yr,mo){
   var parentSt=streams.find(function(s){return s.isParents&&s.isCommitment;});
   if(parentSt&&streamDueInMonth(parentSt,yr,mo)){var pr=getParentForMonth(yr,mo);items.push({id:'parents',name:pr+' this month',amount:getStreamAmount(parentSt,yr,mo),currency:parentSt.currency,type:'out',method:'transfer',note:'Alternating Mother/Father'});}
   settlements.forEach(function(s){if(!s.active)return;var phAmt=settlePhaseAmount(s,yr,mo);if(phAmt>0){var fromAcct=s.divFundAccount||'rmb';var dispAmt=fromAcct==='rmb'?n2(phAmt*S.jod2rmb):phAmt;var dispCur=fromAcct==='rmb'?'RMB':'JOD';items.push({id:'settle-'+s.id,name:s.name.split('-')[0].trim()+' payment',amount:dispAmt,currency:dispCur,type:'out',method:'settlement',note:fJOD(phAmt)+' JOD'+(fromAcct==='rmb'?' from BOC':'')});}});
+  // Holidays — daily budget shows in commitments for each active month
+  safeArr(holidays).forEach(function(h){
+    if(holIsPast(h))return;
+    if(!h.start||!h.end)return;
+    var holStart=new Date(h.start);var holEnd=new Date(h.end);
+    var dailyItems=safeArr(h.items).filter(function(i){return i.type==='daily';});
+    if(dailyItems.length){
+      // Calculate days in this month
+      var monthStart=new Date(yr,mo-1,1);var monthEnd=new Date(yr,mo,0);
+      var overlapStart=new Date(Math.max(holStart.getTime(),monthStart.getTime()));
+      var overlapEnd=new Date(Math.min(holEnd.getTime(),monthEnd.getTime()));
+      var overlapDays=Math.max(0,Math.round((overlapEnd-overlapStart)/86400000)+1);
+      if(overlapDays>0){
+        var dailyTotalJOD=dailyItems.reduce(function(a,item){return a+toJOD(holItemTotal(item)/Math.max(1,item.nights||1),item.currency||'RMB');},0);
+        var monthDailyJOD=n2(dailyTotalJOD*overlapDays);
+        var dacct=dailyItems[0].account||h.account||'boc';
+        var dcur=(dacct==='arab'||dacct==='cash-jod')?'JOD':'RMB';
+        var damt=dcur==='RMB'?n2(monthDailyJOD*S.jod2rmb):monthDailyJOD;
+        items.push({id:'holday-'+h.id+'-'+yr+'-'+mo,name:'✈ '+h.label+' (daily budget)',amount:damt,currency:dcur,type:'out',method:'holiday',note:overlapDays+' days × daily rate'});
+      }
+    }
+  });
   // Holidays — each one-off item appears in its payMonth
   safeArr(holidays).forEach(function(h){
     if(holIsPast(h))return;
