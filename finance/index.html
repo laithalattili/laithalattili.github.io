@@ -544,6 +544,7 @@ input:focus,select:focus{border-color:var(--ink)}
   <button class="btn" onclick="cancelEdit()" id="log-cancel" style="display:none;width:100%;justify-content:center;margin-top:7px">&#10005; Cancel Edit</button>
   <div id="log-favourites" style="margin-top:9px"></div>
   <div class="sec-label" style="margin-top:14px">Category</div>
+  <div id="log-hol-bar" style="margin-bottom:9px"></div>
   <div id="log-budget-bars" style="margin-bottom:9px"></div>
   <div class="cat-grid" id="cat-grid"></div>
   <div class="ig" style="margin-bottom:11px"><label>Note (optional)</label><input type="text" id="log-note" placeholder="e.g. lunch, Taobao, taxi&hellip;"/></div>
@@ -1709,27 +1710,70 @@ function buildProjection(){
       if(w.currency==='JOD'){if(!isPrePaid)jodOut+=w.amount;jodItems.push({l:'\uD83D\uDED2 '+w.name,v:'-'+fJOD(w.amount),c:'neg',streamId:wTickId,isWishlist:true,wlId:w.id,prePaid:isPrePaid});}
       else{if(!isPrePaid)rmbOut+=w.amount;rmbItems.push({l:'\uD83D\uDED2 '+w.name,v:'-'+fRMB(w.amount),c:'neg',streamId:wTickId,isWishlist:true,wlId:w.id,prePaid:isPrePaid});}
     });
-    // Holidays — check prePaidIds
+    // Holidays — one-off items appear in their payMonth; daily items split proportionally
     var holThisMonth=[];
+    // Daily budget: split proportionally across holiday months
     safeArr(holidays).forEach(function(h){
       if(holIsPast(h))return;
-      var pm=holPrepMonth(h);
-      if(pm.yr===yr&&pm.mo===mo){
-        var jodTotal=0,rmbTotal=0;
-        safeArr(h.items).forEach(function(item){
-          var amt=holItemTotal(item);
-          var acct=item.account||h.account||'boc';
-          if(acct==='arab'||acct==='cash-jod'){jodTotal+=toJOD(amt,item.currency||'JOD');}
-          else{rmbTotal+=toRMB(amt,item.currency||'RMB');}
-        });
-        if(jodTotal>0||rmbTotal>0){
-          holThisMonth.push(h.label);
-          var holTickId='hol-'+h.id;
-          var holPrePaid=prePaidIds.indexOf(holTickId)>=0;
-          if(jodTotal>0){if(!holPrePaid)jodOut+=n2(jodTotal);jodItems.push({l:'\u2708 '+h.label+' (trip)',v:'-'+fJOD(n2(jodTotal)),c:'neg',isHoliday:true,holId:h.id,streamId:holTickId,prePaid:holPrePaid});}
-          if(rmbTotal>0){if(!holPrePaid)rmbOut+=n2(rmbTotal);rmbItems.push({l:'\u2708 '+h.label+' (trip)',v:'-'+fRMB(n2(rmbTotal)),c:'neg',isHoliday:true,holId:h.id,streamId:holTickId,prePaid:holPrePaid});}
+      if(!h.start||!h.end)return;
+      var holStart=new Date(h.start);var holEnd=new Date(h.end);
+      var dailyItems=safeArr(h.items).filter(function(it){return it.type==='daily';});
+      if(dailyItems.length){
+        var dailyTotalJOD=dailyItems.reduce(function(a,item){return a+toJOD(holItemTotal(item)/Math.max(1,item.nights||1),item.currency||'RMB');},0);
+        var monthStart=new Date(yr,mo-1,1);var monthEnd=new Date(yr,mo,0);
+        var overlapStart=new Date(Math.max(holStart.getTime(),monthStart.getTime()));
+        var overlapEnd=new Date(Math.min(holEnd.getTime(),monthEnd.getTime()));
+        if(i===0&&holStart<=now)overlapStart=new Date(Math.max(now.getTime(),monthStart.getTime()));
+        var overlapDays=Math.max(0,Math.round((overlapEnd-overlapStart)/86400000)+1);
+        if(overlapDays>0){
+          var monthDailyJOD=n2(dailyTotalJOD*overlapDays);
+          var isCurrentlyActive=holStart<=now&&holEnd>=now;
+          if(i===0&&isCurrentlyActive){
+            var spentJOD=toJOD(holDailyBudgetSpent(h),dailyItems[0].currency||'RMB');
+            monthDailyJOD=n2(Math.max(0,monthDailyJOD-spentJOD));
+          }
+          if(monthDailyJOD>0){
+            var holDayTickId='holday-'+h.id+'-'+yr+'-'+mo;
+            var isDayPrePaid=prePaidIds.indexOf(holDayTickId)>=0;
+            if(holThisMonth.indexOf(h.label)<0)holThisMonth.push(h.label);
+            var dacct=dailyItems[0].account||h.account||'boc';
+            if(dacct==='arab'||dacct==='cash-jod'){
+              if(!isDayPrePaid)jodOut+=monthDailyJOD;
+              jodItems.push({l:'✈ '+h.label+' (daily)',v:'-'+fJOD(monthDailyJOD),c:'neg',streamId:holDayTickId,prePaid:isDayPrePaid});
+            } else {
+              var monthDailyRMB=n2(monthDailyJOD*S.jod2rmb);
+              if(!isDayPrePaid)rmbOut+=monthDailyRMB;
+              rmbItems.push({l:'✈ '+h.label+' (daily)',v:'-'+fRMB(monthDailyRMB),c:'neg',streamId:holDayTickId,prePaid:isDayPrePaid});
+            }
+          }
         }
       }
+    });
+    // One-off items in their payMonth
+    safeArr(holidays).forEach(function(h){
+      if(holIsPast(h))return;
+      if(!h.start)return;
+      var holStart=new Date(h.start);
+      safeArr(h.items).forEach(function(item){
+        if(item.type==='daily')return;
+        var itemYr=item.payYr||holStart.getFullYear();
+        var itemMo=item.payMo||(holStart.getMonth()+1);
+        if(itemYr!==yr||itemMo!==mo)return;
+        var amt=holItemTotal(item);if(!amt)return;
+        var acct=item.account||h.account||'boc';
+        var tickId='holitem-'+h.id+'-'+item.id;
+        var isPrePaid=prePaidIds.indexOf(tickId)>=0;
+        if(holThisMonth.indexOf(h.label)<0)holThisMonth.push(h.label);
+        if(acct==='arab'||acct==='cash-jod'){
+          var jodAmt=toJOD(amt,item.currency||'JOD');
+          if(!isPrePaid)jodOut+=jodAmt;
+          jodItems.push({l:'✈ '+h.label+': '+item.label,v:'-'+fJOD(jodAmt),c:'neg',isHoliday:true,holId:h.id,streamId:tickId,prePaid:isPrePaid});
+        } else {
+          var rmbAmt=toRMB(amt,item.currency||'RMB');
+          if(!isPrePaid)rmbOut+=rmbAmt;
+          rmbItems.push({l:'✈ '+h.label+': '+item.label,v:'-'+fRMB(rmbAmt),c:'neg',isHoliday:true,holId:h.id,streamId:tickId,prePaid:isPrePaid});
+        }
+      });
     });
     // Surplus lump: show in next month (i===1)
     if(i===1){
@@ -2329,7 +2373,22 @@ function getCommitItemsForMonth(yr,mo){
   var parentSt=streams.find(function(s){return s.isParents&&s.isCommitment;});
   if(parentSt&&streamDueInMonth(parentSt,yr,mo)){var pr=getParentForMonth(yr,mo);items.push({id:'parents',name:pr+' this month',amount:getStreamAmount(parentSt,yr,mo),currency:parentSt.currency,type:'out',method:'transfer',note:'Alternating Mother/Father'});}
   settlements.forEach(function(s){if(!s.active)return;var phAmt=settlePhaseAmount(s,yr,mo);if(phAmt>0){var fromAcct=s.divFundAccount||'rmb';var dispAmt=fromAcct==='rmb'?n2(phAmt*S.jod2rmb):phAmt;var dispCur=fromAcct==='rmb'?'RMB':'JOD';items.push({id:'settle-'+s.id,name:s.name.split('-')[0].trim()+' payment',amount:dispAmt,currency:dispCur,type:'out',method:'settlement',note:fJOD(phAmt)+' JOD'+(fromAcct==='rmb'?' from BOC':'')});}});
-  safeArr(holidays).forEach(function(h){if(holIsPast(h))return;var pm=holPrepMonth(h);if(pm.yr===yr&&pm.mo===mo){var tot=holTotalByCur(h);var firstCur=Object.keys(tot)[0]||'RMB';var firstAmt=tot[firstCur]||0;items.push({id:'hol-'+h.id,name:'\u2708 '+h.label,amount:firstAmt,currency:firstCur,type:'out',method:'holiday',note:'Trip budget'});}});
+  // Holidays — each one-off item appears in its payMonth
+  safeArr(holidays).forEach(function(h){
+    if(holIsPast(h))return;
+    if(!h.start)return;
+    var holStart=new Date(h.start);
+    safeArr(h.items).forEach(function(item){
+      if(item.type==='daily')return;
+      var itemYr=item.payYr||holStart.getFullYear();
+      var itemMo=item.payMo||(holStart.getMonth()+1);
+      if(itemYr!==yr||itemMo!==mo)return;
+      var amt=holItemTotal(item);if(!amt)return;
+      var acct=item.account||h.account||'boc';
+      var cur=(acct==='arab'||acct==='cash-jod')?(item.currency||'JOD'):(item.currency||'RMB');
+      items.push({id:'holitem-'+h.id+'-'+item.id,name:'✈ '+h.label+': '+item.label,amount:amt,currency:cur,type:'out',method:'holiday',note:h.label+' — '+item.type});
+    });
+  });
   safeArr(wishlistItems).filter(function(w){return w.scheduledYr===yr&&w.scheduledMo===mo;}).forEach(function(w){items.push({id:'wl-'+w.id,name:'\uD83D\uDED2 '+w.name,amount:w.amount,currency:w.currency,type:'out',method:'wishlist',note:w.note||'Wishlist item'});});
   return items;
 }
@@ -3292,6 +3351,53 @@ function holDays(h){return Math.round((new Date(h.end)-new Date(h.start))/864000
 function holItemTotal(item){if(item.type==='daily'||item.type==='hotel')return n2(item.amount*(item.nights||1));return n2(item.amount);}
 function holTotalByCur(h){var t={};safeArr(h.items).forEach(function(item){var c=item.currency||'RMB';t[c]=(t[c]||0)+holItemTotal(item);});return t;}
 function holIsPast(h){return new Date(h.end)<today();}
+function holIsActive(h){
+  if(!h.start||!h.end)return false;
+  var now=today();var start=new Date(h.start);var end=new Date(h.end);
+  return now>=start&&now<=end;
+}
+function holDailyBudgetTotal(h){
+  var total=0;var cur='RMB';
+  safeArr(h.items).forEach(function(item){
+    if(item.type==='daily'){total+=holItemTotal(item);cur=item.currency||'RMB';}
+  });
+  return {total:n2(total),currency:cur};
+}
+function holDailyBudgetSpent(h){
+  var catKey='__hol-'+h.id+'__';
+  if(!Array.isArray(expenses))return 0;
+  return n2(safeArr(expenses).filter(function(e){return e.category===catKey;}).reduce(function(a,e){return a+toRMB(e.amount,e.currency);},0));
+}
+function getActiveHolidays(){
+  return safeArr(holidays).filter(function(h){return holIsActive(h)&&safeArr(h.items).some(function(i){return i.type==='daily';});});
+}
+function syncHolidayBudgets(){
+  try{
+    if(!S||!S.budgets||!Array.isArray(holidays))return;
+    var activeKeys=[];
+    getActiveHolidays().forEach(function(h){
+      var key='__hol-'+h.id+'__';
+      activeKeys.push(key);
+      var bd=holDailyBudgetTotal(h);
+      if(!S.budgets[key]){
+        S.budgets[key]={amount:bd.total,currency:bd.currency,account:'boc',isHoliday:true,holId:h.id,holLabel:h.label};
+        if(!Array.isArray(S.budgetOrder))S.budgetOrder=[];
+        if(S.budgetOrder.indexOf(key)<0)S.budgetOrder.unshift(key);
+      }
+      if(!S.catColors)S.catColors={};
+      if(!S.catColors[key])S.catColors[key]='#f2a65a';
+      if(typeof CAT_COLORS!=='undefined')CAT_COLORS[key]='#f2a65a';
+    });
+    Object.keys(S.budgets).forEach(function(k){
+      if(k.indexOf('__hol-')===0&&activeKeys.indexOf(k)<0){
+        delete S.budgets[k];
+        if(S.catColors)delete S.catColors[k];
+        if(typeof CAT_COLORS!=='undefined')delete CAT_COLORS[k];
+        if(Array.isArray(S.budgetOrder))S.budgetOrder=S.budgetOrder.filter(function(x){return x!==k;});
+      }
+    });
+  }catch(e){console.warn('syncHolidayBudgets:',e);}
+}
 function holToggleAll(){
   var anyOpen=holidays.some(function(h){return holOpenState[h.id];});
   holidays.forEach(function(h){holOpenState[h.id]=!anyOpen;});
@@ -4668,6 +4774,7 @@ document.addEventListener('DOMContentLoaded',function(){
   });
   migrateBudgets();
   initCatColors();
+  if(typeof syncHolidayBudgets==='function')syncHolidayBudgets();
   initBudgetOrder();
   // Auto-link discretionary stream to all budget categories if not yet linked
   var discSt=streams.find(function(s){return s.id==='discretionary';});
