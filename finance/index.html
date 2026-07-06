@@ -2087,12 +2087,14 @@ async function pushFinanceSummary(){
       holiday_end:holEnd,
       updated_at:new Date().toISOString()
     };
-    await fetch(SB_URL+'/rest/v1/omni_finance_summary',{
+    var res=await fetch(SB_URL+'/rest/v1/omni_finance_summary',{
       method:'POST',
       headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'resolution=merge-duplicates'},
       body:JSON.stringify(payload)
     });
-  }catch(e){console.warn('pushFinanceSummary:',e);}
+    if(!res.ok){var errTxt=await res.text();console.error('[OMNI] push failed HTTP '+res.status+':',errTxt.slice(0,300));}
+    else{console.log('[OMNI] summary pushed for '+monthKey,payload);}
+  }catch(e){console.error('[OMNI] pushFinanceSummary error:',e);}
 }
 function updateSurplus(){
   var now=today();
@@ -2205,7 +2207,12 @@ function renderLogMonthlySummary(){
   var el=document.getElementById('log-month-summary');if(!el)return;
   var now=today();
   var mExp=expenses.filter(function(e){var d=new Date(e.date);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();});
-  var totalBudget=Object.keys(S.budgets).filter(function(c){return c!=='__surplus__'&&c.indexOf('__hol-')<0;}).reduce(function(a,cat){return a+toRMB(getBudgetAmount(cat),getBudgetCurrency(cat));},0);
+  var nyr=now.getFullYear(),nmo=now.getMonth()+1;
+  var frac=nonHolidayFraction(nyr,nmo);
+  // Which budget categories are linked to expense streams (subject to holiday proration)?
+  var linkedCats={};
+  safeArr(streams).forEach(function(s){if(s.type==='expense')safeArr(s.linkedBudgetCats).forEach(function(c){linkedCats[c]=true;});});
+  var totalBudget=Object.keys(S.budgets).filter(function(c){return c!=='__surplus__'&&c.indexOf('__hol-')<0;}).reduce(function(a,cat){var amt=getBudgetAmount(cat);if(linkedCats[cat])amt=n2(amt*frac);return a+toRMB(amt,getBudgetCurrency(cat));},0);
   var totalSpent=mExp.filter(function(e){return e.category!=='__surplus__'&&(e.category||'').indexOf('__hol-')<0;}).reduce(function(a,e){return a+toRMB(e.amount,e.currency);},0);
   var pct=totalBudget>0?Math.min(100,Math.round(totalSpent/totalBudget*100)):0;
   var over=totalSpent>totalBudget;
@@ -2248,15 +2255,20 @@ function renderLogBudgetBars(){
   var mExp2=expenses.filter(function(e){var d=new Date(e.date);return d.getMonth()===now2.getMonth()&&d.getFullYear()===now2.getFullYear();});
   var cats2=getBudgetOrder ? getBudgetOrder().filter(function(c){return c!=='__surplus__'&&c.indexOf('__hol-')<0;}) : Object.keys(S.budgets||{}).filter(function(c){return c!=='__surplus__'&&c.indexOf('__hol-')<0;});
   el.innerHTML='';
+  var nyr2=now2.getFullYear(),nmo2=now2.getMonth()+1;
+  var frac2=nonHolidayFraction(nyr2,nmo2);
+  var linkedCats2={};
+  safeArr(streams).forEach(function(s){if(s.type==='expense')safeArr(s.linkedBudgetCats).forEach(function(c){linkedCats2[c]=true;});});
   cats2.forEach(function(cat){
     var budget2=getBudgetAmount(cat);var cur2=getBudgetCurrency(cat);
+    if(linkedCats2[cat])budget2=n2(budget2*frac2); // prorate during holidays
     var spent2=mExp2.filter(function(x){return x.category===cat;}).reduce(function(a,x){return a+toTarget(x.amount,x.currency,cur2);},0);
     var pct2=Math.min(100,Math.round(spent2/(budget2||1)*100));
     var col2=pct2>90?'var(--red)':pct2>70?'var(--amb)':'var(--grn)';
     var fmtFn2=cur2==='JOD'?fJOD:cur2==='GBP'?fGBP:fRMB;
     var row2=document.createElement('div');row2.style.marginBottom='6px';
     row2.innerHTML='<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">'+
-      '<span style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:'+(CAT_COLORS[cat]||'#aaa')+';display:inline-block"></span>'+cat+'</span>'+
+      '<span style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:'+(CAT_COLORS[cat]||'#aaa')+';display:inline-block"></span>'+catDisplayName(cat)+'</span>'+
       '<span class="mono">'+fmtFn2(spent2)+' / '+fmtFn2(budget2)+' '+cur2+'</span></div>'+
       '<div class="prog-track"><div class="prog-fill" style="width:'+pct2+'%;background:'+col2+'"></div></div>';
     el.appendChild(row2);
