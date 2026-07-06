@@ -2068,8 +2068,8 @@ async function pushFinanceSummary(){
     }
     mExp.forEach(function(e){if(S.budgets&&S.budgets[e.category]&&e.category.indexOf('__hol-')<0&&e.category!=='__surplus__'){spentByCur[e.currency]=(spentByCur[e.currency]||0)+e.amount;}});
     // Holiday budget (active holidays)
-    var holBudget=0,holSpent=0,holCur='RMB';
-    getActiveHolidays().forEach(function(h){var bd=holDailyBudgetTotal(h);holBudget+=bd.total;holCur=bd.currency;holSpent+=holDailyBudgetSpent(h);});
+    var holBudget=0,holSpent=0,holCur='RMB',holStart=null,holEnd=null;
+    getActiveHolidays().forEach(function(h){var bd=holDailyBudgetTotal(h);holBudget+=bd.total;holCur=bd.currency;holSpent+=holDailyBudgetSpent(h);if(!holStart||new Date(h.start)<new Date(holStart))holStart=h.start;if(!holEnd||new Date(h.end)>new Date(holEnd))holEnd=h.end;});
     // Primary (RMB) totals for backward compat
     var budgetTotal=Object.keys(budgetByCur).reduce(function(a,c){return a+toRMB(budgetByCur[c],c);},0);
     var spentTotal=Object.keys(spentByCur).reduce(function(a,c){return a+toRMB(spentByCur[c],c);},0);
@@ -2083,6 +2083,8 @@ async function pushFinanceSummary(){
       holiday_budget:n2(holBudget),
       holiday_spent:n2(holSpent),
       holiday_currency:holCur,
+      holiday_start:holStart,
+      holiday_end:holEnd,
       updated_at:new Date().toISOString()
     };
     await fetch(SB_URL+'/rest/v1/omni_finance_summary',{
