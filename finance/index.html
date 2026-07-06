@@ -2410,6 +2410,21 @@ function getCommitItems(pyr,pmo){
   return items;
 }
 
+function commitToggleAll(){
+  var allKeys=['cat-out','cat-in','cat-carry','sub-transfer','sub-app','sub-settlement','sub-auto','sub-holiday','sub-wishlist','sub-income'];
+  var allOpen=allKeys.every(function(k){return cgOpen(k,true);});
+  allKeys.forEach(function(k){commitGroupState[k]=!allOpen;});
+  autosave();renderCommitments();
+}
+function cgOpen(key,def){
+  if(commitGroupState&&key in commitGroupState)return commitGroupState[key];
+  return def!==undefined?def:true;
+}
+function cgToggle(key,def){
+  var cur=cgOpen(key,def);
+  commitGroupState[key]=!cur;
+  autosave();renderCommitments();
+}
 function getCarryOverItems(yr,mo){
   // Returns unpaid commitment items from past months (not yet ticked)
   var carry=[];
