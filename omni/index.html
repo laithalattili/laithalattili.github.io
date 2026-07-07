@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Omni">
 <meta name="theme-color" content="#0f0c0a">
@@ -766,6 +767,15 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
       </div>
       <div id="ps-depart-preview" style="font-family:var(--mono);font-size:12px;color:var(--acc);padding:.4rem .6rem;background:rgba(184,88,40,.06);border-radius:6px;display:none"></div>
     </div>
+    <div class="inp" style="display:flex;flex-direction:column;gap:4px;margin-bottom:.65rem">
+      <label style="font-size:9px;font-weight:700;color:var(--tx4);text-transform:uppercase">Link to app (optional)</label>
+      <select id="ps-app-link" style="padding:9px 10px;border:1px solid var(--bd2);border-radius:5px;background:var(--sur);color:var(--tx);font-size:14px">
+        <option value="">None</option>
+        <option value="finance">Finance</option>
+        <option value="life">Life Manager</option>
+        <option value="work">Work</option>
+      </select>
+    </div>
     <div style="display:flex;gap:8px;margin-top:.5rem">
       <button id="ps-delete-btn" onclick="deletePersonalSlot()" style="padding:10px;background:var(--er-bg,#fff0f0);color:var(--er,#c00);border:1px solid var(--er,#c00)33;border-radius:8px;font-size:13px;display:none">Delete</button>
       <button onclick="closePersonalSlotModal()" style="flex:1;padding:10px;background:var(--sur);color:var(--tx2);border:1px solid var(--bd2);border-radius:8px;font-size:13px">Cancel</button>
@@ -1173,6 +1183,14 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
         <div class="inp" style="flex:1"><label>From</label><input type="date" id="tm-from"></div>
         <div class="inp" style="flex:1"><label>To</label><input type="date" id="tm-to"></div>
       </div>
+    </div>
+    <div class="inp"><label>Link to app (optional)</label>
+      <select id="tm-app-link">
+        <option value="">None</option>
+        <option value="finance">Finance</option>
+        <option value="life">Life Manager</option>
+        <option value="work">Work</option>
+      </select>
     </div>
     <div class="md-row">
       <button class="btn-s" style="flex:1" onclick="closeTaskModal()">Cancel</button>
@@ -2037,7 +2055,7 @@ function _renderDayNow(){
           return`<div class="slot-task-row"><div class="slot-task-cb${t2.done?' on':''}" onclick="toggleDone('${t2.dk}',this);setTimeout(renderDay,50)">${t2.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t2.done?' done':''}">${t2.text}</div>${rmBtn}</div>`;
         }).join('')}</div>`:'';
         const _leaveBy=ps?.sensitivity&&ps?.travel_mins!=null?_calcLeaveBy(sl.time,ps.sensitivity,ps.travel_mins):null;
-        slotsHtml+=`<div class="slot personal-slot"><div class="slot-hdr"><span class="slot-tr">${sl.time} <b>–${sl.end||sl.endTime}</b></span><span class="slot-pip" style="background:#7080c0"></span><span class="slot-lbl">${sl.label}</span>${_leaveBy?`<span style="font-family:var(--mono);font-size:10px;color:var(--acc);margin-left:4px">${icn('walk',11)} ${_leaveBy}</span>`:''}<button onclick="openEditPersonalSlot('${sl.psId}')" style="font-size:11px;color:#7080c0;background:none;border:none;padding:0 4px">✎</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:20px;font-weight:300;color:#7080c0;background:none;border:none;padding:0 3px;line-height:1">+</button></div>${psTasksHtml}</div>`;
+        slotsHtml+=`<div class="slot personal-slot"><div class="slot-hdr"><span class="slot-tr">${sl.time} <b>–${sl.end||sl.endTime}</b></span><span class="slot-pip" style="background:#7080c0"></span><span class="slot-lbl">${sl.label}</span>${_leaveBy?`<span style="font-family:var(--mono);font-size:10px;color:var(--acc);margin-left:4px">${icn('walk',11)} ${_leaveBy}</span>`:''}${ps?.app_link&&APP_LINKS[ps.app_link]?`<button onclick="openAppLink('${ps.app_link}')" title="Open ${APP_LINKS[ps.app_link].name}" style="font-size:10px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.09);border:1px solid rgba(184,88,40,.25);border-radius:5px;padding:2px 7px;margin-left:4px">${APP_LINKS[ps.app_link].name} ↗</button>`:''}<button onclick="openEditPersonalSlot('${sl.psId}')" style="font-size:11px;color:#7080c0;background:none;border:none;padding:0 4px">✎</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:20px;font-weight:300;color:#7080c0;background:none;border:none;padding:0 3px;line-height:1">+</button></div>${psTasksHtml}</div>`;
         return;
       }
       // Hide free/empty work slots covered by a personal event's time range
@@ -2119,7 +2137,7 @@ function _renderDayNow(){
       const workByCat={};const workUncat=[];const personal=[];
       // Gym tasks belong in habits section only, not in tasks
       unsched.forEach(t=>{if(t.src==='omni'){personal.push(t);}else if(t.src==='work'){if(_isHoliday())return;const cid=t._t?.cat||t._t?.category||'';if(cid&&catMap2[cid]){if(!workByCat[cid])workByCat[cid]=[];workByCat[cid].push(t);}else workUncat.push(t);}});
-      if(personal.length){const pDone=personal.filter(t=>t.done).length;const pTotal=personal.length;const pAllDone=pDone===pTotal;const pKey='omni_cat_col_personal';const pCol=localStorage.getItem(pKey)==='1';th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid #b8582844"><div style="padding:.3rem .7rem;background:${pAllDone?'rgba(184,88,40,.15)':'rgba(184,88,40,.07)'};border-bottom:${pCol?'none':'1px solid rgba(184,88,40,.15)'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('personal')"><span style="width:8px;height:8px;border-radius:50%;background:var(--acc);flex-shrink:0"></span><span style="font-size:10px;font-weight:700;color:var(--acc);flex:1;text-transform:uppercase;letter-spacing:.06em">Personal</span><span style="font-size:10px;color:${pAllDone?'var(--ok)':'var(--tx4)'}">${pAllDone?'✓ All done':''+pDone+'/'+pTotal}</span><span style="font-size:9px;color:var(--tx4);margin-left:3px">${pCol?'▶':'▼'}</span></div>`;if(!pCol){personal.forEach(t=>{const isGym=t.src==='gym';const u=t.tier===2&&t.urg;const m=isGym?(t.gymDone?'Logged ✓':'Tap gym tab'):t.tier===1?'Today':t.tier===2?(u?'⚠ Last day':'Window'):'Sticky';const ttime2=t._t?.taskTime;const cbFn=isGym?"switchTab('gym')":"toggleDone('"+t.dk+"',this);setTimeout(renderDay,50)";const icon=t.done?'✓':isGym?'🏋️':'';const iconSize=isGym&&!t.done?15:11;const editBtn=isGym?'':'<button onclick="openEditTask(\'' +t.id+'\')" style="font-size:12px;color:var(--tx4);background:none;border:none;padding:0 2px">✎</button>';th+=`<div class="task-row t${t.tier}${u?' urg':''}"><div class="task-cb${t.done?' on':''}" onclick="${cbFn}">${(t.done||isGym)?'<span style="font-size:'+iconSize+'px">'+icon+'</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}"> ${t.text}${ttime2?' <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">⌖ '+ttime2+'</span>':''}</div><div class="task-meta">${m}</div></div>${editBtn}</div>`;});}th+=`</div>`;}
+      if(personal.length){const pDone=personal.filter(t=>t.done).length;const pTotal=personal.length;const pAllDone=pDone===pTotal;const pKey='omni_cat_col_personal';const pCol=localStorage.getItem(pKey)==='1';th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid #b8582844"><div style="padding:.3rem .7rem;background:${pAllDone?'rgba(184,88,40,.15)':'rgba(184,88,40,.07)'};border-bottom:${pCol?'none':'1px solid rgba(184,88,40,.15)'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('personal')"><span style="width:8px;height:8px;border-radius:50%;background:var(--acc);flex-shrink:0"></span><span style="font-size:10px;font-weight:700;color:var(--acc);flex:1;text-transform:uppercase;letter-spacing:.06em">Personal</span><span style="font-size:10px;color:${pAllDone?'var(--ok)':'var(--tx4)'}">${pAllDone?'✓ All done':''+pDone+'/'+pTotal}</span><span style="font-size:9px;color:var(--tx4);margin-left:3px">${pCol?'▶':'▼'}</span></div>`;if(!pCol){personal.forEach(t=>{const isGym=t.src==='gym';const u=t.tier===2&&t.urg;const m=isGym?(t.gymDone?'Logged ✓':'Tap gym tab'):t.tier===1?'Today':t.tier===2?(u?'⚠ Last day':'Window'):'Sticky';const ttime2=t._t?.taskTime;const cbFn=isGym?"switchTab('gym')":"toggleDone('"+t.dk+"',this);setTimeout(renderDay,50)";const icon=t.done?'✓':isGym?'🏋️':'';const iconSize=isGym&&!t.done?15:11;const editBtn=isGym?'':'<button onclick="openEditTask(\'' +t.id+'\')" style="font-size:12px;color:var(--tx4);background:none;border:none;padding:0 2px">✎</button>';const linkBtn=(t._t?.appLink&&APP_LINKS[t._t.appLink])?`<button onclick="openAppLink('${t._t.appLink}')" title="Open ${APP_LINKS[t._t.appLink].name}" style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.09);border:1px solid rgba(184,88,40,.25);border-radius:5px;padding:1px 6px;margin-right:2px">${APP_LINKS[t._t.appLink].name} ↗</button>`:'';th+=`<div class="task-row t${t.tier}${u?' urg':''}"><div class="task-cb${t.done?' on':''}" onclick="${cbFn}">${(t.done||isGym)?'<span style="font-size:'+iconSize+'px">'+icon+'</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}"> ${t.text}${ttime2?' <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">⌖ '+ttime2+'</span>':''}</div><div class="task-meta">${m}</div></div>${linkBtn}${editBtn}</div>`;});}th+=`</div>`;}
       WCATS.forEach(cat=>{const cts=workByCat[cat.id];if(!cts?.length)return;const catDone=cts.filter(t=>t.done).length;const catTotal=cts.length;const allCatDone=catDone===catTotal;const catColKey='omni_cat_col_'+cat.id;const catCol2=localStorage.getItem(catColKey)==='1';th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid ${cat.color}44"><div style="padding:.3rem .7rem;background:${allCatDone?cat.color+'22':cat.color+'12'};border-bottom:${catCol2?'none':'1px solid '+cat.color+'22'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('${cat.id}')"><span style="width:8px;height:8px;border-radius:50%;background:${cat.color};flex-shrink:0"></span><span style="font-size:10px;font-weight:700;color:${cat.color};flex:1;text-transform:uppercase;letter-spacing:.06em">${cat.name}</span><span style="font-size:10px;color:${allCatDone?'var(--ok)':'var(--tx4)'}">${allCatDone?'✓ All done':''+catDone+'/'+catTotal}</span><span style="font-size:9px;color:var(--tx4);margin-left:3px">${catCol2?'▶':'▼'}</span></div>`;if(!catCol2){cts.forEach(t=>{const u=t.tier===2&&t.urg;const ttime=t._t?.taskTime;th+=`<div class="task-row t${t.tier}${u?' urg':''}"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}${ttime?' <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">⌖ '+ttime+'</span>':''}</div><div class="task-meta">${u?'⚠ Last day':t.tier===1?'Today':t.tier===2?'This week':'Ongoing'}</div></div></div>`;});}th+=`</div>`;});
       if(workUncat.length){const ucDone=workUncat.filter(t=>t.done).length;const ucTotal=workUncat.length;const ucAllDone=ucDone===ucTotal;const ucKey='omni_cat_col_other';const ucCol=localStorage.getItem(ucKey)==='1';th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid var(--bd)"><div style="padding:.3rem .7rem;background:${ucAllDone?'var(--bg3)':'var(--bg2)'};border-bottom:${ucCol?'none':'1px solid var(--bd)'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('other')"><span style="width:8px;height:8px;border-radius:50%;background:var(--tx4);flex-shrink:0"></span><span style="font-size:10px;font-weight:700;color:var(--tx3);flex:1;text-transform:uppercase;letter-spacing:.06em">Other</span><span style="font-size:10px;color:${ucAllDone?'var(--ok)':'var(--tx4)'}">${ucAllDone?'✓ All done':''+ucDone+'/'+ucTotal}</span><span style="font-size:9px;color:var(--tx4);margin-left:3px">${ucCol?'▶':'▼'}</span></div>`;if(!ucCol){workUncat.forEach(t=>{const u=t.tier===2&&t.urg;const ttime=t._t?.taskTime;th+=`<div class="task-row t${t.tier}${u?' urg':''} src-work"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}${ttime?' <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">⌖ '+ttime+'</span>':''}</div><div class="task-meta">Work · ${u?'⚠ Last day':t.tier===1?'Today':t.tier===2?'Window':'Ongoing'}</div></div></div>`;});}th+=`</div>`;}
     } else {
@@ -2367,6 +2385,7 @@ let _editTaskId=null;
 function openAddTask(){
   _editTaskId=null;el('task-title').textContent='Add Task';el('tm-text').value='';
   el('tm-tier').value='1';el('tm-del').style.display='none';
+  const _tal=el('tm-app-link');if(_tal)_tal.value='';
   el('tm-day-mode').value='weekday';
   el('tm-day').value='Mon';
   const d=new Date();const ds=d.toISOString().split('T')[0];
@@ -2383,6 +2402,7 @@ function openEditTask(id){
   else if(t.recurring){el('tm-day-mode').value='recurring';el('tm-day').value=t.day||'Mon';}
   else{el('tm-day-mode').value='weekday';el('tm-day').value=t.day||'Mon';}
   el('tm-from').value=t.from||'';el('tm-to').value=t.to||'';
+  const _tal2=el('tm-app-link');if(_tal2)_tal2.value=t.appLink||'';
   el('tm-del').style.display='';updateTaskFields();el('task-md').classList.add('on');
 }
 function updateTaskFields(){
@@ -2412,6 +2432,7 @@ async function saveTask(){
     from: tier===2?el('tm-from').value||null:null,
     to: tier===2?el('tm-to').value||null:null,
     taskTime,
+    appLink: el('tm-app-link')?.value||null,
   };
   if(_editTaskId){const i=OTASKS.findIndex(x=>x.id===_editTaskId);if(i>=0)OTASKS[i]=t;else OTASKS.push(t);}
   else OTASKS.push(t);
@@ -4052,6 +4073,7 @@ function openAddPersonalSlot(dateStr){
   document.querySelectorAll('input[name="ps-sens"]').forEach(r=>r.checked=false);
   document.querySelectorAll('#ps-sensitivity-opts label').forEach(l=>{l.style.borderColor='var(--bd)';l.style.background='var(--sur)';});
   document.getElementById('ps-travel').value='';
+  const _al=document.getElementById('ps-app-link');if(_al)_al.value='';
   _populateSensOpts();
   _psRecurChange();
   document.getElementById('personal-slot-modal').style.display='flex';
@@ -4077,6 +4099,7 @@ function openEditPersonalSlot(id){
     _populateSensOpts();
   }
   document.getElementById('ps-travel').value=ps.travel_mins||'';
+  const _al2=document.getElementById('ps-app-link');if(_al2)_al2.value=ps.app_link||'';
   _psUpdateDepartPreview();
   _psRecurChange();
   document.getElementById('personal-slot-modal').style.display='flex';
@@ -4106,6 +4129,7 @@ async function savePersonalSlot(){
     day_of_week:recur==='weekly'?document.getElementById('ps-dow').value:null,
     sensitivity,
     travel_mins,
+    app_link:document.getElementById('ps-app-link')?.value||null,
   };
   console.log('Saving personal slot:',JSON.stringify(row));
   try{
@@ -4219,6 +4243,15 @@ function _renderThemePicker(){
 }
 // Apply saved theme instantly on load
 applyTheme(localStorage.getItem('omni_theme')||'default');
+
+
+// ── APP LINKS (personal events can deep-link to sibling apps) ─────────────────
+const APP_LINKS={
+  finance:{name:'Finance',url:'https://laithalattili.github.io/finance/'},
+  life:{name:'Life Manager',url:'https://la-lifemanager.pages.dev/'},
+  work:{name:'Work',url:'https://laithalattili.github.io/work/'},
+};
+function openAppLink(key){const a=APP_LINKS[key];if(a)window.open(a.url,'_blank');}
 
 // ── HOLIDAY MODE ──────────────────────────────────────────────────────────────
 function _isHoliday(){return localStorage.getItem('omni_holiday')==='1';}
@@ -4860,6 +4893,11 @@ async function glSaveAndClose(){
   closeGymLive();showToast(type+' saved ✓');if(_curTab==='gym')renderGymToday();
 }
 
+
+// ── SERVICE WORKER (network-first; safe to keep — never serves stale pages) ──
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW register failed:',e));
+}
 </script>
 </body>
 </html>
