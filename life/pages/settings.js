@@ -6,9 +6,21 @@ PAGES.settings = async (container, app) => {
   const days = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
   const dayLabels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
+  const activeSection = localStorage.getItem('llm_settings_tab') || 'appearance';
+
   container.innerHTML = `
     <div class="page-title">Settings</div>
-    <div class="page-subtitle">Routines, calendar rules & preferences</div>
+    <div class="page-subtitle">Preferences, routines & data</div>
+
+    <div class="module-tabs" id="settings-tabs">
+      <button class="module-tab ${activeSection==='appearance'?'active':''}" data-section="appearance">Appearance</button>
+      <button class="module-tab ${activeSection==='personal'?'active':''}" data-section="personal">Personal</button>
+      <button class="module-tab ${activeSection==='reading'?'active':''}" data-section="reading">Reading</button>
+      <button class="module-tab ${activeSection==='data'?'active':''}" data-section="data">Data</button>
+    </div>
+
+    <!-- ══ READING SECTION ══ -->
+    <div class="settings-section" data-section="reading" style="display:${activeSection==='reading'?'block':'none'};">
 
     <!-- Reading Routine -->
     <div class="card">
@@ -51,27 +63,19 @@ PAGES.settings = async (container, app) => {
       </div>
     </div>
 
-    <!-- Personal Settings -->
+    <!-- ══ APPEARANCE SECTION ══ -->
+    <div class="settings-section" data-section="appearance" style="display:${activeSection==='appearance'?'block':'none'};">
+
     <div class="card">
-      <div class="card-meta" style="margin-bottom:1rem;">Personal & Display</div>
+      <div class="card-meta" style="margin-bottom:1rem;">Colour Theme</div>
+      <div id="theme-picker" style="display:flex;gap:0.6rem;flex-wrap:wrap;"></div>
+    </div>
 
-      <div style="font-family:var(--mono);font-size:0.6rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.5rem;">Colour Theme</div>
-      <div id="theme-picker" style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:1.25rem;"></div>
-
-      <div class="form-group">
-        <label>Birthday</label>
-        <input type="date" id="pref-birthday" value="1993-12-30">
-      </div>
-
-      <div class="form-group">
-        <label>OMDb API Key</label>
-        <input type="text" id="pref-omdb" placeholder="Get free key at omdbapi.com">
-        <div style="font-family:var(--mono);font-size:0.6rem;color:var(--text3);margin-top:0.2rem;">Used to search and auto-fill film metadata</div>
-      </div>
-
+    <div class="card">
+      <div class="card-meta" style="margin-bottom:1rem;">Info Bar</div>
       <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;">
         <input type="checkbox" id="pref-show-bar" style="width:auto;">
-        <label for="pref-show-bar" style="margin-bottom:0;">Show info bar on desktop (clocks, date, age)</label>
+        <label for="pref-show-bar" style="margin-bottom:0;">Show info bar (clocks, date, age)</label>
       </div>
 
       <div style="font-family:var(--mono);font-size:0.6rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.5rem;margin-top:0.75rem;">Time Zones</div>
@@ -101,6 +105,30 @@ PAGES.settings = async (container, app) => {
       </div>
     </div>
 
+    </div><!-- end appearance -->
+
+    <!-- ══ PERSONAL SECTION ══ -->
+    <div class="settings-section" data-section="personal" style="display:${activeSection==='personal'?'block':'none'};">
+
+    <div class="card">
+      <div class="card-meta" style="margin-bottom:1rem;">Personal</div>
+      <div class="form-group">
+        <label>Birthday</label>
+        <input type="date" id="pref-birthday" value="1993-12-30">
+      </div>
+    </div>
+
+    <!-- PIN moved here -->
+    <div class="card">
+      <div class="card-meta" style="margin-bottom: 1rem;">Security</div>
+      <button class="btn btn-secondary btn-sm" id="btn-change-pin">Change PIN</button>
+    </div>
+
+    </div><!-- end personal -->
+
+    <!-- back into READING section for calendar rules -->
+    <div class="settings-section" data-section="reading" style="display:${activeSection==='reading'?'block':'none'};">
+
     <!-- Calendar Rules -->
     <div class="card">
       <div class="card-header">
@@ -115,13 +143,20 @@ PAGES.settings = async (container, app) => {
       </div>
     </div>
 
-    <!-- PIN -->
+    </div><!-- end reading -->
+
+    <!-- ══ DATA SECTION ══ -->
+    <div class="settings-section" data-section="data" style="display:${activeSection==='data'?'block':'none'};">
+
     <div class="card">
-      <div class="card-meta" style="margin-bottom: 1rem;">Security</div>
-      <button class="btn btn-secondary btn-sm" id="btn-change-pin">Change PIN</button>
+      <div class="card-meta" style="margin-bottom:1rem;">Integrations</div>
+      <div class="form-group">
+        <label>OMDb API Key</label>
+        <input type="text" id="pref-omdb" placeholder="Get free key at omdbapi.com">
+        <div style="font-family:var(--mono);font-size:0.6rem;color:var(--text3);margin-top:0.2rem;">Used to search and auto-fill film metadata</div>
+      </div>
     </div>
 
-    <!-- Export -->
     <div class="card">
       <div class="card-meta" style="margin-bottom: 1rem;">Export</div>
       <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
@@ -130,7 +165,20 @@ PAGES.settings = async (container, app) => {
         <button class="btn btn-secondary btn-sm" onclick="PAGES.exportStats(app)">Stats (PDF)</button>
       </div>
     </div>
+
+    </div><!-- end data -->
   `;
+
+  // Settings sub-tab switching — pure show/hide, all handlers stay live
+  document.getElementById('settings-tabs').addEventListener('click', e => {
+    const section = e.target.dataset.section;
+    if (!section) return;
+    localStorage.setItem('llm_settings_tab', section);
+    container.querySelectorAll('#settings-tabs .module-tab').forEach(t =>
+      t.classList.toggle('active', t.dataset.section === section));
+    container.querySelectorAll('.settings-section').forEach(sec =>
+      sec.style.display = sec.dataset.section === section ? 'block' : 'none');
+  });
 
   // Save reading routine
   document.getElementById('btn-save-routine').addEventListener('click', async () => {
