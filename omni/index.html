@@ -4487,7 +4487,7 @@ async function abLoadTrack(idx){
     if(saved>0&&saved<file.size)_abAudio.currentTime=saved;
     // Events
     _abAudio.addEventListener('loadedmetadata',()=>abRender());
-    _abAudio.addEventListener('timeupdate',()=>{abRender();});
+    _abAudio.addEventListener('timeupdate',()=>{abRender();if(typeof _labRender==='function')_labRender();});
     _abAudio.addEventListener('ended',()=>{abNext();});
     _abAudio.addEventListener('error',()=>{showToast('Error loading track');});
     // Auto-save position every 5s
@@ -4516,6 +4516,34 @@ function abSetSpeed(s){
   if(_abAudio)_abAudio.playbackRate=s;
   document.querySelectorAll('.ab-spd').forEach(b=>b.classList.toggle('on',+b.dataset.s===s));
 }
+// ── Live-mode audio bar render (lab- prefixed elements) ──────────────────────
+function _labRender(){
+  const titleEl=document.getElementById('lab-title');
+  const progEl=document.getElementById('lab-prog-fill');
+  const playBtn=document.getElementById('lab-play-btn');
+  const spdWrap=document.getElementById('lab-spd-btns');
+  if(!titleEl)return;
+  if(!_abFiles.length){
+    titleEl.textContent=_abDirHandle?'Tap Folder to reload':'No audio — tap Folder';
+    if(progEl)progEl.style.width='0%';
+    if(playBtn)playBtn.textContent='▶';
+  }else{
+    const name=_abFiles[_abIdx]?.name||'';
+    const dur=_abAudio?.duration||0,pos=_abAudio?.currentTime||0;
+    const fmt=s=>{const m=Math.floor(s/60),sec=Math.floor(s%60);return m+':'+(sec<10?'0':'')+sec;};
+    titleEl.textContent=name.replace(/\.[^.]+$/,'')+(dur>0?'  ·  '+fmt(pos)+'/'+fmt(dur):'')+'  ·  '+(_abIdx+1)+'/'+_abFiles.length;
+    if(progEl)progEl.style.width=(dur>0?(pos/dur*100):0).toFixed(1)+'%';
+    if(playBtn)playBtn.textContent=(_abAudio&&!_abAudio.paused)?'⏸':'▶';
+  }
+  // Speed buttons
+  if(spdWrap&&!spdWrap.dataset.built){
+    spdWrap.dataset.built='1';
+    spdWrap.innerHTML=[0.75,1,1.25,1.5,2].map(s=>`<button onclick="abSetSpeed(${s});_labRender()" data-spd="${s}" style="font-size:10px;padding:2px 8px;border-radius:10px;background:${s===_abSpeed?'var(--acc)':'rgba(255,255,255,.06)'};color:${s===_abSpeed?'#fff':'#888'};border:1px solid rgba(255,255,255,.1)">${s}×</button>`).join('');
+  }else if(spdWrap){
+    spdWrap.querySelectorAll('button').forEach(b=>{const s=parseFloat(b.dataset.spd);b.style.background=s===_abSpeed?'var(--acc)':'rgba(255,255,255,.06)';b.style.color=s===_abSpeed?'#fff':'#888';});
+  }
+}
+
 function abSeekLive(e,barEl){
   if(!_abAudio||!_abAudio.duration)return;
   const pct=(e.clientX-barEl.getBoundingClientRect().left)/barEl.offsetWidth;
@@ -4726,13 +4754,19 @@ function _fmtCd(remMins){
     return{str:pre+String(totalMin).padStart(2,'0')+':'+String(s).padStart(2,'0'),ot};
   }
 }
+function _showLiveAudioBar(show){
+  const bar=el('live-audio-bar');
+  if(bar)bar.style.display=show?'block':'none';
+  if(show&&typeof _labRender==='function')_labRender();
+}
 function openLive(){
   if(_curTab==='gym'&&_todayType()&&!_hasSessToday()){openGymLivePicker(_todayType());return;}
   _liveOpen=true;_liveShowStart=false;el('live-overlay').classList.add('on');el('btn-live-main')?.classList.add('active');
+  _showLiveAudioBar(true);
   _liveRender();if(_liveInterval)clearInterval(_liveInterval);_liveInterval=setInterval(_liveTick,500);
 }
 function closeLive(){
-  _liveOpen=false;el('live-overlay').classList.remove('on');el('btn-live-main')?.classList.remove('active');
+  _liveOpen=false;el('live-overlay').classList.remove('on');el('btn-live-main')?.classList.remove('active');_showLiveAudioBar(false);
   if(_liveInterval){clearInterval(_liveInterval);_liveInterval=null;}
   if(_liveFrozen)toggleFreeze();if(_liveWake){try{_liveWake.release();}catch(e){}_liveWake=null;}
 }
@@ -4836,10 +4870,11 @@ function openGymLive(type){
   _gymLiveExs=exs.map(ex=>({id:ex.id,name:ex.name,type,sets:REPSCHEME.map((r,i)=>({num:i+1,reps:r,weight:_lastW(ex.id)||'',done:false}))}));
   _gymLiveRestType=null;_gymLiveRestEndMs=0;_gymLiveRestBeepDone=false;_gymLiveStartMs=Date.now();_gymLiveExpandedEx=-1;
   _gymLiveOpen=true;el('live-overlay').classList.add('on');el('btn-live-main')?.classList.add('active');
+  _showLiveAudioBar(true);
   _gymLiveRender();if(_gymLiveInterval)clearInterval(_gymLiveInterval);_gymLiveInterval=setInterval(_gymLiveTick,500);
 }
 function closeGymLive(){
-  _gymLiveOpen=false;el('live-overlay').classList.remove('on');el('btn-live-main')?.classList.remove('active');
+  _gymLiveOpen=false;el('live-overlay').classList.remove('on');el('btn-live-main')?.classList.remove('active');_showLiveAudioBar(false);
   if(_gymLiveInterval){clearInterval(_gymLiveInterval);_gymLiveInterval=null;}
 }
 function glToggleEx(ei){_gymLiveExpandedEx=(_gymLiveExpandedEx===ei)?-1:ei;_gymLiveRender();}
