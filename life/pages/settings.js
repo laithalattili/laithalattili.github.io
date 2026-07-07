@@ -63,6 +63,8 @@ PAGES.settings = async (container, app) => {
       </div>
     </div>
 
+    </div><!-- end reading part 1 -->
+
     <!-- ══ APPEARANCE SECTION ══ -->
     <div class="settings-section" data-section="appearance" style="display:${activeSection==='appearance'?'block':'none'};">
 
