@@ -510,7 +510,7 @@ input:focus,select:focus{border-color:var(--ink)}
     </div>
   </div>
   <div id="dash-alerts"></div><div id="dash-notifications"></div><div id="dash-salary-alert"></div>
-  <div id="dash-proj-cards"><div style="padding:8px;background:var(--surf2);border-radius:6px;font-size:11px;color:var(--ink3)">Loading projection...</div></div>
+  <div id="dash-proj-cards"></div>
   <div id="dash-budget-bar"></div>
   <div id="dash-surplus-section"></div>
   <div id="dash-obligations-inline"></div>
@@ -521,7 +521,8 @@ input:focus,select:focus{border-color:var(--ink)}
     </div>
     <div id="cash-panel-dash"></div>
     <div id="dash-pinned-reserves"></div>
-    <div id="dash-balance-update"></div>
+    <div style="text-align:right;margin:2px 0 6px"><button class="btn btn-xs" id="dash-edit-toggle" onclick="var el=document.getElementById('dash-balance-update');var show=el.style.display==='none';el.style.display=show?'block':'none';this.textContent=show?'&#10005; Close editor':'&#9998; Edit balances & reserves';">&#9998; Edit balances &amp; reserves</button></div>
+    <div id="dash-balance-update" style="display:none"></div>
   </div>
   <div id="dash-settlement-pins" style="display:none"></div>
   <div id="dash-reorder-btn" style="text-align:right;margin-bottom:6px"></div>
@@ -1718,6 +1719,7 @@ function buildProjection(){
     var holThisMonth=[];
     // Daily budget: split proportionally across holiday months
     safeArr(holidays).forEach(function(h){
+      if(h.archived)return;
       if(holIsPast(h))return;
       if(!h.start||!h.end)return;
       var holStart=new Date(h.start);var holEnd=new Date(h.end);
@@ -1755,6 +1757,7 @@ function buildProjection(){
     });
     // One-off items grouped by TYPE, each lump appearing in its pay month (daysBefore)
     safeArr(holidays).forEach(function(h){
+      if(h.archived)return;
       if(holIsPast(h))return;
       if(!h.start)return;
       // Group one-off items by type
@@ -1971,48 +1974,41 @@ function renderDashboard(){
     var col=pct>90?'var(--red)':pct>70?'var(--amb)':'var(--grn)';
     var budBar=document.createElement('div');budBar.className='card';budBar.style.marginBottom='8px';
     budBar.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'+
-      '<div style="font-size:12px;font-weight:700;color:var(--ink2)">This month · budget</div>'+
+      '<div style="font-size:12px;font-weight:700;color:var(--ink2)">This month \u00b7 budget</div>'+
       '<div class="mono" style="font-size:13px;font-weight:700;color:'+(totalSpent>totalBudget?'var(--red)':'var(--ink2)')+'">'+fRMB(totalSpent)+' <span style="font-weight:400;color:var(--ink4)">/ '+fRMB(totalBudget)+'</span></div>'+
       '</div>'+
       '<div class="prog-track"><div class="prog-fill" style="width:'+pct+'%;background:'+col+'"></div></div>'+
       '<div style="font-size:11px;color:var(--ink3);margin-top:3px">'+(totalSpent>totalBudget?'Over by '+fRMB(totalSpent-totalBudget):fRMB(totalBudget-totalSpent)+' remaining')+'</div>';
-    budgetSecEl.appendChild(budBar);
-  }
-
-  // ── Surplus section ─────────────────────────────────────────────────────
-  var surplusEl=document.getElementById('dash-surplus-section');
-  if(surplusEl){
-    surplusEl.innerHTML='';
+    // Compact surplus strip inside the same card
     var surplusByCur=calcSurplusByCur();
-    var hasSurplus=Object.keys(surplusByCur).some(function(sc){return Math.abs(surplusByCur[sc])>0.01;});
-    if(hasSurplus){
-      var surCard=document.createElement('div');surCard.className='card';surCard.style.marginBottom='8px';
+    var surParts=[];
+    Object.entries(surplusByCur).forEach(function(entry){
+      var sc2=entry[0],sa=entry[1];
+      if(Math.abs(sa)<0.01)return;
+      var fmtFn2=sc2==='JOD'?fJOD:sc2==='GBP'?fGBP:fRMB;
+      surParts.push('<span class="mono" style="font-weight:700;color:'+(sa>=0?'var(--grn)':'var(--red)')+'">'+(sa>=0?'+':'')+fmtFn2(sa)+'</span>');
+    });
+    if(surParts.length){
       var resetDate2=S.surplusResetDate?new Date(S.surplusResetDate):null;
       var sinceStr=resetDate2?resetDate2.toLocaleDateString('en-GB',{month:'short',year:'numeric'}):'all time';
-      var surHd2=document.createElement('div');surHd2.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px';
-      var surTitle2=document.createElement('div');surTitle2.innerHTML='<span style="font-size:12px;font-weight:700;color:var(--ink2)">Budget surplus</span> <span style="font-size:10px;color:var(--ink4)">since '+sinceStr+'</span>';
-      var surResetBtn=document.createElement('button');surResetBtn.className='btn btn-xs btn-d';surResetBtn.textContent='Reset';surResetBtn.onclick=resetSurplus;
-      surHd2.appendChild(surTitle2);surHd2.appendChild(surResetBtn);surCard.appendChild(surHd2);
-      Object.entries(surplusByCur).forEach(function(entry){
-        var sc2=entry[0],sa=entry[1];
-        var isPos=sa>=0;
-        var fmtFn2=sc2==='JOD'?fJOD:sc2==='GBP'?fGBP:fRMB;
-        var srow=document.createElement('div');srow.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:.5px solid var(--brd)';
-        srow.innerHTML='<span style="font-size:12px;color:var(--ink3)">'+sc2+'</span><span class="mono" style="font-weight:700;font-size:14px;color:'+(isPos?'var(--grn)':'var(--red)')+'">'+(isPos?'+':'')+fmtFn2(sa)+'</span>';
-        surCard.appendChild(srow);
-      });
-      var curUnspentRMB=S.rmbSurplus||0;
-      if(curUnspentRMB>0){var curRow=document.createElement('div');curRow.style.cssText='margin-top:6px;font-size:11px;color:var(--ink3);font-style:italic';curRow.textContent='This month unspent so far: +'+fRMB(curUnspentRMB);surCard.appendChild(curRow);}
-      surplusEl.appendChild(surCard);
+      var surStrip=document.createElement('div');
+      surStrip.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:.5px solid var(--brd)';
+      surStrip.innerHTML='<span style="font-size:11px;color:var(--ink3)">Surplus <span style="color:var(--ink4);font-size:10px">since '+sinceStr+'</span></span>'+
+        '<span style="display:flex;gap:8px;align-items:center;font-size:12px">'+surParts.join(' ')+
+        '<button class="btn btn-xs btn-d" onclick="resetSurplus()" style="padding:1px 6px;font-size:10px">Reset</button></span>';
+      budBar.appendChild(surStrip);
     }
+    budgetSecEl.appendChild(budBar);
   }
+  // Surplus section container no longer used separately
+  var surplusEl=document.getElementById('dash-surplus-section');
+  if(surplusEl)surplusEl.innerHTML='';
   var up=[];var in30=new Date(now.getTime()+30*86400000);
   holidays.forEach(function(h){var prep=new Date(new Date(h.start).getTime()-21*86400000);if(prep>=now&&prep<=in30)up.push({l:'Book: '+h.label,d:prep,t:'tg-o'});});
   up.sort(function(a,b){return a.d-b.d;});
   var upEl=document.getElementById('dash-upcoming');if(upEl)upEl.innerHTML=up.length?up.map(function(u){return'<div class="tr"><div class="tr-l">'+u.l+'</div><span class="tag '+u.t+'">'+u.d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+'</span></div>';}).join(''):'<div style="font-size:13px;color:var(--ink3)">No upcoming items.</div>';
   // Obligations inline
   var oblEl=document.getElementById('dash-obligations-inline');
-  console.log('[OBL] oblEl=',oblEl?'found':'null','pinned=',settlements.filter(function(s){return s.pinnedHome;}).map(function(s){return s.name;}));
   if(oblEl){
     oblEl.innerHTML='';
     var pinned2=settlements.filter(function(s){return s.pinnedHome;});
@@ -2390,6 +2386,7 @@ function getCommitItems(pyr,pmo){
   // Holidays — daily budget shows in commitments for each active month
   try{
   safeArr(holidays).forEach(function(h){
+    if(h.archived)return;
     if(holIsPast(h))return;
     if(!h.start||!h.end)return;
     var holStart=new Date(h.start);var holEnd=new Date(h.end);
@@ -2412,6 +2409,7 @@ function getCommitItems(pyr,pmo){
   });
   // Holidays — one-off items grouped by TYPE, each lump in its pay month
   safeArr(holidays).forEach(function(h){
+    if(h.archived)return;
     if(holIsPast(h))return;
     if(!h.start)return;
     var byType={flight:[],hotel:[],other:[]};
@@ -3295,15 +3293,20 @@ function renderSettleEditPanel(s,container){
   panel.appendChild(r2);
   var delBtn=document.createElement('button');delBtn.className='btn btn-sm btn-d';delBtn.style.marginTop='6px';delBtn.textContent='Delete this settlement';
   delBtn.onclick=(function(sid){return function(){deleteSettlement(sid);};})(s.id);
-  var settSaveRow=document.createElement('div');settSaveRow.style.cssText='display:flex;gap:8px;align-items:center;margin-top:8px';
+  var settSaveRow=document.createElement('div');settSaveRow.style.cssText='display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap';
   settSaveRow.appendChild(makeSaveBtn('Save settings'));
+  var settArchBtn=document.createElement('button');settArchBtn.className='btn btn-sm';settArchBtn.textContent='\uD83D\uDCE6 Archive';
+  settArchBtn.title='Hide from all views and calculations';
+  settArchBtn.onclick=(function(sid){return function(){var so=settlements.find(function(x){return x.id===sid;});if(!so)return;if(!confirm('Archive "'+so.name+'"? It will be hidden from projection, commitments, and dashboard.'))return;so.archived=true;so.pinnedHome=false;autosave();sbPushNow();renderSettlement();};})(s.id);
+  settSaveRow.appendChild(settArchBtn);
   settSaveRow.appendChild(delBtn);
   panel.appendChild(settSaveRow);
   container.appendChild(panel);
 }
 function renderSettlement(){
   var tabBar=document.getElementById('settle-tabs');if(!tabBar)return;tabBar.innerHTML='';
-  settlements.forEach(function(s){
+  var archivedSettles=settlements.filter(function(s){return s.archived;});
+  settlements.filter(function(s){return !s.archived;}).forEach(function(s){
     var tab=document.createElement('div');tab.className='stab'+(currentStab===s.id?' active':'');
     tab.textContent=s.name.split(' ')[0];
     tab.onclick=(function(sid){return function(){currentStab=sid;renderSettlement();};})(s.id);
@@ -3312,7 +3315,9 @@ function renderSettlement(){
   var addTab=document.createElement('div');addTab.className='stab';addTab.style.cssText='color:var(--ink3);font-size:18px;line-height:1;padding:6px 12px';addTab.textContent='+';addTab.title='Add settlement';addTab.onclick=addSettlement;tabBar.appendChild(addTab);
   var content=document.getElementById('settle-content');if(!content)return;content.innerHTML='';
   if(!settlements.length){content.innerHTML='<div class="info-box">No settlements yet. Click + to add one.</div>';return;}
-  if(!currentStab||!settlements.find(function(x){return x.id===currentStab;}))currentStab=settlements[0].id;
+  var visibleSettles=settlements.filter(function(x){return !x.archived;});
+  if(!visibleSettles.length){content.innerHTML='<div class="info-box">All settlements archived.</div>';}
+  if(!currentStab||!visibleSettles.find(function(x){return x.id===currentStab;}))currentStab=(visibleSettles[0]||{}).id;
   var s=settlements.find(function(x){return x.id===currentStab;});
   if(!s){content.innerHTML='<div class="alert al-i">Select a tab.</div>';return;}
   renderSettleEditPanel(s,content);
@@ -3324,6 +3329,22 @@ function renderSettlement(){
   pinHint.textContent=s.pinnedHome?'Showing on Dashboard':'Click to show on Dashboard';
   pinRow.appendChild(pinBtn);pinRow.appendChild(pinHint);content.appendChild(pinRow);
   if(s.type==='investment')renderMotelSettle(s,content);else renderGenericSettle(s,content);
+  // Archived settlements section
+  if(archivedSettles.length){
+    var saWrap=document.createElement('div');saWrap.style.marginTop='16px';
+    var saHd=document.createElement('div');saHd.style.cssText='font-size:11px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.06em;cursor:pointer;padding:6px 0';
+    saHd.textContent='\uD83D\uDCE6 Archived ('+archivedSettles.length+') \u203A';
+    var saBody=document.createElement('div');saBody.style.display='none';
+    saHd.onclick=function(){saBody.style.display=saBody.style.display==='none'?'block':'none';saHd.textContent='\uD83D\uDCE6 Archived ('+archivedSettles.length+') '+(saBody.style.display==='none'?'\u203A':'\u2304');};
+    archivedSettles.forEach(function(so){
+      var row=document.createElement('div');row.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--surf);border:.5px solid var(--brd);border-radius:var(--r);margin-bottom:4px;opacity:.65';
+      var lbl=document.createElement('span');lbl.style.fontSize='12px';lbl.textContent=so.name+' \u2014 '+settlePct(so)+'% paid';
+      var unarch=document.createElement('button');unarch.className='btn btn-xs';unarch.textContent='Restore';
+      unarch.onclick=(function(sid){return function(){var x=settlements.find(function(y){return y.id===sid;});if(x){x.archived=false;autosave();sbPushNow();renderSettlement();}};})(so.id);
+      row.appendChild(lbl);row.appendChild(unarch);saBody.appendChild(row);
+    });
+    saWrap.appendChild(saHd);saWrap.appendChild(saBody);content.appendChild(saWrap);
+  }
 }
 function renderGenericSettle(s,container){
   var paid=settlePaid(s),left=settleLeft(s),pct=settlePct(s),planned=settlePlannedFuture(s);
@@ -3459,6 +3480,7 @@ function holidayDaysInMonth(yr,mo){
   var daysInMonth=new Date(yr,mo,0).getDate();
   var covered={};
   safeArr(holidays).forEach(function(h){
+    if(h.archived)return;
     if(!h.start||!h.end)return;
     var hs=parseLocalDate(h.start);var he=parseLocalDate(h.end);
     if(!hs||!he)return;
@@ -3504,7 +3526,7 @@ function holDailyBudgetSpent(h){
   return n2(safeArr(expenses).filter(function(e){return e.category===catKey;}).reduce(function(a,e){return a+toRMB(e.amount,e.currency);},0));
 }
 function getActiveHolidays(){
-  return safeArr(holidays).filter(function(h){return holIsActive(h)&&safeArr(h.items).some(function(i){return i.type==='daily';});});
+  return safeArr(holidays).filter(function(h){return !h.archived&&holIsActive(h)&&safeArr(h.items).some(function(i){return i.type==='daily';});});
 }
 function syncHolidayBudgets(){
   try{
@@ -3547,7 +3569,8 @@ function renderHolidays(){
   var btn=document.getElementById('hol-toggle-btn');if(btn)btn.textContent=anyOpen?'\u21C5 Collapse all':'\u21C5 Expand all';
   var CURRENCIES=['RMB','JOD','GBP','USD','EUR','THB','Other'];
   // Sort: upcoming first, past last
-  var sorted=holidays.slice().sort(function(a,b){var ap=holIsPast(a)?1:0,bp=holIsPast(b)?1:0;if(ap!==bp)return ap-bp;return new Date(a.start)-new Date(b.start);});
+  var archived=holidays.filter(function(h){return h.archived;});
+  var sorted=holidays.filter(function(h){return !h.archived;}).sort(function(a,b){var ap=holIsPast(a)?1:0,bp=holIsPast(b)?1:0;if(ap!==bp)return ap-bp;return new Date(a.start)-new Date(b.start);});
   sorted.forEach(function(h){
     var isPast=holIsPast(h);
     var totals=holTotalByCur(h);var totalStr=Object.entries(totals).map(function(e){return e[1].toLocaleString()+' '+e[0];}).join(' + ')||'No budget';
@@ -3621,12 +3644,32 @@ function renderHolidays(){
     var sumDiv=document.createElement('div');sumDiv.id='hsum-'+h.id;sumDiv.style.cssText='background:var(--bg);border-radius:var(--r);padding:9px;margin-top:5px';
     Object.entries(holTotalByCur(h)).forEach(function(e){sumDiv.innerHTML+='<div class="m-tr"><span class="m-tr-l">Total '+e[0]+'</span><span class="m-tr-v pos">'+e[1].toLocaleString()+' '+e[0]+'</span></div>';});
     body.appendChild(sumDiv);
-    // Save button
-    var holSaveBar=document.createElement('div');holSaveBar.style.cssText='padding:10px 0 4px;display:flex;justify-content:flex-end';
+    // Save + Archive buttons
+    var holSaveBar=document.createElement('div');holSaveBar.style.cssText='padding:10px 0 4px;display:flex;justify-content:flex-end;gap:8px;align-items:center';
+    var archBtn=document.createElement('button');archBtn.className='btn btn-sm';archBtn.textContent='\uD83D\uDCE6 Archive';
+    archBtn.title='Hide from all views and calculations';
+    archBtn.onclick=(function(hobj){return function(){if(!confirm('Archive "'+hobj.label+'"? It will be hidden from projection, commitments, and budgets.'))return;hobj.archived=true;autosave();sbPushNow();renderHolidays();};})(h);
+    holSaveBar.appendChild(archBtn);
     holSaveBar.appendChild(makeSaveBtn('Save holiday'));
     body.appendChild(holSaveBar);
     block.appendChild(body);hp.appendChild(block);
   });
+  // Archived section
+  if(archived.length){
+    var archWrap=document.createElement('div');archWrap.style.marginTop='16px';
+    var archHd=document.createElement('div');archHd.style.cssText='font-size:11px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.06em;cursor:pointer;padding:6px 0';
+    archHd.textContent='\uD83D\uDCE6 Archived ('+archived.length+') \u203A';
+    var archBody=document.createElement('div');archBody.style.display='none';
+    archHd.onclick=function(){archBody.style.display=archBody.style.display==='none'?'block':'none';archHd.textContent='\uD83D\uDCE6 Archived ('+archived.length+') '+(archBody.style.display==='none'?'\u203A':'\u2304');};
+    archived.forEach(function(h){
+      var row=document.createElement('div');row.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--surf);border:.5px solid var(--brd);border-radius:var(--r);margin-bottom:4px;opacity:.65';
+      var lbl=document.createElement('span');lbl.style.fontSize='12px';lbl.textContent=h.label+' ('+(h.start||'?')+' \u2192 '+(h.end||'?')+')';
+      var unarch=document.createElement('button');unarch.className='btn btn-xs';unarch.textContent='Restore';
+      unarch.onclick=(function(hobj){return function(){hobj.archived=false;autosave();sbPushNow();renderHolidays();};})(h);
+      row.appendChild(lbl);row.appendChild(unarch);archBody.appendChild(row);
+    });
+    archWrap.appendChild(archHd);archWrap.appendChild(archBody);hp.appendChild(archWrap);
+  }
 }
 function buildHolItemDiv(h,item){
   var CURRENCIES=['RMB','JOD','GBP','USD','EUR','THB','Other'];
@@ -4546,9 +4589,9 @@ function clearOldData(){
   alert('Removed '+(before-expenses.length)+' expenses and old snapshots before '+yr+'.');
   autosave();
 }
-function exportData(){try{var blob=new Blob([JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents},null,2)],{type:'application/json'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='laith-finance-'+today().toISOString().split('T')[0]+'.json';a.click();}catch(e){alert('Export failed: '+e.message);}}
+function exportData(){try{var payload=sbBuildPayload();var blob=new Blob([JSON.stringify(payload.data,null,2)],{type:'application/json'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='laith-finance-'+today().toISOString().split('T')[0]+'.json';a.click();}catch(e){alert('Export failed: '+e.message);}}
 function importData(){document.getElementById('import-file').click();}
-function doImport(input){var file=input.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(e){try{var d=JSON.parse(e.target.result);if(d.S)Object.assign(S,d.S);if(Array.isArray(d.streams))streams=d.streams;if(Array.isArray(d.streamOverrides))streamOverrides=d.streamOverrides;if(Array.isArray(d.settlements))settlements=d.settlements;if(Array.isArray(d.goldPieces))goldPieces=d.goldPieces;if(Array.isArray(d.properties))properties=d.properties;if(Array.isArray(d.holidays))holidays=d.holidays;if(Array.isArray(d.expenses))expenses=d.expenses;if(Array.isArray(d.oneoffEvents))oneoffEvents=d.oneoffEvents;autosave();showView(currentPage);alert('Imported.');}catch(err){alert('Import failed: '+err.message);}};reader.readAsText(file);}
+function doImport(input){var file=input.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(e){try{var d=JSON.parse(e.target.result);if(d.S)Object.assign(S,d.S);if(Array.isArray(d.streams))streams=d.streams;if(Array.isArray(d.streamOverrides))streamOverrides=d.streamOverrides;if(Array.isArray(d.settlements))settlements=d.settlements;if(Array.isArray(d.goldPieces))goldPieces=d.goldPieces;if(Array.isArray(d.properties))properties=d.properties;if(Array.isArray(d.holidays))holidays=d.holidays;if(Array.isArray(d.expenses))expenses=d.expenses;if(Array.isArray(d.oneoffEvents))oneoffEvents=d.oneoffEvents;if(d.tickState&&typeof d.tickState==='object')tickState=d.tickState;if(d.confirmedDebits&&typeof d.confirmedDebits==='object')confirmedDebits=d.confirmedDebits;if(Array.isArray(d.wishlistItems))wishlistItems=d.wishlistItems;if(Array.isArray(d.parentSkips))parentSkips=d.parentSkips;if(d.commitGroupState&&typeof d.commitGroupState==='object')commitGroupState=d.commitGroupState;if(Array.isArray(d.snapshots))S.snapshots=d.snapshots;if(d.catColors)S.catColors=d.catColors;if(Array.isArray(d.budgetOrder))S.budgetOrder=d.budgetOrder;autosave();sbPushNow();showView(currentPage);alert('Imported.');}catch(err){alert('Import failed: '+err.message);}};reader.readAsText(file);}
 function resetData(){if(!confirm('Reset ALL data?'))return;localStorage.removeItem('lf_data');location.reload();}
 
 // ═══ WISHLIST ═══
