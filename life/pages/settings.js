@@ -55,6 +55,9 @@ PAGES.settings = async (container, app) => {
     <div class="card">
       <div class="card-meta" style="margin-bottom:1rem;">Personal & Display</div>
 
+      <div style="font-family:var(--mono);font-size:0.6rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.5rem;">Colour Theme</div>
+      <div id="theme-picker" style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:1.25rem;"></div>
+
       <div class="form-group">
         <label>Birthday</label>
         <input type="date" id="pref-birthday" value="1993-12-30">
@@ -185,6 +188,40 @@ PAGES.settings = async (container, app) => {
   if (savedBirthday) document.getElementById('pref-birthday').value = savedBirthday;
   if (showBar === 'true') document.getElementById('pref-show-bar').checked = true;
   document.getElementById('pref-omdb').value = omdbKey || 'c0c229d0';
+
+  // Theme picker
+  const THEMES = [
+    { id: 'default',    name: 'Warm Neutral',   bg: '#f2ede8', accent: '#c4622d', bg3: '#eae4dd' },
+    { id: 'budapest',   name: 'Grand Budapest', bg: '#f5e9e6', accent: '#9d5c63', bg3: '#eddcd8' },
+    { id: 'darjeeling', name: 'Darjeeling',     bg: '#eef0e4', accent: '#2e6f6c', bg3: '#e2e5d2' },
+    { id: 'moonrise',   name: 'Moonrise',       bg: '#f6f0dc', accent: '#8a7a3b', bg3: '#ede4c8' },
+    { id: 'aquatic',    name: 'Life Aquatic',   bg: '#e9f0f2', accent: '#c0392b', bg3: '#dbe6e9' },
+  ];
+  const currentTheme = localStorage.getItem('llm_theme') || 'default';
+
+  const renderThemePicker = (active) => {
+    document.getElementById('theme-picker').innerHTML = THEMES.map(t => `
+      <div class="theme-swatch ${t.id===active?'active':''}" data-theme="${t.id}"
+        style="cursor:pointer;border:2px solid ${t.id===active?'var(--accent)':'var(--border)'};border-radius:8px;padding:0.5rem;width:104px;background:${t.bg};transition:border-color 0.15s;">
+        <div style="display:flex;gap:0.25rem;margin-bottom:0.4rem;">
+          <div style="width:20px;height:20px;border-radius:50%;background:${t.accent};"></div>
+          <div style="width:20px;height:20px;border-radius:50%;background:${t.bg3};border:1px solid rgba(0,0,0,0.08);"></div>
+        </div>
+        <div style="font-size:0.68rem;font-weight:600;color:#1c1916;">${t.name}</div>
+        ${t.id===active?'<div style="font-family:var(--mono);font-size:0.55rem;color:'+t.accent+';margin-top:0.15rem;">✓ Active</div>':''}
+      </div>
+    `).join('');
+
+    document.querySelectorAll('.theme-swatch').forEach(sw =>
+      sw.addEventListener('click', () => {
+        const theme = sw.dataset.theme;
+        APP.applyTheme(theme);
+        renderThemePicker(theme);
+        app.notify('Theme applied', 'success');
+      })
+    );
+  };
+  renderThemePicker(currentTheme);
 
   // Timezone management
   const defaultZones = [
