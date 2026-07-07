@@ -829,3 +829,100 @@ body.info-bar-visible #app nav {
   white-space: nowrap;
   user-select: none;
 }
+
+/* ══════════════════════════════════════════════════════════
+   THEMES — Wes Anderson-inspired palettes
+   Applied via <html data-theme="..."> attribute
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Grand Budapest — dusty pink, plum, powdered facade ── */
+html[data-theme="budapest"] {
+  --bg:          #f5e9e6;
+  --bg2:         #fbf3f1;
+  --bg3:         #eddcd8;
+  --bg4:         #ddc4be;
+  --border:      #d0b3ac;
+  --border2:     #b8968e;
+  --text:        #241a18;
+  --text2:       #6e5651;
+  --text3:       #a3867f;
+  --accent:      #9d5c63;
+  --accent2:     #82474e;
+  --accent-dim:  rgba(157,92,99,0.10);
+  --red:         #a63d3d;
+  --green:       #4f7a5e;
+  --green-light: #64966f;
+  --blue:        #4a6c8c;
+  --day-reading: rgba(157,92,99,0.08);
+  --day-done:    rgba(79,122,94,0.10);
+  --day-off:     rgba(163,134,127,0.06);
+}
+
+/* ── Darjeeling — sage, teal, mustard train ── */
+html[data-theme="darjeeling"] {
+  --bg:          #eef0e4;
+  --bg2:         #f7f8f0;
+  --bg3:         #e2e5d2;
+  --bg4:         #cdd2b8;
+  --border:      #b9c0a2;
+  --border2:     #9da688;
+  --text:        #1b1f18;
+  --text2:       #59614f;
+  --text3:       #8b9379;
+  --accent:      #2e6f6c;
+  --accent2:     #235755;
+  --accent-dim:  rgba(46,111,108,0.10);
+  --red:         #b0603a;   /* train mustard-rust */
+  --green:       #4a7c3f;
+  --green-light: #5f9852;
+  --blue:        #34647e;
+  --day-reading: rgba(46,111,108,0.08);
+  --day-done:    rgba(74,124,63,0.10);
+  --day-off:     rgba(139,147,121,0.06);
+}
+
+/* ── Moonrise — ivory, olive khaki, scout uniform ── */
+html[data-theme="moonrise"] {
+  --bg:          #f6f0dc;
+  --bg2:         #fbf7ea;
+  --bg3:         #ede4c8;
+  --bg4:         #ddd0a8;
+  --border:      #c9ba90;
+  --border2:     #ab9b70;
+  --text:        #201c10;
+  --text2:       #635a3e;
+  --text3:       #968a64;
+  --accent:      #8a7a3b;
+  --accent2:     #6e6130;
+  --accent-dim:  rgba(138,122,59,0.12);
+  --red:         #ad4a2f;
+  --green:       #5b7a3d;
+  --green-light: #729650;
+  --blue:        #3f6478;
+  --day-reading: rgba(138,122,59,0.10);
+  --day-done:    rgba(91,122,61,0.10);
+  --day-off:     rgba(150,138,100,0.06);
+}
+
+/* ── Life Aquatic — pale sky, Zissou red, sea foam ── */
+html[data-theme="aquatic"] {
+  --bg:          #e9f0f2;
+  --bg2:         #f4f8f9;
+  --bg3:         #dbe6e9;
+  --bg4:         #c2d4d9;
+  --border:      #a8c0c7;
+  --border2:     #88a5ad;
+  --text:        #14191b;
+  --text2:       #4e6167;
+  --text3:       #7e959c;
+  --accent:      #c0392b;
+  --accent2:     #9d2e22;
+  --accent-dim:  rgba(192,57,43,0.09);
+  --red:         #c0392b;
+  --green:       #2e7d6e;
+  --green-light: #3a9e8b;
+  --blue:        #2874a6;
+  --day-reading: rgba(192,57,43,0.07);
+  --day-done:    rgba(46,125,110,0.10);
+  --day-off:     rgba(126,149,156,0.06);
+}

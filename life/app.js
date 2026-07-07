@@ -236,7 +236,36 @@ const APP = {
     });
 
     this.initInfoBar();
+    this.initTheme();
     // bottom nav wired in index.html
+  },
+
+  async initTheme() {
+    // Instant apply from localStorage, then confirm from Supabase
+    const local = localStorage.getItem('llm_theme');
+    if (local && local !== 'default') {
+      document.documentElement.setAttribute('data-theme', local);
+    }
+    try {
+      const saved = await DB.getSetting('theme');
+      if (saved && saved !== 'default') {
+        document.documentElement.setAttribute('data-theme', saved);
+        localStorage.setItem('llm_theme', saved);
+      } else if (saved === 'default') {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem('llm_theme', 'default');
+      }
+    } catch(e) { /* theme is cosmetic, fail silently */ }
+  },
+
+  applyTheme(theme) {
+    if (theme === 'default') {
+      document.documentElement.removeAttribute('data-theme');
+    } else {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+    localStorage.setItem('llm_theme', theme);
+    DB.setSetting('theme', theme);
   },
 
   async initInfoBar() {
@@ -509,3 +538,4 @@ const APP = {
     document.querySelectorAll('.modal-overlay').forEach(el => el.remove());
   }
 };
+
