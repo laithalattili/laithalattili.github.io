@@ -26,6 +26,56 @@
   --font:'DM Sans',sans-serif;
   --mono:'DM Mono',monospace;
 }
+
+/* ── SETTINGS GROUPS ── */
+.ss-group{border:1px solid var(--bd);border-radius:10px;margin-bottom:.6rem;overflow:hidden;background:var(--sur)}
+.ss-grp-hdr{width:100%;display:flex;justify-content:space-between;align-items:center;padding:.65rem .8rem;background:var(--bg2);border:none;font-family:var(--font);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--tx2);cursor:pointer}
+.ss-grp-chev{transition:transform .18s;color:var(--tx4);font-size:11px}
+.ss-group.closed .ss-grp-chev{transform:rotate(-90deg)}
+.ss-group.closed .ss-grp-body{display:none}
+.ss-grp-body{padding:.3rem .8rem .6rem}
+.ss-grp-body .ss{border-bottom:1px solid var(--bd);padding:.55rem 0}
+.ss-grp-body .ss:last-child{border-bottom:none}
+
+/* ── THEMES (matching Life Manager palettes) ── */
+html[data-theme="budapest"]{
+  --bg:#f5e9e6;--bg2:#efe0dc;--bg3:#eddcd8;--bg4:#e0cbc5;
+  --sur:#fbf3f1;--sur2:#f5e9e6;
+  --acc:#9d5c63;--acc2:#82474e;--acc3:#b57880;
+  --tx:#241a18;--tx2:#4a3733;--tx3:#6e5651;--tx4:#a3867f;
+  --bd:#d0b3ac;--bd2:#c2a19a;
+  --ok:#4f7a5e;--ok-bg:#e9f1ec;
+  --er:#a63d3d;--er-bg:#f6e9e9;
+}
+html[data-theme="darjeeling"]{
+  --bg:#eef0e4;--bg2:#e8ebdb;--bg3:#e2e5d2;--bg4:#d2d6bd;
+  --sur:#f7f8f0;--sur2:#eef0e4;
+  --acc:#2e6f6c;--acc2:#235755;--acc3:#468f8b;
+  --tx:#1b1f18;--tx2:#3d4435;--tx3:#59614f;--tx4:#8b9379;
+  --bd:#b9c0a2;--bd2:#a9b190;
+  --ok:#4a7c3f;--ok-bg:#e9f0e6;
+  --er:#b0603a;--er-bg:#f7ece5;
+}
+html[data-theme="moonrise"]{
+  --bg:#f6f0dc;--bg2:#f1ead2;--bg3:#ede4c8;--bg4:#ddd2b0;
+  --sur:#fbf7ea;--sur2:#f6f0dc;
+  --acc:#8a7a3b;--acc2:#6e6130;--acc3:#a59450;
+  --tx:#201c10;--tx2:#443d28;--tx3:#635a3e;--tx4:#968a64;
+  --bd:#c9ba90;--bd2:#bbab7e;
+  --ok:#5b7a3d;--ok-bg:#edf1e5;
+  --er:#ad4a2f;--er-bg:#f7eae5;
+}
+html[data-theme="aquatic"]{
+  --bg:#e9f0f2;--bg2:#e1eaed;--bg3:#dbe6e9;--bg4:#c8d8dc;
+  --sur:#f4f8f9;--sur2:#e9f0f2;
+  --acc:#c0392b;--acc2:#9d2e22;--acc3:#d55b4e;
+  --tx:#14191b;--tx2:#36464c;--tx3:#4e6167;--tx4:#7e959c;
+  --bd:#a8c0c7;--bd2:#96b1b9;
+  --ok:#2e7d6e;--ok-bg:#e6f1ef;
+  --er:#c0392b;--er-bg:#f7e8e6;
+  --in:#2874a6;--in-bg:#e6eff6;
+}
+
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden}
 body{font-family:var(--font);background:var(--bg);color:var(--tx);font-size:14px;line-height:1.4}
@@ -67,7 +117,7 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
 @keyframes blink{50%{opacity:.1}}
 .hdr-date{font-size:10px;color:#4a3e30;margin-top:2px;letter-spacing:.03em}
 .hdr-r{display:flex;align-items:center;justify-content:flex-end;gap:5px}
-.hbtn{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);font-size:15px;color:#4a3e30;transition:all .12s;flex-shrink:0}
+.hbtn{width:34px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);color:#8a7a68;transition:all .12s;flex-shrink:0;padding:0}
 .hbtn:active{background:rgba(255,255,255,.12);transform:scale(.9)}
 .hbtn.lit{color:#f0c040;background:rgba(240,192,64,.1);border-color:rgba(240,192,64,.2)}
 .hdr-r2{padding:2px 12px 5px;border-top:1px solid rgba(255,255,255,.05);display:flex;align-items:center;gap:0;overflow:hidden}
@@ -446,7 +496,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
     <button class="pin-btn" onclick="pp(1)">1</button><button class="pin-btn" onclick="pp(2)">2</button><button class="pin-btn" onclick="pp(3)">3</button>
     <button class="pin-btn" onclick="pp(4)">4</button><button class="pin-btn" onclick="pp(5)">5</button><button class="pin-btn" onclick="pp(6)">6</button>
     <button class="pin-btn" onclick="pp(7)">7</button><button class="pin-btn" onclick="pp(8)">8</button><button class="pin-btn" onclick="pp(9)">9</button>
-    <button class="pin-btn pin-act" onclick="pinLeft()">⭐</button>
+    <button class="pin-btn pin-act" onclick="pinLeft()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.7 5.6 6.1.8-4.5 4.3 1.1 6-5.4-2.9-5.4 2.9 1.1-6L3.2 9.4l6.1-.8L12 3z"/></svg></button>
     <button class="pin-btn" onclick="pp(0)">0</button>
     <button class="pin-btn pin-act" onclick="pinBack()">⌫</button>
   </div>
@@ -463,11 +513,11 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
         <div class="hdr-date" id="hdr-date">–</div>
       </div>
       <div class="hdr-r">
-        <button class="hbtn" id="btn-star" onclick="setDefault()" title="Set default">⭐</button>
-        <button class="hbtn" id="btn-wake" onclick="toggleWake()" title="Screen on">☀️</button>
-        <button class="hbtn" id="btn-holiday" onclick="toggleHoliday()" title="Holiday mode">🏖️</button>
-        <button class="hbtn" onclick="lockApp()" title="Lock">🔒</button>
-        <button class="hbtn" onclick="openSettings()" title="Settings">⚙️</button>
+        <button class="hbtn" id="btn-star" onclick="setDefault()" title="Set default"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.7 5.6 6.1.8-4.5 4.3 1.1 6-5.4-2.9-5.4 2.9 1.1-6L3.2 9.4l6.1-.8L12 3z"/></svg></button>
+        <button class="hbtn" id="btn-wake" onclick="toggleWake()" title="Screen on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4V2m0 20v-2m8-8h2M2 12h2m13.7-5.7l1.4-1.4M4.9 19.1l1.4-1.4m0-11.4L4.9 4.9m14.2 14.2l-1.4-1.4M17 12a5 5 0 11-10 0 5 5 0 0110 0z"/></svg></button>
+        <button class="hbtn" id="btn-holiday" onclick="toggleHoliday()" title="Holiday mode"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V10m0 0C12 6 9 4 5 5c2 .5 3.5 2 4 4m3 1c0-4 3-6 7-5-2 .5-3.5 2-4 4m-3 1C10 7.5 6.9 7 4 9c2.2-.3 4 .6 5 2m3-1c2-2.5 5.1-3 8-1-2.2-.3-4 .6-5 2M8 22h8"/></svg></button>
+        <button class="hbtn" onclick="lockApp()" title="Lock"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 11V8a6 6 0 1112 0v3m-13 0h14v10H5V11z"/></svg></button>
+        <button class="hbtn" onclick="openSettings()" title="Settings"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 100-6 3 3 0 000 6zm8-3l1.8-1-1.5-2.6-2 .6a7 7 0 00-1.7-1L16 5h-3l-.6 2a7 7 0 00-1.7 1l-2-.6L7.2 10 9 11v2l-1.8 1 1.5 2.6 2-.6a7 7 0 001.7 1L13 19h3l.6-2a7 7 0 001.7-1l2 .6 1.5-2.6L20 13v-1z"/></svg></button>
       </div>
     </div>
     <div class="hdr-r2" id="hdr-r2">
@@ -634,7 +684,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
 <!-- GUITAR CONFIG MODAL -->
 <div class="md-wrap" id="guitar-cfg-modal" style="position:fixed;inset:0;z-index:600;display:none;align-items:center;justify-content:center;padding:1rem;background:rgba(0,0,0,.45)">
   <div class="md" style="background:var(--sur);border-radius:14px;width:100%;max-width:380px;padding:1.1rem;max-height:82vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.18)">
-    <div style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:.9rem">🎸 Guitar Practice</div>
+    <div style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:.9rem;display:flex;align-items:center;gap:7px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3l4 4-6.5 6.5a4.5 4.5 0 11-4-4L17 3zm2 0l2 2M9 15l.01.01"/></svg> Guitar Practice</div>
     <div class="inp" style="display:flex;flex-direction:column;gap:4px;margin-bottom:.65rem">
       <label style="font-size:9px;font-weight:700;color:var(--tx4);text-transform:uppercase;letter-spacing:.08em">Sessions per week</label>
       <input type="number" id="gtr-freq" min="1" max="7" value="3" style="padding:9px 10px;border:1px solid var(--bd2);border-radius:5px;background:var(--sur);color:var(--tx);font-size:14px">
@@ -699,7 +749,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
     <label for="ps-depart-toggle" style="display:flex;align-items:center;gap:10px;margin-bottom:.65rem;padding:.6rem .7rem;background:var(--bg3);border-radius:8px;cursor:pointer">
       <input type="checkbox" id="ps-depart-toggle" onchange="_psDepartChange()" style="width:16px;height:16px;accent-color:var(--acc);cursor:pointer">
       <div>
-        <div style="font-size:13px;font-weight:600;color:var(--tx)">🚶 Needs departure time?</div>
+        <div style="font-size:13px;font-weight:600;color:var(--tx)">Needs departure time?</div>
         <div style="font-size:11px;color:var(--tx4)">For flights, trains, meetings away from here</div>
       </div>
     </label>
@@ -764,11 +814,11 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
 </div>
 
 <nav id="nav">
-  <button class="ntab on" data-tab="dashboard" onclick="switchTab('dashboard')"><span class="ni">▦</span><span>Dashboard</span></button>
-  <button class="ntab" data-tab="planner" onclick="switchTab('planner')"><span class="ni">📅</span><span>Planner</span></button>
-  <button class="ntab" data-tab="wardrobe" onclick="switchTab('wardrobe')"><span class="ni">👔</span><span>Wardrobe</span></button>
-  <button class="ntab" data-tab="gym" onclick="switchTab('gym')"><span class="ni">🏋️</span><span>Gym</span></button>
-  <button class="ntab" data-tab="checklists" onclick="switchTab('checklists')"><span class="ni">✅</span><span>Checklists</span></button>
+  <button class="ntab on" data-tab="dashboard" onclick="switchTab('dashboard')"><span class="ni"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg></span><span>Dashboard</span></button>
+  <button class="ntab" data-tab="planner" onclick="switchTab('planner')"><span class="ni"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1zm-1 5h16M8 3v4m8-4v4"/></svg></span><span>Planner</span></button>
+  <button class="ntab" data-tab="wardrobe" onclick="switchTab('wardrobe')"><span class="ni"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3l4 2 4-2 5 4-2.5 3L17 8.5V21H7V8.5L5.5 10 3 7l5-4z"/></svg></span><span>Wardrobe</span></button>
+  <button class="ntab" data-tab="gym" onclick="switchTab('gym')"><span class="ni"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h2m16 0h2M6 8v8m4-10v12m4-12v12m4-8v8"/></svg></span><span>Gym</span></button>
+  <button class="ntab" data-tab="checklists" onclick="switchTab('checklists')"><span class="ni"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h2v2H4V6zm5 1h11M4 11h2v2H4v-2zm5 1h11M4 16h2v2H4v-2zm5 1h11"/></svg></span><span>Checklists</span></button>
 </nav>
 <!-- SLOT TASK PICKER SHEET -->
 <div class="sh-wrap" id="slot-picker-sh">
@@ -791,7 +841,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
       <div class="live-subtitle" id="live-subtitle"></div>
     </div>
     <div class="live-hdr-r">
-      <button class="live-ibtn" id="live-wake-btn" onclick="toggleLiveWake()" title="Screen on">☀️</button>
+      <button class="live-ibtn" id="live-wake-btn" onclick="toggleLiveWake()" title="Screen on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4V2m0 20v-2m8-8h2M2 12h2m13.7-5.7l1.4-1.4M4.9 19.1l1.4-1.4m0-11.4L4.9 4.9m14.2 14.2l-1.4-1.4M17 12a5 5 0 11-10 0 5 5 0 0110 0z"/></svg></button>
       <button class="live-ibtn" id="live-freeze-btn" onclick="toggleFreeze()" title="Freeze screen">🧊</button>
       <button class="live-ibtn" onclick="closeLive()" title="Exit">✕</button>
     </div>
@@ -853,56 +903,88 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
     <div class="sh-drag"></div>
     <div class="sh-title">Settings</div>
     <div class="sh-body">
-      <div class="ss">
-        <div class="ss-title">Identity</div>
-        <div class="inp"><label>Birthday</label><input type="date" id="s-bday" onchange="saveSetting('birthday',this.value)"></div>
-      </div>
-      <div class="ss">
-        <div class="ss-title">Timezones</div>
-        <div style="font-size:11px;color:var(--tx3);margin-bottom:.45rem">First = primary (large display). Others shown smaller.</div>
-        <div id="tz-list"></div>
-        <button class="btn-s" style="font-size:12px;margin-top:.4rem" onclick="addTZ()">+ Add timezone</button>
-      </div>
-      <div class="ss">
-        <div class="ss-title">Wardrobe — Season ranges</div>
-        <div style="font-size:11px;color:var(--tx3);margin-bottom:.45rem">Define summer date ranges (MM-DD). Everything outside = winter.</div>
-        <div id="season-ranges"></div>
-        <button class="btn-s" style="font-size:12px;margin-top:.4rem" onclick="addSeasonRange()">+ Add summer range</button>
-        <div class="sr" style="margin-top:.6rem">
-          <span class="sr-lbl">Outfit time</span>
-          <input type="time" id="s-outfit-time" class="si" onchange="saveSetting('outfitTime',this.value)">
+      <!-- ═══ APPEARANCE ═══ -->
+      <div class="ss-group" data-grp="appearance">
+        <button class="ss-grp-hdr" onclick="toggleSGrp(this)"><span>Appearance</span><span class="ss-grp-chev">▾</span></button>
+        <div class="ss-grp-body">
+          <div class="ss">
+            <div class="ss-title">Theme</div>
+            <div id="theme-picker" style="display:flex;gap:8px;flex-wrap:wrap;padding:.3rem 0"></div>
+          </div>
+          <div class="ss">
+            <div class="ss-title">Timezones</div>
+            <div style="font-size:11px;color:var(--tx3);margin-bottom:.45rem">First = primary (large display). Others shown smaller.</div>
+            <div id="tz-list"></div>
+            <button class="btn-s" style="font-size:12px;margin-top:.4rem" onclick="addTZ()">+ Add timezone</button>
+          </div>
         </div>
       </div>
-      <div class="ss">
-        <div class="ss-title">Auto-lock</div>
-        <div class="sr">
-          <span class="sr-lbl">Inactivity (days, 0=never)</span>
-          <input type="number" id="s-lock-days" class="si" min="0" max="30" style="width:52px;text-align:center" onchange="saveSetting('lockDays',+this.value||0)">
-        </div>
-        <div class="sr">
-          <span class="sr-lbl">Weekly lock day</span>
-          <select id="s-lock-day" class="si" onchange="saveSetting('weeklyLockDay',this.value)">
-            <option value="">None</option>
-            <option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option>
-            <option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option>
-          </select>
-        </div>
-        <button class="btn-s" style="font-size:12px;margin-top:.5rem" onclick="changePIN()">Change PIN</button>
-      </div>
-      <div class="ss">
-        <div class="ss-title">Gym</div>
-        <div class="sr">
-          <span class="sr-lbl">Weight unit</span>
-          <select id="s-wu" class="si" onchange="saveSetting('weightUnit',this.value)">
-            <option value="kg">kg</option><option value="lbs">lbs</option>
-          </select>
+
+      <!-- ═══ PLANNER ═══ -->
+      <div class="ss-group" data-grp="planner">
+        <button class="ss-grp-hdr" onclick="toggleSGrp(this)"><span>Planner</span><span class="ss-grp-chev">▾</span></button>
+        <div class="ss-grp-body">
+          <div class="ss" id="depart-settings-section">
+            <div class="ss-title">Departure Categories</div>
+            <div style="font-size:11px;color:var(--tx3);margin-bottom:.45rem">Arrival buffers used to compute "leave by" times.</div>
+            <div id="depart-cats-list"></div>
+            <button onclick="_addDepartCat()" style="width:100%;margin-top:.4rem;padding:8px;background:var(--bg3);border:1px dashed var(--bd2);border-radius:7px;color:var(--tx3);font-size:12px;cursor:pointer">+ Add category</button>
+          </div>
         </div>
       </div>
-      <div class="ss"><div class="ss-title">Audio Player</div><div class="sr"><span class="sr-lbl">Skip distance (seconds)</span><input type="number" id="s-audio-skip" class="si" min="1" max="120" style="width:60px;text-align:center" onchange="localStorage.setItem('omni_audio_skip',this.value);showToast('Skip: '+this.value+'s')"></div></div>
-      <div class="ss" id="depart-settings-section">
-        <div class="ss-title">🚶 Departure Categories</div>
-        <div id="depart-cats-list"></div>
-        <button onclick="_addDepartCat()" style="width:100%;margin-top:.4rem;padding:8px;background:var(--bg3);border:1px dashed var(--bd2);border-radius:7px;color:var(--tx3);font-size:12px;cursor:pointer">+ Add category</button>
+
+      <!-- ═══ HABITS & GYM ═══ -->
+      <div class="ss-group" data-grp="habits">
+        <button class="ss-grp-hdr" onclick="toggleSGrp(this)"><span>Habits &amp; Gym</span><span class="ss-grp-chev">▾</span></button>
+        <div class="ss-grp-body">
+          <div class="ss">
+            <div class="ss-title">Gym</div>
+            <div class="sr">
+              <span class="sr-lbl">Weight unit</span>
+              <select id="s-wu" class="si" onchange="saveSetting('weightUnit',this.value)">
+                <option value="kg">kg</option><option value="lbs">lbs</option>
+              </select>
+            </div>
+            <div class="sr"><span class="sr-lbl">Audio skip distance (seconds)</span><input type="number" id="s-audio-skip" class="si" min="1" max="120" style="width:60px;text-align:center" onchange="localStorage.setItem('omni_audio_skip',this.value);showToast('Skip: '+this.value+'s')"></div>
+          </div>
+          <div class="ss">
+            <div class="ss-title">Wardrobe — Season ranges</div>
+            <div style="font-size:11px;color:var(--tx3);margin-bottom:.45rem">Define summer date ranges (MM-DD). Everything outside = winter.</div>
+            <div id="season-ranges"></div>
+            <button class="btn-s" style="font-size:12px;margin-top:.4rem" onclick="addSeasonRange()">+ Add summer range</button>
+            <div class="sr" style="margin-top:.6rem">
+              <span class="sr-lbl">Outfit time</span>
+              <input type="time" id="s-outfit-time" class="si" onchange="saveSetting('outfitTime',this.value)">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ ACCOUNT ═══ -->
+      <div class="ss-group" data-grp="account">
+        <button class="ss-grp-hdr" onclick="toggleSGrp(this)"><span>Account &amp; Security</span><span class="ss-grp-chev">▾</span></button>
+        <div class="ss-grp-body">
+          <div class="ss">
+            <div class="ss-title">Identity</div>
+            <div class="inp"><label>Birthday</label><input type="date" id="s-bday" onchange="saveSetting('birthday',this.value)"></div>
+          </div>
+          <div class="ss">
+            <div class="ss-title">Auto-lock</div>
+            <div class="sr">
+              <span class="sr-lbl">Inactivity (days, 0=never)</span>
+              <input type="number" id="s-lock-days" class="si" min="0" max="30" style="width:52px;text-align:center" onchange="saveSetting('lockDays',+this.value||0)">
+            </div>
+            <div class="sr">
+              <span class="sr-lbl">Weekly lock day</span>
+              <select id="s-lock-day" class="si" onchange="saveSetting('weeklyLockDay',this.value)">
+                <option value="">None</option>
+                <option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option>
+                <option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option>
+              </select>
+            </div>
+            <button class="btn-s" style="font-size:12px;margin-top:.5rem" onclick="changePIN()">Change PIN</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -996,7 +1078,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
     <div class="md-title">Season override — this week</div>
     <div style="font-size:13px;color:var(--tx2);margin-bottom:.85rem">Overrides your date ranges for this week only.</div>
     <div style="display:flex;gap:8px;margin-bottom:.6rem">
-      <button class="btn-s" style="flex:1" onclick="setSeasonOv('summer')">☀️ Summer</button>
+      <button class="btn-s" style="flex:1" onclick="setSeasonOv('summer')">Summer</button>
       <button class="btn-s" style="flex:1" onclick="setSeasonOv('winter')">❄️ Winter</button>
     </div>
     <button onclick="clearSeasonOv()" style="width:100%;padding:9px;background:var(--bg3);color:var(--tx3);border:1px solid var(--bd);border-radius:var(--r);font-size:13px">Clear override</button>
@@ -1143,6 +1225,11 @@ async function loadSettings(){
     const{data}=await supaFrom('omni_settings').select('key,value');
     if(data)data.forEach(r=>{try{S[r.key]=JSON.parse(r.value);}catch(e){S[r.key]=r.value;}});
     _sloc();
+    // Apply synced theme from another device (localStorage gave instant paint; remote wins)
+    if(S.theme&&S.theme!==(localStorage.getItem('omni_theme')||'default')){
+      applyTheme(S.theme);
+      if(typeof _renderThemePicker==='function')_renderThemePicker();
+    }
   }catch(e){}
 }
 function _sloc(){try{localStorage.setItem('omni_s',JSON.stringify(S));}catch(e){}}
@@ -1313,7 +1400,7 @@ function switchTab(t){
   if(t==='gym'){if(!_gLoaded)loadGym().then(()=>switchGV(_gv||'today'));else switchGV(_gv||'today');}
   if(t==='checklists'){if(!_cLoaded)loadChecklists().then(()=>switchCV(_cv||'rhythms'));else switchCV(_cv||'rhythms');}
 }
-function setDefault(){_defPage=_curTab;try{localStorage.setItem('omni_dp',_defPage);}catch(e){}showToast('Default: '+_defPage+' ⭐');const b=el('btn-star');if(b){b.classList.add('lit');setTimeout(()=>b.classList.remove('lit'),1100);}}
+function setDefault(){_defPage=_curTab;try{localStorage.setItem('omni_dp',_defPage);}catch(e){}showToast('Default: '+_defPage+' ✓');const b=el('btn-star');if(b){b.classList.add('lit');setTimeout(()=>b.classList.remove('lit'),1100);}}
 function _renderDepartCats(){
   const list=document.getElementById('depart-cats-list');
   if(!list)return;
@@ -1350,13 +1437,15 @@ function openSettings(){
   el('settings-sh').classList.add('on');
   _refreshSUI();
   _renderDepartCats();
+  _renderThemePicker();
+  _restoreSGrps();
 }
 function closeSettings(){el('settings-sh').classList.remove('on');}
 let _wake=null;
 async function toggleWake(){
   const b=el('btn-wake');
   if(_wake){try{await _wake.release();}catch(e){}_wake=null;b.classList.remove('lit');showToast('Screen lock restored');}
-  else{try{_wake=await navigator.wakeLock.request('screen');b.classList.add('lit');showToast('Screen staying on ☀️');_wake.addEventListener('release',()=>{_wake=null;b.classList.remove('lit');});}catch(e){showToast('Wake lock unavailable');}}
+  else{try{_wake=await navigator.wakeLock.request('screen');b.classList.add('lit');showToast('Screen staying on ✓');_wake.addEventListener('release',()=>{_wake=null;b.classList.remove('lit');});}catch(e){showToast('Wake lock unavailable');}}
 }
 function showToast(msg,dur=2200){
   const c=el('toast');const t=document.createElement('div');t.className='toast';t.textContent=msg;c.appendChild(t);setTimeout(()=>t.remove(),dur);
@@ -1906,7 +1995,7 @@ function _renderDayNow(){
     : `<div style="padding:.25rem .6rem;font-size:11px;color:var(--tx4);font-style:italic">Free day</div>`;
 
   let slotsHtml=_holiday
-    ? `<div style="display:flex;align-items:center;justify-content:space-between;padding:.3rem .6rem .1rem"><div class="sec-lbl" style="padding:0;color:#4a90d0">🏖️ Holiday</div></div>`
+    ? `<div style="display:flex;align-items:center;justify-content:space-between;padding:.3rem .6rem .1rem"><div class="sec-lbl" style="padding:0;color:#4a90d0">Holiday</div></div>`
     : `<div style="display:flex;align-items:center;justify-content:space-between;padding:.3rem .6rem .1rem"><div class="sec-lbl" style="padding:0">Timetable</div><button onclick="toggleSlotsCol()" style="font-size:10px;font-weight:700;color:var(--tx3);background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r3);padding:2px 8px">${slotsCol?'Expand ↓':'Collapse ↑'}</button></div>`;
 
   if(slotsCol){
@@ -1948,7 +2037,7 @@ function _renderDayNow(){
           return`<div class="slot-task-row"><div class="slot-task-cb${t2.done?' on':''}" onclick="toggleDone('${t2.dk}',this);setTimeout(renderDay,50)">${t2.done?'<span style="color:var(--ok);font-size:10px">✓</span>':''}</div><div class="slot-task-tx${t2.done?' done':''}">${t2.text}</div>${rmBtn}</div>`;
         }).join('')}</div>`:'';
         const _leaveBy=ps?.sensitivity&&ps?.travel_mins!=null?_calcLeaveBy(sl.time,ps.sensitivity,ps.travel_mins):null;
-        slotsHtml+=`<div class="slot personal-slot"><div class="slot-hdr"><span class="slot-tr">${sl.time} <b>–${sl.end||sl.endTime}</b></span><span class="slot-pip" style="background:#7080c0"></span><span class="slot-lbl">${sl.label}</span>${_leaveBy?`<span style="font-family:var(--mono);font-size:10px;color:var(--acc);margin-left:4px">🚶${_leaveBy}</span>`:''}<button onclick="openEditPersonalSlot('${sl.psId}')" style="font-size:11px;color:#7080c0;background:none;border:none;padding:0 4px">✎</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:20px;font-weight:300;color:#7080c0;background:none;border:none;padding:0 3px;line-height:1">+</button></div>${psTasksHtml}</div>`;
+        slotsHtml+=`<div class="slot personal-slot"><div class="slot-hdr"><span class="slot-tr">${sl.time} <b>–${sl.end||sl.endTime}</b></span><span class="slot-pip" style="background:#7080c0"></span><span class="slot-lbl">${sl.label}</span>${_leaveBy?`<span style="font-family:var(--mono);font-size:10px;color:var(--acc);margin-left:4px">${icn('walk',11)} ${_leaveBy}</span>`:''}<button onclick="openEditPersonalSlot('${sl.psId}')" style="font-size:11px;color:#7080c0;background:none;border:none;padding:0 4px">✎</button><button onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" style="font-size:20px;font-weight:300;color:#7080c0;background:none;border:none;padding:0 3px;line-height:1">+</button></div>${psTasksHtml}</div>`;
         return;
       }
       // Hide free/empty work slots covered by a personal event's time range
@@ -2030,9 +2119,9 @@ function _renderDayNow(){
       const workByCat={};const workUncat=[];const personal=[];
       // Gym tasks belong in habits section only, not in tasks
       unsched.forEach(t=>{if(t.src==='omni'){personal.push(t);}else if(t.src==='work'){if(_isHoliday())return;const cid=t._t?.cat||t._t?.category||'';if(cid&&catMap2[cid]){if(!workByCat[cid])workByCat[cid]=[];workByCat[cid].push(t);}else workUncat.push(t);}});
-      if(personal.length){const pDone=personal.filter(t=>t.done).length;const pTotal=personal.length;const pAllDone=pDone===pTotal;const pKey='omni_cat_col_personal';const pCol=localStorage.getItem(pKey)==='1';th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid #b8582844"><div style="padding:.3rem .7rem;background:${pAllDone?'rgba(184,88,40,.15)':'rgba(184,88,40,.07)'};border-bottom:${pCol?'none':'1px solid rgba(184,88,40,.15)'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('personal')"><span style="width:8px;height:8px;border-radius:50%;background:var(--acc);flex-shrink:0"></span><span style="font-size:10px;font-weight:700;color:var(--acc);flex:1;text-transform:uppercase;letter-spacing:.06em">Personal</span><span style="font-size:10px;color:${pAllDone?'var(--ok)':'var(--tx4)'}">${pAllDone?'✓ All done':''+pDone+'/'+pTotal}</span><span style="font-size:9px;color:var(--tx4);margin-left:3px">${pCol?'▶':'▼'}</span></div>`;if(!pCol){personal.forEach(t=>{const isGym=t.src==='gym';const u=t.tier===2&&t.urg;const m=isGym?(t.gymDone?'Logged ✓':'Tap gym tab'):t.tier===1?'Today':t.tier===2?(u?'⚠ Last day':'Window'):'Sticky';const ttime2=t._t?.taskTime;const cbFn=isGym?"switchTab('gym')":"toggleDone('"+t.dk+"',this);setTimeout(renderDay,50)";const icon=t.done?'✓':isGym?'🏋️':'';const iconSize=isGym&&!t.done?15:11;const editBtn=isGym?'':'<button onclick="openEditTask(\'' +t.id+'\')" style="font-size:12px;color:var(--tx4);background:none;border:none;padding:0 2px">✎</button>';th+=`<div class="task-row t${t.tier}${u?' urg':''}"><div class="task-cb${t.done?' on':''}" onclick="${cbFn}">${(t.done||isGym)?'<span style="font-size:'+iconSize+'px">'+icon+'</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}"> ${t.text}${ttime2?' <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">📌 '+ttime2+'</span>':''}</div><div class="task-meta">${m}</div></div>${editBtn}</div>`;});}th+=`</div>`;}
-      WCATS.forEach(cat=>{const cts=workByCat[cat.id];if(!cts?.length)return;const catDone=cts.filter(t=>t.done).length;const catTotal=cts.length;const allCatDone=catDone===catTotal;const catColKey='omni_cat_col_'+cat.id;const catCol2=localStorage.getItem(catColKey)==='1';th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid ${cat.color}44"><div style="padding:.3rem .7rem;background:${allCatDone?cat.color+'22':cat.color+'12'};border-bottom:${catCol2?'none':'1px solid '+cat.color+'22'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('${cat.id}')"><span style="width:8px;height:8px;border-radius:50%;background:${cat.color};flex-shrink:0"></span><span style="font-size:10px;font-weight:700;color:${cat.color};flex:1;text-transform:uppercase;letter-spacing:.06em">${cat.name}</span><span style="font-size:10px;color:${allCatDone?'var(--ok)':'var(--tx4)'}">${allCatDone?'✓ All done':''+catDone+'/'+catTotal}</span><span style="font-size:9px;color:var(--tx4);margin-left:3px">${catCol2?'▶':'▼'}</span></div>`;if(!catCol2){cts.forEach(t=>{const u=t.tier===2&&t.urg;const ttime=t._t?.taskTime;th+=`<div class="task-row t${t.tier}${u?' urg':''}"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}${ttime?' <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">📌 '+ttime+'</span>':''}</div><div class="task-meta">${u?'⚠ Last day':t.tier===1?'Today':t.tier===2?'This week':'Ongoing'}</div></div></div>`;});}th+=`</div>`;});
-      if(workUncat.length){const ucDone=workUncat.filter(t=>t.done).length;const ucTotal=workUncat.length;const ucAllDone=ucDone===ucTotal;const ucKey='omni_cat_col_other';const ucCol=localStorage.getItem(ucKey)==='1';th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid var(--bd)"><div style="padding:.3rem .7rem;background:${ucAllDone?'var(--bg3)':'var(--bg2)'};border-bottom:${ucCol?'none':'1px solid var(--bd)'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('other')"><span style="width:8px;height:8px;border-radius:50%;background:var(--tx4);flex-shrink:0"></span><span style="font-size:10px;font-weight:700;color:var(--tx3);flex:1;text-transform:uppercase;letter-spacing:.06em">Other</span><span style="font-size:10px;color:${ucAllDone?'var(--ok)':'var(--tx4)'}">${ucAllDone?'✓ All done':''+ucDone+'/'+ucTotal}</span><span style="font-size:9px;color:var(--tx4);margin-left:3px">${ucCol?'▶':'▼'}</span></div>`;if(!ucCol){workUncat.forEach(t=>{const u=t.tier===2&&t.urg;const ttime=t._t?.taskTime;th+=`<div class="task-row t${t.tier}${u?' urg':''} src-work"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}${ttime?' <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">📌 '+ttime+'</span>':''}</div><div class="task-meta">Work · ${u?'⚠ Last day':t.tier===1?'Today':t.tier===2?'Window':'Ongoing'}</div></div></div>`;});}th+=`</div>`;}
+      if(personal.length){const pDone=personal.filter(t=>t.done).length;const pTotal=personal.length;const pAllDone=pDone===pTotal;const pKey='omni_cat_col_personal';const pCol=localStorage.getItem(pKey)==='1';th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid #b8582844"><div style="padding:.3rem .7rem;background:${pAllDone?'rgba(184,88,40,.15)':'rgba(184,88,40,.07)'};border-bottom:${pCol?'none':'1px solid rgba(184,88,40,.15)'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('personal')"><span style="width:8px;height:8px;border-radius:50%;background:var(--acc);flex-shrink:0"></span><span style="font-size:10px;font-weight:700;color:var(--acc);flex:1;text-transform:uppercase;letter-spacing:.06em">Personal</span><span style="font-size:10px;color:${pAllDone?'var(--ok)':'var(--tx4)'}">${pAllDone?'✓ All done':''+pDone+'/'+pTotal}</span><span style="font-size:9px;color:var(--tx4);margin-left:3px">${pCol?'▶':'▼'}</span></div>`;if(!pCol){personal.forEach(t=>{const isGym=t.src==='gym';const u=t.tier===2&&t.urg;const m=isGym?(t.gymDone?'Logged ✓':'Tap gym tab'):t.tier===1?'Today':t.tier===2?(u?'⚠ Last day':'Window'):'Sticky';const ttime2=t._t?.taskTime;const cbFn=isGym?"switchTab('gym')":"toggleDone('"+t.dk+"',this);setTimeout(renderDay,50)";const icon=t.done?'✓':isGym?'🏋️':'';const iconSize=isGym&&!t.done?15:11;const editBtn=isGym?'':'<button onclick="openEditTask(\'' +t.id+'\')" style="font-size:12px;color:var(--tx4);background:none;border:none;padding:0 2px">✎</button>';th+=`<div class="task-row t${t.tier}${u?' urg':''}"><div class="task-cb${t.done?' on':''}" onclick="${cbFn}">${(t.done||isGym)?'<span style="font-size:'+iconSize+'px">'+icon+'</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}"> ${t.text}${ttime2?' <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">⌖ '+ttime2+'</span>':''}</div><div class="task-meta">${m}</div></div>${editBtn}</div>`;});}th+=`</div>`;}
+      WCATS.forEach(cat=>{const cts=workByCat[cat.id];if(!cts?.length)return;const catDone=cts.filter(t=>t.done).length;const catTotal=cts.length;const allCatDone=catDone===catTotal;const catColKey='omni_cat_col_'+cat.id;const catCol2=localStorage.getItem(catColKey)==='1';th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid ${cat.color}44"><div style="padding:.3rem .7rem;background:${allCatDone?cat.color+'22':cat.color+'12'};border-bottom:${catCol2?'none':'1px solid '+cat.color+'22'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('${cat.id}')"><span style="width:8px;height:8px;border-radius:50%;background:${cat.color};flex-shrink:0"></span><span style="font-size:10px;font-weight:700;color:${cat.color};flex:1;text-transform:uppercase;letter-spacing:.06em">${cat.name}</span><span style="font-size:10px;color:${allCatDone?'var(--ok)':'var(--tx4)'}">${allCatDone?'✓ All done':''+catDone+'/'+catTotal}</span><span style="font-size:9px;color:var(--tx4);margin-left:3px">${catCol2?'▶':'▼'}</span></div>`;if(!catCol2){cts.forEach(t=>{const u=t.tier===2&&t.urg;const ttime=t._t?.taskTime;th+=`<div class="task-row t${t.tier}${u?' urg':''}"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}${ttime?' <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">⌖ '+ttime+'</span>':''}</div><div class="task-meta">${u?'⚠ Last day':t.tier===1?'Today':t.tier===2?'This week':'Ongoing'}</div></div></div>`;});}th+=`</div>`;});
+      if(workUncat.length){const ucDone=workUncat.filter(t=>t.done).length;const ucTotal=workUncat.length;const ucAllDone=ucDone===ucTotal;const ucKey='omni_cat_col_other';const ucCol=localStorage.getItem(ucKey)==='1';th+=`<div style="margin:0 .6rem .25rem;border-radius:var(--r);overflow:hidden;border:1px solid var(--bd)"><div style="padding:.3rem .7rem;background:${ucAllDone?'var(--bg3)':'var(--bg2)'};border-bottom:${ucCol?'none':'1px solid var(--bd)'};display:flex;align-items:center;gap:6px;cursor:pointer" onclick="toggleCatCollapse('other')"><span style="width:8px;height:8px;border-radius:50%;background:var(--tx4);flex-shrink:0"></span><span style="font-size:10px;font-weight:700;color:var(--tx3);flex:1;text-transform:uppercase;letter-spacing:.06em">Other</span><span style="font-size:10px;color:${ucAllDone?'var(--ok)':'var(--tx4)'}">${ucAllDone?'✓ All done':''+ucDone+'/'+ucTotal}</span><span style="font-size:9px;color:var(--tx4);margin-left:3px">${ucCol?'▶':'▼'}</span></div>`;if(!ucCol){workUncat.forEach(t=>{const u=t.tier===2&&t.urg;const ttime=t._t?.taskTime;th+=`<div class="task-row t${t.tier}${u?' urg':''} src-work"><div class="task-cb${t.done?' on':''}" onclick="toggleDone('${t.dk}',this);setTimeout(renderDay,50)">${t.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div style="flex:1"><div class="task-tx${t.done?' done':''}">${t.text}${ttime?' <span style="font-size:9px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:8px;margin-left:4px">⌖ '+ttime+'</span>':''}</div><div class="task-meta">Work · ${u?'⚠ Last day':t.tier===1?'Today':t.tier===2?'Window':'Ongoing'}</div></div></div>`;});}th+=`</div>`;}
     } else {
       th+=`<div style="padding:.35rem .6rem;font-size:12px;color:var(--tx4);font-style:italic">No unscheduled tasks.</div>`;
     }
@@ -3180,13 +3269,13 @@ async function renderDash(){
   if(habRow){
     const gymDone=typeof _hasSessToday==='function'?_hasSessToday():false;const gymType=typeof _todayType==='function'?_todayType():null;
     const bookDone=HAB_DATA.bookDone; // source of truth: reading_log via HAB_DATA
-    const filmDone=_habDone('film',dateStr);
+    const filmDone=HAB_DATA.filmDone; // watch_log is source of truth
     const guitarDone=_habDone('guitar',dateStr);
     const habits=[
-      {icon:'🏋️',label:'Gym',done:gymDone,skip:!gymType,sub:gymType||'Rest'},
-      {icon:'📖',label:'Reading',done:bookDone,skip:false,sub:bookDone?'Done':'Due'},
-      {icon:'🎬',label:'Film',done:filmDone,skip:!HAB_DATA.film,sub:filmDone?'Watched':'Planned'},
-      {icon:'🎸',label:'Guitar',done:guitarDone,skip:false,sub:guitarDone?'Done':'Due'},
+      {icon:icn('gym',20),label:'Gym',done:gymDone,skip:!gymType,sub:gymType||'Rest'},
+      {icon:icn('book',20),label:'Reading',done:bookDone,skip:false,sub:bookDone?'Done':'Due'},
+      {icon:icn('film',20),label:'Film',done:filmDone,skip:!HAB_DATA.film,sub:filmDone?'Watched':'Planned'},
+      {icon:icn('guitar',20),label:'Guitar',done:guitarDone,skip:false,sub:guitarDone?'Done':'Due'},
     ];
     habRow.innerHTML=habits.filter(h=>!h.skip).map(h=>`
       <div style="flex:1;min-width:60px;display:flex;flex-direction:column;align-items:center;gap:3px;padding:.4rem .3rem;border-radius:8px;background:${h.done?'rgba(80,160,80,.08)':'var(--bg3)'};border:1px solid ${h.done?'rgba(80,160,80,.2)':'var(--bd)'}">
@@ -3237,7 +3326,7 @@ async function renderDash(){
       const m=typeof feed.meta==='string'?JSON.parse(feed.meta||'{}'):feed.meta||{};
       const title=feed.title||'Film';
       const runtime=m.runtime_mins?`${m.runtime_mins} min`:'';
-      const done=_habDone('film',dateStr);
+      const done=HAB_DATA.filmDone;
       fm2.innerHTML=`<div style="font-size:13px;font-weight:600;color:var(--tx)">${title}</div>
         ${runtime?`<div style="font-family:var(--mono);font-size:11px;color:var(--tx4);margin-top:2px">${runtime}</div>`:''}
         <div style="margin-top:.35rem;font-size:11px;font-weight:700;color:${done?'var(--ok)':'var(--acc)'}">${done?'✓ Watched':'Planned today'}</div>`;
@@ -3302,10 +3391,10 @@ async function renderDash(){
           const monthlyPart=monthlyZero
             ?`<div style="padding-top:.45rem;border-top:1px solid var(--bd);font-size:11px;color:var(--tx4)">Monthly budget is ${cur} 0 — full month on holiday</div>`
             :smallBar('This month',cur,fin.spent_total,fin.budget_total,pct,surplus,over,barColor);
-          fc2.innerHTML=(hasHoliday?bigBar('🏖️ Holiday',hCur,fin.holiday_spent,fin.holiday_budget,hPct,hSurplus,hOver,hBarColor):'')+monthlyPart;
+          fc2.innerHTML=(hasHoliday?bigBar('Holiday',hCur,fin.holiday_spent,fin.holiday_budget,hPct,hSurplus,hOver,hBarColor):'')+monthlyPart;
         }else{
           // Monthly big, holiday small (if exists)
-          fc2.innerHTML=bigBar('This month',cur,fin.spent_total,fin.budget_total,pct,surplus,over,barColor)+(hasHoliday?smallBar('🏖️ Holiday',hCur,fin.holiday_spent,fin.holiday_budget,hPct,hSurplus,hOver,hBarColor):'');
+          fc2.innerHTML=bigBar('This month',cur,fin.spent_total,fin.budget_total,pct,surplus,over,barColor)+(hasHoliday?smallBar('Holiday',hCur,fin.holiday_spent,fin.holiday_budget,hPct,hSurplus,hOver,hBarColor):'');
         }
       }else{
         fc2.innerHTML='<span style="color:var(--tx4);font-size:12px">No budget data yet</span>';
@@ -3392,7 +3481,7 @@ function openSlotTaskPicker(time,dateStr){
     const pGrp=others.filter(t=>t.src==='omni'||t.src==='gym');
     // Build habits group — show all habits not yet assigned to this slot
     const habTypes2=['gym','book','film','course','guitar'];
-    const habLabels2={gym:'🏋️ Gym session',book:'📖 Reading',film:'🎬 Film',course:'🎓 Course',guitar:'🎸 Guitar Practice'};
+    const habLabels2={gym:'Gym session',book:'Reading',film:'Film',course:'Course',guitar:'Guitar Practice'};
     const habTasks2=habTypes2
       .filter(type=>{
         // Only show if: habit is relevant today AND not already at this slot
@@ -3421,14 +3510,14 @@ function openSlotTaskPicker(time,dateStr){
            if(t.src==='habit'){
              const alreadyHere=_habSlotTime(t.habType,dateStr)===time;
              const curSlot=_habSlotTime(t.habType,dateStr);
-             const curMark=curSlot&&!alreadyHere?' (📌'+curSlot+')':'';
+             const curMark=curSlot&&!alreadyHere?' (⌖'+curSlot+')':'';
              const doneMark=t.done?'✓ ':'';
              const fn=alreadyHere?`_habSetSlotTime('${t.habType}','${dateStr}','');renderDay();openSlotTaskPicker('${time}','${dateStr}')`:  `_habSetSlotTime('${t.habType}','${dateStr}','${time}');closeSheet('slot-picker-sh');renderDay()`;
              html+=`<div style="display:flex;align-items:center;gap:8px;padding:.33rem .8rem .33rem 1.5rem;border-top:.5px solid var(--bd);cursor:pointer;background:${alreadyHere?'rgba(144,96,192,.08)':''}" onclick="${fn}"><span style="color:${alreadyHere?'var(--er)':'#9060c0'};font-size:13px">${alreadyHere?'×':'→'}</span><span style="font-size:13px;color:var(--tx);flex:1">${doneMark}${t.text}${curMark}</span>${alreadyHere?'<span style="font-size:10px;color:var(--tx4)">remove</span>':''}</div>`;
              return;
            }
            const isElsewhere=t._t?.taskTime&&t._t.taskTime!==time;
-           const ttLabel=isElsewhere?' 📌'+t._t.taskTime:'';
+           const ttLabel=isElsewhere?' ⌖'+t._t.taskTime:'';
            const fn=t.src==='omni'?"assignTask('"+t.id+"','"+time+"','"+dateStr+"')":t.src==='gym'?"assignGymToSlot('"+time+"')":"assignWorkTaskToSlot('"+t.id+"','"+time+"')";
            html+=`<div style="display:flex;align-items:center;gap:8px;padding:.33rem .8rem .33rem 1.5rem;border-top:.5px solid var(--bd);cursor:pointer" onclick="${fn}"><span style="color:var(--acc)">→</span><span style="font-size:13px;color:var(--tx);flex:1">${t.text}${ttLabel}</span></div>`;
          });
@@ -3492,7 +3581,7 @@ let HAB_LOADED=false;
 
 // ── Load habits data for a given date ────────────────────────────────────────
 async function loadHabitsFor(dateStr){
-  HAB_DATA={gym:null,book:null,film:null,course:null,bookDone:false};
+  HAB_DATA={gym:null,book:null,books:[],film:null,course:null,bookDone:false,bookLogId:null,filmDone:false,filmLogId:null,courseDone:false,courseLogId:null};
   if(!_OK)return;
   // Use local date string to match Life Manager's timezone
   const localDateStr=dateStr||(()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
@@ -3504,7 +3593,10 @@ async function loadHabitsFor(dateStr){
         // Parse meta if it's a JSON string
         const m=row.meta?(typeof row.meta==='string'?JSON.parse(row.meta):row.meta):{};
         const rowWithMeta={...row,meta:m};
-        if(row.type==='book'||row.type==='reading'||row.type==='reading-review')HAB_DATA.book=rowWithMeta;
+        if(row.type==='book'||row.type==='reading'||row.type==='reading-review'){
+          HAB_DATA.books.push(rowWithMeta);
+          HAB_DATA.book=HAB_DATA.books[0]; // legacy single ref = first book
+        }
         if(row.type==='film')HAB_DATA.film=rowWithMeta;
         if(row.type==='course')HAB_DATA.course=rowWithMeta;
       });
@@ -3513,11 +3605,32 @@ async function loadHabitsFor(dateStr){
     const{data:gym}=await supaFrom('omni_gym_sessions').select('id,session_type').eq('date',dateStr).limit(1);
     if(gym?.length)HAB_DATA.gym=gym[0];
     // Reading: check reading_log for done state
-    if(HAB_DATA.book?.source_id){
+    // Per-book done state from reading_log
+    for(const bk of HAB_DATA.books){
       const{data:rl}=await supaFrom('reading_log')
-        .select('id,pages_read').eq('book_id',HAB_DATA.book.source_id).eq('date',dateStr)
-        .gt('pages_read',0).maybeSingle();
-      HAB_DATA.bookDone=!!rl;
+        .select('id,pages_read').eq('book_id',bk.source_id).eq('date',dateStr)
+        .gt('pages_read',0).limit(1);
+      bk._done=!!(rl&&rl.length);
+      bk._logId=rl?.[0]?.id||null;
+    }
+    // Legacy single-book refs point at first book
+    if(HAB_DATA.books.length){
+      HAB_DATA.bookDone=HAB_DATA.books[0]._done;
+      HAB_DATA.bookLogId=HAB_DATA.books[0]._logId;
+    }
+    // Film: check watch_log (source of truth, syncs across devices)
+    if(HAB_DATA.film?.source_id){
+      const{data:wl}=await supaFrom('watch_log')
+        .select('id').eq('film_id',HAB_DATA.film.source_id).eq('date',dateStr).limit(1);
+      HAB_DATA.filmDone=!!(wl&&wl.length);
+      HAB_DATA.filmLogId=wl?.[0]?.id||null;
+    }
+    // Course: check course_log
+    if(HAB_DATA.course?.source_id){
+      const{data:cl}=await supaFrom('course_log')
+        .select('id').eq('course_id',HAB_DATA.course.source_id).eq('date',dateStr).limit(1);
+      HAB_DATA.courseDone=!!(cl&&cl.length);
+      HAB_DATA.courseLogId=cl?.[0]?.id||null;
     }
   }catch(e){console.warn('Habits load',e);}
 }
@@ -3576,18 +3689,21 @@ async function _logHabit(type,dateStr,meta={}){
         const pagesPlanned=+(m.pagesPlanned||m.pages_planned||(toPage-fromPage)||0);
         // Write to reading_log (source of truth shared with Life Manager)
         const{data:existing}=await supaFrom('reading_log')
-          .select('id').eq('book_id',bookId).eq('date',dateStr).maybeSingle();
+          .select('id').eq('book_id',bookId).eq('date',dateStr).limit(1);
+        const existingId=existing?.[0]?.id||null;
         const entry={book_id:bookId,date:dateStr,pages_planned:pagesPlanned,pages_read:pagesPlanned,is_review:!!(HAB_DATA.book?.meta?.isReview||HAB_DATA.book?.meta?.is_review),current_page_after:toPage||null};
-        if(existing?.id){
-          await supaFrom('reading_log').update(entry).eq('id',existing.id);
+        if(existingId){
+          await supaFrom('reading_log').update(entry).eq('id',existingId);
+          HAB_DATA.bookLogId=existingId;
         }else{
-          await supaFrom('reading_log').insert(entry);
+          const{data:inserted}=await supaFrom('reading_log').insert(entry).select('id').limit(1);
+          HAB_DATA.bookLogId=inserted?.[0]?.id||null;
         }
         HAB_DATA.bookDone=true;
         // Update current_page on yearly_queue
         if(toPage){
-          const{data:qr}=await supaFrom('yearly_queue').select('id').eq('book_id',bookId).maybeSingle();
-          if(qr?.id)await supaFrom('yearly_queue').update({current_page:toPage}).eq('id',qr.id);
+          const{data:qr}=await supaFrom('yearly_queue').select('id').eq('book_id',bookId).limit(1);
+          if(qr?.[0]?.id)await supaFrom('yearly_queue').update({current_page:toPage}).eq('id',qr[0].id);
         }
       }
     }
@@ -3596,22 +3712,22 @@ async function _logHabit(type,dateStr,meta={}){
       if(feed?.source_id){
         const filmId=feed.source_id;
         // Insert watch_log entry
-        const{data:existing}=await supaFrom('watch_log').select('id').eq('film_id',filmId).eq('date',dateStr).maybeSingle();
-        if(!existing){
+        const{data:existing}=await supaFrom('watch_log').select('id').eq('film_id',filmId).eq('date',dateStr).limit(1);
+        if(!(existing&&existing.length)){
           await supaFrom('watch_log').insert({film_id:filmId,date:dateStr,session:1});
           await supaFrom('films').update({status:'watched',updated_at:new Date().toISOString()}).eq('id',filmId);
         }
         // Mark film_plan as done if exists
-        const{data:fp}=await supaFrom('film_plan').select('id').eq('film_id',filmId).eq('done',false).eq('planned_date',dateStr).maybeSingle();
-        if(fp?.id)await supaFrom('film_plan').update({done:true}).eq('id',fp.id);
+        const{data:fp}=await supaFrom('film_plan').select('id').eq('film_id',filmId).eq('done',false).eq('planned_date',dateStr).limit(1);
+        if(fp?.[0]?.id)await supaFrom('film_plan').update({done:true}).eq('id',fp[0].id);
       }
     }
     else if(type==='course'){
       const feed=HAB_DATA.course;
       if(feed?.source_id){
         const m=typeof feed.meta==='string'?JSON.parse(feed.meta||'{}'):feed.meta||{};
-        const{data:existing}=await supaFrom('course_log').select('id').eq('course_id',feed.source_id).eq('date',dateStr).maybeSingle();
-        if(!existing){
+        const{data:existing}=await supaFrom('course_log').select('id').eq('course_id',feed.source_id).eq('date',dateStr).limit(1);
+        if(!(existing&&existing.length)){
           await supaFrom('course_log').insert({course_id:feed.source_id,episode:m.episode||null,date:dateStr,notes:'Logged from Omni'});
         }
       }
@@ -3638,65 +3754,63 @@ async function renderHabits(dateStr,dayName){
   const _gymTypeForDay=typeof GPROG!=='undefined'&&GPROG?(GPROG.days||{})[_gymViewDay]||null:null;
   if(_gymTypeForDay||gymDone){
   h+=`<div class="habit-row${gymDone?' done':''}">
-    <span class="habit-icon">🏋️</span>
+    <span class="habit-icon" style="color:var(--tx3)">${icn('gym',18)}</span>
     <div class="habit-body">
       <div class="habit-name">Gym${gymDone?' — '+HAB_DATA.gym.session_type:(_gymTypeForDay?' — '+_gymTypeForDay:'')}</div>
-      <div class="habit-sub">${gymDone?'Session logged ✓':'Not logged yet'}${gymSlot?' · 📌'+gymSlot:''}</div>
+      <div class="habit-sub">${gymDone?'Session logged ✓':'Not logged yet'}${gymSlot?' · ⌖ '+gymSlot:''}</div>
     </div>
-    <button onclick="_habPickTime('gym','${dateStr}')" style="font-size:10px;background:none;border:none;padding:0 4px;color:${gymSlot?'var(--acc)':'var(--tx4)'}">📌</button>
+    <button onclick="_habPickTime('gym','${dateStr}')" style="font-size:10px;background:none;border:none;padding:0 4px;color:${gymSlot?'var(--acc)':'var(--tx4)'}">${icn('pin',13)}</button>
     <div class="habit-tick${gymDone?' on':''}" onclick="${gymDone?'unlogGymQuick()':'logGymQuick()'}">${gymDone?'✓':''}</div>
   </div>`;
   } // end gym
 
-  // ── BOOK ──────────────────────────────────────────────────────────────────
-  const bookDone=HAB_DATA.bookDone; // reading_log is source of truth
-  const bookData=HAB_DATA.book;
-  if(bookData){
-  const bookTitle=bookData?.title||'Reading';
-  const bookMeta=bookData?.meta?(typeof bookData.meta==='string'?JSON.parse(bookData.meta):bookData.meta):{};
-  const pages=bookMeta.pages_planned||bookMeta.pages||null;
-  const isReview=!!(bookMeta.isReview||bookMeta.is_review||bookData.type==='reading-review');
-  const pageRange=(()=>{const f=bookMeta.fromPage||bookMeta.from_page||'';const t=bookMeta.toPage||bookMeta.to_page||'';return f&&t?'pp.'+f+'–'+t:pages?pages+'p':'Daily reading';})();
-  h+=`<div class="habit-row${bookDone?' done':''}" id="hab-book">
-    <span class="habit-icon">${isReview?'🔁':'📖'}</span>
+  // ── BOOKS — one row per scheduled book (supports book handover days) ──────
+  HAB_DATA.books.forEach((bk,bi)=>{
+    const bDone=!!bk._done;
+    const bMeta=bk.meta||{};
+    const bPages=bMeta.pages_planned||bMeta.pagesPlanned||bMeta.pages||null;
+    const bIsReview=!!(bMeta.isReview||bMeta.is_review||bk.type==='reading-review');
+    const bRange=(()=>{const f=bMeta.fromPage||bMeta.from_page||'';const t=bMeta.toPage||bMeta.to_page||'';return f&&t?'pp.'+f+'–'+t:bPages?bPages+'p':'Daily reading';})();
+    h+=`<div class="habit-row${bDone?' done':''}" id="hab-book-${bi}">
+    <span class="habit-icon" style="color:var(--tx3)">${icn(bIsReview?'repeat':'book',18)}</span>
     <div class="habit-body">
-      <div class="habit-name">${bookTitle}${isReview?` <span style="font-size:10px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:4px;vertical-align:middle">REVIEW</span>`:''}</div>
-      <div class="habit-sub">${pageRange}${bookDone?' ✓':''}</div>
+      <div class="habit-name">${bk.title||'Reading'}${bIsReview?` <span style="font-size:10px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.1);padding:1px 5px;border-radius:4px;vertical-align:middle">REVIEW</span>`:''}</div>
+      <div class="habit-sub">${bRange}${bDone?' ✓':''}</div>
     </div>
-    <button onclick="_habPickTime('book','${dateStr}')" style="font-size:10px;background:none;border:none;padding:0 4px;color:${_habSlotTime('book',dateStr)?'var(--acc)':'var(--tx4)'}">📌</button>
-    <div class="habit-tick${bookDone?' on':''}" onclick="${bookDone?`_unlogHabit('book','${dateStr}').then(()=>renderHabits('${dateStr}','${dayName}'))`:`_tickBook('${dateStr}')`}">${bookDone?'✓':''}</div>
+    <button onclick="_habPickTime('book','${dateStr}')" style="font-size:10px;background:none;border:none;padding:0 4px;color:${_habSlotTime('book',dateStr)?'var(--acc)':'var(--tx4)'}">${icn('pin',13)}</button>
+    <div class="habit-tick${bDone?' on':''}" onclick="_toggleBookTick(${bi},'${dateStr}')">${bDone?'✓':''}</div>
   </div>`;
-  } // end if(bookData)
+  });
 
   // ── FILM ──────────────────────────────────────────────────────────────────
-  const filmDone=_habDone('film',dateStr);
+  const filmDone=HAB_DATA.filmDone; // watch_log source of truth
   const filmData=HAB_DATA.film;
   if(filmData){
     const filmMeta=filmData.meta?JSON.parse(filmData.meta):{};
     h+=`<div class="habit-row${filmDone?' done':''}" id="hab-film">
-      <span class="habit-icon">🎬</span>
+      <span class="habit-icon" style="color:var(--tx3)">${icn('film',18)}</span>
       <div class="habit-body">
         <div class="habit-name">${filmData.title}</div>
         <div class="habit-sub">${filmMeta.year||''} ${filmMeta.director?'· '+filmMeta.director:''}${filmDone?' — Watched ✓':''}</div>
       </div>
-      <button onclick="_habPickTime('film','${dateStr}')" style="font-size:10px;background:none;border:none;padding:0 4px;color:${_habSlotTime('film',dateStr)?'var(--acc)':'var(--tx4)'}">📌</button>
-      <div class="habit-tick${filmDone?' on':''}" onclick="_tickHabit('film','${dateStr}',${JSON.stringify(JSON.stringify(filmMeta))})">${filmDone?'✓':''}</div>
+      <button onclick="_habPickTime('film','${dateStr}')" style="font-size:10px;background:none;border:none;padding:0 4px;color:${_habSlotTime('film',dateStr)?'var(--acc)':'var(--tx4)'}">${icn('pin',13)}</button>
+      <div class="habit-tick${filmDone?' on':''}" onclick="_toggleFilmTick('${dateStr}')">${filmDone?'✓':''}</div>
     </div>`;
   }
 
   // ── COURSE ────────────────────────────────────────────────────────────────
-  const courseDone=_habDone('course',dateStr);
+  const courseDone=HAB_DATA.courseDone; // course_log is source of truth
   const courseData=HAB_DATA.course;
   if(courseData){
     const courseMeta=courseData.meta?JSON.parse(courseData.meta):{};
     h+=`<div class="habit-row${courseDone?' done':''}" id="hab-course">
-      <span class="habit-icon">🎓</span>
+      <span class="habit-icon" style="color:var(--tx3)">${icn('cap',18)}</span>
       <div class="habit-body">
         <div class="habit-name">${courseData.title}</div>
         <div class="habit-sub">${courseMeta.episode||courseMeta.session?'Session '+(courseMeta.episode||courseMeta.session):'Daily session'}${courseDone?' ✓':''}</div>
       </div>
-      <button onclick="_habPickTime('course','${dateStr}')" style="font-size:10px;background:none;border:none;padding:0 4px;color:${_habSlotTime('course',dateStr)?'var(--acc)':'var(--tx4)'}">📌</button>
-      <div class="habit-tick${courseDone?' on':''}" onclick="_tickHabit('course','${dateStr}',${JSON.stringify(JSON.stringify(courseMeta))})">${courseDone?'✓':''}</div>
+      <button onclick="_habPickTime('course','${dateStr}')" style="font-size:10px;background:none;border:none;padding:0 4px;color:${_habSlotTime('course',dateStr)?'var(--acc)':'var(--tx4)'}">${icn('pin',13)}</button>
+      <div class="habit-tick${courseDone?' on':''}" onclick="_toggleCourseTick('${dateStr}')">${courseDone?'✓':''}</div>
     </div>`;
   }
 
@@ -3706,7 +3820,7 @@ async function renderHabits(dateStr,dayName){
     const timeStr=gtrCfg.time?` · ${gtrCfg.time}`:'';
     const durStr=gtrCfg.dur?` · ${gtrCfg.dur}min`:'';
     h+=`<div class="habit-row${gtrDone?' done':''}" id="hab-guitar">
-      <span class="habit-icon">🎸</span>
+      <span class="habit-icon" style="color:var(--tx3)">${icn('guitar',18)}</span>
       <div class="habit-body">
         <div class="habit-name">Guitar Practice</div>
         <div class="habit-sub">${gtrCfg.dur}min${timeStr}${gtrDone?' — Done ✓':''}</div>
@@ -3737,26 +3851,86 @@ async function _unlogHabit(type,dateStr){
   try{
     await supaFrom('omni_habit_log').delete().eq('date',dateStr).eq('type',type);
     if(type==='book'||type==='reading'){
-      const bookId=HAB_DATA.book?.source_id;
-      if(bookId){
-        await supaFrom('reading_log').delete().eq('book_id',bookId).eq('date',dateStr);
+      // Delete only the specific row Omni created — not manual Life Manager logs
+      if(HAB_DATA.bookLogId){
+        await supaFrom('reading_log').delete().eq('id',HAB_DATA.bookLogId);
+        HAB_DATA.bookLogId=null;
         HAB_DATA.bookDone=false;
+      }else{
+        // Fallback: look up the row first, delete by id
+        const bookId=HAB_DATA.book?.source_id;
+        if(bookId){
+          const{data:rows}=await supaFrom('reading_log').select('id').eq('book_id',bookId).eq('date',dateStr).limit(1);
+          if(rows?.[0]?.id)await supaFrom('reading_log').delete().eq('id',rows[0].id);
+          HAB_DATA.bookDone=false;
+        }
       }
     }
   }catch(e){console.warn('Unlog habit:',e.message);}
 }
 
-async function _tickBook(dateStr){
-  const d=new Date();d.setDate(d.getDate()+_dayOff);
-  const dayName=DS[d.getDay()];
-  if(HAB_DATA.bookDone){
-    await _unlogHabit('book',dateStr);
-    await renderHabits(dateStr,dayName);
+async function _toggleFilmTick(dateStr){
+  const d=new Date(dateStr+'T12:00:00');const dayName=DS[d.getDay()];
+  if(HAB_DATA.filmDone){
+    // Untick: delete watch_log row by id, revert film status
+    try{
+      if(HAB_DATA.filmLogId){
+        await supaFrom('watch_log').delete().eq('id',HAB_DATA.filmLogId);
+        HAB_DATA.filmLogId=null;
+      }
+      const filmId=HAB_DATA.film?.source_id;
+      if(filmId)await supaFrom('films').update({status:'to-watch',updated_at:new Date().toISOString()}).eq('id',filmId);
+      HAB_DATA.filmDone=false;
+    }catch(e){console.warn('Film untick:',e.message);}
   }else{
-    await _logHabit('book',dateStr,HAB_DATA.book?.meta||{});
-    await renderHabits(dateStr,dayName);
+    await _logHabit('film',dateStr,HAB_DATA.film?.meta||{});
+    HAB_DATA.filmDone=true;
   }
+  await renderHabits(dateStr,dayName);
 }
+async function _toggleCourseTick(dateStr){
+  const d=new Date(dateStr+'T12:00:00');const dayName=DS[d.getDay()];
+  if(HAB_DATA.courseDone){
+    try{
+      if(HAB_DATA.courseLogId){
+        await supaFrom('course_log').delete().eq('id',HAB_DATA.courseLogId);
+        HAB_DATA.courseLogId=null;
+      }
+      HAB_DATA.courseDone=false;
+    }catch(e){console.warn('Course untick:',e.message);}
+  }else{
+    await _logHabit('course',dateStr,HAB_DATA.course?.meta||{});
+    HAB_DATA.courseDone=true;
+  }
+  await renderHabits(dateStr,dayName);
+}
+async function _toggleBookTick(bookIdx,dateStr){
+  const d=new Date(dateStr+'T12:00:00');
+  const dayName=DS[d.getDay()];
+  const bk=HAB_DATA.books[bookIdx];
+  if(!bk)return;
+  if(bk._done){
+    // Untick: delete the specific row by id
+    try{
+      if(bk._logId){
+        await supaFrom('reading_log').delete().eq('id',bk._logId);
+        bk._logId=null;bk._done=false;
+      }else{
+        const{data:rows}=await supaFrom('reading_log').select('id').eq('book_id',bk.source_id).eq('date',dateStr).limit(1);
+        if(rows?.[0]?.id)await supaFrom('reading_log').delete().eq('id',rows[0].id);
+        bk._done=false;
+      }
+    }catch(e){console.warn('Book untick:',e.message);}
+  }else{
+    // Tick: point legacy single-book ref at THIS book, then log
+    HAB_DATA.book=bk;
+    await _logHabit('book',dateStr,bk.meta||{});
+    bk._done=true;bk._logId=HAB_DATA.bookLogId;
+  }
+  await renderHabits(dateStr,dayName);
+}
+// Legacy alias
+async function _tickBook(dateStr){return _toggleBookTick(0,dateStr);}
 
 async function _tickHabit(type,dateStr,metaJson){
   const was=_habDone(type,dateStr);
@@ -3833,7 +4007,7 @@ function _gtrTick(){
   const ov=document.getElementById('gtr-timer-ov');if(!ov)return;
   const pct=Math.min(100,(1-(rem/_gtrTimerMs))*100);
   ov.innerHTML=`
-    <div style="font-size:11px;font-weight:700;color:#6a5a48;letter-spacing:.2em;text-transform:uppercase">🎸 Guitar Practice</div>
+    <div style="font-size:11px;font-weight:700;color:#6a5a48;letter-spacing:.2em;text-transform:uppercase">Guitar Practice</div>
     <div style="font-size:72px;font-weight:200;color:#fff;font-family:var(--mono);letter-spacing:.04em">${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}</div>
     <div style="width:220px;height:3px;background:rgba(255,255,255,.12);border-radius:2px">
       <div style="height:100%;width:${pct}%;background:var(--acc3);border-radius:2px;transition:width .5s"></div>
@@ -3961,13 +4135,98 @@ async function deletePersonalSlot(){
 
 
 
+
+
+// ── SVG ICONS (monochrome, inherit currentColor, theme-aware) ─────────────────
+const I_PATHS={
+  bolt:'M13 2L4.5 12.5H11L10 22l8.5-10.5H12L13 2z',
+  star:'M12 3l2.7 5.6 6.1.8-4.5 4.3 1.1 6-5.4-2.9-5.4 2.9 1.1-6L3.2 9.4l6.1-.8L12 3z',
+  sun:'M12 4V2m0 20v-2m8-8h2M2 12h2m13.7-5.7l1.4-1.4M4.9 19.1l1.4-1.4m0-11.4L4.9 4.9m14.2 14.2l-1.4-1.4M17 12a5 5 0 11-10 0 5 5 0 0110 0z',
+  palm:'M12 22V10m0 0C12 6 9 4 5 5c2 .5 3.5 2 4 4m3 1c0-4 3-6 7-5-2 .5-3.5 2-4 4m-3 1C10 7.5 6.9 7 4 9c2.2-.3 4 .6 5 2m3-1c2-2.5 5.1-3 8-1-2.2-.3-4 .6-5 2M8 22h8',
+  lock:'M6 11V8a6 6 0 1112 0v3m-13 0h14v10H5V11z',
+  gear:'M12 15a3 3 0 100-6 3 3 0 000 6zm8-3l1.8-1-1.5-2.6-2 .6a7 7 0 00-1.7-1L16 5h-3l-.6 2a7 7 0 00-1.7 1l-2-.6L7.2 10 9 11v2l-1.8 1 1.5 2.6 2-.6a7 7 0 001.7 1L13 19h3l.6-2a7 7 0 001.7-1l2 .6 1.5-2.6L20 13v-1z',
+  gym:'M2 12h2m16 0h2M6 8v8m4-10v12m4-12v12m4-8v8',
+  book:'M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2V5zm2 14h13M8 7h7M8 10h5',
+  film:'M4 4h16v16H4V4zm0 4h16M4 12h16M4 16h16M8 4v16m8-16v16',
+  cap:'M2 9l10-5 10 5-10 5L2 9zm4 3v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5M22 9v6',
+  guitar:'M17 3l4 4-6.5 6.5a4.5 4.5 0 11-4-4L17 3zm2 0l2 2M9 15l.01.01',
+  repeat:'M4 8h12l-3-3m3 11H4l3 3M4 8v3m16 2v3',
+  pin:'M9 4h6l-1 6 3 3v2H7v-2l3-3-1-6zm3 11v5',
+  walk:'M13 5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM9 22l2.5-6L9 13l1-5 3 1 2.5 3H19M9 8L6 9.5 5 13m6 3l2 2 1 4',
+  plane:'M2 14l8-2 4-9 2 1-2 8 6 2 1-2 2 1-2 5-5-1-6 5-2-1 3-6-7 1-2-2z',
+  train:'M6 3h12a2 2 0 012 2v9a3 3 0 01-3 3H7a3 3 0 01-3-3V5a2 2 0 012-2zm-2 7h16M8 20l-2 2m12-2l2 2M8.5 14h.01m7 0h.01',
+  cal:'M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1zm-1 5h16M8 3v4m8-4v4',
+  cup:'M5 4h11v7a5 5 0 01-5.5 5A5 5 0 015 11V4zm11 2h2a2 2 0 012 2v1a3 3 0 01-3 3h-1M5 20h11',
+  ice:'M12 2v20M4 7l16 10M4 17L20 7M12 6l-2-2m2 2l2-2m-2 14l-2 2m2-2l2 2M6.5 8.5L4 8m2.5.5L6 11m11.5 4.5L20 16m-2.5-.5l.5-2.5M6.5 15.5L4 16m2.5-.5L6 13m11.5-4.5L20 8m-2.5.5L17 6',
+  flex:'M7 5a2 2 0 012-2h1l2 5 5 1a4 4 0 013 4v5a3 3 0 01-3 3h-4a8 8 0 01-8-8V7a2 2 0 012-2z',
+  swatch:'M12 3a9 9 0 100 18h1a2 2 0 002-2 2 2 0 012-2h2a2 2 0 002-2 9 9 0 00-9-12zM7.5 11a1 1 0 110-2 1 1 0 010 2zm3.5-4a1 1 0 110-2 1 1 0 010 2zm5 1a1 1 0 110-2 1 1 0 010 2z',
+  shirt:'M8 3l4 2 4-2 5 4-2.5 3L17 8.5V21H7V8.5L5.5 10 3 7l5-4z',
+  moon:'M20 13.5A8.5 8.5 0 1110.5 4 6.8 6.8 0 0020 13.5z',
+};
+function icn(name,size=16,sw=1.7){
+  const p=I_PATHS[name];if(!p)return'';
+  return`<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-2px;flex-shrink:0"><path d="${p}"/></svg>`;
+}
+
+
+function toggleSGrp(btn){
+  const g=btn.closest('.ss-group');g.classList.toggle('closed');
+  try{const st=JSON.parse(localStorage.getItem('omni_sgrp')||'{}');st[g.dataset.grp]=g.classList.contains('closed');localStorage.setItem('omni_sgrp',JSON.stringify(st));}catch(e){}
+}
+function _restoreSGrps(){
+  try{const st=JSON.parse(localStorage.getItem('omni_sgrp')||'{}');
+    document.querySelectorAll('.ss-group').forEach(g=>{if(st[g.dataset.grp])g.classList.add('closed');});}catch(e){}
+}
+
+// ── THEME SYSTEM ──────────────────────────────────────────────────────────────
+const OMNI_THEMES=[
+  {id:'default',name:'Omni',sw:['#ede8e2','#b85828','#f5f1ec']},
+  {id:'budapest',name:'Budapest',sw:['#f5e9e6','#9d5c63','#fbf3f1']},
+  {id:'darjeeling',name:'Darjeeling',sw:['#eef0e4','#2e6f6c','#f7f8f0']},
+  {id:'moonrise',name:'Moonrise',sw:['#f6f0dc','#8a7a3b','#fbf7ea']},
+  {id:'aquatic',name:'Aquatic',sw:['#e9f0f2','#c0392b','#f4f8f9']},
+];
+function applyTheme(t){
+  if(t&&t!=='default')document.documentElement.setAttribute('data-theme',t);
+  else document.documentElement.removeAttribute('data-theme');
+  localStorage.setItem('omni_theme',t||'default');
+  // Update theme-color meta for PWA chrome
+  const mc=document.querySelector('meta[name="theme-color"]');
+  const th=OMNI_THEMES.find(x=>x.id===(t||'default'));
+  if(mc&&th)mc.setAttribute('content',th.sw[0]);
+}
+function setTheme(t){
+  applyTheme(t);
+  // Sync across devices via Omni's own omni_settings (key 'theme').
+  // Still independent of Life Manager — it never reads this key.
+  try{if(typeof saveSetting==='function')saveSetting('theme',t);}catch(e){}
+  _renderThemePicker();
+  showToast('Theme: '+(OMNI_THEMES.find(x=>x.id===t)?.name||t)+' ✓');
+}
+function _renderThemePicker(){
+  const wrap=document.getElementById('theme-picker');
+  if(!wrap)return;
+  const cur=localStorage.getItem('omni_theme')||'default';
+  wrap.innerHTML=OMNI_THEMES.map(t=>`
+    <div onclick="setTheme('${t.id}')" style="flex:1;min-width:56px;cursor:pointer;text-align:center">
+      <div style="height:38px;border-radius:8px;border:2px solid ${t.id===cur?'var(--acc)':'var(--bd)'};overflow:hidden;display:flex">
+        <div style="flex:2;background:${t.sw[0]}"></div>
+        <div style="flex:1;background:${t.sw[1]}"></div>
+        <div style="flex:1;background:${t.sw[2]}"></div>
+      </div>
+      <div style="font-size:9px;font-weight:${t.id===cur?'700':'500'};color:${t.id===cur?'var(--acc)':'var(--tx4)'};margin-top:3px;text-transform:uppercase;letter-spacing:.04em">${t.name}</div>
+    </div>`).join('');
+}
+// Apply saved theme instantly on load
+applyTheme(localStorage.getItem('omni_theme')||'default');
+
 // ── HOLIDAY MODE ──────────────────────────────────────────────────────────────
 function _isHoliday(){return localStorage.getItem('omni_holiday')==='1';}
 function toggleHoliday(){
   const on=!_isHoliday();
   localStorage.setItem('omni_holiday',on?'1':'0');
   _refreshHolidayBtn();
-  showToast(on?'🏖️ Holiday mode on':'Holiday mode off');
+  showToast(on?'Holiday mode on ✓':'Holiday mode off');
   renderDay();
   if(_curTab==='dashboard')renderDash();
 }
@@ -4053,7 +4312,7 @@ function _psUpdateDepartPreview(){
   const leaveBy=_calcLeaveBy(start,sens,travel);
   if(leaveBy&&sens&&travel>0){
     const cat=_getDepartCats().find(c=>c.key===sens);
-    prev.innerHTML='🚶 Leave by <b>'+leaveBy+'</b>'+(cat?' ('+cat.buffer+'min buffer + '+travel+'min travel)':'');
+    prev.innerHTML='Leave by <b>'+leaveBy+'</b>'+(cat?' ('+cat.buffer+'min buffer + '+travel+'min travel)':'');
     prev.style.display='block';
   }else prev.style.display='none';
 }
@@ -4454,7 +4713,7 @@ function toggleFreeze(){
   _liveFrozen=!_liveFrozen;const ov=el('freeze-ov');
   const hdr=document.querySelector('#live-overlay .live-hdr');const hdrH=hdr?hdr.getBoundingClientRect().bottom:80;
   if(ov){ov.style.top=hdrH+'px';ov.classList.toggle('on',_liveFrozen);}
-  const btn=el('live-freeze-btn');if(btn){btn.classList.toggle('freeze-on',_liveFrozen);btn.textContent='🧊';}
+  const btn=el('live-freeze-btn');if(btn){btn.classList.toggle('freeze-on',_liveFrozen);btn.textContent='❄';}
 }
 function _liveRender(){
   const ctx=_getLiveCtx();_liveCtx=ctx;
@@ -4466,7 +4725,7 @@ function _liveRender(){
     const ds=todayStr();const todayLog=WLOG.find(l=>l.date===ds);
     const sugg=todayLog?WCOMBOS.find(c=>c.id===todayLog.combination_id):getOutfitSuggestion(ds,[],DS[new Date().getDay()]);
     if(sugg){const items=(sugg.item_ids||[]).map(id=>WITEMS.find(i=>i.id===id)).filter(Boolean);
-      body+=`<div class="live-outfit-strip"><div class="live-outfit-lbl">${todayLog?'✓ Outfit confirmed':'Suggested'} — ${sugg.name}</div><div style="display:flex;gap:5px;overflow-x:auto;padding:2px 0">${items.map(i=>i.photo_url?`<img src="${i.photo_url}" style="width:48px;height:48px;object-fit:cover;border-radius:5px;flex-shrink:0;border:1px solid #222">`:`<div style="width:48px;height:48px;background:#1a1a1a;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px">${W_ICO[i.category]||'👔'}</div>`).join('')}</div>${!todayLog?`<div style="display:flex;gap:6px;margin-top:6px"><button onclick="dashConfirm('${sugg.id}');_liveRender()" style="flex:2;padding:6px;background:var(--acc);color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:700;font-family:var(--font)">✓ Wearing this</button><button onclick="dashSkip('${sugg.id}');_liveRender()" style="flex:1;padding:6px;background:#1a1a1a;color:#666;border:1px solid #222;border-radius:5px;font-size:11px;font-family:var(--font)">Skip</button></div>`:''}</div>`;
+      body+=`<div class="live-outfit-strip"><div class="live-outfit-lbl">${todayLog?'✓ Outfit confirmed':'Suggested'} — ${sugg.name}</div><div style="display:flex;gap:5px;overflow-x:auto;padding:2px 0">${items.map(i=>i.photo_url?`<img src="${i.photo_url}" style="width:48px;height:48px;object-fit:cover;border-radius:5px;flex-shrink:0;border:1px solid #222">`:`<div style="width:48px;height:48px;background:#1a1a1a;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#666">${icn('shirt',22)}</div>`).join('')}</div>${!todayLog?`<div style="display:flex;gap:6px;margin-top:6px"><button onclick="dashConfirm('${sugg.id}');_liveRender()" style="flex:2;padding:6px;background:var(--acc);color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:700;font-family:var(--font)">✓ Wearing this</button><button onclick="dashSkip('${sugg.id}');_liveRender()" style="flex:1;padding:6px;background:#1a1a1a;color:#666;border:1px solid #222;border-radius:5px;font-size:11px;font-family:var(--font)">Skip</button></div>`:''}</div>`;
     }
   }
   if(ctx.idx>=0){
@@ -4498,7 +4757,7 @@ function _liveTick(){
   const subtitleEl=el('live-subtitle');
   if(subtitleEl){
     if(ctx.type==='depart'&&!_liveShowStart){
-      subtitleEl.innerHTML=`<span style="color:var(--acc);font-weight:700">🚶 Leave by ${ctx.leaveBy}</span>`;
+      subtitleEl.innerHTML=`<span style="color:var(--acc);font-weight:700">${icn('walk',13)} Leave by ${ctx.leaveBy}</span>`;
     }else if(ctx.type==='depart'&&_liveShowStart){
       subtitleEl.textContent='Event starts at '+ctx.st;
     }else{
@@ -4510,7 +4769,7 @@ function _liveTick(){
     if(ctx.type==='depart'&&!_liveShowStart){
       lbl.innerHTML=`<span style="color:var(--acc);font-size:12px;font-weight:600">Time until you must leave</span><br><span onclick="_liveShowStart=true;_liveTick()" style="font-size:10px;color:#666;cursor:pointer;text-decoration:underline">switch to time until event start</span>`;
     }else if(ctx.type==='depart'&&_liveShowStart){
-      lbl.innerHTML=`<span style="font-size:12px">Time until event starts</span><br><span onclick="_liveShowStart=false;_liveTick()" style="font-size:10px;color:var(--acc);cursor:pointer;text-decoration:underline">🚶 switch to departure countdown</span>`;
+      lbl.innerHTML=`<span style="font-size:12px">Time until event starts</span><br><span onclick="_liveShowStart=false;_liveTick()" style="font-size:10px;color:var(--acc);cursor:pointer;text-decoration:underline">switch to departure ⏱ countdown</span>`;
     }else{
       lbl.textContent=ctx.cdLabel||(ot?'Overtime':'Remaining');
       lbl.style.color='';
