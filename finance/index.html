@@ -560,7 +560,7 @@ input:focus,select:focus{border-color:var(--ink)}
   <div class="page-hd"><div><div class="pg-title">Commitments</div><div class="pg-sub">Tick to confirm &mdash; amounts deduct from balance &amp; record in Settlement</div></div></div>
   <div style="display:flex;gap:7px;align-items:center;margin-bottom:13px;flex-wrap:wrap">
     <button class="btn btn-sm" onclick="cMov(-1)">&laquo;</button>
-    <div class="badge-month" id="commit-label" style="font-size:14px;font-weight:700;color:var(--ink)">May 2026</div>
+    <div class="badge-month" id="commit-label" style="font-size:14px;font-weight:700;color:var(--ink);min-width:130px;text-align:center">May 2026</div>
     <button class="btn btn-sm" onclick="cMov(1)">&raquo;</button>
     <div style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap">
       <button class="btn btn-sm" id="cc-expand-btn" onclick="commitToggleAll()">&#8645; Expand all</button>
@@ -1905,7 +1905,11 @@ function renderDashboard(){
   // Pinned reserves — separate card
   renderPinnedReservesCard();
   var mExp=expenses.filter(function(e){var d2=new Date(e.date);return d2.getMonth()===now.getMonth()&&d2.getFullYear()===now.getFullYear();});
-  var totalBudget=Object.keys(S.budgets).reduce(function(a,cat){return a+toRMB(getBudgetAmount(cat),getBudgetCurrency(cat));},0);var totalSpent=mExp.reduce(function(a,e){return a+toRMB(e.amount,e.currency);},0);
+  var dashFrac=nonHolidayFraction(yr,mo);
+  var dashLinkedCats={};
+  safeArr(streams).forEach(function(s){if(s.type==='expense')safeArr(s.linkedBudgetCats).forEach(function(c){dashLinkedCats[c]=true;});});
+  var totalBudget=Object.keys(S.budgets).filter(function(c){return c!=='__surplus__'&&c.indexOf('__hol-')<0;}).reduce(function(a,cat){var amt=getBudgetAmount(cat);if(dashLinkedCats[cat])amt=n2(amt*dashFrac);return a+toRMB(amt,getBudgetCurrency(cat));},0);
+  var totalSpent=mExp.filter(function(e){return e.category!=='__surplus__'&&(e.category||'').indexOf('__hol-')<0;}).reduce(function(a,e){return a+toRMB(e.amount,e.currency);},0);
   // ── Projection cards ───────────────────────────────────────────────────
   var projEl=document.getElementById('dash-proj-cards');
   if(projEl){
