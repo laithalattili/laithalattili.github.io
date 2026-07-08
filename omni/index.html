@@ -38,6 +38,11 @@
 .ss-grp-body .ss{border-bottom:1px solid var(--bd);padding:.55rem 0}
 .ss-grp-body .ss:last-child{border-bottom:none}
 
+
+.pk-tab{flex:1;padding:.5rem;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx4);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer}
+.pk-tab.active{color:var(--acc);border-bottom-color:var(--acc)}
+.pkt-body{position:relative}
+
 /* ── THEMES (matching Life Manager palettes) ── */
 html[data-theme="budapest"]{
   --bg:#f5e9e6;--bg2:#efe0dc;--bg3:#eddcd8;--bg4:#e0cbc5;
@@ -572,6 +577,12 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
           <div id="dc-reading-main" style="color:var(--tx4);font-size:12px">–</div>
         </div>
 
+        <!-- PACKING CARD -->
+        <div id="dc-pack-card" style="background:var(--sur);border-radius:12px;padding:.75rem .9rem;border:1px solid var(--bd);display:none">
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx4);margin-bottom:.35rem">Packing</div>
+          <div id="dc-pack-main"></div>
+        </div>
+
         <!-- FILM CARD -->
         <div id="dc-film-card" style="background:var(--sur);border-radius:12px;padding:.75rem .9rem;border:1px solid var(--bd);display:none">
           <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx4);margin-bottom:.35rem">Film this week</div>
@@ -677,19 +688,63 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
       <div id="cv-rhythms"></div>
       <div id="cv-tasks" style="display:none"></div>
       <div id="cv-packing" style="display:none">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem .6rem .2rem">
-          <div class="sec-lbl" style="padding:0">Packing Lists</div>
-          <button onclick="openAddPackingList()" style="font-size:11px;color:var(--acc);font-weight:700;background:none;border:none">+ New list</button>
+        <!-- Sub-tabs -->
+        <div style="display:flex;gap:0;border-bottom:1px solid var(--bd);background:var(--sur)">
+          <button class="pk-tab active" data-pkt="items" onclick="switchPKTab('items')">Items</button>
+          <button class="pk-tab" data-pkt="lists" onclick="switchPKTab('lists')">Lists</button>
+          <button class="pk-tab" data-pkt="active" onclick="switchPKTab('active')">Active</button>
         </div>
-        <div id="packing-lists-wrap"></div>
-        <!-- Active list detail view -->
-        <div id="packing-detail" style="display:none">
-          <div style="display:flex;align-items:center;gap:8px;padding:.5rem .6rem .2rem">
-            <button onclick="closePackingDetail()" style="font-size:12px;color:var(--tx4);background:none;border:none;padding:0">← Back</button>
-            <div id="packing-detail-name" class="sec-lbl" style="padding:0;flex:1"></div>
-            <button onclick="openAddPackingItem()" style="font-size:11px;color:var(--acc);font-weight:700;background:none;border:none">+ Add</button>
+
+        <!-- ITEMS tab -->
+        <div id="pkt-items" class="pkt-body">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem .6rem .2rem">
+            <div class="sec-lbl" style="padding:0">Item Library</div>
+            <div style="display:flex;gap:8px">
+              <button onclick="openAddPackCat()" style="font-size:11px;color:var(--tx3);font-weight:700;background:none;border:none">+ Category</button>
+              <button onclick="openAddPackItem()" style="font-size:11px;color:var(--acc);font-weight:700;background:none;border:none">+ Item</button>
+            </div>
           </div>
-          <div id="packing-items-wrap"></div>
+          <div id="pk-items-wrap"></div>
+        </div>
+
+        <!-- LISTS tab -->
+        <div id="pkt-lists" class="pkt-body" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem .6rem .2rem">
+            <div class="sec-lbl" style="padding:0">Packing Lists</div>
+            <button onclick="openAddPackList()" style="font-size:11px;color:var(--acc);font-weight:700;background:none;border:none">+ New list</button>
+          </div>
+          <div id="pk-lists-wrap"></div>
+        </div>
+
+        <!-- ACTIVE tab -->
+        <div id="pkt-active" class="pkt-body" style="display:none">
+          <div id="pk-active-wrap" style="padding:.5rem .6rem"></div>
+        </div>
+
+        <!-- LIST DETAIL (overlaid) -->
+        <div id="pk-list-detail" style="display:none;position:absolute;inset:0;background:var(--bg);z-index:10;overflow-y:auto">
+          <div style="display:flex;align-items:center;gap:8px;padding:.5rem .6rem .3rem;border-bottom:1px solid var(--bd);background:var(--sur)">
+            <button onclick="closePKDetail()" style="font-size:12px;color:var(--tx4);background:none;border:none">← Back</button>
+            <div id="pk-detail-name" style="flex:1;font-size:14px;font-weight:700;color:var(--tx)"></div>
+            <button onclick="openEditPackList(_pkDetailListId)" style="font-size:11px;color:var(--tx4);background:none;border:none">✎</button>
+          </div>
+          <!-- Periods -->
+          <div style="padding:.45rem .6rem;border-bottom:1px solid var(--bd)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx4)">Active Periods</div>
+              <button onclick="openAddPackPeriod()" style="font-size:11px;color:var(--acc);font-weight:700;background:none;border:none">+ Add period</button>
+            </div>
+            <div id="pk-periods-wrap"></div>
+          </div>
+          <!-- Items in list -->
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:.45rem .6rem .2rem">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx4)">Items</div>
+            <div style="display:flex;gap:8px">
+              <button onclick="openAddCatToList()" style="font-size:11px;color:var(--tx3);font-weight:700;background:none;border:none">+ Category</button>
+              <button onclick="openAddItemToList()" style="font-size:11px;color:var(--acc);font-weight:700;background:none;border:none">+ Item</button>
+            </div>
+          </div>
+          <div id="pk-detail-items"></div>
         </div>
       </div>
       <div id="cv-templates" style="display:none"></div>
@@ -1252,6 +1307,69 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
     <button class="btn-danger" id="pi-del" style="display:none" onclick="deletePackingItem()">Delete</button>
   </div>
 </div>
+
+
+<!-- PK: CATEGORY MODAL -->
+<div class="md-wrap" id="pkcat-md"><div class="md">
+  <div class="md-title">Category</div>
+  <div class="inp"><label>Name</label><input type="text" id="pkcat-name" placeholder="e.g. Clothing"></div>
+  <div class="md-row"><button class="btn-s" style="flex:1" onclick="closePKCatModal()">Cancel</button><button class="btn-p" style="flex:2" onclick="savePKCat()">Save</button></div>
+  <button class="btn-danger" id="pkcat-del" style="display:none" onclick="deletePKCat()">Delete</button>
+</div></div>
+
+<!-- PK: ITEM MODAL -->
+<div class="md-wrap" id="pkitem-md"><div class="md">
+  <div class="md-title">Item</div>
+  <div class="inp"><label>Name</label><input type="text" id="pkitem-name" placeholder="e.g. Passport"></div>
+  <div class="inp"><label>Categories</label><div id="pkitem-cats" style="display:flex;flex-direction:column;gap:4px;padding:.25rem 0"></div></div>
+  <div class="inp" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="pkitem-req"> <label for="pkitem-req" style="font-size:13px">Required ★ (always show in live mode)</label></div>
+  <div class="md-row"><button class="btn-s" style="flex:1" onclick="closePKItemModal()">Cancel</button><button class="btn-p" style="flex:2" onclick="savePKItem()">Save</button></div>
+  <button class="btn-danger" id="pkitem-del" style="display:none" onclick="deletePKItem()">Delete</button>
+</div></div>
+
+<!-- PK: LIST MODAL -->
+<div class="md-wrap" id="pklist-md"><div class="md">
+  <div class="md-title">Packing List</div>
+  <div class="inp"><label>Name</label><input type="text" id="pklist-name" placeholder="e.g. Jordan Summer Trip"></div>
+  <div class="md-row"><button class="btn-s" style="flex:1" onclick="closePKListModal()">Cancel</button><button class="btn-p" style="flex:2" onclick="savePKList()">Save</button></div>
+  <button class="btn-danger" id="pklist-del" style="display:none" onclick="deletePKList()">Delete list</button>
+</div></div>
+
+<!-- PK: PERIOD MODAL -->
+<div class="md-wrap" id="pkper-md"><div class="md">
+  <div class="md-title">Active Period</div>
+  <div class="inp"><label>From</label><input type="date" id="pkper-start"></div>
+  <div class="inp"><label>Until</label><input type="date" id="pkper-end"></div>
+  <div class="md-row"><button class="btn-s" style="flex:1" onclick="closePKPerModal()">Cancel</button><button class="btn-p" style="flex:2" onclick="savePKPeriod()">Save</button></div>
+  <button class="btn-danger" id="pkper-del" style="display:none" onclick="deletePKPeriod()">Delete period</button>
+</div></div>
+
+<!-- PK: ADD ITEM TO LIST MODAL -->
+<div class="md-wrap" id="pklitem-md"><div class="md">
+  <div class="md-title">Add Item to List</div>
+  <div class="inp"><label>Search library</label><input type="text" id="pklitem-search" placeholder="Type to filter..." oninput="_renderItemPicker(this.value)"></div>
+  <div id="pklitem-list" style="max-height:180px;overflow-y:auto;border:1px solid var(--bd);border-radius:5px;margin-bottom:.5rem"></div>
+  <div class="inp"><label>Or create new item</label><input type="text" id="pklitem-new" placeholder="New item name (adds to library too)"></div>
+  <div class="inp"><label>Note for this list (optional)</label><input type="text" id="pklitem-note" placeholder="e.g. Check adapter"></div>
+  <div class="inp" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="pklitem-req"> <label for="pklitem-req" style="font-size:13px">Required ★ in this list</label></div>
+  <div class="md-row"><button class="btn-s" style="flex:1" onclick="closePKLItemModal()">Cancel</button><button class="btn-p" style="flex:2" onclick="savePKListItem()">Add</button></div>
+</div></div>
+
+<!-- PK: ADD CATEGORY TO LIST MODAL -->
+<div class="md-wrap" id="pklcat-md"><div class="md">
+  <div class="md-title">Add Category to List</div>
+  <div id="pklcat-list" style="max-height:280px;overflow-y:auto"></div>
+  <button class="btn-s" style="width:100%;margin-top:.5rem" onclick="closePKLCatModal()">Close</button>
+</div></div>
+
+<!-- PK: EDIT LIST ITEM MODAL -->
+<div class="md-wrap" id="pkli-md"><div class="md">
+  <div class="md-title">Edit Item in List</div>
+  <div class="inp"><label>Note (for this list only)</label><input type="text" id="pkli-note" placeholder="e.g. Check adapter works in Jordan"></div>
+  <div class="inp" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="pkli-req"> <label for="pkli-req" style="font-size:13px">Required ★ in this list</label></div>
+  <div class="md-row"><button class="btn-s" style="flex:1" onclick="closePKLIModal()">Cancel</button><button class="btn-p" style="flex:2" onclick="savePKLI()">Save</button></div>
+  <button class="btn-danger" onclick="deletePKLI()">Remove from list</button>
+</div></div>
 
 <!-- RHYTHM MODAL -->
 <div class="md-wrap" id="rh-md">
@@ -3185,7 +3303,7 @@ async function switchCV(v){
   ['rhythms','tasks','packing','templates'].forEach(x=>{const e=el('cv-'+x);if(e)e.style.display=x===v?'':'none';});
   if(!_cLoaded)await loadChecklists();
   if(v==='rhythms')renderCVRhythms();if(v==='tasks')renderCVTasks();
-  if(v==='packing'){if(!_packLoaded){loadPacking().then(()=>{renderPackingLists();});}else renderPackingLists();}
+  if(v==='packing'){if(!_pkLoaded){loadPacking().then(()=>switchPKTab('items'));}else switchPKTab('items');}
   if(v==='templates')el('cv-templates').innerHTML='<div style="padding:.75rem;font-size:13px;color:var(--tx3)">Templates — coming in next build.</div>';
 }
 
@@ -3477,6 +3595,24 @@ async function renderDash(){
       }
     }catch(e){fc2.innerHTML='<span style="color:var(--tx4);font-size:12px">–</span>';}
   }
+
+  // ── PACKING progress ───────────────────────────────────────────────────────
+  const pkCard=el('dc-pack-card');const pkMain=el('dc-pack-main');
+  if(pkCard&&pkMain&&_pkLoaded){
+    const active=_pkActiveList();
+    if(active){
+      pkCard.style.display='';
+      const period=_pkActivePeriod(active.id);
+      const listItems=PK_LIST_ITEMS.filter(x=>x.list_id===active.id);
+      const tickable=listItems.length;
+      const ticked=period?PK_TICKS.filter(t=>t.period_id===period.id&&listItems.some(li=>li.id===t.list_item_id)).length:0;
+      const pct=tickable>0?Math.round(ticked/tickable*100):0;
+      const barColor=pct===100?'var(--ok)':pct>50?'var(--acc)':'var(--bd2)';
+      pkMain.innerHTML=`<div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:4px">${active.name}</div>
+        <div style="height:8px;background:var(--bd);border-radius:4px;overflow:hidden;margin-bottom:3px"><div style="height:100%;width:${pct}%;background:${barColor};border-radius:4px;transition:width .5s"></div></div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--tx4)">${ticked} / ${tickable} packed · ${pct}%</div>`;
+    }else pkCard.style.display='none';
+  }else if(pkCard)pkCard.style.display='none';
 
   // ── OUTFIT ─────────────────────────────────────────────────────────────────
   renderDashOutfit();
@@ -4915,208 +5051,476 @@ function _liveNoteSave(idx,ds){const bs=[];el('live-body').querySelectorAll('.li
 function addLiveNote(idx,ds){const bs=getNotes(idx,ds);bs.push({text:'',depth:0});saveNotes(idx,ds,bs);_liveRender();setTimeout(()=>{const tas=el('live-body').querySelectorAll('.live-bullet-inp');if(tas.length){const last=tas[tas.length-1];last.focus();last.style.height='auto';last.style.height=last.scrollHeight+'px';}},50);}
 
 
+
 // ═══════════════════════════════════════════════════
-// PACKING LISTS
+// PACKING SYSTEM v2
 // ═══════════════════════════════════════════════════
-let PACK_LISTS=[],PACK_ITEMS=[],PACK_TICKS=[],_packLoaded=false;
-let _editPackListId=null,_editPackItemId=null,_activePackListId=null;
+let PK_CATS=[],PK_ITEMS=[],PK_ITEM_TAGS=[],PK_LISTS=[],PK_PERIODS=[],PK_LIST_ITEMS=[],PK_TICKS=[];
+let _pkLoaded=false,_pkDetailListId=null,_pkDetailPeriodId=null;
+let _pkEditCatId=null,_pkEditItemId=null,_pkEditListId=null,_pkEditPeriodId=null,_pkEditListItemId=null;
+let _pkTab='items';
 
 async function loadPacking(){
   if(!_OK)return;
   try{
-    const[{data:lists},{data:items},{data:ticks}]=await Promise.all([
-      supaFrom('omni_packing_lists').select('*').order('created_at'),
-      supaFrom('omni_packing_items').select('*').order('list_id,position'),
-      supaFrom('omni_packing_ticks').select('*'),
+    const[c,it,itg,l,p,li,tk]=await Promise.all([
+      supaFrom('omni_pack_categories').select('*').order('position'),
+      supaFrom('omni_pack_items').select('*').order('name'),
+      supaFrom('omni_pack_item_tags').select('*'),
+      supaFrom('omni_pack_lists').select('*').order('name'),
+      supaFrom('omni_pack_periods').select('*').order('start_date'),
+      supaFrom('omni_pack_list_items').select('*').order('position'),
+      supaFrom('omni_pack_ticks').select('*'),
     ]);
-    PACK_LISTS=lists||[];PACK_ITEMS=items||[];PACK_TICKS=ticks||[];
-    _packLoaded=true;
+    PK_CATS=c?.data||c||[];PK_ITEMS=it?.data||it||[];PK_ITEM_TAGS=itg?.data||itg||[];
+    PK_LISTS=l?.data||l||[];PK_PERIODS=p?.data||p||[];PK_LIST_ITEMS=li?.data||li||[];PK_TICKS=tk?.data||tk||[];
+    _pkLoaded=true;
   }catch(e){console.warn('Packing load:',e.message);}
 }
 
-function _activePackList(){
-  // List with date range covering today, or most recently created if none
+function _pkActivePeriod(listId){
   const today=todayStr();
-  const active=PACK_LISTS.filter(l=>l.start_date&&l.end_date&&today>=l.start_date&&today<=l.end_date);
-  return active[0]||null;
+  return PK_PERIODS.find(p=>p.list_id===listId&&today>=p.start_date&&today<=p.end_date)||null;
+}
+function _pkActiveList(){
+  for(const l of PK_LISTS){if(_pkActivePeriod(l.id))return l;}
+  return null;
 }
 
-// ── LIST CRUD ─────────────────────────────────────────────────────────────────
-function openAddPackingList(){
-  _editPackListId=null;
-  el('pack-list-title').textContent='New Packing List';
-  el('pl-name').value='';el('pl-start').value='';el('pl-end').value='';
-  el('pl-del').style.display='none';
-  el('pack-list-md').classList.add('on');
-}
-function openEditPackingList(id){
-  const l=PACK_LISTS.find(x=>x.id===id);if(!l)return;
-  _editPackListId=id;
-  el('pack-list-title').textContent='Edit List';
-  el('pl-name').value=l.name||'';
-  el('pl-start').value=l.start_date||'';el('pl-end').value=l.end_date||'';
-  el('pl-del').style.display='';
-  el('pack-list-md').classList.add('on');
-}
-function closePackingListModal(){el('pack-list-md').classList.remove('on');}
-async function savePackingList(){
-  const name=el('pl-name').value.trim();if(!name)return;
-  const row={name,start_date:el('pl-start').value||null,end_date:el('pl-end').value||null};
-  try{
-    if(_editPackListId){
-      await supaFrom('omni_packing_lists').update(row).eq('id',_editPackListId);
-      const i=PACK_LISTS.findIndex(x=>x.id===_editPackListId);if(i>=0)PACK_LISTS[i]={...PACK_LISTS[i],...row};
-    }else{
-      const{data}=await supaFrom('omni_packing_lists').insert(row).select().single();
-      if(data)PACK_LISTS.push(data);
-    }
-    closePackingListModal();renderPackingLists();showToast('Saved ✓');
-  }catch(e){showToast('Save failed');console.error(e);}
-}
-async function deletePackingList(){
-  if(!_editPackListId)return;
-  await supaFrom('omni_packing_lists').delete().eq('id',_editPackListId);
-  PACK_LISTS=PACK_LISTS.filter(x=>x.id!==_editPackListId);
-  PACK_ITEMS=PACK_ITEMS.filter(x=>x.list_id!==_editPackListId);
-  closePackingListModal();closePackingDetail();renderPackingLists();showToast('Deleted');
+function switchPKTab(t){
+  _pkTab=t;
+  document.querySelectorAll('.pk-tab').forEach(b=>b.classList.toggle('active',b.dataset.pkt===t));
+  ['items','lists','active'].forEach(x=>{ const el2=el('pkt-'+x);if(el2)el2.style.display=x===t?'':'none'; });
+  if(t==='items')renderPKItems();
+  if(t==='lists')renderPKLists();
+  if(t==='active')renderPKActive();
 }
 
-// ── ITEM CRUD ─────────────────────────────────────────────────────────────────
-function openAddPackingItem(){
-  _editPackItemId=null;
-  el('pack-item-title').textContent='Add Item';
-  el('pi-type').value='item';el('pi-text').value='';
-  el('pi-del').style.display='none';
-  el('pack-item-md').classList.add('on');
+// ── RENDER: ITEMS TAB ─────────────────────────────────────────────────────────
+function renderPKItems(){
+  const wrap=el('pk-items-wrap');if(!wrap)return;
+  // Group by category
+  const uncatItems=PK_ITEMS.filter(it=>!PK_ITEM_TAGS.some(t=>t.item_id===it.id));
+  let html='';
+  PK_CATS.forEach(cat=>{
+    const items=PK_ITEMS.filter(it=>PK_ITEM_TAGS.some(t=>t.item_id===it.id&&t.category_id===cat.id));
+    html+=`<div style="padding:.4rem .6rem .1rem;display:flex;align-items:center;justify-content:space-between;margin-top:.1rem">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--tx3)">${cat.name}</div>
+      <button onclick="openEditPackCat('${cat.id}')" style="font-size:10px;color:var(--tx4);background:none;border:none">✎</button>
+    </div>`;
+    items.forEach(it=>{html+=_pkItemRow(it);});
+    if(!items.length)html+=`<div style="padding:.25rem 1.2rem;font-size:11px;color:var(--tx4)">No items</div>`;
+  });
+  if(uncatItems.length){
+    html+=`<div style="padding:.4rem .6rem .1rem;margin-top:.1rem"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--tx4)">Uncategorised</div></div>`;
+    uncatItems.forEach(it=>{html+=_pkItemRow(it);});
+  }
+  if(!PK_ITEMS.length)html='<div style="padding:1.5rem;text-align:center;font-size:13px;color:var(--tx4)">No items yet.</div>';
+  wrap.innerHTML=html;
 }
-function openEditPackingItem(id){
-  const it=PACK_ITEMS.find(x=>x.id===id);if(!it)return;
-  _editPackItemId=id;
-  el('pack-item-title').textContent='Edit Item';
-  el('pi-type').value=it.type||'item';el('pi-text').value=it.text||'';
-  el('pi-del').style.display='';
-  el('pack-item-md').classList.add('on');
+function _pkItemRow(it){
+  const cats=PK_ITEM_TAGS.filter(t=>t.item_id===it.id).map(t=>PK_CATS.find(c=>c.id===t.category_id)?.name).filter(Boolean);
+  return`<div style="display:flex;align-items:center;gap:8px;padding:.4rem .75rem;border-bottom:.5px solid var(--bd)">
+    <div style="flex:1">
+      <div style="font-size:13px;color:var(--tx)">${it.name}${it.required?'<span style="font-size:9px;color:var(--acc);font-weight:700;margin-left:5px">★</span>':''}</div>
+      ${cats.length?`<div style="font-size:10px;color:var(--tx4)">${cats.join(', ')}</div>`:''}
+    </div>
+    <button onclick="openEditPackItem('${it.id}')" style="font-size:10px;color:var(--tx4);background:none;border:none">✎</button>
+  </div>`;
 }
-function closePackingItemModal(){el('pack-item-md').classList.remove('on');}
-async function savePackingItem(){
-  const text=el('pi-text').value.trim();if(!text||!_activePackListId)return;
-  const maxPos=Math.max(0,...PACK_ITEMS.filter(x=>x.list_id===_activePackListId).map(x=>x.position||0));
-  const row={list_id:_activePackListId,type:el('pi-type').value,text,position:maxPos+1};
-  try{
-    if(_editPackItemId){
-      await supaFrom('omni_packing_items').update({type:row.type,text:row.text}).eq('id',_editPackItemId);
-      const i=PACK_ITEMS.findIndex(x=>x.id===_editPackItemId);if(i>=0)PACK_ITEMS[i]={...PACK_ITEMS[i],type:row.type,text:row.text};
-    }else{
-      const{data}=await supaFrom('omni_packing_items').insert(row).select().single();
-      if(data)PACK_ITEMS.push(data);
-    }
-    closePackingItemModal();renderPackingDetail(_activePackListId);showToast('Saved ✓');
-  }catch(e){showToast('Save failed');console.error(e);}
+
+// ── RENDER: LISTS TAB ─────────────────────────────────────────────────────────
+function renderPKLists(){
+  const wrap=el('pk-lists-wrap');if(!wrap)return;
+  if(!PK_LISTS.length){wrap.innerHTML='<div style="padding:1.5rem;text-align:center;font-size:13px;color:var(--tx4)">No lists yet.</div>';return;}
+  wrap.innerHTML=PK_LISTS.map(l=>{
+    const today=todayStr();
+    const active=_pkActivePeriod(l.id);
+    const itemCount=PK_LIST_ITEMS.filter(x=>x.list_id===l.id).length;
+    const periods=PK_PERIODS.filter(p=>p.list_id===l.id);
+    const nextPeriod=periods.filter(p=>p.start_date>today).sort((a,b)=>a.start_date.localeCompare(b.start_date))[0];
+    const meta=active?'Active now':nextPeriod?'Next: '+nextPeriod.start_date:periods.length?periods.length+' period(s)':'No dates set';
+    return`<div style="display:flex;align-items:center;gap:10px;padding:.55rem .75rem;border-bottom:.5px solid var(--bd);background:var(--sur)${active?';border-left:3px solid var(--acc)':''}">
+      <div style="flex:1;cursor:pointer" onclick="openPKDetail('${l.id}')">
+        <div style="font-size:13px;font-weight:600;color:var(--tx)">${l.name}${active?'<span style="font-size:9px;font-weight:700;background:var(--acc);color:#fff;padding:1px 5px;border-radius:4px;margin-left:6px">ACTIVE</span>':''}</div>
+        <div style="font-size:10px;color:var(--tx4)">${meta} · ${itemCount} items</div>
+      </div>
+      <button onclick="openEditPackList('${l.id}')" style="font-size:11px;color:var(--tx4);background:none;border:none">✎</button>
+    </div>`;
+  }).join('');
 }
-async function deletePackingItem(){
-  if(!_editPackItemId)return;
-  await supaFrom('omni_packing_items').delete().eq('id',_editPackItemId);
-  PACK_ITEMS=PACK_ITEMS.filter(x=>x.id!==_editPackItemId);
-  closePackingItemModal();renderPackingDetail(_activePackListId);showToast('Deleted');
+
+// ── RENDER: ACTIVE TAB ────────────────────────────────────────────────────────
+function renderPKActive(){
+  const wrap=el('pk-active-wrap');if(!wrap)return;
+  const active=_pkActiveList();
+  if(!active){wrap.innerHTML='<div style="font-size:13px;color:var(--tx4);text-align:center;padding:1.5rem">No active packing list right now.</div>';return;}
+  const period=_pkActivePeriod(active.id);
+  _pkDetailListId=active.id;_pkDetailPeriodId=period?.id||null;
+  wrap.innerHTML=`<div style="font-size:14px;font-weight:700;color:var(--tx);margin-bottom:.1rem">${active.name}</div>
+    <div style="font-size:11px;color:var(--tx4);margin-bottom:.65rem">${period?period.start_date+' – '+period.end_date:''}</div>`+
+    _renderPackChecklist(active.id,period?.id,true);
+}
+
+// ── RENDER: CHECKLIST (shared between active tab + live mode) ─────────────────
+function _renderPackChecklist(listId,periodId,withRequired){
+  const listItems=PK_LIST_ITEMS.filter(x=>x.list_id===listId).sort((a,b)=>(a.position||0)-(b.position||0));
+  if(!listItems.length)return'<div style="font-size:13px;color:var(--tx4);text-align:center;padding:1rem">No items in this list.</div>';
+  // Group by category
+  const catMap={};
+  listItems.forEach(li=>{
+    const cid=li.category_id||'__none';
+    if(!catMap[cid])catMap[cid]=[];
+    catMap[cid].push(li);
+  });
+  let html='';
+  // Categories in order
+  const orderedCats=[...PK_CATS.filter(c=>catMap[c.id]),'__none'].filter(Boolean);
+  orderedCats.forEach(cat=>{
+    const cid=cat==='__none'?'__none':cat.id;
+    const items=catMap[cid]||[];
+    if(!items.length)return;
+    if(cid!=='__none')html+=`<div style="padding:.45rem .6rem .15rem;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--tx3)">${cat.name||cat}</div>`;
+    items.forEach(li=>{
+      const item=PK_ITEMS.find(x=>x.id===li.item_id);if(!item)return;
+      const isReq=li.required!=null?li.required:item.required;
+      if(withRequired&&!isReq)return; // in active/live, show required only unless showing all
+      const ticked=periodId&&PK_TICKS.some(t=>t.list_item_id===li.id&&t.period_id===periodId);
+      html+=`<div onclick="togglePKTick('${li.id}','${periodId}')" style="display:flex;align-items:center;gap:10px;padding:.45rem .75rem;border-bottom:.5px solid var(--bd);cursor:pointer">
+        <div style="width:20px;height:20px;border-radius:50%;border:2px solid ${ticked?'var(--ok)':'var(--bd2)'};background:${ticked?'var(--ok)':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700">${ticked?'✓':''}</div>
+        <div style="flex:1">
+          <div style="font-size:13px;color:${ticked?'var(--tx4)':'var(--tx)'};text-decoration:${ticked?'line-through':'none'}">${item.name}${isReq?'<span style="font-size:9px;color:var(--acc);margin-left:4px">★</span>':''}</div>
+          ${li.note?`<div style="font-size:10px;color:var(--tx4)">${li.note}</div>`:''}
+        </div>
+      </div>`;
+    });
+  });
+  return html;
+}
+
+// ── RENDER: LIST DETAIL ───────────────────────────────────────────────────────
+function openPKDetail(listId){
+  _pkDetailListId=listId;
+  const list=PK_LISTS.find(x=>x.id===listId);
+  if(el('pk-detail-name'))el('pk-detail-name').textContent=list?.name||'';
+  // Find active period
+  const period=_pkActivePeriod(listId);
+  _pkDetailPeriodId=period?.id||null;
+  renderPKPeriods();renderPKDetailItems();
+  if(el('pk-list-detail'))el('pk-list-detail').style.display='';
+}
+function closePKDetail(){
+  if(el('pk-list-detail'))el('pk-list-detail').style.display='none';
+  _pkDetailListId=null;
+}
+function renderPKPeriods(){
+  const wrap=el('pk-periods-wrap');if(!wrap||!_pkDetailListId)return;
+  const periods=PK_PERIODS.filter(p=>p.list_id===_pkDetailListId).sort((a,b)=>a.start_date.localeCompare(b.start_date));
+  const today=todayStr();
+  if(!periods.length){wrap.innerHTML='<div style="font-size:11px;color:var(--tx4)">No periods yet.</div>';return;}
+  wrap.innerHTML=periods.map(p=>{
+    const isNow=today>=p.start_date&&today<=p.end_date;
+    return`<div style="display:flex;align-items:center;gap:8px;padding:.25rem 0">
+      <div style="flex:1;font-size:12px;font-family:var(--mono);color:${isNow?'var(--ok)':'var(--tx3)'}">${p.start_date} – ${p.end_date}${isNow?' ✓ now':''}</div>
+      <button onclick="openEditPackPeriod('${p.id}')" style="font-size:10px;color:var(--tx4);background:none;border:none">✎</button>
+    </div>`;
+  }).join('');
+}
+function renderPKDetailItems(){
+  const wrap=el('pk-detail-items');if(!wrap||!_pkDetailListId)return;
+  const listItems=PK_LIST_ITEMS.filter(x=>x.list_id===_pkDetailListId).sort((a,b)=>(a.position||0)-(b.position||0));
+  if(!listItems.length){wrap.innerHTML='<div style="padding:1rem;font-size:13px;color:var(--tx4);text-align:center">No items. Tap + Item or + Category to add.</div>';return;}
+  const catMap={};
+  listItems.forEach(li=>{const cid=li.category_id||'__none';if(!catMap[cid])catMap[cid]=[];catMap[cid].push(li);});
+  let html='';
+  const period=_pkDetailPeriodId;
+  const allCats=[...PK_CATS.filter(c=>catMap[c.id]),{id:'__none',name:'Other'}];
+  allCats.forEach(cat=>{
+    const items=catMap[cat.id]||[];if(!items.length)return;
+    if(cat.id!=='__none')html+=`<div style="padding:.45rem .75rem .15rem;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--tx3);display:flex;align-items:center;justify-content:space-between"><span>${cat.name}</span></div>`;
+    items.forEach(li=>{
+      const item=PK_ITEMS.find(x=>x.id===li.item_id);if(!item)return;
+      const ticked=period&&PK_TICKS.some(t=>t.list_item_id===li.id&&t.period_id===period);
+      const isReq=li.required!=null?li.required:item.required;
+      html+=`<div style="display:flex;align-items:center;gap:8px;padding:.4rem .75rem;border-bottom:.5px solid var(--bd)">
+        <div onclick="togglePKTick('${li.id}','${period||''}')" style="width:20px;height:20px;border-radius:50%;border:2px solid ${ticked?'var(--ok)':'var(--bd2)'};background:${ticked?'var(--ok)':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;cursor:pointer">${ticked?'✓':''}</div>
+        <div style="flex:1">
+          <div style="font-size:13px;color:${ticked?'var(--tx4)':'var(--tx)'};text-decoration:${ticked?'line-through':'none'}">${item.name}${isReq?'<span style="font-size:9px;color:var(--acc);margin-left:4px">★</span>':''}</div>
+          ${li.note?`<div style="font-size:10px;color:var(--tx4)">${li.note}</div>`:''}
+        </div>
+        <button onclick="openEditPKListItem('${li.id}')" style="font-size:10px;color:var(--tx4);background:none;border:none">✎</button>
+      </div>`;
+    });
+  });
+  wrap.innerHTML=html;
 }
 
 // ── TICK ──────────────────────────────────────────────────────────────────────
-async function togglePackTick(itemId,listId){
-  const existing=PACK_TICKS.find(t=>t.item_id===itemId&&t.list_id===listId);
-  if(existing){
-    await supaFrom('omni_packing_ticks').delete().eq('id',existing.id);
-    PACK_TICKS=PACK_TICKS.filter(t=>t.id!==existing.id);
-  }else{
-    const{data}=await supaFrom('omni_packing_ticks').insert({item_id:itemId,list_id:listId}).select().single();
-    if(data)PACK_TICKS.push(data);
-  }
-  renderPackingDetail(listId);
-  // Also refresh live mode if open
-  if(_liveOpen||_gymLiveOpen)_renderLivePackCard();
-}
-
-// ── RENDER ────────────────────────────────────────────────────────────────────
-function renderPackingLists(){
-  const wrap=el('packing-lists-wrap');if(!wrap)return;
-  const today=todayStr();
-  if(!PACK_LISTS.length){
-    wrap.innerHTML='<div style="padding:1.25rem;font-size:13px;color:var(--tx4);text-align:center">No packing lists yet.</div>';
-    return;
-  }
-  wrap.innerHTML=PACK_LISTS.map(l=>{
-    const items=PACK_ITEMS.filter(x=>x.list_id===l.id);
-    const ticked=PACK_TICKS.filter(t=>t.list_id===l.id).length;
-    const tickable=items.filter(x=>x.type!=='title').length;
-    const isActive=l.start_date&&l.end_date&&today>=l.start_date&&today<=l.end_date;
-    const dateStr=l.start_date&&l.end_date?`${l.start_date} – ${l.end_date}`:'No dates';
-    return`<div style="display:flex;align-items:center;gap:10px;padding:.55rem .75rem;border-bottom:.5px solid var(--bd);background:var(--sur)${isActive?';border-left:3px solid var(--acc)':''}">
-      <div style="flex:1;cursor:pointer" onclick="openPackingDetail('${l.id}')">
-        <div style="font-size:13px;font-weight:600;color:var(--tx)">${l.name}${isActive?'<span style="font-size:9px;font-weight:700;background:var(--acc);color:#fff;padding:1px 5px;border-radius:4px;margin-left:6px">ACTIVE</span>':''}</div>
-        <div style="font-size:10px;color:var(--tx4)">${dateStr} · ${tickable>0?ticked+'/'+tickable+' packed':items.length+' items'}</div>
-      </div>
-      <button onclick="openEditPackingList('${l.id}')" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0">✎</button>
-    </div>`;
-  }).join('');
-}
-
-function openPackingDetail(listId){
-  _activePackListId=listId;
-  const list=PACK_LISTS.find(x=>x.id===listId);
-  el('packing-detail-name').textContent=list?.name||'';
-  el('packing-lists-wrap').style.display='none';
-  el('packing-detail').style.display='';
-  renderPackingDetail(listId);
-}
-function closePackingDetail(){
-  _activePackListId=null;
-  el('packing-detail').style.display='none';
-  el('packing-lists-wrap').style.display='';
-}
-
-function renderPackingDetail(listId){
-  const wrap=el('packing-items-wrap');if(!wrap)return;
-  const items=PACK_ITEMS.filter(x=>x.list_id===listId).sort((a,b)=>(a.position||0)-(b.position||0));
-  if(!items.length){
-    wrap.innerHTML='<div style="padding:1.25rem;font-size:13px;color:var(--tx4);text-align:center">No items yet. Tap + Add to start.</div>';
-    return;
-  }
-  wrap.innerHTML=items.map(it=>{
-    const ticked=PACK_TICKS.some(t=>t.item_id===it.id&&t.list_id===listId);
-    if(it.type==='title'){
-      return`<div style="padding:.5rem .75rem .2rem;margin-top:.25rem;display:flex;align-items:center;justify-content:space-between">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--tx3)">${it.text}</div>
-        <button onclick="openEditPackingItem('${it.id}')" style="font-size:10px;color:var(--tx4);background:none;border:none;padding:0">✎</button>
-      </div>`;
+async function togglePKTick(listItemId,periodId){
+  if(!periodId)return;
+  const existing=PK_TICKS.find(t=>t.list_item_id===listItemId&&t.period_id===periodId);
+  try{
+    if(existing){
+      await supaFrom('omni_pack_ticks').delete().eq('id',existing.id);
+      PK_TICKS=PK_TICKS.filter(t=>t.id!==existing.id);
+    }else{
+      const{data}=await supaFrom('omni_pack_ticks').insert({list_item_id:listItemId,period_id:periodId}).select().single();
+      if(data)PK_TICKS.push(data);
     }
-    const indent=it.type==='subitem'?'padding-left:1.75rem':'';
-    return`<div style="display:flex;align-items:center;gap:10px;padding:.45rem .75rem;border-bottom:.5px solid var(--bd);background:var(--sur);${indent}">
-      <div onclick="togglePackTick('${it.id}','${listId}')" style="width:20px;height:20px;border-radius:50%;border:2px solid ${ticked?'var(--ok)':'var(--bd2)'};background:${ticked?'var(--ok)':'transparent'};cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px">${ticked?'✓':''}</div>
-      <div style="flex:1;font-size:13px;color:${ticked?'var(--tx4)':'var(--tx)'};text-decoration:${ticked?'line-through':'none'}">${it.text}</div>
-      <button onclick="openEditPackingItem('${it.id}')" style="font-size:10px;color:var(--tx4);background:none;border:none;padding:0">✎</button>
-    </div>`;
-  }).join('');
+    renderPKDetailItems();renderPKActive();_renderLivePackCard();
+  }catch(e){console.warn('Tick:',e.message);}
 }
 
 // ── LIVE MODE PACKING CARD ────────────────────────────────────────────────────
 function _renderLivePackCard(){
-  const active=_activePackList();
-  const liveWrap=el('live-pack-card');
-  if(!liveWrap)return;
-  if(!active){liveWrap.style.display='none';return;}
-  liveWrap.style.display='';
-  const items=PACK_ITEMS.filter(x=>x.list_id===active.id).sort((a,b)=>(a.position||0)-(b.position||0));
-  const tickable=items.filter(x=>x.type!=='title');
-  const ticked=tickable.filter(x=>PACK_TICKS.some(t=>t.item_id===x.id&&t.list_id===active.id));
-  liveWrap.innerHTML=`<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6a5a48;margin-bottom:.35rem">${active.name} · ${ticked.length}/${tickable.length} packed</div>`+
-    items.map(it=>{
-      if(it.type==='title')return`<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#555;margin:.4rem 0 .15rem">${it.text}</div>`;
-      const done=PACK_TICKS.some(t=>t.item_id===it.id&&t.list_id===active.id);
-      const indent=it.type==='subitem'?'margin-left:14px':'';
-      return`<div onclick="togglePackTick('${it.id}','${active.id}')" style="${indent};display:flex;align-items:center;gap:8px;padding:.25rem 0;cursor:pointer">
-        <div style="width:16px;height:16px;border-radius:50%;border:1.5px solid ${done?'#4a7a5a':'#333'};background:${done?'#4a7a5a':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff">${done?'✓':''}</div>
-        <span style="font-size:12px;color:${done?'#444':'#ccc'};text-decoration:${done?'line-through':'none'}">${it.text}</span>
-      </div>`;
-    }).join('');
+  const card=el('live-pack-card');if(!card)return;
+  const active=_pkActiveList();
+  if(!active){card.style.display='none';return;}
+  const period=_pkActivePeriod(active.id);
+  card.style.display='';
+  const listItems=PK_LIST_ITEMS.filter(x=>x.list_id===active.id).sort((a,b)=>(a.position||0)-(b.position||0));
+  const tickable=listItems.length;
+  const ticked=period?PK_TICKS.filter(t=>t.period_id===period.id&&listItems.some(li=>li.id===t.list_item_id)).length:0;
+  // Only required items in live mode
+  const reqItems=listItems.filter(li=>{const it=PK_ITEMS.find(x=>x.id===li.item_id);return li.required!=null?li.required:(it?.required||false);});
+  card.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#8a7a68">${active.name}</div>
+    <div style="font-family:var(--mono);font-size:10px;color:${ticked===tickable?'#4a7a5a':'#8a7a68'}">${ticked}/${tickable} packed</div>
+  </div>`+
+  (reqItems.length?reqItems.map(li=>{
+    const item=PK_ITEMS.find(x=>x.id===li.item_id);if(!item)return'';
+    const done=period&&PK_TICKS.some(t=>t.list_item_id===li.id&&t.period_id===period.id);
+    return`<div onclick="togglePKTick('${li.id}','${period?.id||''}')" style="display:flex;align-items:center;gap:8px;padding:.2rem 0;cursor:pointer">
+      <div style="width:15px;height:15px;border-radius:50%;border:1.5px solid ${done?'#4a7a5a':'#333'};background:${done?'#4a7a5a':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff">${done?'✓':''}</div>
+      <span style="font-size:12px;color:${done?'#444':'#ccc'};text-decoration:${done?'line-through':'none'}">${item.name}</span>
+    </div>`;
+  }).join(''):`<div style="font-size:11px;color:#555">No required items — open Packing tab to see all.</div>`);
+}
+
+// ── CRUD: CATEGORIES ──────────────────────────────────────────────────────────
+function openAddPackCat(){_pkEditCatId=null;el('pkcat-name').value='';el('pkcat-del').style.display='none';el('pkcat-md').classList.add('on');}
+function openEditPackCat(id){const c=PK_CATS.find(x=>x.id===id);if(!c)return;_pkEditCatId=id;el('pkcat-name').value=c.name||'';el('pkcat-del').style.display='';el('pkcat-md').classList.add('on');}
+function closePKCatModal(){el('pkcat-md').classList.remove('on');}
+async function savePKCat(){
+  const name=el('pkcat-name').value.trim();if(!name)return;
+  const row={name,position:_pkEditCatId?undefined:PK_CATS.length};
+  try{
+    if(_pkEditCatId){
+      await supaFrom('omni_pack_categories').update({name}).eq('id',_pkEditCatId);
+      const i=PK_CATS.findIndex(x=>x.id===_pkEditCatId);if(i>=0)PK_CATS[i].name=name;
+    }else{
+      const{data}=await supaFrom('omni_pack_categories').insert({name,position:PK_CATS.length}).select().single();
+      if(data)PK_CATS.push(data);
+    }
+    closePKCatModal();renderPKItems();showToast('Saved ✓');
+  }catch(e){showToast('Error');console.error(e);}
+}
+async function deletePKCat(){
+  if(!_pkEditCatId)return;
+  await supaFrom('omni_pack_categories').delete().eq('id',_pkEditCatId);
+  PK_CATS=PK_CATS.filter(x=>x.id!==_pkEditCatId);
+  PK_ITEM_TAGS=PK_ITEM_TAGS.filter(x=>x.category_id!==_pkEditCatId);
+  closePKCatModal();renderPKItems();showToast('Deleted');
+}
+
+// ── CRUD: ITEMS ───────────────────────────────────────────────────────────────
+function openAddPackItem(){
+  _pkEditItemId=null;
+  el('pkitem-name').value='';el('pkitem-req').checked=false;
+  _renderItemCatCheckboxes(null);
+  el('pkitem-del').style.display='none';el('pkitem-md').classList.add('on');
+}
+function openEditPackItem(id){
+  const it=PK_ITEMS.find(x=>x.id===id);if(!it)return;
+  _pkEditItemId=id;
+  el('pkitem-name').value=it.name||'';el('pkitem-req').checked=!!it.required;
+  const selCats=PK_ITEM_TAGS.filter(t=>t.item_id===id).map(t=>t.category_id);
+  _renderItemCatCheckboxes(selCats);
+  el('pkitem-del').style.display='';el('pkitem-md').classList.add('on');
+}
+function _renderItemCatCheckboxes(selected){
+  const wrap=el('pkitem-cats');if(!wrap)return;
+  wrap.innerHTML=PK_CATS.map(c=>`<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:.15rem 0;cursor:pointer"><input type="checkbox" value="${c.id}" ${selected&&selected.includes(c.id)?'checked':''}> ${c.name}</label>`).join('');
+}
+function closePKItemModal(){el('pkitem-md').classList.remove('on');}
+async function savePKItem(){
+  const name=el('pkitem-name').value.trim();if(!name)return;
+  const req=el('pkitem-req').checked;
+  const selCats=Array.from(el('pkitem-cats').querySelectorAll('input:checked')).map(x=>x.value);
+  try{
+    let itemId=_pkEditItemId;
+    if(itemId){
+      await supaFrom('omni_pack_items').update({name,required:req}).eq('id',itemId);
+      const i=PK_ITEMS.findIndex(x=>x.id===itemId);if(i>=0){PK_ITEMS[i].name=name;PK_ITEMS[i].required=req;}
+      // Re-sync tags
+      await supaFrom('omni_pack_item_tags').delete().eq('item_id',itemId);
+      PK_ITEM_TAGS=PK_ITEM_TAGS.filter(t=>t.item_id!==itemId);
+    }else{
+      const{data}=await supaFrom('omni_pack_items').insert({name,required:req}).select().single();
+      if(data){PK_ITEMS.push(data);itemId=data.id;}
+    }
+    if(itemId&&selCats.length){
+      const rows=selCats.map(cid=>({item_id:itemId,category_id:cid}));
+      const{data:tags}=await supaFrom('omni_pack_item_tags').insert(rows).select();
+      if(tags)PK_ITEM_TAGS.push(...tags);
+    }
+    closePKItemModal();renderPKItems();showToast('Saved ✓');
+  }catch(e){showToast('Error');console.error(e);}
+}
+async function deletePKItem(){
+  if(!_pkEditItemId)return;
+  await supaFrom('omni_pack_items').delete().eq('id',_pkEditItemId);
+  PK_ITEMS=PK_ITEMS.filter(x=>x.id!==_pkEditItemId);
+  PK_ITEM_TAGS=PK_ITEM_TAGS.filter(x=>x.item_id!==_pkEditItemId);
+  closePKItemModal();renderPKItems();showToast('Deleted');
+}
+
+// ── CRUD: LISTS ───────────────────────────────────────────────────────────────
+function openAddPackList(){_pkEditListId=null;el('pklist-name').value='';el('pklist-del').style.display='none';el('pklist-md').classList.add('on');}
+function openEditPackList(id){const l=PK_LISTS.find(x=>x.id===id);if(!l)return;_pkEditListId=id;el('pklist-name').value=l.name||'';el('pklist-del').style.display='';el('pklist-md').classList.add('on');}
+function closePKListModal(){el('pklist-md').classList.remove('on');}
+async function savePKList(){
+  const name=el('pklist-name').value.trim();if(!name)return;
+  try{
+    if(_pkEditListId){
+      await supaFrom('omni_pack_lists').update({name}).eq('id',_pkEditListId);
+      const i=PK_LISTS.findIndex(x=>x.id===_pkEditListId);if(i>=0)PK_LISTS[i].name=name;
+    }else{
+      const{data}=await supaFrom('omni_pack_lists').insert({name}).select().single();
+      if(data)PK_LISTS.push(data);
+    }
+    closePKListModal();renderPKLists();showToast('Saved ✓');
+  }catch(e){showToast('Error');console.error(e);}
+}
+async function deletePKList(){
+  if(!_pkEditListId)return;
+  await supaFrom('omni_pack_lists').delete().eq('id',_pkEditListId);
+  PK_LISTS=PK_LISTS.filter(x=>x.id!==_pkEditListId);
+  PK_LIST_ITEMS=PK_LIST_ITEMS.filter(x=>x.list_id!==_pkEditListId);
+  PK_PERIODS=PK_PERIODS.filter(x=>x.list_id!==_pkEditListId);
+  closePKListModal();closePKDetail();renderPKLists();showToast('Deleted');
+}
+
+// ── CRUD: PERIODS ─────────────────────────────────────────────────────────────
+function openAddPackPeriod(){_pkEditPeriodId=null;el('pkper-start').value='';el('pkper-end').value='';el('pkper-del').style.display='none';el('pkper-md').classList.add('on');}
+function openEditPackPeriod(id){const p=PK_PERIODS.find(x=>x.id===id);if(!p)return;_pkEditPeriodId=id;el('pkper-start').value=p.start_date||'';el('pkper-end').value=p.end_date||'';el('pkper-del').style.display='';el('pkper-md').classList.add('on');}
+function closePKPerModal(){el('pkper-md').classList.remove('on');}
+async function savePKPeriod(){
+  const s=el('pkper-start').value,e=el('pkper-end').value;
+  if(!s||!e||!_pkDetailListId)return;
+  try{
+    if(_pkEditPeriodId){
+      await supaFrom('omni_pack_periods').update({start_date:s,end_date:e}).eq('id',_pkEditPeriodId);
+      const i=PK_PERIODS.findIndex(x=>x.id===_pkEditPeriodId);if(i>=0){PK_PERIODS[i].start_date=s;PK_PERIODS[i].end_date=e;}
+    }else{
+      const{data}=await supaFrom('omni_pack_periods').insert({list_id:_pkDetailListId,start_date:s,end_date:e}).select().single();
+      if(data)PK_PERIODS.push(data);
+    }
+    closePKPerModal();renderPKPeriods();showToast('Saved ✓');
+  }catch(e2){showToast('Error');console.error(e2);}
+}
+async function deletePKPeriod(){
+  if(!_pkEditPeriodId)return;
+  await supaFrom('omni_pack_periods').delete().eq('id',_pkEditPeriodId);
+  PK_PERIODS=PK_PERIODS.filter(x=>x.id!==_pkEditPeriodId);
+  closePKPerModal();renderPKPeriods();showToast('Deleted');
+}
+
+// ── CRUD: ADD ITEMS TO LIST ───────────────────────────────────────────────────
+function openAddItemToList(){
+  el('pklitem-search').value='';
+  _renderItemPicker('');
+  el('pklitem-note').value='';el('pklitem-req').checked=false;
+  el('pklitem-new').value='';
+  el('pklitem-md').classList.add('on');
+}
+function openAddCatToList(){
+  el('pklcat-md').classList.add('on');
+  _renderCatPicker();
+}
+function closePKLItemModal(){el('pklitem-md').classList.remove('on');}
+function closePKLCatModal(){el('pklcat-md').classList.remove('on');}
+function _renderItemPicker(q){
+  const wrap=el('pklitem-list');if(!wrap)return;
+  const items=PK_ITEMS.filter(x=>!q||x.name.toLowerCase().includes(q.toLowerCase()));
+  wrap.innerHTML=items.map(it=>`<div onclick="selectPKItemForList('${it.id}')" style="padding:.4rem .5rem;border-bottom:.5px solid var(--bd);font-size:13px;cursor:pointer;color:var(--tx)">${it.name}</div>`).join('')+
+    `<div style="padding:.4rem .5rem;font-size:12px;color:var(--tx4);border-top:1px dashed var(--bd)">Or create new → see field below</div>`;
+}
+let _pkSelItemId=null;
+function selectPKItemForList(id){
+  _pkSelItemId=id;
+  const it=PK_ITEMS.find(x=>x.id===id);
+  el('pklitem-list').querySelectorAll('div').forEach(d=>d.style.background='');
+  const sel=el('pklitem-list').querySelector(`[onclick*="${id}"]`);
+  if(sel)sel.style.background='rgba(184,88,40,.08)';
+}
+async function savePKListItem(){
+  if(!_pkDetailListId)return;
+  const note=el('pklitem-note').value.trim();
+  const req=el('pklitem-req').checked;
+  const newName=el('pklitem-new').value.trim();
+  let itemId=_pkSelItemId;
+  try{
+    // Create new item if typed
+    if(newName&&!itemId){
+      const{data}=await supaFrom('omni_pack_items').insert({name:newName,required:req}).select().single();
+      if(data){PK_ITEMS.push(data);itemId=data.id;}
+    }
+    if(!itemId){showToast('Select or create an item');return;}
+    const maxPos=Math.max(0,...PK_LIST_ITEMS.filter(x=>x.list_id===_pkDetailListId).map(x=>x.position||0));
+    const{data}=await supaFrom('omni_pack_list_items').insert({
+      list_id:_pkDetailListId,item_id:itemId,note:note||null,
+      required:newName?req:null,position:maxPos+1
+    }).select().single();
+    if(data)PK_LIST_ITEMS.push(data);
+    _pkSelItemId=null;closePKLItemModal();renderPKDetailItems();showToast('Added ✓');
+  }catch(e){showToast('Error');console.error(e);}
+}
+function _renderCatPicker(){
+  const wrap=el('pklcat-list');if(!wrap)return;
+  wrap.innerHTML=PK_CATS.map(c=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:.4rem .5rem;border-bottom:.5px solid var(--bd)">
+    <span style="font-size:13px;color:var(--tx)">${c.name} (${PK_ITEMS.filter(it=>PK_ITEM_TAGS.some(t=>t.item_id===it.id&&t.category_id===c.id)).length} items)</span>
+    <button onclick="addCatToList('${c.id}')" style="font-size:11px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.08);border:1px solid rgba(184,88,40,.2);border-radius:5px;padding:2px 8px">Add all</button>
+  </div>`).join('');
+}
+async function addCatToList(catId){
+  if(!_pkDetailListId)return;
+  const catItems=PK_ITEMS.filter(it=>PK_ITEM_TAGS.some(t=>t.item_id===it.id&&t.category_id===catId));
+  const existing=new Set(PK_LIST_ITEMS.filter(x=>x.list_id===_pkDetailListId).map(x=>x.item_id));
+  const toAdd=catItems.filter(it=>!existing.has(it.id));
+  if(!toAdd.length){showToast('All items already in list');return;}
+  let pos=Math.max(0,...PK_LIST_ITEMS.filter(x=>x.list_id===_pkDetailListId).map(x=>x.position||0));
+  const rows=toAdd.map(it=>({list_id:_pkDetailListId,item_id:it.id,category_id:catId,position:++pos}));
+  try{
+    const{data}=await supaFrom('omni_pack_list_items').insert(rows).select();
+    if(data)PK_LIST_ITEMS.push(...data);
+    closePKLCatModal();renderPKDetailItems();showToast(toAdd.length+' items added ✓');
+  }catch(e){showToast('Error');console.error(e);}
+}
+function openEditPKListItem(id){
+  const li=PK_LIST_ITEMS.find(x=>x.id===id);if(!li)return;
+  _pkEditListItemId=id;
+  el('pkli-note').value=li.note||'';
+  el('pkli-req').checked=li.required!=null?li.required:(PK_ITEMS.find(x=>x.id===li.item_id)?.required||false);
+  el('pkli-md').classList.add('on');
+}
+function closePKLIModal(){el('pkli-md').classList.remove('on');}
+async function savePKLI(){
+  if(!_pkEditListItemId)return;
+  const note=el('pkli-note').value.trim();
+  const req=el('pkli-req').checked;
+  try{
+    await supaFrom('omni_pack_list_items').update({note:note||null,required:req}).eq('id',_pkEditListItemId);
+    const i=PK_LIST_ITEMS.findIndex(x=>x.id===_pkEditListItemId);
+    if(i>=0){PK_LIST_ITEMS[i].note=note||null;PK_LIST_ITEMS[i].required=req;}
+    closePKLIModal();renderPKDetailItems();showToast('Saved ✓');
+  }catch(e){showToast('Error');}
+}
+async function deletePKLI(){
+  if(!_pkEditListItemId)return;
+  await supaFrom('omni_pack_list_items').delete().eq('id',_pkEditListItemId);
+  PK_LIST_ITEMS=PK_LIST_ITEMS.filter(x=>x.id!==_pkEditListItemId);
+  closePKLIModal();renderPKDetailItems();showToast('Removed from list');
 }
 
 // ═══════════════════════════════════════════════════
