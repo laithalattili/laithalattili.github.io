@@ -687,7 +687,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
       </div>
       <div id="cv-rhythms"></div>
       <div id="cv-tasks" style="display:none"></div>
-      <div id="cv-packing" style="display:none">
+      <div id="cv-packing" style="display:none;position:relative;overflow:hidden">
         <!-- Sub-tabs -->
         <div style="display:flex;gap:0;border-bottom:1px solid var(--bd);background:var(--sur)">
           <button class="pk-tab active" data-pkt="items" onclick="switchPKTab('items')">Items</button>
@@ -722,7 +722,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
         </div>
 
         <!-- LIST DETAIL (overlaid) -->
-        <div id="pk-list-detail" style="display:none;position:absolute;inset:0;background:var(--bg);z-index:10;overflow-y:auto">
+        <div id="pk-list-detail" style="display:none;position:absolute;inset:0;background:var(--bg);z-index:10;overflow-y:auto;min-height:100%">
           <div style="display:flex;align-items:center;gap:8px;padding:.5rem .6rem .3rem;border-bottom:1px solid var(--bd);background:var(--sur)">
             <button onclick="closePKDetail()" style="font-size:12px;color:var(--tx4);background:none;border:none">← Back</button>
             <div id="pk-detail-name" style="flex:1;font-size:14px;font-weight:700;color:var(--tx)"></div>
@@ -5063,7 +5063,7 @@ let _pkTab='items';
 async function loadPacking(){
   if(!_OK)return;
   try{
-    const[c,it,itg,l,p,li,tk]=await Promise.all([
+    const[{data:c},{data:it},{data:itg},{data:l},{data:p},{data:li},{data:tk}]=await Promise.all([
       supaFrom('omni_pack_categories').select('*').order('position'),
       supaFrom('omni_pack_items').select('*').order('name'),
       supaFrom('omni_pack_item_tags').select('*'),
@@ -5072,8 +5072,8 @@ async function loadPacking(){
       supaFrom('omni_pack_list_items').select('*').order('position'),
       supaFrom('omni_pack_ticks').select('*'),
     ]);
-    PK_CATS=c?.data||c||[];PK_ITEMS=it?.data||it||[];PK_ITEM_TAGS=itg?.data||itg||[];
-    PK_LISTS=l?.data||l||[];PK_PERIODS=p?.data||p||[];PK_LIST_ITEMS=li?.data||li||[];PK_TICKS=tk?.data||tk||[];
+    PK_CATS=c||[];PK_ITEMS=it||[];PK_ITEM_TAGS=itg||[];
+    PK_LISTS=l||[];PK_PERIODS=p||[];PK_LIST_ITEMS=li||[];PK_TICKS=tk||[];
     _pkLoaded=true;
   }catch(e){console.warn('Packing load:',e.message);}
 }
@@ -5201,17 +5201,20 @@ function _renderPackChecklist(listId,periodId,withRequired){
 // ── RENDER: LIST DETAIL ───────────────────────────────────────────────────────
 function openPKDetail(listId){
   _pkDetailListId=listId;
+  _pkEditListId=listId; // so openEditPackList works from detail header
   const list=PK_LISTS.find(x=>x.id===listId);
   if(el('pk-detail-name'))el('pk-detail-name').textContent=list?.name||'';
-  // Find active period
   const period=_pkActivePeriod(listId);
   _pkDetailPeriodId=period?.id||null;
-  renderPKPeriods();renderPKDetailItems();
-  if(el('pk-list-detail'))el('pk-list-detail').style.display='';
+  renderPKPeriods();
+  renderPKDetailItems();
+  const det=el('pk-list-detail');
+  if(det){det.style.display='block';det.scrollTop=0;}
 }
 function closePKDetail(){
-  if(el('pk-list-detail'))el('pk-list-detail').style.display='none';
-  _pkDetailListId=null;
+  const det=el('pk-list-detail');if(det)det.style.display='none';
+  _pkDetailListId=null;_pkDetailPeriodId=null;
+  renderPKLists();
 }
 function renderPKPeriods(){
   const wrap=el('pk-periods-wrap');if(!wrap||!_pkDetailListId)return;
