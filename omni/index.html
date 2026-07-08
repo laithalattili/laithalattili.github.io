@@ -1320,7 +1320,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
 <!-- PK: ITEM MODAL -->
 <div class="md-wrap" id="pkitem-md"><div class="md">
   <div class="md-title">Item</div>
-  <div class="inp"><label>Name</label><input type="text" id="pkitem-name" placeholder="e.g. Passport"></div>
+  <div class="inp"><label>Name <span style="color:var(--tx4);font-weight:400">(comma-separate for multiple)</span></label><input type="text" id="pkitem-name" placeholder="Passport, Charger, Toothbrush"></div>
   <div class="inp"><label>Categories</label><div id="pkitem-cats" style="display:flex;flex-direction:column;gap:4px;padding:.25rem 0"></div></div>
   <div class="inp" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="pkitem-req"> <label for="pkitem-req" style="font-size:13px">Required ★ (always show in live mode)</label></div>
   <div class="md-row"><button class="btn-s" style="flex:1" onclick="closePKItemModal()">Cancel</button><button class="btn-p" style="flex:2" onclick="savePKItem()">Save</button></div>
@@ -1349,10 +1349,10 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
   <div class="md-title">Add Item to List</div>
   <div class="inp"><label>Search library</label><input type="text" id="pklitem-search" placeholder="Type to filter..." oninput="_renderItemPicker(this.value)"></div>
   <div id="pklitem-list" style="max-height:180px;overflow-y:auto;border:1px solid var(--bd);border-radius:5px;margin-bottom:.5rem"></div>
-  <div class="inp"><label>Or create new item</label><input type="text" id="pklitem-new" placeholder="New item name (adds to library too)"></div>
+  <div class="inp"><label>Or create new <span style="color:var(--tx4);font-weight:400">(comma for multiple)</span></label><input type="text" id="pklitem-new" placeholder="New item(s), adds to library too"></div>
   <div class="inp"><label>Note for this list (optional)</label><input type="text" id="pklitem-note" placeholder="e.g. Check adapter"></div>
   <div class="inp" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="pklitem-req"> <label for="pklitem-req" style="font-size:13px">Required ★ in this list</label></div>
-  <div class="md-row"><button class="btn-s" style="flex:1" onclick="closePKLItemModal()">Cancel</button><button class="btn-p" style="flex:2" onclick="savePKListItem()">Add</button></div>
+  <div class="md-row"><button class="btn-s" style="flex:1" onclick="closePKLItemModal()">Cancel</button><button class="btn-p" id="pklitem-add-btn" style="flex:2" onclick="savePKListItem()">Add</button></div>
 </div></div>
 
 <!-- PK: ADD CATEGORY TO LIST MODAL -->
@@ -5347,27 +5347,40 @@ function _renderItemCatCheckboxes(selected){
 }
 function closePKItemModal(){el('pkitem-md').classList.remove('on');}
 async function savePKItem(){
-  const name=el('pkitem-name').value.trim();if(!name)return;
+  const raw=el('pkitem-name').value.trim();if(!raw)return;
   const req=el('pkitem-req').checked;
   const selCats=Array.from(el('pkitem-cats').querySelectorAll('input:checked')).map(x=>x.value);
   try{
-    let itemId=_pkEditItemId;
-    if(itemId){
-      await supaFrom('omni_pack_items').update({name,required:req}).eq('id',itemId);
-      const i=PK_ITEMS.findIndex(x=>x.id===itemId);if(i>=0){PK_ITEMS[i].name=name;PK_ITEMS[i].required=req;}
-      // Re-sync tags
+    if(_pkEditItemId){
+      // Editing: single item only (no splitting)
+      const itemId=_pkEditItemId;
+      await supaFrom('omni_pack_items').update({name:raw,required:req}).eq('id',itemId);
+      const i=PK_ITEMS.findIndex(x=>x.id===itemId);if(i>=0){PK_ITEMS[i].name=raw;PK_ITEMS[i].required=req;}
       await supaFrom('omni_pack_item_tags').delete().eq('item_id',itemId);
       PK_ITEM_TAGS=PK_ITEM_TAGS.filter(t=>t.item_id!==itemId);
-    }else{
-      const{data}=await supaFrom('omni_pack_items').insert({name,required:req}).select().single();
-      if(data){PK_ITEMS.push(data);itemId=data.id;}
+      if(selCats.length){
+        const rows=selCats.map(cid=>({item_id:itemId,category_id:cid}));
+        const{data:tags}=await supaFrom('omni_pack_item_tags').insert(rows).select();
+        if(tags)PK_ITEM_TAGS.push(...tags);
+      }
+      closePKItemModal();renderPKItems();showToast('Saved ✓');
+      return;
     }
-    if(itemId&&selCats.length){
-      const rows=selCats.map(cid=>({item_id:itemId,category_id:cid}));
-      const{data:tags}=await supaFrom('omni_pack_item_tags').insert(rows).select();
-      if(tags)PK_ITEM_TAGS.push(...tags);
+    // Adding: split on comma for multiple items at once
+    const names=raw.split(',').map(s=>s.trim()).filter(Boolean);
+    let added=0;
+    for(const nm of names){
+      const{data}=await supaFrom('omni_pack_items').insert({name:nm,required:req}).select().single();
+      if(data){
+        PK_ITEMS.push(data);added++;
+        if(selCats.length){
+          const rows=selCats.map(cid=>({item_id:data.id,category_id:cid}));
+          const{data:tags}=await supaFrom('omni_pack_item_tags').insert(rows).select();
+          if(tags)PK_ITEM_TAGS.push(...tags);
+        }
+      }
     }
-    closePKItemModal();renderPKItems();showToast('Saved ✓');
+    closePKItemModal();renderPKItems();showToast(added>1?added+' items added ✓':'Saved ✓');
   }catch(e){showToast('Error');console.error(e);}
 }
 async function deletePKItem(){
@@ -5431,10 +5444,12 @@ async function deletePKPeriod(){
 
 // ── CRUD: ADD ITEMS TO LIST ───────────────────────────────────────────────────
 function openAddItemToList(){
+  _pkSelItems=new Set();
   el('pklitem-search').value='';
   _renderItemPicker('');
   el('pklitem-note').value='';el('pklitem-req').checked=false;
   el('pklitem-new').value='';
+  const btn=el('pklitem-add-btn');if(btn)btn.textContent='Add';
   el('pklitem-md').classList.add('on');
 }
 function openAddCatToList(){
@@ -5443,40 +5458,55 @@ function openAddCatToList(){
 }
 function closePKLItemModal(){el('pklitem-md').classList.remove('on');}
 function closePKLCatModal(){el('pklcat-md').classList.remove('on');}
+let _pkSelItems=new Set();
 function _renderItemPicker(q){
   const wrap=el('pklitem-list');if(!wrap)return;
-  const items=PK_ITEMS.filter(x=>!q||x.name.toLowerCase().includes(q.toLowerCase()));
-  wrap.innerHTML=items.map(it=>`<div onclick="selectPKItemForList('${it.id}')" style="padding:.4rem .5rem;border-bottom:.5px solid var(--bd);font-size:13px;cursor:pointer;color:var(--tx)">${it.name}</div>`).join('')+
-    `<div style="padding:.4rem .5rem;font-size:12px;color:var(--tx4);border-top:1px dashed var(--bd)">Or create new → see field below</div>`;
+  // Exclude items already in this list
+  const inList=new Set(PK_LIST_ITEMS.filter(x=>x.list_id===_pkDetailListId).map(x=>x.item_id));
+  const items=PK_ITEMS.filter(x=>(!q||x.name.toLowerCase().includes(q.toLowerCase()))&&!inList.has(x.id));
+  if(!items.length){wrap.innerHTML='<div style="padding:.6rem .5rem;font-size:12px;color:var(--tx4)">No matching items. Create one below.</div>';return;}
+  wrap.innerHTML=items.map(it=>{
+    const sel=_pkSelItems.has(it.id);
+    const cats=PK_ITEM_TAGS.filter(t=>t.item_id===it.id).map(t=>PK_CATS.find(c=>c.id===t.category_id)?.name).filter(Boolean);
+    return`<div onclick="togglePKPickItem('${it.id}')" style="display:flex;align-items:center;gap:9px;padding:.4rem .5rem;border-bottom:.5px solid var(--bd);cursor:pointer;background:${sel?'rgba(184,88,40,.08)':''}">
+      <div style="width:18px;height:18px;border-radius:4px;border:2px solid ${sel?'var(--acc)':'var(--bd2)'};background:${sel?'var(--acc)':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px">${sel?'✓':''}</div>
+      <div style="flex:1"><div style="font-size:13px;color:var(--tx)">${it.name}</div>${cats.length?`<div style="font-size:10px;color:var(--tx4)">${cats.join(', ')}</div>`:''}</div>
+    </div>`;
+  }).join('');
 }
-let _pkSelItemId=null;
-function selectPKItemForList(id){
-  _pkSelItemId=id;
-  const it=PK_ITEMS.find(x=>x.id===id);
-  el('pklitem-list').querySelectorAll('div').forEach(d=>d.style.background='');
-  const sel=el('pklitem-list').querySelector(`[onclick*="${id}"]`);
-  if(sel)sel.style.background='rgba(184,88,40,.08)';
+function togglePKPickItem(id){
+  if(_pkSelItems.has(id))_pkSelItems.delete(id);else _pkSelItems.add(id);
+  _renderItemPicker(el('pklitem-search')?.value||'');
+  // Update the Add button count
+  const btn=el('pklitem-add-btn');
+  if(btn)btn.textContent=_pkSelItems.size>1?('Add '+_pkSelItems.size+' items'):'Add';
 }
 async function savePKListItem(){
   if(!_pkDetailListId)return;
   const note=el('pklitem-note').value.trim();
   const req=el('pklitem-req').checked;
-  const newName=el('pklitem-new').value.trim();
-  let itemId=_pkSelItemId;
+  const newRaw=el('pklitem-new').value.trim();
   try{
-    // Create new item if typed
-    if(newName&&!itemId){
-      const{data}=await supaFrom('omni_pack_items').insert({name:newName,required:req}).select().single();
-      if(data){PK_ITEMS.push(data);itemId=data.id;}
+    const itemIds=[..._pkSelItems];
+    // Create new item(s) if typed (comma-separated allowed here too)
+    if(newRaw){
+      const names=newRaw.split(',').map(s=>s.trim()).filter(Boolean);
+      for(const nm of names){
+        const{data}=await supaFrom('omni_pack_items').insert({name:nm,required:req}).select().single();
+        if(data){PK_ITEMS.push(data);itemIds.push(data.id);}
+      }
     }
-    if(!itemId){showToast('Select or create an item');return;}
-    const maxPos=Math.max(0,...PK_LIST_ITEMS.filter(x=>x.list_id===_pkDetailListId).map(x=>x.position||0));
-    const{data}=await supaFrom('omni_pack_list_items').insert({
-      list_id:_pkDetailListId,item_id:itemId,note:note||null,
-      required:newName?req:null,position:maxPos+1
-    }).select().single();
-    if(data)PK_LIST_ITEMS.push(data);
-    _pkSelItemId=null;closePKLItemModal();renderPKDetailItems();showToast('Added ✓');
+    if(!itemIds.length){showToast('Select or create an item');return;}
+    let pos=Math.max(0,...PK_LIST_ITEMS.filter(x=>x.list_id===_pkDetailListId).map(x=>x.position||0));
+    const rows=itemIds.map(id=>({
+      list_id:_pkDetailListId,item_id:id,
+      note:(itemIds.length===1?note:'')||null,
+      required:req?true:null,position:++pos
+    }));
+    const{data}=await supaFrom('omni_pack_list_items').insert(rows).select();
+    if(data)PK_LIST_ITEMS.push(...data);
+    _pkSelItems=new Set();closePKLItemModal();renderPKDetailItems();
+    showToast(rows.length>1?rows.length+' items added ✓':'Added ✓');
   }catch(e){showToast('Error');console.error(e);}
 }
 function _renderCatPicker(){
