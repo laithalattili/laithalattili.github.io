@@ -117,8 +117,8 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
 .hdr-blink{animation:blink 1s step-start infinite}
 @keyframes blink{50%{opacity:.1}}
 .hdr-date{font-size:10px;color:#4a3e30;margin-top:2px;letter-spacing:.03em}
-.hdr-r{display:flex;align-items:center;justify-content:flex-end;gap:5px}
-.hbtn{width:34px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);color:#8a7a68;transition:all .12s;flex-shrink:0;padding:0}
+.hdr-r{display:flex;align-items:center;justify-content:flex-end;gap:3px;flex-shrink:0}
+.hbtn{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);color:#8a7a68;transition:all .12s;flex-shrink:0;padding:0}
 .hbtn:active{background:rgba(255,255,255,.12);transform:scale(.9)}
 .hbtn.lit{color:#f0c040;background:rgba(240,192,64,.1);border-color:rgba(240,192,64,.2)}
 .hdr-r2{padding:2px 12px 5px;border-top:1px solid rgba(255,255,255,.05);display:flex;align-items:center;gap:0;overflow:hidden}
@@ -884,9 +884,9 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
     </div>
     <div style="display:flex;align-items:center;justify-content:center;gap:10px">
       <button onclick="abPrev()" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.06);color:#888;border:1px solid rgba(255,255,255,.1);font-size:14px;display:flex;align-items:center;justify-content:center">⏮</button>
-      <button onclick="abSkipBack()" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.08);color:#b09070;border:1px solid rgba(255,255,255,.12);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center">−30</button>
+      <button onclick="abSkipBack()" id="lab-skip-back" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.08);color:#b09070;border:1px solid rgba(255,255,255,.12);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center">−5s</button>
       <button id="lab-play-btn" onclick="abTogglePlay();_labRender()" style="width:54px;height:54px;border-radius:50%;background:var(--acc);color:#fff;border:none;font-size:22px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(184,88,40,.4)">▶</button>
-      <button onclick="abSkipFwd()" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.08);color:#b09070;border:1px solid rgba(255,255,255,.12);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center">+30</button>
+      <button onclick="abSkipFwd()" id="lab-skip-fwd" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.08);color:#b09070;border:1px solid rgba(255,255,255,.12);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center">+5s</button>
       <button onclick="abNext()" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.06);color:#888;border:1px solid rgba(255,255,255,.1);font-size:14px;display:flex;align-items:center;justify-content:center">⏭</button>
     </div>
     <div style="display:flex;justify-content:center;gap:6px;margin-top:.45rem" id="lab-spd-btns"></div>
@@ -949,6 +949,8 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
         <div class="ss-grp-body">
           <div class="ss">
             <div class="ss-title">Gym</div>
+            <div class="sr"><span class="sr-lbl">Rest between sets (sec)</span><input type="number" id="s-set-rest" class="si" min="10" max="600" style="width:60px;text-align:center" onchange="localStorage.setItem('omni_gym_set_rest',this.value);showToast('Set rest: '+this.value+'s')"></div>
+            <div class="sr"><span class="sr-lbl">Rest between exercises (sec)</span><input type="number" id="s-ex-rest" class="si" min="10" max="600" style="width:60px;text-align:center" onchange="localStorage.setItem('omni_gym_ex_rest',this.value);showToast('Exercise rest: '+this.value+'s')"></div>
             <div class="sr">
               <span class="sr-lbl">Weight unit</span>
               <select id="s-wu" class="si" onchange="saveSetting('weightUnit',this.value)">
@@ -1457,6 +1459,8 @@ function openSettings(){
   _renderDepartCats();
   _renderThemePicker();
   _restoreSGrps();
+  const _sr=el('s-set-rest');if(_sr)_sr.value=localStorage.getItem('omni_gym_set_rest')||'90';
+  const _er=el('s-ex-rest');if(_er)_er.value=localStorage.getItem('omni_gym_ex_rest')||'180';
 }
 function closeSettings(){el('settings-sh').classList.remove('on');}
 let _wake=null;
@@ -4536,6 +4540,10 @@ function _labRender(){
     if(playBtn)playBtn.textContent=(_abAudio&&!_abAudio.paused)?'⏸':'▶';
   }
   // Speed buttons
+  // Update skip button labels from settings
+  const _skipSec=parseInt(localStorage.getItem('omni_audio_skip')||'5');
+  const _lsb=document.getElementById('lab-skip-back');if(_lsb)_lsb.textContent='-'+_skipSec+'s';
+  const _lsf=document.getElementById('lab-skip-fwd');if(_lsf)_lsf.textContent='+'+_skipSec+'s';
   if(spdWrap&&!spdWrap.dataset.built){
     spdWrap.dataset.built='1';
     spdWrap.innerHTML=[0.75,1,1.25,1.5,2].map(s=>`<button onclick="abSetSpeed(${s});_labRender()" data-spd="${s}" style="font-size:10px;padding:2px 8px;border-radius:10px;background:${s===_abSpeed?'var(--acc)':'rgba(255,255,255,.06)'};color:${s===_abSpeed?'#fff':'#888'};border:1px solid rgba(255,255,255,.1)">${s}×</button>`).join('');
@@ -4860,7 +4868,9 @@ function addLiveNote(idx,ds){const bs=getNotes(idx,ds);bs.push({text:'',depth:0}
 let _gymLiveOpen=false,_gymLiveSessType='',_gymLiveDurMins=90,_gymLiveStartMs=0;
 let _gymLiveExs=[],_gymLiveRestType=null,_gymLiveRestEndMs=0,_gymLiveRestBeepDone=false,_gymLiveInterval=null;
 let _gymLiveExpandedEx=-1;
-const GYM_SET_REST_MS=90000,GYM_EX_REST_MS=180000;
+function _gymSetRestMs(){return (parseInt(localStorage.getItem('omni_gym_set_rest')||'90'))*1000;}
+function _gymExRestMs(){return (parseInt(localStorage.getItem('omni_gym_ex_rest')||'180'))*1000;}
+// _gymSetRestMs() and _gymExRestMs() now use settings via _gymSetRestMs()/_gymExRestMs()
 function openGymLivePicker(type){
   const t=type||_todayType();if(!t)return;
   openGymLive(t);
@@ -4893,11 +4903,14 @@ function _gymLiveRender(){
   const firstIncompleteIdx=_gymLiveExs.findIndex(ex=>ex.sets.some(s=>!s.done));
   let body=`<div class="gl-sess-info"><span class="gl-sess-type">${_gymLiveSessType}</span><span class="gl-sess-prog">${_gymLiveExs.filter(ex=>ex.sets.every(s=>s.done)).length}/${_gymLiveExs.length} exercises</span></div>`;
   _gymLiveExs.forEach((ex,ei)=>{
-    const allDone=ex.sets.every(s=>s.done);const isActive=ei===firstIncompleteIdx;
-    body+=`<div class="gl-ex-block${isActive?' active':''}${allDone?' done-ex':''}" id="glex-${ei}"><div class="gl-ex-hdr">${gymIcon(ex.name)}<div class="gl-ex-name${allDone?' done-name':''}">${ex.name}</div>${allDone?'<span style="color:var(--ok);font-size:14px">✓</span>':''}</div>`;
-    if(isActive||allDone){ex.sets.forEach((set,si)=>{body+=`<div class="gl-set-row"><div class="gl-set-dot${set.done?' done':''}" onclick="glTickSet(${ei},${si})">${set.done?'✓':set.num}</div><span class="gl-set-reps">${set.reps} rep</span><input type="number" class="gl-set-w" value="${set.weight}" placeholder="0" step="0.5" onchange="glSetW(${ei},${si},this.value)" onclick="this.select()"><span class="gl-set-unit">${unit()}</span></div>`;});}
+    const allDone=ex.sets.every(s=>s.done);
+    const isActive=ei===firstIncompleteIdx;
+    const isExpanded=_gymLiveExpandedEx===ei||(isActive&&_gymLiveExpandedEx===-1);
+    const showSets=isExpanded||allDone;
+    body+=`<div class="gl-ex-block${isActive?' active':''}${allDone?' done-ex':''}" id="glex-${ei}" onclick="glToggleEx(${ei})"><div class="gl-ex-hdr">${gymIcon(ex.name)}<div class="gl-ex-name${allDone?' done-name':''}">${ex.name}</div>${allDone?'<span style="color:var(--ok);font-size:14px">✓</span>':'<span style="font-size:10px;color:#444;margin-left:auto">${isExpanded?"▾":"›"}</span>'}</div>`;
+    if(showSets){ex.sets.forEach((set,si)=>{body+=`<div class="gl-set-row"><div class="gl-set-dot${set.done?' done':''}" onclick="event.stopPropagation();glTickSet(${ei},${si})">${set.done?'✓':set.num}</div><span class="gl-set-reps">${set.reps} rep</span><input type="number" class="gl-set-w" value="${set.weight}" placeholder="0" step="0.5" onchange="glSetW(${ei},${si},this.value)" onclick="event.stopPropagation();this.select()"><span class="gl-set-unit">${unit()}</span></div>`;});}
     else{body+=`<div style="padding:.28rem .8rem;font-size:11px;color:#333">${ex.sets.length} sets</div>`;}
-    if(isActive&&_gymLiveRestType){const restLeft=Math.max(0,(_gymLiveRestEndMs-Date.now())/1000);const total=_gymLiveRestType==='set'?GYM_SET_REST_MS/1000:GYM_EX_REST_MS/1000;const pct2=Math.max(0,Math.min(100,(1-restLeft/total)*100));const done2=restLeft<=0;const cls=done2?'done-rest':_gymLiveRestType==='set'?'set-rest':'ex-rest';const m2=Math.floor(restLeft/60),s2=Math.round(restLeft%60);const tStr=done2?'Go!':`${m2>0?m2+'m ':''}${String(s2).padStart(2,'0')}s`;body+=`<div class="gl-rest"><span class="gl-rest-lbl">${_gymLiveRestType==='set'?'Set rest':'Exercise rest'}</span><span class="gl-rest-val ${cls}" id="gl-rest-val">${tStr}</span><div class="gl-rest-bg"><div class="gl-rest-fill" id="gl-rest-fill" style="width:${pct2}%"></div></div><button class="gl-rest-skip" onclick="glSkipRest()">Skip ›</button></div>`;}
+    if(isActive&&_gymLiveRestType){const restLeft=Math.max(0,(_gymLiveRestEndMs-Date.now())/1000);const total=_gymLiveRestType==='set'?_gymSetRestMs()/1000:_gymExRestMs()/1000;const pct2=Math.max(0,Math.min(100,(1-restLeft/total)*100));const done2=restLeft<=0;const cls=done2?'done-rest':_gymLiveRestType==='set'?'set-rest':'ex-rest';const m2=Math.floor(restLeft/60),s2=Math.round(restLeft%60);const tStr=done2?'Go!':`${m2>0?m2+'m ':''}${String(s2).padStart(2,'0')}s`;body+=`<div class="gl-rest"><span class="gl-rest-lbl">${_gymLiveRestType==='set'?'Set rest':'Exercise rest'}</span><span class="gl-rest-val ${cls}" id="gl-rest-val">${tStr}</span><div class="gl-rest-bg"><div class="gl-rest-fill" id="gl-rest-fill" style="width:${pct2}%"></div></div><button class="gl-rest-skip" onclick="glSkipRest()">Skip ›</button></div>`;}
     body+=`</div>`;
   });
   if(firstIncompleteIdx===-1){body+=`<div style="margin:.5rem .8rem;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:10px;padding:1.25rem;text-align:center"><div style="font-size:28px;margin-bottom:8px">💪</div><div style="font-size:15px;font-weight:700;color:#e0e0e0;margin-bottom:4px">Session complete!</div><div style="font-size:12px;color:#555;margin-bottom:1rem">${_gymLiveExs.length} exercises · ${Math.round(elapsed)} min</div><button onclick="glSaveAndClose()" style="padding:10px 24px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:var(--font)">Save & Exit</button></div>`;}
@@ -4912,11 +4925,11 @@ function _gymLiveTick(){
   const lbl=el('live-cd-lbl');if(lbl)lbl.textContent=ot?'Overtime':'Remaining';
   const now=new Date();const nt=el('live-now-t');if(nt)nt.textContent=_p(now.getHours())+':'+_p(now.getMinutes())+':'+_p(now.getSeconds());
   const pct=Math.min(100,Math.max(0,(elapsed/_gymLiveDurMins)*100));const pf=el('live-prog-fill');if(pf)pf.style.width=pct+'%';
-  if(_gymLiveRestType){const restLeft=Math.max(0,(_gymLiveRestEndMs-Date.now())/1000);const total=_gymLiveRestType==='set'?GYM_SET_REST_MS/1000:GYM_EX_REST_MS/1000;const pct2=Math.max(0,Math.min(100,(1-restLeft/total)*100));const done2=restLeft<=0;if(done2&&!_gymLiveRestBeepDone){_gymLiveRestBeepDone=true;beepRest();}const rvEl=el('gl-rest-val');if(rvEl){const m2=Math.floor(restLeft/60),s2=Math.round(restLeft%60);rvEl.textContent=done2?'Go!':`${m2>0?m2+'m ':''}${String(s2).padStart(2,'0')}s`;rvEl.className='gl-rest-val '+(done2?'done-rest':_gymLiveRestType==='set'?'set-rest':'ex-rest');}const rfEl=el('gl-rest-fill');if(rfEl)rfEl.style.width=pct2+'%';}
+  if(_gymLiveRestType){const restLeft=Math.max(0,(_gymLiveRestEndMs-Date.now())/1000);const total=_gymLiveRestType==='set'?_gymSetRestMs()/1000:_gymExRestMs()/1000;const pct2=Math.max(0,Math.min(100,(1-restLeft/total)*100));const done2=restLeft<=0;if(done2&&!_gymLiveRestBeepDone){_gymLiveRestBeepDone=true;beepRest();}const rvEl=el('gl-rest-val');if(rvEl){const m2=Math.floor(restLeft/60),s2=Math.round(restLeft%60);rvEl.textContent=done2?'Go!':`${m2>0?m2+'m ':''}${String(s2).padStart(2,'0')}s`;rvEl.className='gl-rest-val '+(done2?'done-rest':_gymLiveRestType==='set'?'set-rest':'ex-rest');}const rfEl=el('gl-rest-fill');if(rfEl)rfEl.style.width=pct2+'%';}
 }
 function glTickSet(ei,si){
   const ex=_gymLiveExs[ei];const set=ex.sets[si];set.done=!set.done;beepSetDone();
-  if(set.done){const allDone=ex.sets.every(s=>s.done);const isLast=_gymLiveExs.slice(ei+1).every(e=>e.sets.every(s=>s.done));if(allDone&&!isLast){_gymLiveRestType='ex';_gymLiveRestEndMs=Date.now()+GYM_EX_REST_MS;_gymLiveRestBeepDone=false;}else if(!allDone){_gymLiveRestType='set';_gymLiveRestEndMs=Date.now()+GYM_SET_REST_MS;_gymLiveRestBeepDone=false;}else{_gymLiveRestType=null;}}else{_gymLiveRestType=null;}
+  if(set.done){const allDone=ex.sets.every(s=>s.done);const isLast=_gymLiveExs.slice(ei+1).every(e=>e.sets.every(s=>s.done));if(allDone&&!isLast){_gymLiveRestType='ex';_gymLiveRestEndMs=Date.now()+_gymExRestMs();_gymLiveRestBeepDone=false;}else if(!allDone){_gymLiveRestType='set';_gymLiveRestEndMs=Date.now()+_gymSetRestMs();_gymLiveRestBeepDone=false;}else{_gymLiveRestType=null;}}else{_gymLiveRestType=null;}
   _gymLiveRender();
 }
 function glSetW(ei,si,v){_gymLiveExs[ei].sets[si].weight=v;const sets=_gymLiveExs[ei].sets;for(let i=si+1;i<sets.length;i++){if(!sets[i].done)sets[i].weight=v;}}
