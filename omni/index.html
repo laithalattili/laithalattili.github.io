@@ -676,7 +676,22 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
       </div>
       <div id="cv-rhythms"></div>
       <div id="cv-tasks" style="display:none"></div>
-      <div id="cv-packing" style="display:none"></div>
+      <div id="cv-packing" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem .6rem .2rem">
+          <div class="sec-lbl" style="padding:0">Packing Lists</div>
+          <button onclick="openAddPackingList()" style="font-size:11px;color:var(--acc);font-weight:700;background:none;border:none">+ New list</button>
+        </div>
+        <div id="packing-lists-wrap"></div>
+        <!-- Active list detail view -->
+        <div id="packing-detail" style="display:none">
+          <div style="display:flex;align-items:center;gap:8px;padding:.5rem .6rem .2rem">
+            <button onclick="closePackingDetail()" style="font-size:12px;color:var(--tx4);background:none;border:none;padding:0">← Back</button>
+            <div id="packing-detail-name" class="sec-lbl" style="padding:0;flex:1"></div>
+            <button onclick="openAddPackingItem()" style="font-size:11px;color:var(--acc);font-weight:700;background:none;border:none">+ Add</button>
+          </div>
+          <div id="packing-items-wrap"></div>
+        </div>
+      </div>
       <div id="cv-templates" style="display:none"></div>
     </div>
 
@@ -1199,6 +1214,42 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
       <button class="btn-p" style="flex:2" onclick="saveTask()">Save</button>
     </div>
     <button class="btn-danger" id="tm-del" style="display:none" onclick="deleteTask()">Delete</button>
+  </div>
+</div>
+
+
+<!-- PACKING LIST MODAL -->
+<div class="md-wrap" id="pack-list-md">
+  <div class="md">
+    <div class="md-title" id="pack-list-title">New Packing List</div>
+    <div class="inp"><label>List name</label><input type="text" id="pl-name" placeholder="e.g. Jordan Summer Trip"></div>
+    <div class="inp"><label>Active from (optional)</label><input type="date" id="pl-start"></div>
+    <div class="inp"><label>Active until (optional)</label><input type="date" id="pl-end"></div>
+    <div class="md-row">
+      <button class="btn-s" style="flex:1" onclick="closePackingListModal()">Cancel</button>
+      <button class="btn-p" style="flex:2" onclick="savePackingList()">Save</button>
+    </div>
+    <button class="btn-danger" id="pl-del" style="display:none" onclick="deletePackingList()">Delete list</button>
+  </div>
+</div>
+
+<!-- PACKING ITEM MODAL -->
+<div class="md-wrap" id="pack-item-md">
+  <div class="md">
+    <div class="md-title" id="pack-item-title">Add Item</div>
+    <div class="inp"><label>Type</label>
+      <select id="pi-type">
+        <option value="title">Category title</option>
+        <option value="item" selected>Item</option>
+        <option value="subitem">Sub-item</option>
+      </select>
+    </div>
+    <div class="inp"><label>Text</label><input type="text" id="pi-text" placeholder="Item name or category"></div>
+    <div class="md-row">
+      <button class="btn-s" style="flex:1" onclick="closePackingItemModal()">Cancel</button>
+      <button class="btn-p" style="flex:2" onclick="savePackingItem()">Save</button>
+    </div>
+    <button class="btn-danger" id="pi-del" style="display:none" onclick="deletePackingItem()">Delete</button>
   </div>
 </div>
 
@@ -3134,7 +3185,7 @@ async function switchCV(v){
   ['rhythms','tasks','packing','templates'].forEach(x=>{const e=el('cv-'+x);if(e)e.style.display=x===v?'':'none';});
   if(!_cLoaded)await loadChecklists();
   if(v==='rhythms')renderCVRhythms();if(v==='tasks')renderCVTasks();
-  if(v==='packing')el('cv-packing').innerHTML='<div style="padding:.75rem;font-size:13px;color:var(--tx3)">Packing lists — coming in next build.</div>';
+  if(v==='packing'){if(!_packLoaded){loadPacking().then(()=>{renderPackingLists();});}else renderPackingLists();}
   if(v==='templates')el('cv-templates').innerHTML='<div style="padding:.75rem;font-size:13px;color:var(--tx3)">Templates — coming in next build.</div>';
 }
 
@@ -4771,6 +4822,7 @@ function openLive(){
   if(_curTab==='gym'&&_todayType()&&!_hasSessToday()){openGymLivePicker(_todayType());return;}
   _liveOpen=true;_liveShowStart=false;el('live-overlay').classList.add('on');el('btn-live-main')?.classList.add('active');
   _showLiveAudioBar(true);
+  if(_packLoaded)_renderLivePackCard();
   _liveRender();if(_liveInterval)clearInterval(_liveInterval);_liveInterval=setInterval(_liveTick,500);
 }
 function closeLive(){
@@ -4862,6 +4914,211 @@ function _liveTick(){
 function _liveNoteSave(idx,ds){const bs=[];el('live-body').querySelectorAll('.live-bullet').forEach(row=>{const ta=row.querySelector('textarea');const ind=parseInt(row.style.paddingLeft)||0;bs.push({text:ta?ta.value:'',depth:Math.round(ind/14)});});saveNotes(idx,ds,bs);}
 function addLiveNote(idx,ds){const bs=getNotes(idx,ds);bs.push({text:'',depth:0});saveNotes(idx,ds,bs);_liveRender();setTimeout(()=>{const tas=el('live-body').querySelectorAll('.live-bullet-inp');if(tas.length){const last=tas[tas.length-1];last.focus();last.style.height='auto';last.style.height=last.scrollHeight+'px';}},50);}
 
+
+// ═══════════════════════════════════════════════════
+// PACKING LISTS
+// ═══════════════════════════════════════════════════
+let PACK_LISTS=[],PACK_ITEMS=[],PACK_TICKS=[],_packLoaded=false;
+let _editPackListId=null,_editPackItemId=null,_activePackListId=null;
+
+async function loadPacking(){
+  if(!_OK)return;
+  try{
+    const[{data:lists},{data:items},{data:ticks}]=await Promise.all([
+      supaFrom('omni_packing_lists').select('*').order('created_at'),
+      supaFrom('omni_packing_items').select('*').order('list_id,position'),
+      supaFrom('omni_packing_ticks').select('*'),
+    ]);
+    PACK_LISTS=lists||[];PACK_ITEMS=items||[];PACK_TICKS=ticks||[];
+    _packLoaded=true;
+  }catch(e){console.warn('Packing load:',e.message);}
+}
+
+function _activePackList(){
+  // List with date range covering today, or most recently created if none
+  const today=todayStr();
+  const active=PACK_LISTS.filter(l=>l.start_date&&l.end_date&&today>=l.start_date&&today<=l.end_date);
+  return active[0]||null;
+}
+
+// ── LIST CRUD ─────────────────────────────────────────────────────────────────
+function openAddPackingList(){
+  _editPackListId=null;
+  el('pack-list-title').textContent='New Packing List';
+  el('pl-name').value='';el('pl-start').value='';el('pl-end').value='';
+  el('pl-del').style.display='none';
+  el('pack-list-md').classList.add('on');
+}
+function openEditPackingList(id){
+  const l=PACK_LISTS.find(x=>x.id===id);if(!l)return;
+  _editPackListId=id;
+  el('pack-list-title').textContent='Edit List';
+  el('pl-name').value=l.name||'';
+  el('pl-start').value=l.start_date||'';el('pl-end').value=l.end_date||'';
+  el('pl-del').style.display='';
+  el('pack-list-md').classList.add('on');
+}
+function closePackingListModal(){el('pack-list-md').classList.remove('on');}
+async function savePackingList(){
+  const name=el('pl-name').value.trim();if(!name)return;
+  const row={name,start_date:el('pl-start').value||null,end_date:el('pl-end').value||null};
+  try{
+    if(_editPackListId){
+      await supaFrom('omni_packing_lists').update(row).eq('id',_editPackListId);
+      const i=PACK_LISTS.findIndex(x=>x.id===_editPackListId);if(i>=0)PACK_LISTS[i]={...PACK_LISTS[i],...row};
+    }else{
+      const{data}=await supaFrom('omni_packing_lists').insert(row).select().single();
+      if(data)PACK_LISTS.push(data);
+    }
+    closePackingListModal();renderPackingLists();showToast('Saved ✓');
+  }catch(e){showToast('Save failed');console.error(e);}
+}
+async function deletePackingList(){
+  if(!_editPackListId)return;
+  await supaFrom('omni_packing_lists').delete().eq('id',_editPackListId);
+  PACK_LISTS=PACK_LISTS.filter(x=>x.id!==_editPackListId);
+  PACK_ITEMS=PACK_ITEMS.filter(x=>x.list_id!==_editPackListId);
+  closePackingListModal();closePackingDetail();renderPackingLists();showToast('Deleted');
+}
+
+// ── ITEM CRUD ─────────────────────────────────────────────────────────────────
+function openAddPackingItem(){
+  _editPackItemId=null;
+  el('pack-item-title').textContent='Add Item';
+  el('pi-type').value='item';el('pi-text').value='';
+  el('pi-del').style.display='none';
+  el('pack-item-md').classList.add('on');
+}
+function openEditPackingItem(id){
+  const it=PACK_ITEMS.find(x=>x.id===id);if(!it)return;
+  _editPackItemId=id;
+  el('pack-item-title').textContent='Edit Item';
+  el('pi-type').value=it.type||'item';el('pi-text').value=it.text||'';
+  el('pi-del').style.display='';
+  el('pack-item-md').classList.add('on');
+}
+function closePackingItemModal(){el('pack-item-md').classList.remove('on');}
+async function savePackingItem(){
+  const text=el('pi-text').value.trim();if(!text||!_activePackListId)return;
+  const maxPos=Math.max(0,...PACK_ITEMS.filter(x=>x.list_id===_activePackListId).map(x=>x.position||0));
+  const row={list_id:_activePackListId,type:el('pi-type').value,text,position:maxPos+1};
+  try{
+    if(_editPackItemId){
+      await supaFrom('omni_packing_items').update({type:row.type,text:row.text}).eq('id',_editPackItemId);
+      const i=PACK_ITEMS.findIndex(x=>x.id===_editPackItemId);if(i>=0)PACK_ITEMS[i]={...PACK_ITEMS[i],type:row.type,text:row.text};
+    }else{
+      const{data}=await supaFrom('omni_packing_items').insert(row).select().single();
+      if(data)PACK_ITEMS.push(data);
+    }
+    closePackingItemModal();renderPackingDetail(_activePackListId);showToast('Saved ✓');
+  }catch(e){showToast('Save failed');console.error(e);}
+}
+async function deletePackingItem(){
+  if(!_editPackItemId)return;
+  await supaFrom('omni_packing_items').delete().eq('id',_editPackItemId);
+  PACK_ITEMS=PACK_ITEMS.filter(x=>x.id!==_editPackItemId);
+  closePackingItemModal();renderPackingDetail(_activePackListId);showToast('Deleted');
+}
+
+// ── TICK ──────────────────────────────────────────────────────────────────────
+async function togglePackTick(itemId,listId){
+  const existing=PACK_TICKS.find(t=>t.item_id===itemId&&t.list_id===listId);
+  if(existing){
+    await supaFrom('omni_packing_ticks').delete().eq('id',existing.id);
+    PACK_TICKS=PACK_TICKS.filter(t=>t.id!==existing.id);
+  }else{
+    const{data}=await supaFrom('omni_packing_ticks').insert({item_id:itemId,list_id:listId}).select().single();
+    if(data)PACK_TICKS.push(data);
+  }
+  renderPackingDetail(listId);
+  // Also refresh live mode if open
+  if(_liveOpen||_gymLiveOpen)_renderLivePackCard();
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function renderPackingLists(){
+  const wrap=el('packing-lists-wrap');if(!wrap)return;
+  const today=todayStr();
+  if(!PACK_LISTS.length){
+    wrap.innerHTML='<div style="padding:1.25rem;font-size:13px;color:var(--tx4);text-align:center">No packing lists yet.</div>';
+    return;
+  }
+  wrap.innerHTML=PACK_LISTS.map(l=>{
+    const items=PACK_ITEMS.filter(x=>x.list_id===l.id);
+    const ticked=PACK_TICKS.filter(t=>t.list_id===l.id).length;
+    const tickable=items.filter(x=>x.type!=='title').length;
+    const isActive=l.start_date&&l.end_date&&today>=l.start_date&&today<=l.end_date;
+    const dateStr=l.start_date&&l.end_date?`${l.start_date} – ${l.end_date}`:'No dates';
+    return`<div style="display:flex;align-items:center;gap:10px;padding:.55rem .75rem;border-bottom:.5px solid var(--bd);background:var(--sur)${isActive?';border-left:3px solid var(--acc)':''}">
+      <div style="flex:1;cursor:pointer" onclick="openPackingDetail('${l.id}')">
+        <div style="font-size:13px;font-weight:600;color:var(--tx)">${l.name}${isActive?'<span style="font-size:9px;font-weight:700;background:var(--acc);color:#fff;padding:1px 5px;border-radius:4px;margin-left:6px">ACTIVE</span>':''}</div>
+        <div style="font-size:10px;color:var(--tx4)">${dateStr} · ${tickable>0?ticked+'/'+tickable+' packed':items.length+' items'}</div>
+      </div>
+      <button onclick="openEditPackingList('${l.id}')" style="font-size:11px;color:var(--tx4);background:none;border:none;padding:0">✎</button>
+    </div>`;
+  }).join('');
+}
+
+function openPackingDetail(listId){
+  _activePackListId=listId;
+  const list=PACK_LISTS.find(x=>x.id===listId);
+  el('packing-detail-name').textContent=list?.name||'';
+  el('packing-lists-wrap').style.display='none';
+  el('packing-detail').style.display='';
+  renderPackingDetail(listId);
+}
+function closePackingDetail(){
+  _activePackListId=null;
+  el('packing-detail').style.display='none';
+  el('packing-lists-wrap').style.display='';
+}
+
+function renderPackingDetail(listId){
+  const wrap=el('packing-items-wrap');if(!wrap)return;
+  const items=PACK_ITEMS.filter(x=>x.list_id===listId).sort((a,b)=>(a.position||0)-(b.position||0));
+  if(!items.length){
+    wrap.innerHTML='<div style="padding:1.25rem;font-size:13px;color:var(--tx4);text-align:center">No items yet. Tap + Add to start.</div>';
+    return;
+  }
+  wrap.innerHTML=items.map(it=>{
+    const ticked=PACK_TICKS.some(t=>t.item_id===it.id&&t.list_id===listId);
+    if(it.type==='title'){
+      return`<div style="padding:.5rem .75rem .2rem;margin-top:.25rem;display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--tx3)">${it.text}</div>
+        <button onclick="openEditPackingItem('${it.id}')" style="font-size:10px;color:var(--tx4);background:none;border:none;padding:0">✎</button>
+      </div>`;
+    }
+    const indent=it.type==='subitem'?'padding-left:1.75rem':'';
+    return`<div style="display:flex;align-items:center;gap:10px;padding:.45rem .75rem;border-bottom:.5px solid var(--bd);background:var(--sur);${indent}">
+      <div onclick="togglePackTick('${it.id}','${listId}')" style="width:20px;height:20px;border-radius:50%;border:2px solid ${ticked?'var(--ok)':'var(--bd2)'};background:${ticked?'var(--ok)':'transparent'};cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px">${ticked?'✓':''}</div>
+      <div style="flex:1;font-size:13px;color:${ticked?'var(--tx4)':'var(--tx)'};text-decoration:${ticked?'line-through':'none'}">${it.text}</div>
+      <button onclick="openEditPackingItem('${it.id}')" style="font-size:10px;color:var(--tx4);background:none;border:none;padding:0">✎</button>
+    </div>`;
+  }).join('');
+}
+
+// ── LIVE MODE PACKING CARD ────────────────────────────────────────────────────
+function _renderLivePackCard(){
+  const active=_activePackList();
+  const liveWrap=el('live-pack-card');
+  if(!liveWrap)return;
+  if(!active){liveWrap.style.display='none';return;}
+  liveWrap.style.display='';
+  const items=PACK_ITEMS.filter(x=>x.list_id===active.id).sort((a,b)=>(a.position||0)-(b.position||0));
+  const tickable=items.filter(x=>x.type!=='title');
+  const ticked=tickable.filter(x=>PACK_TICKS.some(t=>t.item_id===x.id&&t.list_id===active.id));
+  liveWrap.innerHTML=`<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6a5a48;margin-bottom:.35rem">${active.name} · ${ticked.length}/${tickable.length} packed</div>`+
+    items.map(it=>{
+      if(it.type==='title')return`<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#555;margin:.4rem 0 .15rem">${it.text}</div>`;
+      const done=PACK_TICKS.some(t=>t.item_id===it.id&&t.list_id===active.id);
+      const indent=it.type==='subitem'?'margin-left:14px':'';
+      return`<div onclick="togglePackTick('${it.id}','${active.id}')" style="${indent};display:flex;align-items:center;gap:8px;padding:.25rem 0;cursor:pointer">
+        <div style="width:16px;height:16px;border-radius:50%;border:1.5px solid ${done?'#4a7a5a':'#333'};background:${done?'#4a7a5a':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff">${done?'✓':''}</div>
+        <span style="font-size:12px;color:${done?'#444':'#ccc'};text-decoration:${done?'line-through':'none'}">${it.text}</span>
+      </div>`;
+    }).join('');
+}
+
 // ═══════════════════════════════════════════════════
 // GYM LIVE MODE
 // ═══════════════════════════════════════════════════
@@ -4881,6 +5138,7 @@ function openGymLive(type){
   _gymLiveRestType=null;_gymLiveRestEndMs=0;_gymLiveRestBeepDone=false;_gymLiveStartMs=Date.now();_gymLiveExpandedEx=-1;
   _gymLiveOpen=true;el('live-overlay').classList.add('on');el('btn-live-main')?.classList.add('active');
   _showLiveAudioBar(true);
+  if(_packLoaded)_renderLivePackCard();
   _gymLiveRender();if(_gymLiveInterval)clearInterval(_gymLiveInterval);_gymLiveInterval=setInterval(_gymLiveTick,500);
 }
 function closeGymLive(){
@@ -4906,11 +5164,12 @@ function _gymLiveRender(){
     const allDone=ex.sets.every(s=>s.done);
     const isActive=ei===firstIncompleteIdx;
     const isExpanded=_gymLiveExpandedEx===ei||(isActive&&_gymLiveExpandedEx===-1);
+    const isHighlighted=isExpanded&&!allDone; // orange border follows selection
     const showSets=isExpanded||allDone;
-    body+=`<div class="gl-ex-block${isActive?' active':''}${allDone?' done-ex':''}" id="glex-${ei}" onclick="glToggleEx(${ei})"><div class="gl-ex-hdr">${gymIcon(ex.name)}<div class="gl-ex-name${allDone?' done-name':''}">${ex.name}</div>${allDone?'<span style="color:var(--ok);font-size:14px">✓</span>':'<span style="font-size:10px;color:#444;margin-left:auto">${isExpanded?"▾":"›"}</span>'}</div>`;
+    body+=`<div class="gl-ex-block${isHighlighted?' active':''}${allDone?' done-ex':''}" id="glex-${ei}" onclick="glToggleEx(${ei})"><div class="gl-ex-hdr">${gymIcon(ex.name)}<div class="gl-ex-name${allDone?' done-name':''}">${ex.name}</div>${allDone?'<span style="color:var(--ok);font-size:14px">✓</span>':'<span style="font-size:10px;color:#444;margin-left:auto">${isExpanded?"▾":"›"}</span>'}</div>`;
     if(showSets){ex.sets.forEach((set,si)=>{body+=`<div class="gl-set-row"><div class="gl-set-dot${set.done?' done':''}" onclick="event.stopPropagation();glTickSet(${ei},${si})">${set.done?'✓':set.num}</div><span class="gl-set-reps">${set.reps} rep</span><input type="number" class="gl-set-w" value="${set.weight}" placeholder="0" step="0.5" onchange="glSetW(${ei},${si},this.value)" onclick="event.stopPropagation();this.select()"><span class="gl-set-unit">${unit()}</span></div>`;});}
     else{body+=`<div style="padding:.28rem .8rem;font-size:11px;color:#333">${ex.sets.length} sets</div>`;}
-    if(isActive&&_gymLiveRestType){const restLeft=Math.max(0,(_gymLiveRestEndMs-Date.now())/1000);const total=_gymLiveRestType==='set'?_gymSetRestMs()/1000:_gymExRestMs()/1000;const pct2=Math.max(0,Math.min(100,(1-restLeft/total)*100));const done2=restLeft<=0;const cls=done2?'done-rest':_gymLiveRestType==='set'?'set-rest':'ex-rest';const m2=Math.floor(restLeft/60),s2=Math.round(restLeft%60);const tStr=done2?'Go!':`${m2>0?m2+'m ':''}${String(s2).padStart(2,'0')}s`;body+=`<div class="gl-rest"><span class="gl-rest-lbl">${_gymLiveRestType==='set'?'Set rest':'Exercise rest'}</span><span class="gl-rest-val ${cls}" id="gl-rest-val">${tStr}</span><div class="gl-rest-bg"><div class="gl-rest-fill" id="gl-rest-fill" style="width:${pct2}%"></div></div><button class="gl-rest-skip" onclick="glSkipRest()">Skip ›</button></div>`;}
+    if(isExpanded&&_gymLiveRestType){const restLeft=Math.max(0,(_gymLiveRestEndMs-Date.now())/1000);const total=_gymLiveRestType==='set'?_gymSetRestMs()/1000:_gymExRestMs()/1000;const pct2=Math.max(0,Math.min(100,(1-restLeft/total)*100));const done2=restLeft<=0;const cls=done2?'done-rest':_gymLiveRestType==='set'?'set-rest':'ex-rest';const m2=Math.floor(restLeft/60),s2=Math.round(restLeft%60);const tStr=done2?'Go!':`${m2>0?m2+'m ':''}${String(s2).padStart(2,'0')}s`;body+=`<div class="gl-rest"><span class="gl-rest-lbl">${_gymLiveRestType==='set'?'Set rest':'Exercise rest'}</span><span class="gl-rest-val ${cls}" id="gl-rest-val">${tStr}</span><div class="gl-rest-bg"><div class="gl-rest-fill" id="gl-rest-fill" style="width:${pct2}%"></div></div><button class="gl-rest-skip" onclick="glSkipRest()">Skip ›</button></div>`;}
     body+=`</div>`;
   });
   if(firstIncompleteIdx===-1){body+=`<div style="margin:.5rem .8rem;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:10px;padding:1.25rem;text-align:center"><div style="font-size:28px;margin-bottom:8px">💪</div><div style="font-size:15px;font-weight:700;color:#e0e0e0;margin-bottom:4px">Session complete!</div><div style="font-size:12px;color:#555;margin-bottom:1rem">${_gymLiveExs.length} exercises · ${Math.round(elapsed)} min</div><button onclick="glSaveAndClose()" style="padding:10px 24px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:var(--font)">Save & Exit</button></div>`;}
