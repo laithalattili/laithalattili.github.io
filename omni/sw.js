@@ -1,7 +1,7 @@
 // LA Omni service worker — NETWORK-FIRST so deployments always show immediately.
 // Bump CACHE_V on any deploy where you want old caches purged (optional; network-first
 // means stale pages can't happen anyway — cache is only an offline fallback).
-const CACHE_V = 'omni-v2';
+const CACHE_V = 'omni-v3';
 
 self.addEventListener('install', e => { self.skipWaiting(); });
 
