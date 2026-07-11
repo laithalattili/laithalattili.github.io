@@ -999,6 +999,7 @@ var S={
   salaryMode:'split',
   targetMonth:{yr:null,mo:null},
   surplusResetDate:null,
+  mlFlowOpen:{jod:true,rmb:true},
   salaryPhases:[],
   salaryRMBFull:0,
   // Log
@@ -3235,18 +3236,28 @@ function renderMonthLookup(){
   var trueJodNet=row.trueJodNet!=null?row.trueJodNet:row.jodNet;
   var trueRmbNet=row.trueRmbNet!=null?row.trueRmbNet:row.rmbNet;
   var jodCard=document.createElement('div');jodCard.className='card';jodCard.style.marginBottom='8px';
-  jodCard.innerHTML='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--grn);margin-bottom:7px">'+S.arabLabel+' Flows</div>';
-  if(jodInItems.length){jodCard.innerHTML+='<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--grn);margin-bottom:3px">Income</div>'+jodInItems.map(function(it){return'<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:.5px solid var(--brd);font-size:12px"><span>'+it.l+'</span><span class="mono pos">'+it.v+'</span></div>';}).join('');}
-  if(jodOutItems.length){jodCard.innerHTML+='<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--red);margin:6px 0 3px">Outflows</div>'+jodOutItems.map(function(it){return'<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:.5px solid var(--brd);font-size:12px"><span>'+it.l+'</span><span class="mono neg">'+it.v+'</span></div>';}).join('');}
-  jodCard.innerHTML+='<div style="background:var(--grn-bg);border-radius:var(--r);padding:6px 9px;margin-top:6px;display:flex;justify-content:space-between"><span style="font-weight:700;color:var(--grn);font-size:12px">Net JOD</span><span class="mono" style="font-weight:700;color:'+(trueJodNet>=0?'var(--grn)':'var(--red)')+';">'+(trueJodNet>=0?'+':'')+fJOD(trueJodNet)+'</span></div>';
+  var jodOpen=S.mlFlowOpen?S.mlFlowOpen.jod!==false:true;
+  var jodHd=document.createElement('div');jodHd.style.cssText='display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none';
+  jodHd.innerHTML='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--grn)">'+S.arabLabel+' Flows</div><div style="font-size:14px;color:var(--ink4)">'+(jodOpen?'\u2304':'\u203A')+'</div>';
+  var jodBody=document.createElement('div');jodBody.style.display=jodOpen?'block':'none';
+  jodHd.onclick=function(){var now2=S.mlFlowOpen||{};now2.jod=jodBody.style.display==='none';S.mlFlowOpen=now2;autosave();jodBody.style.display=now2.jod?'block':'none';jodHd.querySelector('div:last-child').textContent=now2.jod?'\u2304':'\u203A';};
+  if(jodInItems.length){var jodInHtml='<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--grn);margin-bottom:3px">Income</div>'+jodInItems.map(function(it){return'<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:.5px solid var(--brd);font-size:12px"><span>'+it.l+'</span><span class="mono pos">'+it.v+'</span></div>';}).join('');jodBody.innerHTML+=jodInHtml;}
+  if(jodOutItems.length){var jodOutHtml='<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--red);margin:6px 0 3px">Outflows</div>'+jodOutItems.map(function(it){return'<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:.5px solid var(--brd);font-size:12px"><span>'+it.l+'</span><span class="mono neg">'+it.v+'</span></div>';}).join('');jodBody.innerHTML+=jodOutHtml;}
+  jodBody.innerHTML+='<div style="background:var(--grn-bg);border-radius:var(--r);padding:6px 9px;margin-top:6px;display:flex;justify-content:space-between"><span style="font-weight:700;color:var(--grn);font-size:12px">Net JOD</span><span class="mono" style="font-weight:700;color:'+(trueJodNet>=0?'var(--grn)':'var(--red)')+'">'+(trueJodNet>=0?'+':'')+fJOD(trueJodNet)+'</span></div>';
+  jodCard.appendChild(jodHd);jodCard.appendChild(jodBody);
   out.appendChild(jodCard);
   var rmbInItems=row.rmbItems.filter(function(it){return it.c==='pos'&&!it.bold&&!it.isBalance;});
   var rmbOutItems=row.rmbItems.filter(function(it){return it.c==='neg'&&!it.bold&&!it.isBalance;});
   var rmbCard=document.createElement('div');rmbCard.className='card';
-  rmbCard.innerHTML='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--blu);margin-bottom:7px">'+S.bocLabel+' Flows</div>';
-  if(rmbInItems.length){rmbCard.innerHTML+='<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--grn);margin-bottom:3px">Income</div>'+rmbInItems.map(function(it){return'<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:.5px solid var(--brd);font-size:12px"><span>'+it.l+'</span><span class="mono pos">'+it.v+'</span></div>';}).join('');}
-  if(rmbOutItems.length){rmbCard.innerHTML+='<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--red);margin:6px 0 3px">Outflows</div>'+rmbOutItems.map(function(it){return'<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:.5px solid var(--brd);font-size:12px"><span>'+it.l+'</span><span class="mono neg">'+it.v+'</span></div>';}).join('');}
-  rmbCard.innerHTML+='<div style="background:var(--blu-bg);border-radius:var(--r);padding:6px 9px;margin-top:6px;display:flex;justify-content:space-between"><span style="font-weight:700;color:var(--blu);font-size:12px">Net RMB</span><span class="mono" style="font-weight:700;color:'+(trueRmbNet>=0?'var(--grn)':'var(--red)')+';">'+(trueRmbNet>=0?'+':'')+fRMB(trueRmbNet)+'</span></div>';
+  var rmbOpen=S.mlFlowOpen?S.mlFlowOpen.rmb!==false:true;
+  var rmbHd=document.createElement('div');rmbHd.style.cssText='display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none';
+  rmbHd.innerHTML='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--blu)">'+S.bocLabel+' Flows</div><div style="font-size:14px;color:var(--ink4)">'+(rmbOpen?'\u2304':'\u203A')+'</div>';
+  var rmbBody=document.createElement('div');rmbBody.style.display=rmbOpen?'block':'none';
+  rmbHd.onclick=function(){var now3=S.mlFlowOpen||{};now3.rmb=rmbBody.style.display==='none';S.mlFlowOpen=now3;autosave();rmbBody.style.display=now3.rmb?'block':'none';rmbHd.querySelector('div:last-child').textContent=now3.rmb?'\u2304':'\u203A';};
+  if(rmbInItems.length){var rmbInHtml='<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--grn);margin-bottom:3px">Income</div>'+rmbInItems.map(function(it){return'<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:.5px solid var(--brd);font-size:12px"><span>'+it.l+'</span><span class="mono pos">'+it.v+'</span></div>';}).join('');rmbBody.innerHTML+=rmbInHtml;}
+  if(rmbOutItems.length){var rmbOutHtml='<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--red);margin:6px 0 3px">Outflows</div>'+rmbOutItems.map(function(it){return'<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:.5px solid var(--brd);font-size:12px"><span>'+it.l+'</span><span class="mono neg">'+it.v+'</span></div>';}).join('');rmbBody.innerHTML+=rmbOutHtml;}
+  rmbBody.innerHTML+='<div style="background:var(--blu-bg);border-radius:var(--r);padding:6px 9px;margin-top:6px;display:flex;justify-content:space-between"><span style="font-weight:700;color:var(--blu);font-size:12px">Net RMB</span><span class="mono" style="font-weight:700;color:'+(trueRmbNet>=0?'var(--grn)':'var(--red)')+'">'+(trueRmbNet>=0?'+':'')+fRMB(trueRmbNet)+'</span></div>';
+  rmbCard.appendChild(rmbHd);rmbCard.appendChild(rmbBody);
   out.appendChild(rmbCard);
   // Settlements remaining as of this month
   var mlSettles=settlements.filter(function(s){return s.active&&!s.archived&&s.type!=='investment'&&(s.totalJOD||0)>0;});
