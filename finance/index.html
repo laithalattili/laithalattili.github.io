@@ -548,10 +548,13 @@ input:focus,select:focus{border-color:var(--ink)}
   <div class="sec-label" style="margin-top:14px">Category</div>
   <div id="log-budget-bars" style="margin-bottom:9px"></div>
   <div class="cat-grid" id="cat-grid"></div>
+  <div class="ig" id="log-holcat-wrap" style="margin-bottom:11px;display:none"><label>Holiday category (optional)</label><input type="text" id="log-holcat" list="holcat-suggestions" placeholder="e.g. food, transport, gifts&hellip;"/><datalist id="holcat-suggestions"></datalist></div>
   <div class="ig" style="margin-bottom:11px"><label>Note (optional)</label><input type="text" id="log-note" placeholder="e.g. lunch, Taobao, taxi&hellip;"/></div>
   <div class="sec-label" style="margin-top:18px">Recent entries</div>
   <div class="card" id="expense-log"></div>
   <div class="sec-label">This month by category</div>
+  <div id="hol-pie-section" style="display:none"><div class="sec-label">Holiday spending by category</div>
+  <div class="card" style="margin-bottom:10px"><div style="position:relative;height:200px"><canvas id="hol-cat-chart"></canvas></div></div></div>
   <div class="card"><div style="position:relative;height:200px"><canvas id="cat-chart"></canvas></div></div>
 </div>
 
@@ -1441,6 +1444,35 @@ function settleLeft(s){
   return Math.max(0,n2((s.totalJOD||0)-settlePaid(s)));
 }
 function settlePct(s){var t=s.totalJOD||0;if(!t)return 0;var paid=s.type==='mortgage'?n2(t-settleLeft(s)):settlePaid(s);return Math.round(Math.min(100,paid/t*100));}
+function settleLeftAtMonth(s,tyr,tmo){
+  // Remaining to pay AFTER all planned phase payments through end of (tyr,tmo).
+  // Starts from current settleLeft (payments already made) and subtracts planned
+  // payments from the current month through the target month, using the
+  // settlement's own fixed FX rate (same logic as settlePlannedFuture).
+  var left=settleLeft(s);
+  var now=today();var nowYr=now.getFullYear(),nowMo=now.getMonth()+1;
+  if(tyr*12+tmo<nowYr*12+nowMo)return left; // past month: just show current remaining
+  var rate=settleFxRate(s);
+  var base=s.totalCurrency||'JOD';
+  var planned=0;
+  safeArr(s.phases).forEach(function(ph){
+    var startYr=ph.startYr,startMo=ph.startMon;
+    var endYr=ph.endYr,endMo=ph.endMon;
+    if(startYr*12+startMo<nowYr*12+nowMo){startYr=nowYr;startMo=nowMo;}
+    for(var yr2=startYr,mo2=startMo;;){
+      if(yr2*12+mo2>endYr*12+endMo)break;
+      if(yr2*12+mo2>tyr*12+tmo)break; // stop at target month
+      var amt;
+      if(ph.currency===base){amt=ph.monthly;}
+      else if(base==='JOD'&&ph.currency==='RMB'){amt=n2(ph.monthly/rate);}
+      else if(base==='RMB'&&ph.currency==='JOD'){amt=n2(ph.monthly*rate);}
+      else{var altC=settleAltCur(s);if(ph.currency===altC){amt=n2(ph.monthly/rate);}else{amt=n2(toJOD(ph.monthly,ph.currency)/Math.max(0.001,toJOD(1,base)));}}
+      planned+=amt;
+      mo2++;if(mo2>12){mo2=1;yr2++;}
+    }
+  });
+  return Math.max(0,n2(left-planned));
+}
 function settlePlannedFuture(s){
   var now=today();var total=0;
   var rate=settleFxRate(s);
@@ -2039,8 +2071,23 @@ function renderDashboard(){
 
 // ═══ LOG ═══
 function catDisplayName(cat){if(cat==='__surplus__')return 'Surplus';if(cat&&cat.indexOf('__hol-')===0){var b=S.budgets&&S.budgets[cat];return b&&b.holLabel?('✈ '+b.holLabel):'✈ Holiday';}return cat;}
-function renderCatGrid(){var cg=document.getElementById('cat-grid');if(!cg)return;cg.innerHTML='';Object.keys(CAT_COLORS).forEach(function(cat){var btn=document.createElement('div');btn.className='cat-btn'+(S.selectedCat===cat?' sel':'');var dot=document.createElement('div');dot.className='cat-dot';dot.style.background=CAT_COLORS[cat];btn.appendChild(dot);var lbl=document.createElement('span');lbl.textContent=catDisplayName(cat);btn.appendChild(lbl);btn.onclick=function(){S.selectedCat=cat;renderCatGrid();};cg.appendChild(btn);});}
-function submitExp(){var amt=parseFloat(document.getElementById('log-amt').value);if(!amt||amt<=0)return alert('Enter a valid amount.');var entry={id:Date.now(),amount:amt,currency:S.logCur,category:S.selectedCat,date:document.getElementById('log-date').value||today().toISOString().split('T')[0],note:document.getElementById('log-note').value};if(editingExpId!==null){var i=expenses.findIndex(function(e){return e.id===editingExpId;});if(i>-1)expenses[i]=entry;editingExpId=null;}else expenses.unshift(entry);document.getElementById('log-amt').value='';document.getElementById('log-note').value='';updateSurplus();autosave();renderLog();renderLogMonthlySummary();}
+function renderCatGrid(){var cg=document.getElementById('cat-grid');if(!cg)return;cg.innerHTML='';Object.keys(CAT_COLORS).forEach(function(cat){var btn=document.createElement('div');btn.className='cat-btn'+(S.selectedCat===cat?' sel':'');var dot=document.createElement('div');dot.className='cat-dot';dot.style.background=CAT_COLORS[cat];btn.appendChild(dot);var lbl=document.createElement('span');lbl.textContent=catDisplayName(cat);btn.appendChild(lbl);btn.onclick=function(){S.selectedCat=cat;renderCatGrid();updateHolCatField();};cg.appendChild(btn);});updateHolCatField();}
+function updateHolCatField(){
+  var wrap=document.getElementById('log-holcat-wrap');if(!wrap)return;
+  var isHol=(S.selectedCat||'').indexOf('__hol-')===0;
+  wrap.style.display=isHol?'block':'none';
+  if(isHol){
+    var dl=document.getElementById('holcat-suggestions');if(dl){dl.innerHTML='';
+      var seen={};
+      safeArr(expenses).forEach(function(e){
+        if(e.category!==S.selectedCat||!e.holCat)return;
+        var k=e.holCat.trim().toLowerCase();if(!k||seen[k])return;seen[k]=e.holCat.trim();
+      });
+      Object.values(seen).forEach(function(v){var o=document.createElement('option');o.value=v;dl.appendChild(o);});
+    }
+  }
+}
+function submitExp(){var amt=parseFloat(document.getElementById('log-amt').value);if(!amt||amt<=0)return alert('Enter a valid amount.');var holCatEl=document.getElementById('log-holcat');var holCatVal=(holCatEl&&(S.selectedCat||'').indexOf('__hol-')===0)?(holCatEl.value||'').trim():'';var entry={id:Date.now(),amount:amt,currency:S.logCur,category:S.selectedCat,date:document.getElementById('log-date').value||today().toISOString().split('T')[0],note:document.getElementById('log-note').value,holCat:holCatVal||undefined};if(editingExpId!==null){var i=expenses.findIndex(function(e){return e.id===editingExpId;});if(i>-1)expenses[i]=entry;editingExpId=null;}else expenses.unshift(entry);document.getElementById('log-amt').value='';document.getElementById('log-note').value='';var hcEl=document.getElementById('log-holcat');if(hcEl)hcEl.value='';updateSurplus();autosave();renderLog();renderLogMonthlySummary();}
 async function pushFinanceSummary(){
   try{
     var now=today();
@@ -2150,6 +2197,7 @@ function editExp(id){
   setLogCur(e.currency);S.selectedCat=e.category;renderCatGrid();
   var dateEl=document.getElementById('log-date');if(dateEl)dateEl.value=e.date;
   var noteEl=document.getElementById('log-note');if(noteEl)noteEl.value=e.note||'';
+  var hcEl2=document.getElementById('log-holcat');if(hcEl2)hcEl2.value=e.holCat||'';
   document.getElementById('log-btn-lbl').textContent='Save Edit';
   document.getElementById('log-cancel').style.display='block';
   document.getElementById('log-mode-lbl').textContent='Editing entry';
@@ -2289,7 +2337,7 @@ function renderLog(){
     expenses.slice(0,60).forEach(function(e){
       var row=document.createElement('div');row.className='tr';
       var left=document.createElement('div');left.style.cssText='display:flex;align-items:center;gap:9px;flex:1;min-width:0';
-      left.innerHTML='<div style="width:9px;height:9px;border-radius:50%;background:'+(CAT_COLORS[e.category]||'#aaa')+';flex-shrink:0"></div><div style="min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(e.note||e.category)+'</div><div style="font-size:11px;color:var(--ink3)">'+e.category+' &middot; '+e.date+'</div></div>';
+      var catNice=catDisplayName(e.category)+(e.holCat?' \u00b7 '+e.holCat:'');left.innerHTML='<div style="width:9px;height:9px;border-radius:50%;background:'+(CAT_COLORS[e.category]||'#aaa')+';flex-shrink:0"></div><div style="min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(e.note||catDisplayName(e.category))+'</div><div style="font-size:11px;color:var(--ink3)">'+catNice+' &middot; '+e.date+'</div></div>';
       var right=document.createElement('div');right.style.cssText='display:flex;align-items:center;gap:5px;flex-shrink:0';
       var amtSpan=document.createElement('span');amtSpan.className='tr-v neg';amtSpan.textContent='-'+e.amount.toLocaleString()+' '+e.currency;
       var editBtn=document.createElement('button');editBtn.className='btn btn-xs';editBtn.textContent='Edit';
@@ -2300,14 +2348,36 @@ function renderLog(){
       row.appendChild(left);row.appendChild(right);el.appendChild(row);
     });
   }
-  // Chart
+  // Normal spending chart (excludes holiday & surplus)
   var now=today();
   var mExp=expenses.filter(function(e){var d=new Date(e.date);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();});
-  var cats={};mExp.forEach(function(e){cats[e.category]=(cats[e.category]||0)+toRMB(e.amount,e.currency);});
+  var cats={};mExp.forEach(function(e){if(e.category==='__surplus__'||(e.category||'').indexOf('__hol-')===0)return;cats[e.category]=(cats[e.category]||0)+toRMB(e.amount,e.currency);});
   try{if(catChart){catChart.destroy();catChart=null;}}catch(x){}
   var labels=Object.keys(cats);var ccEl=document.getElementById('cat-chart');
   if(labels.length&&ccEl){
-    try{catChart=new Chart(ccEl.getContext('2d'),{type:'doughnut',data:{labels:labels,datasets:[{data:labels.map(function(l){return Math.round(cats[l]);}),backgroundColor:labels.map(function(l){return CAT_COLORS[l]||'#aaa';}),borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{family:'Sora',size:11},boxWidth:10,padding:8}}}}});}catch(x){}
+    try{catChart=new Chart(ccEl.getContext('2d'),{type:'doughnut',data:{labels:labels.map(catDisplayName),datasets:[{data:labels.map(function(l){return Math.round(cats[l]);}),backgroundColor:labels.map(function(l){return CAT_COLORS[l]||'#aaa';}),borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{family:'Sora',size:11},boxWidth:10,padding:8}}}}});}catch(x){}
+  }
+  // Holiday spending chart — grouped by free-text sub-category (case-insensitive)
+  var holSec=document.getElementById('hol-pie-section');
+  try{if(window._holCatChart){window._holCatChart.destroy();window._holCatChart=null;}}catch(x){}
+  var holExp=safeArr(expenses).filter(function(e){return (e.category||'').indexOf('__hol-')===0;});
+  if(holSec){
+    if(holExp.length){
+      var holGroups={};var holDisplay={};
+      holExp.forEach(function(e){
+        var raw=(e.holCat||'').trim();
+        var key=raw?raw.toLowerCase():'__other__';
+        if(!holDisplay[key])holDisplay[key]=raw||'Other';
+        holGroups[key]=(holGroups[key]||0)+toJOD(e.amount,e.currency);
+      });
+      var hLabels=Object.keys(holGroups);
+      var hcEl=document.getElementById('hol-cat-chart');
+      if(hLabels.length&&hcEl){
+        holSec.style.display='block';
+        var HOLPAL=['#f2a65a','#e88b6a','#d9c06a','#c98b9e','#8fb98f','#7fa8c9','#b39a7c','#a3a380'];
+        try{window._holCatChart=new Chart(hcEl.getContext('2d'),{type:'doughnut',data:{labels:hLabels.map(function(k){return holDisplay[k];}),datasets:[{data:hLabels.map(function(k){return Math.round(holGroups[k]*100)/100;}),backgroundColor:hLabels.map(function(k,i){return HOLPAL[i%HOLPAL.length];}),borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{family:'Sora',size:11},boxWidth:10,padding:8}}}}});}catch(x){}
+      } else {holSec.style.display='none';}
+    } else {holSec.style.display='none';}
   }
 }
 
@@ -3178,6 +3248,26 @@ function renderMonthLookup(){
   if(rmbOutItems.length){rmbCard.innerHTML+='<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--red);margin:6px 0 3px">Outflows</div>'+rmbOutItems.map(function(it){return'<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:.5px solid var(--brd);font-size:12px"><span>'+it.l+'</span><span class="mono neg">'+it.v+'</span></div>';}).join('');}
   rmbCard.innerHTML+='<div style="background:var(--blu-bg);border-radius:var(--r);padding:6px 9px;margin-top:6px;display:flex;justify-content:space-between"><span style="font-weight:700;color:var(--blu);font-size:12px">Net RMB</span><span class="mono" style="font-weight:700;color:'+(trueRmbNet>=0?'var(--grn)':'var(--red)')+';">'+(trueRmbNet>=0?'+':'')+fRMB(trueRmbNet)+'</span></div>';
   out.appendChild(rmbCard);
+  // Settlements remaining as of this month
+  var mlSettles=settlements.filter(function(s){return s.active&&!s.archived&&s.type!=='investment'&&(s.totalJOD||0)>0;});
+  if(mlSettles.length){
+    var setCard=document.createElement('div');setCard.className='card';setCard.style.marginTop='10px';
+    setCard.innerHTML='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin-bottom:7px">Settlements \u2014 remaining after '+row.label+'</div>';
+    mlSettles.forEach(function(s){
+      var leftAt=settleLeftAtMonth(s,row.yr,row.mo);
+      var total=s.totalJOD||0;
+      var pctPaid=total>0?Math.round(Math.min(100,(total-leftAt)/total*100)):0;
+      var doneNow=leftAt<=0.01;
+      setCard.innerHTML+='<div style="margin-bottom:9px">'+
+        '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">'+
+        '<span>'+s.name.split('-')[0].trim()+'</span>'+
+        '<span class="mono" style="font-weight:700;color:'+(doneNow?'var(--grn)':'var(--ink)')+'">'+(doneNow?'\u2713 Paid off':fmtSettleAmtInView(leftAt,s)+' left')+'</span></div>'+
+        '<div class="prog-track"><div class="prog-fill" style="width:'+pctPaid+'%;background:'+(doneNow?'var(--grn)':'var(--blu)')+'"></div></div>'+
+        '<div style="font-size:10px;color:var(--ink3);margin-top:1px">'+pctPaid+'% covered by then (paid + planned)</div>'+
+        '</div>';
+    });
+    out.appendChild(setCard);
+  }
   if(row.belowReserve){var belowAlert=document.createElement('div');belowAlert.className='alert al-d';belowAlert.textContent='Arab Bank below reserve this month.';out.appendChild(belowAlert);}
 }
 
