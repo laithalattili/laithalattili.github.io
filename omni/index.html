@@ -565,6 +565,11 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
           <div id="dc-habits-row" style="display:flex;gap:.6rem;flex-wrap:wrap"></div>
         </div>
 
+        <!-- HOLIDAY CARD -->
+        <div id="dc-holiday-card" style="background:var(--sur);border-radius:12px;padding:.75rem .9rem;border:1px solid var(--bd);display:none">
+          <div id="dc-holiday-main"></div>
+        </div>
+
         <!-- FINANCE CARD -->
         <div id="dc-finance-card" style="background:var(--sur);border-radius:12px;padding:.75rem .9rem;border:1px solid var(--bd)">
           <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx4);margin-bottom:.4rem">Budget this month</div>
@@ -3534,6 +3539,13 @@ async function renderDash(){
       const now2=new Date();
       const monthStr=now2.getFullYear()+'-'+String(now2.getMonth()+1).padStart(2,'0');
       const{data:fin}=await supaFrom('omni_finance_summary').select('*').eq('month',monthStr).maybeSingle();
+      // Cache holiday dates for auto holiday-mode + the holiday countdown card
+      if(fin?.holiday_start&&fin?.holiday_end){
+        const changed=HOL_DATES?.start!==fin.holiday_start||HOL_DATES?.end!==fin.holiday_end;
+        HOL_DATES={start:fin.holiday_start,end:fin.holiday_end};
+        if(changed){_refreshHolidayBtn();}
+      }else HOL_DATES=null;
+      _renderHolidayCard();
       if(fin&&(fin.budget_total>0||fin.holiday_budget>0)){
         const cur=fin.currency||'RMB';
         const hCur=fin.holiday_currency||cur;
@@ -4361,10 +4373,10 @@ const I_PATHS={
   lock:'M6 11V8a6 6 0 1112 0v3m-13 0h14v10H5V11z',
   gear:'M12 15a3 3 0 100-6 3 3 0 000 6zm8-3l1.8-1-1.5-2.6-2 .6a7 7 0 00-1.7-1L16 5h-3l-.6 2a7 7 0 00-1.7 1l-2-.6L7.2 10 9 11v2l-1.8 1 1.5 2.6 2-.6a7 7 0 001.7 1L13 19h3l.6-2a7 7 0 001.7-1l2 .6 1.5-2.6L20 13v-1z',
   gym:'M2 12h2m16 0h2M6 8v8m4-10v12m4-12v12m4-8v8',
-  book:'M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2V5zm2 14h13M8 7h7M8 10h5',
+  book:'M12 6.5C10.6 5.4 8.6 4.8 6 4.8c-.9 0-1.7.1-2.4.2v13c.7-.1 1.5-.2 2.4-.2 2.6 0 4.6.6 6 1.7m0-13c1.4-1.1 3.4-1.7 6-1.7.9 0 1.7.1 2.4.2v13c-.7-.1-1.5-.2-2.4-.2-2.6 0-4.6.6-6 1.7m0-13v13',
   film:'M4 4h16v16H4V4zm0 4h16M4 12h16M4 16h16M8 4v16m8-16v16',
   cap:'M2 9l10-5 10 5-10 5L2 9zm4 3v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5M22 9v6',
-  guitar:'M17 3l4 4-6.5 6.5a4.5 4.5 0 11-4-4L17 3zm2 0l2 2M9 15l.01.01',
+  guitar:'M15 9l4.2-4.2a1.6 1.6 0 012.2 2.2L17.2 11.2M17 5.5l1.5 1.5M6.6 14.4a5 5 0 107.1 7.1 5 5 0 00-7.1-7.1zm3 3a1.5 1.5 0 102.1 2.1 1.5 1.5 0 00-2.1-2.1z',
   repeat:'M4 8h12l-3-3m3 11H4l3 3M4 8v3m16 2v3',
   pin:'M9 4h6l-1 6 3 3v2H7v-2l3-3-1-6zm3 11v5',
   walk:'M13 5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM9 22l2.5-6L9 13l1-5 3 1 2.5 3H19M9 8L6 9.5 5 13m6 3l2 2 1 4',
@@ -4445,14 +4457,63 @@ const APP_LINKS={
 function openAppLink(key){const a=APP_LINKS[key];if(a)window.open(a.url,'_blank');}
 
 // ── HOLIDAY MODE ──────────────────────────────────────────────────────────────
-function _isHoliday(){return localStorage.getItem('omni_holiday')==='1';}
+// Holiday dates from Finance app (cached after first dashboard load)
+let HOL_DATES=null; // {start,end} or null
+function _holidayInfo(){
+  // Returns {inHoliday,start,end,totalDays,dayNum,daysLeft,pct} or null
+  if(!HOL_DATES?.start||!HOL_DATES?.end)return null;
+  const today=todayStr();
+  if(today<HOL_DATES.start||today>HOL_DATES.end)return null;
+  const d0=new Date(HOL_DATES.start+'T12:00:00');
+  const d1=new Date(HOL_DATES.end+'T12:00:00');
+  const dn=new Date(today+'T12:00:00');
+  const DAY=86400000;
+  const totalDays=Math.round((d1-d0)/DAY)+1;      // inclusive
+  const dayNum=Math.round((dn-d0)/DAY)+1;          // today is day N
+  const daysLeft=Math.round((d1-dn)/DAY)+1;        // includes today
+  const pct=Math.min(100,Math.max(0,Math.round((dayNum/totalDays)*100)));
+  return{inHoliday:true,start:HOL_DATES.start,end:HOL_DATES.end,totalDays,dayNum,daysLeft,pct};
+}
+// Manual override: '1' forced on, '0' forced off, null/absent = auto
+function _isHoliday(){
+  const manual=localStorage.getItem('omni_holiday');
+  if(manual==='1')return true;
+  if(manual==='0')return false;
+  return !!_holidayInfo(); // auto: on when today is inside the holiday range
+}
 function toggleHoliday(){
   const on=!_isHoliday();
-  localStorage.setItem('omni_holiday',on?'1':'0');
+  const auto=!!_holidayInfo();
+  // If the new state matches what auto-detection would give, clear the override
+  if(on===auto)localStorage.removeItem('omni_holiday');
+  else localStorage.setItem('omni_holiday',on?'1':'0');
   _refreshHolidayBtn();
   showToast(on?'Holiday mode on ✓':'Holiday mode off');
   renderDay();
   if(_curTab==='dashboard')renderDash();
+}
+
+function _renderHolidayCard(){
+  const card=el('dc-holiday-card');const main=el('dc-holiday-main');
+  if(!card||!main)return;
+  const h=_holidayInfo();
+  if(!h){card.style.display='none';return;}
+  card.style.display='';
+  const barCol=h.pct>85?'var(--er)':h.pct>60?'var(--wa)':'var(--ok)';
+  const dayWord=h.daysLeft===1?'day':'days';
+  main.innerHTML=`
+    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:.45rem">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--acc)">Holiday</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--tx4)">${h.start} – ${h.end}</div>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:.5rem">
+      <span style="font-size:26px;font-weight:700;color:var(--tx);line-height:1">${h.daysLeft}</span>
+      <span style="font-size:13px;color:var(--tx3)">${dayWord} left</span>
+    </div>
+    <div style="height:10px;background:var(--bd);border-radius:5px;overflow:hidden">
+      <div style="height:100%;width:${h.pct}%;background:${barCol};border-radius:5px;transition:width .5s"></div>
+    </div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--tx4);margin-top:4px">Day ${h.dayNum} of ${h.totalDays} · ${h.pct}% through</div>`;
 }
 function _refreshHolidayBtn(){
   const b=document.getElementById('btn-holiday');
