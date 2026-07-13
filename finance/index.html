@@ -1069,6 +1069,7 @@ function fmt(n,c){if(c==='JOD')return fJOD(n);if(c==='GBP')return fGBP(n);return
 function getCurRate(c){
   if(c==='JOD')return 1;
   if(c==='RMB')return 1/S.jod2rmb;
+  if(c==='GBP')return S.gbp2jod||1.78;
   var cc=safeArr(S.customCurrencies).find(function(x){return x.code===c;});
   return cc?cc.rateToJOD:1;
 }
