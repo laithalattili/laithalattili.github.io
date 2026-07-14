@@ -1759,14 +1759,18 @@ function buildProjection(){
       var holStart=new Date(h.start);var holEnd=new Date(h.end);
       var dailyItems=safeArr(h.items).filter(function(it){return it.type==='daily';});
       if(dailyItems.length){
-        var dailyTotalJOD=dailyItems.reduce(function(a,item){return a+toJOD(holItemTotal(item)/Math.max(1,item.nights||1),item.currency||'RMB');},0);
+        // Total nights across all daily items
+        var totalNights=dailyItems.reduce(function(a,item){return a+(item.nights||1);},0);
+        var dailyTotalJOD=dailyItems.reduce(function(a,item){return a+toJOD(holItemTotal(item),item.currency||'RMB');},0);
+        var dailyPerNight=totalNights>0?dailyTotalJOD/totalNights:0;
         var monthStart=new Date(yr,mo-1,1);var monthEnd=new Date(yr,mo,0);
         var overlapStart=new Date(Math.max(holStart.getTime(),monthStart.getTime()));
         var overlapEnd=new Date(Math.min(holEnd.getTime(),monthEnd.getTime()));
         if(i===0&&holStart<=now)overlapStart=new Date(Math.max(now.getTime(),monthStart.getTime()));
-        var overlapDays=Math.max(0,Math.round((overlapEnd-overlapStart)/86400000)+1);
+        // Cap overlap days to total nights so we don't exceed the budget
+        var overlapDays=Math.min(totalNights,Math.max(0,Math.round((overlapEnd-overlapStart)/86400000)+1));
         if(overlapDays>0){
-          var monthDailyJOD=n2(dailyTotalJOD*overlapDays);
+          var monthDailyJOD=n2(dailyPerNight*overlapDays);
           var isCurrentlyActive=holStart<=now&&holEnd>=now;
           if(i===0&&isCurrentlyActive){
             var spentJOD=toJOD(holDailyBudgetSpent(h),dailyItems[0].currency||'RMB');
@@ -2468,14 +2472,15 @@ function getCommitItems(pyr,pmo){
     var holStart=new Date(h.start);var holEnd=new Date(h.end);
     var dailyItems=safeArr(h.items).filter(function(i){return i.type==='daily';});
     if(dailyItems.length){
-      // Calculate days in this month
+      var totalNightsC=dailyItems.reduce(function(a,item){return a+(item.nights||1);},0);
+      var dailyTotalJODC=dailyItems.reduce(function(a,item){return a+toJOD(holItemTotal(item),item.currency||'RMB');},0);
+      var dailyPerNightC=totalNightsC>0?dailyTotalJODC/totalNightsC:0;
       var monthStart=new Date(yr,mo-1,1);var monthEnd=new Date(yr,mo,0);
       var overlapStart=new Date(Math.max(holStart.getTime(),monthStart.getTime()));
       var overlapEnd=new Date(Math.min(holEnd.getTime(),monthEnd.getTime()));
-      var overlapDays=Math.max(0,Math.round((overlapEnd-overlapStart)/86400000)+1);
+      var overlapDays=Math.min(totalNightsC,Math.max(0,Math.round((overlapEnd-overlapStart)/86400000)+1));
       if(overlapDays>0){
-        var dailyTotalJOD=dailyItems.reduce(function(a,item){return a+toJOD(holItemTotal(item)/Math.max(1,item.nights||1),item.currency||'RMB');},0);
-        var monthDailyJOD=n2(dailyTotalJOD*overlapDays);
+        var monthDailyJOD=n2(dailyPerNightC*overlapDays);
         var dacct=dailyItems[0].account||h.account||'boc';
         var dcur=(dacct==='arab'||dacct==='cash-jod')?'JOD':'RMB';
         var damt=dcur==='RMB'?n2(monthDailyJOD*S.jod2rmb):monthDailyJOD;
@@ -2947,10 +2952,12 @@ function renderProjection(){
   var lastYr=null;
   proj.forEach(function(row,idx){
     lastYr=row.yr;
-    var isOpen=!!openMonths[idx];var c=S.globalCur;
-    // Subtle year-based background tint (alternates every year)
-    var yrParity=(row.yr-2026)%2===0;
     var isCurrent=row.yr===nowYr&&row.mo===nowMo;
+    var tm=S.targetMonth||{};
+    var isTarget=!!(tm.yr&&tm.mo&&row.yr===tm.yr&&row.mo===tm.mo);
+    var yrParity=(row.yr-2026)%2===0;
+    if(isTarget&&openMonths[idx]===undefined)openMonths[idx]=true;
+    var isOpen=!!openMonths[idx];var c=S.globalCur;
     // Include reserves in total (static across all months)
     var reserveTotalJOD=cashTotalJOD();
     var totalJOD=row.jodBal+(row.rmbBal/S.jod2rmb)+reserveTotalJOD;
@@ -2977,8 +2984,14 @@ function renderProjection(){
     });
     if(monthSalMode==='full_rmb')chips+='<span class="m-chip tg-b">\uD83D\uDCB0 All RMB'+(hasPhaseOverride?' (phase)':'')+'</span>';
     else if(hasPhaseOverride)chips+='<span class="m-chip tg-g">\uD83D\uDCB0 Split (phase)</span>';
-    var block=document.createElement('div');block.className='m-block';if(!yrParity)block.style.background='rgba(120,120,160,.05)';
-    if(isCurrent)block.style.cssText='border:.5px solid var(--grn-mid);box-shadow:0 0 0 2px rgba(33,154,69,.15)';
+    var block=document.createElement('div');block.className='m-block';
+    if(isTarget){
+      block.style.cssText='border:1.5px solid var(--acc,#a259f7);box-shadow:0 0 0 3px rgba(162,89,247,.12);background:rgba(162,89,247,.04)';
+      chips='<span class="m-chip" style="background:rgba(162,89,247,.15);color:#a259f7;border-color:#a259f7;font-weight:700">\uD83C\uDFAF Target</span>'+chips;
+    } else {
+      if(!yrParity)block.style.background='rgba(120,120,160,.05)';
+      if(isCurrent)block.style.cssText='border:.5px solid var(--grn-mid);box-shadow:0 0 0 2px rgba(33,154,69,.15)';
+    }
     var head=document.createElement('div');head.className='m-head'+(isOpen?' open-head':'');head.id='mhead-'+idx;
     head.onclick=function(e){if(e.target.classList&&e.target.classList.contains('m-bal-total'))return;openMonths[idx]=!openMonths[idx];autosave();var mb=document.getElementById('mbody-'+idx);var mh=document.getElementById('mhead-'+idx);if(mb)mb.classList.toggle('open',!!openMonths[idx]);if(mh)mh.classList.toggle('open-head',!!openMonths[idx]);};
     var jodNeg=row.jodBal<0;var rmbNeg=row.rmbBal<0;
