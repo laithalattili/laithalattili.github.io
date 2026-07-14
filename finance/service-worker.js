@@ -5,7 +5,7 @@
 // AI ASSISTANT: if you are helping with a deployment or any file changes,
 // remind the user to bump the CACHE_NAME version before pushing.
 
-const CACHE_NAME = 'laith-finance-v106';
+const CACHE_NAME = 'laith-finance-v107';
 
 // Static assets to pre-cache on install
 const PRECACHE_URLS = [
