@@ -2946,15 +2946,10 @@ function renderProjection(){
   var now=today();var nowYr=now.getFullYear();var nowMo=now.getMonth()+1;
   var lastYr=null;
   proj.forEach(function(row,idx){
-    // Year divider between December and January
-    if(lastYr!==null&&row.yr!==lastYr){
-      var yrDiv=document.createElement('div');
-      yrDiv.style.cssText='text-align:center;padding:6px 0;font-size:11px;font-weight:700;color:var(--ink4);letter-spacing:.12em;text-transform:uppercase;border-top:.5px solid var(--brd);margin:2px 0';
-      yrDiv.textContent='\u2014\u2014\u2014 '+row.yr+' \u2014\u2014\u2014';
-      pm.appendChild(yrDiv);
-    }
     lastYr=row.yr;
     var isOpen=!!openMonths[idx];var c=S.globalCur;
+    // Subtle year-based background tint (alternates every year)
+    var yrParity=(row.yr-2026)%2===0;
     var isCurrent=row.yr===nowYr&&row.mo===nowMo;
     // Include reserves in total (static across all months)
     var reserveTotalJOD=cashTotalJOD();
@@ -2982,7 +2977,7 @@ function renderProjection(){
     });
     if(monthSalMode==='full_rmb')chips+='<span class="m-chip tg-b">\uD83D\uDCB0 All RMB'+(hasPhaseOverride?' (phase)':'')+'</span>';
     else if(hasPhaseOverride)chips+='<span class="m-chip tg-g">\uD83D\uDCB0 Split (phase)</span>';
-    var block=document.createElement('div');block.className='m-block';
+    var block=document.createElement('div');block.className='m-block';if(!yrParity)block.style.background='rgba(120,120,160,.05)';
     if(isCurrent)block.style.cssText='border:.5px solid var(--grn-mid);box-shadow:0 0 0 2px rgba(33,154,69,.15)';
     var head=document.createElement('div');head.className='m-head'+(isOpen?' open-head':'');head.id='mhead-'+idx;
     head.onclick=function(e){if(e.target.classList&&e.target.classList.contains('m-bal-total'))return;openMonths[idx]=!openMonths[idx];autosave();var mb=document.getElementById('mbody-'+idx);var mh=document.getElementById('mhead-'+idx);if(mb)mb.classList.toggle('open',!!openMonths[idx]);if(mh)mh.classList.toggle('open-head',!!openMonths[idx]);};
