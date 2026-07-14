@@ -2790,11 +2790,12 @@ function renderSalaryPhases(container){
       delete ph.mo;delete ph.yr; // normalize old single-month format
       autosave();sbPushNow();renderSalaryPhases(cont);
     };})(p.id,container);
-    var r1=document.createElement('div');r1.style.cssText='display:flex;gap:5px;align-items:center;font-size:11px;flex-wrap:wrap;margin-bottom:4px';
-    r1.innerHTML='<span style="color:var(--ink3)">From:</span>';r1.appendChild(fmSel);r1.appendChild(fyInp);
-    r1.innerHTML+='<span style="color:var(--ink3)"> To:</span>';r1.appendChild(tmSel);r1.appendChild(tyInp);
-    var r2=document.createElement('div');r2.style.cssText='display:flex;gap:5px;align-items:center;font-size:11px;flex-wrap:wrap';
-    r2.innerHTML='<span style="color:var(--ink3)">Mode:</span>';r2.appendChild(modeSel);r2.appendChild(savePhaseBtn);
+    function mkFld(label,el){var d=document.createElement('div');d.style.cssText='display:flex;flex-direction:column;gap:2px';var l=document.createElement('label');l.style.cssText='font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em';l.textContent=label;d.appendChild(l);d.appendChild(el);return d;}
+    var r1=document.createElement('div');r1.style.cssText='display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:6px';
+    r1.appendChild(mkFld('From month',fmSel));r1.appendChild(mkFld('From year',fyInp));
+    r1.appendChild(mkFld('To month',tmSel));r1.appendChild(mkFld('To year',tyInp));
+    var r2=document.createElement('div');r2.style.cssText='display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap';
+    r2.appendChild(mkFld('Mode',modeSel));r2.appendChild(savePhaseBtn);
     editForm.appendChild(r1);editForm.appendChild(r2);
     editBtn.onclick=function(){editForm.style.display=editForm.style.display==='none'?'block':'none';editBtn.textContent=editForm.style.display==='none'?'Edit':'Close';};
     var del=document.createElement('button');del.className='btn btn-xs btn-d';del.textContent='Del';
@@ -2867,12 +2868,12 @@ function renderProjection(){
   var jodIg=document.createElement('div');var jodL=document.createElement('label');jodL.textContent='JOD → Arab Bank';jodL.style.cssText='display:block;font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:4px';
   var jodInp=document.createElement('input');jodInp.type='number';jodInp.style.cssText='font-family:var(--mono);font-size:13px;width:100%';
   var salJODst=streams.find(function(s){return s.isSalaryJOD;});jodInp.value=salJODst?(salJODst.amount||''):'';jodInp.placeholder='e.g. 2210';
-  jodInp.onchange=function(){var s=streams.find(function(x){return x.isSalaryJOD;});if(s){s.amount=parseFloat(this.value)||0;autosave();}};
+  jodInp.onchange=function(){var s=streams.find(function(x){return x.isSalaryJOD;});if(s){s.amount=parseFloat(this.value)||0;autosave();sbPushNow();}};
   jodIg.appendChild(jodL);jodIg.appendChild(jodInp);splitWrap.appendChild(jodIg);
   var rmbIg=document.createElement('div');var rmbL=document.createElement('label');rmbL.textContent='RMB → BOC';rmbL.style.cssText='display:block;font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:4px';
   var rmbInp=document.createElement('input');rmbInp.type='number';rmbInp.style.cssText='font-family:var(--mono);font-size:13px;width:100%';
   var salRMBst=streams.find(function(s){return s.isSalaryRMB;});rmbInp.value=salRMBst?(salRMBst.amount||''):'';rmbInp.placeholder='e.g. 4410';
-  rmbInp.onchange=function(){var s=streams.find(function(x){return x.isSalaryRMB;});if(s){s.amount=parseFloat(this.value)||0;autosave();}};
+  rmbInp.onchange=function(){var s=streams.find(function(x){return x.isSalaryRMB;});if(s){s.amount=parseFloat(this.value)||0;autosave();sbPushNow();}};
   rmbIg.appendChild(rmbL);rmbIg.appendChild(rmbInp);splitWrap.appendChild(rmbIg);
   rc.appendChild(splitWrap);
   var frWrap=document.createElement('div');frWrap.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap';
@@ -2943,7 +2944,16 @@ function renderProjection(){
   ctrlRow.appendChild(countLbl);ctrlRow.appendChild(rightBtns);
   pm.appendChild(ctrlRow);
   var now=today();var nowYr=now.getFullYear();var nowMo=now.getMonth()+1;
+  var lastYr=null;
   proj.forEach(function(row,idx){
+    // Year divider between December and January
+    if(lastYr!==null&&row.yr!==lastYr){
+      var yrDiv=document.createElement('div');
+      yrDiv.style.cssText='text-align:center;padding:6px 0;font-size:11px;font-weight:700;color:var(--ink4);letter-spacing:.12em;text-transform:uppercase;border-top:.5px solid var(--brd);margin:2px 0';
+      yrDiv.textContent='\u2014\u2014\u2014 '+row.yr+' \u2014\u2014\u2014';
+      container.appendChild(yrDiv);
+    }
+    lastYr=row.yr;
     var isOpen=!!openMonths[idx];var c=S.globalCur;
     var isCurrent=row.yr===nowYr&&row.mo===nowMo;
     // Include reserves in total (static across all months)
