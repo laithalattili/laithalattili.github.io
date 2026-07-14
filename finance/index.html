@@ -204,6 +204,8 @@ input:focus,select:focus{border-color:var(--ink)}
 .m-bal-rmb{background:var(--blu-bg);color:var(--blu)}
 .m-bal-total{font-size:10px;font-family:var(--mono);color:var(--ink3);cursor:pointer;padding:2px 7px;border-radius:5px;border:.5px dashed var(--brd2)}
 .m-bal-total:hover{color:var(--ink)}
+.m-bal-total.neg-total{background:var(--red)!important;color:#fff!important;border-color:var(--red)!important;font-size:13px!important;font-weight:800!important;animation:negpulse 1.8s ease-in-out infinite}
+@keyframes negpulse{0%,100%{opacity:1}50%{opacity:.7}}
 .m-chips{display:flex;gap:3px;flex-wrap:wrap;margin-top:4px}
 .m-chip{font-size:10px;padding:2px 5px;border-radius:4px;border:.5px solid var(--brd2);color:var(--ink3);white-space:nowrap}
 .m-chip.w{background:var(--amb-bg);color:var(--amb);border-color:transparent}
@@ -3000,7 +3002,7 @@ function renderProjection(){
     if(jodNeg||rmbNeg)block.classList.add('has-negative');
     var curLabel=isCurrent?' <span style="font-size:10px;background:var(--grn-bg);color:var(--grn);padding:1px 5px;border-radius:4px;font-weight:700">NOW</span>':'';
     head.innerHTML='<div class="m-head-l"><div class="m-name">'+row.label+curLabel+'</div>'+
-      '<div class="m-bal-row"><span class="'+jodPillClass+'">JOD '+fJOD(row.jodBal).replace(' JOD','')+'</span><span class="'+rmbPillClass+'">'+fRMB(row.rmbBal)+'</span>'+resPills+'<span class="m-bal-total" onclick="event.stopPropagation();toggleCombinedCur()" title="Click to switch currency">='+totalDisp+'</span></div><div class="m-chips">'+chips+'</div></div>';
+      '<div class="m-bal-row"><span class="'+jodPillClass+'">JOD '+fJOD(row.jodBal).replace(' JOD','')+'</span><span class="'+rmbPillClass+'">'+fRMB(row.rmbBal)+'</span>'+resPills+'<span class="m-bal-total'+(totalJOD<0?' neg-total':'')+'" onclick="event.stopPropagation();toggleCombinedCur()" title="Click to switch currency">'+(totalJOD<0?'\u26a0 ':'')+'='+totalDisp+'</span></div><div class="m-chips">'+chips+'</div></div>';
     block.appendChild(head);
     var body=document.createElement('div');body.className='m-body'+(isOpen?' open':'');body.id='mbody-'+idx;
     // Two columns with income/expense separation
