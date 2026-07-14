@@ -2772,9 +2772,34 @@ function renderSalaryPhases(container){
     }
     var lbl=document.createElement('span');lbl.style.cssText='font-family:var(--mono);font-weight:700;flex:1';lbl.textContent=rangeStr;
     var tag=document.createElement('span');tag.className='tag '+(p.mode==='split'?'tg-g':'tg-b');tag.textContent=p.mode==='split'?'Split':'All RMB';
+    var editBtn=document.createElement('button');editBtn.className='btn btn-xs';editBtn.textContent='Edit';
+    var editForm=document.createElement('div');editForm.style.cssText='display:none;width:100%;margin-top:6px;padding-top:6px;border-top:.5px solid var(--brd)';
+    // Build edit form fields
+    var MSHORT=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function mkSel(vals,cur){var s=document.createElement('select');s.style.cssText='font-size:11px;padding:2px 4px;border-radius:4px';vals.forEach(function(v){var o=document.createElement('option');o.value=v;o.textContent=v;if(String(v)===String(cur))o.selected=true;s.appendChild(o);});return s;}
+    var fmSel=mkSel(MSHORT,MSHORT[(p.fromMo||p.mo||1)-1]);var fyInp=document.createElement('input');fyInp.type='number';fyInp.value=p.fromYr||p.yr||2026;fyInp.style.cssText='width:60px;font-size:11px;padding:2px;border-radius:4px';
+    var tmSel=mkSel(MSHORT,MSHORT[(p.toMo||p.mo||12)-1]);var tyInp=document.createElement('input');tyInp.type='number';tyInp.value=p.toYr||p.yr||2026;tyInp.style.cssText='width:60px;font-size:11px;padding:2px;border-radius:4px';
+    var modeSel=document.createElement('select');modeSel.style.cssText='font-size:11px;padding:2px 4px;border-radius:4px';
+    ['split','full_rmb'].forEach(function(v){var o=document.createElement('option');o.value=v;o.textContent=v==='split'?'Split':'All RMB';if(v===p.mode)o.selected=true;modeSel.appendChild(o);});
+    var savePhaseBtn=document.createElement('button');savePhaseBtn.className='btn btn-xs btn-p';savePhaseBtn.textContent='Save';
+    savePhaseBtn.onclick=(function(pid,cont){return function(){
+      var ph=safeArr(S.salaryPhases).find(function(x){return x.id===pid;});if(!ph)return;
+      ph.fromMo=MSHORT.indexOf(fmSel.value)+1;ph.fromYr=parseInt(fyInp.value);
+      ph.toMo=MSHORT.indexOf(tmSel.value)+1;ph.toYr=parseInt(tyInp.value);
+      ph.mode=modeSel.value;
+      delete ph.mo;delete ph.yr; // normalize old single-month format
+      autosave();sbPushNow();renderSalaryPhases(cont);
+    };})(p.id,container);
+    var r1=document.createElement('div');r1.style.cssText='display:flex;gap:5px;align-items:center;font-size:11px;flex-wrap:wrap;margin-bottom:4px';
+    r1.innerHTML='<span style="color:var(--ink3)">From:</span>';r1.appendChild(fmSel);r1.appendChild(fyInp);
+    r1.innerHTML+='<span style="color:var(--ink3)"> To:</span>';r1.appendChild(tmSel);r1.appendChild(tyInp);
+    var r2=document.createElement('div');r2.style.cssText='display:flex;gap:5px;align-items:center;font-size:11px;flex-wrap:wrap';
+    r2.innerHTML='<span style="color:var(--ink3)">Mode:</span>';r2.appendChild(modeSel);r2.appendChild(savePhaseBtn);
+    editForm.appendChild(r1);editForm.appendChild(r2);
+    editBtn.onclick=function(){editForm.style.display=editForm.style.display==='none'?'block':'none';editBtn.textContent=editForm.style.display==='none'?'Edit':'Close';};
     var del=document.createElement('button');del.className='btn btn-xs btn-d';del.textContent='Del';
     del.onclick=(function(pid,cont){return function(){S.salaryPhases=safeArr(S.salaryPhases).filter(function(x){return x.id!==pid;});autosave();renderSalaryPhases(cont);};})(p.id,container);
-    row.appendChild(lbl);row.appendChild(tag);row.appendChild(del);container.appendChild(row);
+    row.appendChild(lbl);row.appendChild(tag);row.appendChild(editBtn);row.appendChild(del);row.appendChild(editForm);container.appendChild(row);
   });
 }
 
@@ -2890,7 +2915,7 @@ function renderProjection(){
     if(fromYr*12+fromMo>toYr*12+toMo){alert('From must be before To.');return;}
     S.salaryPhases=safeArr(S.salaryPhases);
     S.salaryPhases.push({id:'sp'+Date.now(),fromYr:fromYr,fromMo:fromMo,toYr:toYr,toMo:toMo,mode:mode});
-    autosave();renderSalaryPhases(phasesList);
+    autosave();sbPushNow();renderSalaryPhases(phasesList);renderProjection();
   };
   var fromLbl=document.createElement('span');fromLbl.style.cssText='font-size:11px;color:var(--ink3);align-self:center';fromLbl.textContent='From';
   var toLbl=document.createElement('span');toLbl.style.cssText='font-size:11px;color:var(--ink3);align-self:center';toLbl.textContent='To';
