@@ -400,7 +400,7 @@ input:focus,select:focus{border-color:var(--ink)}
 .settings-sec.open .settings-sec-body{display:block}
 
 /* MISC */
-.two-col{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:9px}@media(max-width:420px){.two-col{grid-template-columns:1fr}}
 .three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 @media(max-width:580px){.two-col,.three-col,.cat-grid{grid-template-columns:1fr 1fr}}
 .badge-month{font-size:12px;padding:3px 10px;border-radius:6px;background:var(--bg);color:var(--ink2);border:.5px solid var(--brd);font-weight:600}
@@ -1964,14 +1964,14 @@ function renderDashboard(){
     var resJOD=cashTotalJOD();
     function mkProjRow(row,label,isCurrent){
       var d2=document.createElement('div');
-      d2.style.cssText='display:grid;grid-template-columns:'+(isCurrent?'110px':'90px')+' 1fr 1fr auto;gap:6px;align-items:center;padding:'+(isCurrent?'10px 12px':'7px 10px')+';background:'+(isCurrent?'var(--surf2)':'var(--surf)')+';border-radius:var(--r);margin-bottom:3px;border:.5px solid '+(isCurrent?'var(--brd)':'var(--brd2)')+';'+(isCurrent?'':'opacity:.85');
-      var lbl=document.createElement('div');lbl.style.cssText='font-size:'+(isCurrent?'13px':'10px')+';font-weight:'+(isCurrent?'800':'600')+';color:'+(isCurrent?'var(--ink)':'var(--ink3)')+';line-height:1.2';lbl.textContent=label;d2.appendChild(lbl);
+      d2.style.cssText='display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:'+(isCurrent?'10px 12px':'7px 10px')+';background:'+(isCurrent?'var(--surf2)':'var(--surf)')+';border-radius:var(--r);margin-bottom:3px;border:.5px solid '+(isCurrent?'var(--brd)':'var(--brd2)')+';'+(isCurrent?'':'opacity:.85');
+      var lbl=document.createElement('div');lbl.style.cssText='font-size:'+(isCurrent?'13px':'10px')+';font-weight:'+(isCurrent?'800':'600')+';color:'+(isCurrent?'var(--ink)':'var(--ink3)')+';line-height:1.2;flex:0 0 100%';lbl.textContent=label;d2.appendChild(lbl);
       var tjod=row.jodBal;var trmb=row.rmbBal;var ttl=tjod+(trmb/S.jod2rmb)+resJOD;
       var jneg=tjod<0;var rneg=trmb<0;var tneg=ttl<0;
       var fs=isCurrent?'13px':'12px';var fst=isCurrent?'15px':'13px';
-      var jp=document.createElement('div');jp.style.cssText='padding:3px 7px;border-radius:4px;font-family:var(--mono);font-size:'+fs+';font-weight:700;background:'+(jneg?'var(--red-bg)':'var(--grn-bg)')+';color:'+(jneg?'var(--red)':'var(--grn)');jp.textContent=fJOD(tjod);d2.appendChild(jp);
-      var rp=document.createElement('div');rp.style.cssText='padding:3px 7px;border-radius:4px;font-family:var(--mono);font-size:'+fs+';font-weight:700;background:'+(rneg?'var(--red-bg)':'var(--blu-bg)')+';color:'+(rneg?'var(--red)':'var(--blu)');rp.textContent=fRMB(trmb);d2.appendChild(rp);
-      var td=document.createElement('div');td.style.cssText='padding:3px 9px;border-radius:4px;font-family:var(--mono);font-size:'+fst+';font-weight:800;cursor:pointer;'+(tneg?'background:var(--red);color:#fff':'background:var(--grn-bg);border:.5px solid var(--grn-mid);color:var(--grn)');
+      var jp=document.createElement('div');jp.style.cssText='padding:3px 7px;border-radius:4px;font-family:var(--mono);font-size:'+fs+';font-weight:700;flex:1;min-width:80px;background:'+(jneg?'var(--red-bg)':'var(--grn-bg)')+';color:'+(jneg?'var(--red)':'var(--grn)');jp.textContent=fJOD(tjod);d2.appendChild(jp);
+      var rp=document.createElement('div');rp.style.cssText='padding:3px 7px;border-radius:4px;font-family:var(--mono);font-size:'+fs+';font-weight:700;flex:1;min-width:80px;background:'+(rneg?'var(--red-bg)':'var(--blu-bg)')+';color:'+(rneg?'var(--red)':'var(--blu)');rp.textContent=fRMB(trmb);d2.appendChild(rp);
+      var td=document.createElement('div');td.style.cssText='padding:3px 9px;border-radius:4px;font-family:var(--mono);font-size:'+fst+';font-weight:800;cursor:pointer;flex-shrink:0;'+(tneg?'background:var(--red);color:#fff':'background:var(--grn-bg);border:.5px solid var(--grn-mid);color:var(--grn)');
       td.textContent='= '+(gc==='JOD'?fJOD(ttl):fRMB(ttl*S.jod2rmb));td.title='Click to switch currency';
       td.onclick=function(){toggleCombinedCur();renderDashboard();};d2.appendChild(td);
       return d2;
@@ -1995,13 +1995,13 @@ function renderDashboard(){
     tmCtrl.appendChild(tmLbl);tmCtrl.appendChild(tmMo);tmCtrl.appendChild(tmYr);tmCtrl.appendChild(tmSet);tmWrap.appendChild(tmCtrl);
     if(tmRow){
       var tmGrid=document.createElement('div');
-      tmGrid.style.cssText='display:grid;grid-template-columns:100px 1fr 1fr auto;gap:6px;align-items:center';
-      var tmRowLbl=document.createElement('div');tmRowLbl.style.cssText='font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em';tmRowLbl.textContent=MN[tm.mo-1]+' '+tm.yr;
+      tmGrid.style.cssText='display:flex;flex-wrap:wrap;gap:6px;align-items:center';
+      var tmRowLbl=document.createElement('div');tmRowLbl.style.cssText='font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;flex:0 0 100%';tmRowLbl.textContent=MN[tm.mo-1]+' '+tm.yr;
       var tjod2=tmRow.jodBal;var trmb2=tmRow.rmbBal;var ttl2=tjod2+(trmb2/S.jod2rmb)+resJOD;
       var jneg2=tjod2<0;var rneg2=trmb2<0;var tneg2=ttl2<0;
-      var jp2=document.createElement('div');jp2.style.cssText='padding:3px 7px;border-radius:4px;font-family:var(--mono);font-size:12px;font-weight:700;background:'+(jneg2?'var(--red-bg)':'var(--grn-bg)')+';color:'+(jneg2?'var(--red)':'var(--grn)');jp2.textContent=fJOD(tjod2);
-      var rp2=document.createElement('div');rp2.style.cssText='padding:3px 7px;border-radius:4px;font-family:var(--mono);font-size:12px;font-weight:700;background:'+(rneg2?'var(--red-bg)':'var(--blu-bg)')+';color:'+(rneg2?'var(--red)':'var(--blu)');rp2.textContent=fRMB(trmb2);
-      var td2=document.createElement('div');td2.style.cssText='padding:3px 9px;border-radius:4px;font-family:var(--mono);font-size:13px;font-weight:800;cursor:pointer;'+(tneg2?'background:var(--red);color:#fff':'background:var(--grn-bg);border:.5px solid var(--grn-mid);color:var(--grn)');
+      var jp2=document.createElement('div');jp2.style.cssText='padding:3px 7px;border-radius:4px;font-family:var(--mono);font-size:12px;font-weight:700;flex:1;min-width:80px;background:'+(jneg2?'var(--red-bg)':'var(--grn-bg)')+';color:'+(jneg2?'var(--red)':'var(--grn)');jp2.textContent=fJOD(tjod2);
+      var rp2=document.createElement('div');rp2.style.cssText='padding:3px 7px;border-radius:4px;font-family:var(--mono);font-size:12px;font-weight:700;flex:1;min-width:80px;background:'+(rneg2?'var(--red-bg)':'var(--blu-bg)')+';color:'+(rneg2?'var(--red)':'var(--blu)');rp2.textContent=fRMB(trmb2);
+      var td2=document.createElement('div');td2.style.cssText='padding:3px 9px;border-radius:4px;font-family:var(--mono);font-size:13px;font-weight:800;cursor:pointer;flex-shrink:0;'+(tneg2?'background:var(--red);color:#fff':'background:var(--grn-bg);border:.5px solid var(--grn-mid);color:var(--grn)');
       td2.textContent='= '+(gc==='JOD'?fJOD(ttl2):fRMB(ttl2*S.jod2rmb));td2.title='Click to switch currency';
       td2.onclick=function(){toggleCombinedCur();renderDashboard();};
       tmGrid.appendChild(tmRowLbl);tmGrid.appendChild(jp2);tmGrid.appendChild(rp2);tmGrid.appendChild(td2);
