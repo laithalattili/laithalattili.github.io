@@ -400,7 +400,7 @@ input:focus,select:focus{border-color:var(--ink)}
 .settings-sec.open .settings-sec-body{display:block}
 
 /* MISC */
-.two-col{display:grid;grid-template-columns:1fr 1fr;gap:9px}@media(max-width:420px){.two-col{grid-template-columns:1fr}}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:9px}@media(max-width:600px){.two-col{grid-template-columns:1fr}}
 .three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 @media(max-width:580px){.two-col,.three-col,.cat-grid{grid-template-columns:1fr 1fr}}
 .badge-month{font-size:12px;padding:3px 10px;border-radius:6px;background:var(--bg);color:var(--ink2);border:.5px solid var(--brd);font-weight:600}
@@ -2017,12 +2017,22 @@ function renderDashboard(){
     var pct=Math.min(100,Math.round(totalSpent/(totalBudget||1)*100));
     var col=pct>90?'var(--red)':pct>70?'var(--amb)':'var(--grn)';
     var budBar=document.createElement('div');budBar.className='card';budBar.style.marginBottom='8px';
+    // If normal budget is 0 due to full-holiday month, show holiday budget instead
+    var holActive=getActiveHolidays();
+    var holBudgetTotal=holActive.reduce(function(a,h){var bd=holDailyBudgetTotal(h);return a+toRMB(bd.total,bd.currency);},0);
+    var holSpentTotal=holActive.reduce(function(a,h){return a+holDailyBudgetSpent(h);},0);
+    var showingHol=totalBudget<1&&holBudgetTotal>0;
+    var dispBudget=showingHol?holBudgetTotal:totalBudget;
+    var dispSpent=showingHol?holSpentTotal:totalSpent;
+    var dispPct=Math.min(100,Math.round(dispSpent/(dispBudget||1)*100));
+    var dispCol=dispPct>90?'var(--red)':dispPct>70?'var(--amb)':'#f2a65a';
+    var budTitle=showingHol?'This month \u00b7 holiday budget':'This month \u00b7 budget';
     budBar.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'+
-      '<div style="font-size:12px;font-weight:700;color:var(--ink2)">This month \u00b7 budget</div>'+
-      '<div class="mono" style="font-size:13px;font-weight:700;color:'+(totalSpent>totalBudget?'var(--red)':'var(--ink2)')+'">'+fRMB(totalSpent)+' <span style="font-weight:400;color:var(--ink4)">/ '+fRMB(totalBudget)+'</span></div>'+
+      '<div style="font-size:12px;font-weight:700;color:'+(showingHol?'#f2a65a':'var(--ink2)')+'">'+budTitle+'</div>'+
+      '<div class="mono" style="font-size:13px;font-weight:700;color:'+(dispSpent>dispBudget?'var(--red)':'var(--ink2)')+'">'+fRMB(dispSpent)+' <span style="font-weight:400;color:var(--ink4)">/ '+fRMB(dispBudget)+'</span></div>'+
       '</div>'+
-      '<div class="prog-track"><div class="prog-fill" style="width:'+pct+'%;background:'+col+'"></div></div>'+
-      '<div style="font-size:11px;color:var(--ink3);margin-top:3px">'+(totalSpent>totalBudget?'Over by '+fRMB(totalSpent-totalBudget):fRMB(totalBudget-totalSpent)+' remaining')+'</div>';
+      '<div class="prog-track"><div class="prog-fill" style="width:'+dispPct+'%;background:'+dispCol+'"></div></div>'+
+      '<div style="font-size:11px;color:var(--ink3);margin-top:3px">'+(dispSpent>dispBudget?'Over by '+fRMB(dispSpent-dispBudget):fRMB(dispBudget-dispSpent)+' remaining')+'</div>';
     // Compact surplus strip inside the same card
     var surplusByCur=calcSurplusByCur();
     var surParts=[];
