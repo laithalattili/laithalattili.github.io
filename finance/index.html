@@ -567,6 +567,7 @@ input:focus,select:focus{border-color:var(--ink)}
     <button class="btn btn-sm" onclick="cMov(-1)">&laquo;</button>
     <div class="badge-month" id="commit-label" style="font-size:14px;font-weight:700;color:var(--ink);min-width:130px;text-align:center">May 2026</div>
     <button class="btn btn-sm" onclick="cMov(1)">&raquo;</button>
+    <button class="btn btn-sm" id="commit-today-btn" onclick="commitMon={year:today().getFullYear(),month:today().getMonth()+1};renderCommitments();" style="margin-left:4px">Today</button>
     <div style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap">
       <button class="btn btn-sm" id="cc-expand-btn" onclick="commitToggleAll()">&#8645; Expand all</button>
       <button class="btn btn-sm btn-g" onclick="tickAll()">&#10003; Tick all</button>
@@ -2574,6 +2575,7 @@ function getCarryOverItems(yr,mo){
 }
 function renderCommitments(){
   var clEl=document.getElementById('commit-label');if(clEl)clEl.textContent=MNAMES[commitMon.month-1]+' '+commitMon.year;
+  var todayBtn=document.getElementById('commit-today-btn');if(todayBtn){var isCommitNow=commitMon.year===today().getFullYear()&&commitMon.month===today().getMonth()+1;todayBtn.style.display=isCommitNow?'none':'inline-flex';}
   var yr=commitMon.year,mo=commitMon.month;
   var items=getCommitItems();
   var carryItems=getCarryOverItems(yr,mo);
@@ -3905,9 +3907,11 @@ function renderAssets(){
   var g1=document.createElement('div');g1.className='ig';var g1l=document.createElement('label');g1l.textContent='Gold spot per oz (JOD)';g1.appendChild(g1l);var g1i=document.createElement('input');g1i.type='number';g1i.value=S.goldSpotOz;g1i.onchange=function(){S.goldSpotOz=parseFloat(this.value)||S.goldSpotOz;var g2i=document.getElementById('g-gram-inp');if(g2i)g2i.value=n2(S.goldSpotOz/OZ_TO_G);autosave();renderAssets();};g1.appendChild(g1i);gsRow.appendChild(g1);
   var g2=document.createElement('div');g2.className='ig';var g2l=document.createElement('label');g2l.textContent='Per gram (JOD)';g2.appendChild(g2l);var g2i=document.createElement('input');g2i.type='number';g2i.id='g-gram-inp';g2i.value=n2(S.goldSpotOz/OZ_TO_G);g2i.onchange=function(){S.goldSpotOz=n2(parseFloat(this.value)*OZ_TO_G)||S.goldSpotOz;autosave();renderAssets();};g2.appendChild(g2i);gsRow.appendChild(g2);
   gsCard.innerHTML='<div class="card-title" style="margin-bottom:9px">Gold spot price</div>';gsCard.appendChild(gsRow);al.appendChild(gsCard);
+  // Note: Gold pieces and Properties sections will be hidden if empty
   // Gold pieces
   var gTotal=goldPieces.reduce(function(a,p){var oz=p.unit==='oz'?p.weight:p.unit==='gram'?p.weight/OZ_TO_G:p.weight/1000;return a+oz*S.goldSpotOz;},0);
   var gpHd=document.createElement('div');gpHd.innerHTML='<div class="sec-label" style="margin-top:0">Gold pieces (total: '+fJOD(gTotal)+')</div>';al.appendChild(gpHd);
+  if(!goldPieces.length){var gpEmpty=document.createElement('div');gpEmpty.style.cssText='font-size:12px;color:var(--ink4);padding:8px 0';gpEmpty.textContent='No gold pieces added yet. Click + Add gold above.';al.appendChild(gpEmpty);}
   goldPieces.forEach(function(p){
     var oz=p.unit==='oz'?p.weight:p.unit==='gram'?p.weight/OZ_TO_G:p.weight/1000;var val=n2(oz*S.goldSpotOz);var paid2=n2(oz*p.paidPerUnit);var pnl=n2(val-paid2);
     var card=document.createElement('div');card.className='card';card.style.marginBottom='8px';
@@ -3929,6 +3933,7 @@ function renderAssets(){
   });
   // Properties
   var prHd=document.createElement('div');prHd.innerHTML='<div class="sec-label">Properties & land</div>';al.appendChild(prHd);
+  if(!properties.length){var prEmpty=document.createElement('div');prEmpty.style.cssText='font-size:12px;color:var(--ink4);padding:8px 0';prEmpty.textContent='No properties added yet. Click + Add asset above.';al.appendChild(prEmpty);}
   properties.forEach(function(p){
     var eq=n2((p.value-p.paid)*p.share);
     var card=document.createElement('div');card.className='card';card.style.marginBottom='8px';
