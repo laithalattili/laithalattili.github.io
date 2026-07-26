@@ -3689,7 +3689,10 @@ function holDailyBudgetTotal(h){
 function holDailyBudgetSpent(h){
   var catKey='__hol-'+h.id+'__';
   if(!Array.isArray(expenses))return 0;
-  return n2(safeArr(expenses).filter(function(e){return e.category===catKey;}).reduce(function(a,e){return a+toRMB(e.amount,e.currency);},0));
+  // Return spent in the holiday's daily-budget currency (not always RMB)
+  var bd=holDailyBudgetTotal(h);
+  var cur=bd.currency||'RMB';
+  return n2(safeArr(expenses).filter(function(e){return e.category===catKey;}).reduce(function(a,e){return a+toTarget(e.amount,e.currency,cur);},0));
 }
 function getActiveHolidays(){
   return safeArr(holidays).filter(function(h){return !h.archived&&holIsActive(h)&&safeArr(h.items).some(function(i){return i.type==='daily';});});
