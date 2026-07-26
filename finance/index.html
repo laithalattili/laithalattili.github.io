@@ -2109,7 +2109,7 @@ function updateHolCatField(){
     }
   }
 }
-function submitExp(){var amt=parseFloat(document.getElementById('log-amt').value);if(!amt||amt<=0)return alert('Enter a valid amount.');var holCatEl=document.getElementById('log-holcat');var holCatVal=(holCatEl&&(S.selectedCat||'').indexOf('__hol-')===0)?(holCatEl.value||'').trim():'';var entry={id:Date.now(),amount:amt,currency:S.logCur,category:S.selectedCat,date:document.getElementById('log-date').value||today().toISOString().split('T')[0],note:document.getElementById('log-note').value,holCat:holCatVal||undefined};if(editingExpId!==null){var i=expenses.findIndex(function(e){return e.id===editingExpId;});if(i>-1)expenses[i]=entry;editingExpId=null;}else expenses.unshift(entry);document.getElementById('log-amt').value='';document.getElementById('log-note').value='';var hcEl=document.getElementById('log-holcat');if(hcEl)hcEl.value='';updateSurplus();autosave();renderLog();renderLogMonthlySummary();}
+function submitExp(){var amt=parseFloat(document.getElementById('log-amt').value);if(!amt||amt<=0)return alert('Enter a valid amount.');var holCatEl=document.getElementById('log-holcat');var holCatVal=(holCatEl&&(S.selectedCat||'').indexOf('__hol-')===0)?(holCatEl.value||'').trim():'';var entry={id:Date.now(),amount:amt,currency:S.logCur,category:S.selectedCat,date:document.getElementById('log-date').value||today().toISOString().split('T')[0],note:document.getElementById('log-note').value,holCat:holCatVal||undefined};if(editingExpId!==null){var i=expenses.findIndex(function(e){return e.id===editingExpId;});if(i>-1)expenses[i]=entry;editingExpId=null;}else expenses.unshift(entry);document.getElementById('log-amt').value='';document.getElementById('log-note').value='';var hcEl=document.getElementById('log-holcat');if(hcEl)hcEl.value='';updateSurplus();autosave();sbPushNow();renderLog();renderLogMonthlySummary();}
 async function pushFinanceSummary(){
   try{
     var now=today();
@@ -2210,7 +2210,7 @@ function resetSurplus(){
 }
 function deleteExp(id){
   expenses=expenses.filter(function(e){return e.id!==id;});
-  updateSurplus();autosave();renderLog();
+  updateSurplus();autosave();sbPushNow();renderLog();
 }
 function editExp(id){
   var e=expenses.find(function(x){return x.id===id;});if(!e)return;
