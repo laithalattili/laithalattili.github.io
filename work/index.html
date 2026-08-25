@@ -66,7 +66,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .app{padding:.75rem;max-width:440px;margin:0 auto;padding-bottom:80px}
 
 /* TABS */
-.tabs{display:flex;background:#fff;border-top:1px solid var(--border3);position:fixed;bottom:0;left:0;right:0;z-index:200;overflow:hidden;box-shadow:0 -1px 8px rgba(0,0,0,.08);padding-bottom:env(safe-area-inset-bottom)}
+.tabs{display:flex;background:#fff;border-top:1px solid var(--border3);position:fixed;bottom:0;left:0;right:0;z-index:200;overflow:visible;box-shadow:0 -1px 8px rgba(0,0,0,.08);padding-bottom:env(safe-area-inset-bottom)}
 .tab{flex:1;padding:8px 2px 6px;background:none;border:none;border-top:2px solid transparent;cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:9px;font-weight:600;color:#868e96;position:relative;-webkit-tap-highlight-color:transparent}
 .tab-icon{font-size:18px;line-height:1}
 .ico{width:1em;height:1em;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-0.12em;flex-shrink:0}
@@ -90,6 +90,11 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .qc-cat{min-height:58px;border-radius:var(--r);border:none;cursor:pointer;font-size:15px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;padding:8px;text-align:center}
 .qc-cat:active{transform:scale(.96)}
 .qc-cat.last{outline:3px solid rgba(0,0,0,.18);outline-offset:-3px}
+.qc-row{display:flex;align-items:center;gap:8px;margin-bottom:11px}
+.qc-sticky{flex:1;min-height:42px;border-radius:var(--r);border:1.5px solid var(--border2);background:#fff;color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+.qc-sticky.on{background:#fffbe6;border-color:#ffe066;color:#7d5800}
+.qc-div{display:flex;align-items:center;gap:8px;margin:12px 0 9px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em}
+.qc-div:before,.qc-div:after{content:'';flex:1;height:1px;background:var(--border)}
 .tab.active{color:#212529;border-top:2px solid #212529;background:#f8f9fa}
 .tab-dot{position:absolute;top:4px;right:calc(50% - 14px);width:7px;height:7px;border-radius:50%;background:#2b8a3e;display:none}
 .tab-content{display:none}.tab-content.active{display:block}
@@ -24326,7 +24331,7 @@ function renderTodayView(){
     const _catMap={};_cats.forEach(ct=>{_catMap[ct.id]=ct;});
 
     function _taskRow(t){
-      const _done=localStorage.getItem('plan_done_'+t.id+'_w'+_wNum)==='1';
+      const _done=localStorage.getItem(t.scope==='sticky'?('plan_done_'+t.id):('plan_done_'+t.id+'_w'+_wNum))==='1';
       const _cat=_catMap[t.cat]||{color:'#868e96'};
       return`<div class="plan-task-row" style="background:#fff;border-radius:8px;margin-bottom:3px;border:1px solid #e9ecef">
         <div class="plan-task-cat-dot" style="background:${_cat.color}"></div>
@@ -25546,7 +25551,7 @@ function renderWeekTasksView(){
   const todayStr=_todayDateStr();
 
   // Task done key: sticky uses task id, others use id+weekNum
-  function doneKey(t){return 'plan_done_'+t.id+'_w'+wNum;}
+  function doneKey(t){return t.scope==='sticky'?('plan_done_'+t.id):('plan_done_'+t.id+'_w'+wNum);}
   function isDone(t){return localStorage.getItem(doneKey(t))==='1';}
   function toggleDone(taskId){
     const t=tasks.find(x=>x.id===taskId);if(!t)return;
@@ -25688,9 +25693,9 @@ function planToggleDone(taskId){
   const tasks=S.planData||[];
   const t=tasks.find(x=>x.id===taskId);if(!t)return;
   const wNum=getWeekNumber(ttWeekOffset);
-  const k='plan_done_'+t.id+'_w'+wNum;
+  const k=t.scope==='sticky'?('plan_done_'+t.id):('plan_done_'+t.id+'_w'+wNum);
   const was=localStorage.getItem(k)==='1';
-  localStorage.setItem(k,was?'0':'1');
+  setDone(k,!was);
   renderWeekTasksView();
   if(ttView==='today')renderTodayView();
 }
@@ -27663,6 +27668,104 @@ function removeStudent(classId,idx){
 let _negClassId=null,_negStudentName=null;
 const NEG_CATS=['Disruption','Device misuse','Sleeping','No homework','No effort'];
 
+// ══ CROSS-APP INBOX (work side) ═══════════════════════════════
+async function sendToOmni(text,sticky){
+  try{
+    const{error}=await supa.from('app_inbox').insert({
+      target_app:'omni',text:text,category_hint:null,
+      sticky:!!sticky,source:'work',consumed:false});
+    if(error)throw error;
+    return true;
+  }catch(e){console.warn('sendToOmni failed',e.message);return false;}
+}
+async function drainWorkInbox(){
+  try{
+    const{data,error}=await supa.from('app_inbox')
+      .select('*').eq('target_app','work').eq('consumed',false);
+    if(error)throw error;
+    if(!data||!data.length)return;
+    if(!S.planData)S.planData=[];
+    const cats=S.planCategories||[];
+    const dn=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const ids=[];
+    data.forEach(row=>{
+      let cat=null;
+      if(row.category_hint){
+        const h=String(row.category_hint).toLowerCase();
+        const m=cats.find(x=>String(x.id).toLowerCase()===h)||cats.find(x=>String(x.name).toLowerCase()===h);
+        cat=m?m.id:null;
+      }
+      if(!cat)cat=cats[0]?cats[0].id:'gen';
+      S.planData.push({
+        id:'in'+(row.id||Date.now()).toString().slice(0,12)+Math.random().toString(36).slice(2,6),
+        text:row.text,
+        scope:row.sticky?'sticky':'day',
+        recur:null,recurDay:null,weekNum:null,
+        date:row.sticky?null:_todayStr(),
+        day:row.sticky?null:dn[new Date().getDay()],
+        time:null,cat:cat
+      });
+      ids.push(row.id);
+    });
+    saveSettings();
+    try{localStorage.setItem('planData',JSON.stringify(S.planData));}catch(e){}
+    await supa.from('app_inbox').update({consumed:true}).in('id',ids);
+    if(typeof showToastMsg==='function')showToastMsg('✓ '+ids.length+' task'+(ids.length>1?'s':'')+' from Omni','#16a34a');
+    try{if(typeof renderWeekTasksView==='function'&&document.getElementById('week-tasks-view'))renderWeekTasksView();}catch(e){}
+  }catch(e){console.warn('drainWorkInbox',e.message);}
+}
+
+// ══ SHARED DONE-STATE SYNC (task_done table) ══════════════════
+let _doneHydrated=false;
+function _doneQueueAdd(key,val){
+  try{const q=JSON.parse(localStorage.getItem('_doneQueue')||'[]');
+    const i=q.findIndex(x=>x.key===key);
+    if(i>=0)q[i]={key,done:val};else q.push({key,done:val});
+    localStorage.setItem('_doneQueue',JSON.stringify(q));}catch(e){}
+}
+function _doneQueueClear(key){
+  try{const q=JSON.parse(localStorage.getItem('_doneQueue')||'[]');
+    localStorage.setItem('_doneQueue',JSON.stringify(q.filter(x=>x.key!==key)));}catch(e){}
+}
+async function _doneFlushQueue(){
+  let q=[];try{q=JSON.parse(localStorage.getItem('_doneQueue')||'[]');}catch(e){}
+  if(!q.length)return;
+  for(const item of q){
+    try{
+      const{error}=await supa.from('task_done').upsert(
+        {key:item.key,done:item.done,updated_at:new Date().toISOString()},{onConflict:'key'});
+      if(!error)_doneQueueClear(item.key);
+    }catch(e){}
+  }
+}
+// Single entry point for every done-state write
+function setDone(key,val){
+  try{localStorage.setItem(key,val?'1':'0');}catch(e){}
+  _doneQueueAdd(key,val);
+  supa.from('task_done').upsert({key,done:!!val,updated_at:new Date().toISOString()},{onConflict:'key'})
+    .then(({error})=>{if(!error)_doneQueueClear(key);},()=>{});
+}
+async function hydrateDoneState(){
+  try{
+    const{data,error}=await supa.from('task_done').select('key,done');
+    if(error)throw error;
+    (data||[]).forEach(r=>{try{localStorage.setItem(r.key,r.done?'1':'0');}catch(e){}});
+    _doneHydrated=true;
+    await _doneFlushQueue();
+  }catch(e){console.warn('done hydrate failed',e.message);}
+}
+function _subscribeDoneRealtime(){
+  try{
+    supa.channel('task_done_rt')
+      .on('postgres_changes',{event:'*',schema:'public',table:'task_done'},payload=>{
+        const r=payload.new||payload.old;if(!r||!r.key)return;
+        try{localStorage.setItem(r.key,(payload.new&&payload.new.done)?'1':'0');}catch(e){}
+        try{if(typeof renderWeekTasksView==='function'&&document.getElementById('week-tasks-view'))renderWeekTasksView();}catch(e){}
+        try{if(typeof renderTimetable==='function'&&ttEditMode===false)renderTimetable();}catch(e){}
+      }).subscribe();
+  }catch(e){}
+}
+
 const _todayStr=()=>{
   // Use local timezone from boarding settings or default Asia/Shanghai
   const tz=(_boardingSettings&&_boardingSettings.timezone)||'Asia/Shanghai';
@@ -28596,6 +28699,7 @@ function initApp(){
   settingsUnlocked=false;
   const sl=document.getElementById('settings-locked');if(sl)sl.style.display='flex';
   const sc=document.getElementById('settings-content');if(sc)sc.style.display='none';
+  hydrateDoneState().then(()=>{_subscribeDoneRealtime();drainWorkInbox();try{if(_curTab==='week'&&typeof renderWeekTasksView==='function')renderWeekTasksView();}catch(e){}});
   loadSettings();loadPeople();loadState();loadSlotNotes();loadHolidays();applyHolidaysToCalendar();loadCalCustomEvents();loadListsData();loadLinks();loadDuties();loadTutorMeetings();dsLoad();loadBoardingSettings();_subscribePenaltiesRealtime();loadNurseMap();loadCommentMap();
   buildMorningChecks();restoreMCState();
   initWeekTab();checkTaskReset();renderCustomFlowsList();
@@ -33976,15 +34080,32 @@ function initActiveMode(){
 <div id="qc-sheet">
   <input id="qc-input" type="text" placeholder="What needs doing?" autocomplete="off"
     onkeydown="if(event.key==='Enter')qcSaveLast();if(event.key==='Escape')closeQuickCapture()">
+  <div class="qc-row">
+    <button id="qc-sticky" class="qc-sticky" onclick="qcToggleSticky()">Today</button>
+  </div>
   <div class="qc-cats" id="qc-cats"></div>
+  <div class="qc-div">Personal</div>
+  <div class="qc-cats">
+    <button class="qc-cat" style="background:#6d4c9f;grid-column:1/-1" onclick="qcSendPersonal()">Send to Omni</button>
+  </div>
 </div>
 <script>
+var _qcSticky=false;
+function qcToggleSticky(){
+  _qcSticky=!_qcSticky;
+  var b=document.getElementById('qc-sticky');
+  b.classList.toggle('on',_qcSticky);
+  b.textContent=_qcSticky?'\u{1F4CC} Sticky \u00B7 no date':'Today';
+}
 function openQuickCapture(){
   var cats=(S.planCategories&&S.planCategories.length?S.planCategories:[{id:'gen',name:'General',color:'#495057'}]);
   var last=localStorage.getItem('qcLastCat')||'';
   document.getElementById('qc-cats').innerHTML=cats.map(function(ct){
     return '<button class="qc-cat'+(ct.id===last?' last':'')+'" style="background:'+ct.color+'" onclick="qcSave(&quot;'+ct.id+'&quot;)">'+ct.name+'</button>';
   }).join('');
+  _qcSticky=false;
+  var sb=document.getElementById('qc-sticky');
+  if(sb){sb.classList.remove('on');sb.textContent='Today';}
   document.getElementById('qc-backdrop').classList.add('open');
   document.getElementById('qc-sheet').classList.add('open');
   var inp=document.getElementById('qc-input');
@@ -34001,8 +34122,8 @@ function qcSave(catId){
   if(!text){document.getElementById('qc-input').focus();return;}
   if(!S.planData)S.planData=[];
   var dn=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  S.planData.push({id:'qc'+Date.now(),text:text,scope:'day',recur:null,recurDay:null,weekNum:null,
-    date:_todayStr(),day:dn[new Date().getDay()],time:null,cat:catId});
+  S.planData.push({id:'qc'+Date.now(),text:text,scope:_qcSticky?'sticky':'day',recur:null,recurDay:null,weekNum:null,
+    date:_qcSticky?null:_todayStr(),day:_qcSticky?null:dn[new Date().getDay()],time:null,cat:catId});
   saveSettings();
   try{localStorage.setItem('planData',JSON.stringify(S.planData));localStorage.setItem('qcLastCat',catId);}catch(e){}
   closeQuickCapture();
@@ -34015,7 +34136,17 @@ function qcSaveLast(){
   var ok=last&&cats.some(function(x){return x.id===last;});
   qcSave(ok?last:(cats[0]?cats[0].id:'gen'));
 }
+function qcSendPersonal(){
+  var text=document.getElementById('qc-input').value.trim();
+  if(!text){document.getElementById('qc-input').focus();return;}
+  var sticky=_qcSticky;
+  closeQuickCapture();
+  sendToOmni(text,sticky).then(function(ok){
+    showToastMsg(ok?'\u2713 Sent to Omni':'\u2717 Could not reach Omni',ok?'#16a34a':'#dc2626');
+  });
+}
 </script>
+
 
 </body>
 </html><script>
