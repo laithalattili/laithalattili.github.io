@@ -78,6 +78,18 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .btn-sec{font-size:11px;padding:5px 10px;border-radius:var(--rsm);border:1px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;font-weight:600;display:inline-flex;align-items:center;gap:4px}
 .btn-pri{font-size:11px;padding:5px 10px;border-radius:var(--rsm);border:1px solid #00205B;background:#00205B;color:#fff;cursor:pointer;font-weight:600;display:inline-flex;align-items:center;gap:4px}
 .btn-sec .ico,.btn-pri .ico{width:12px;height:12px}
+.qc-fab{width:52px;height:52px;border-radius:50%;background:var(--accent);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;margin-top:-22px;box-shadow:0 4px 12px rgba(196,98,45,.4);flex-shrink:0;align-self:flex-start}
+.qc-fab:active{transform:scale(.93)}
+#qc-sheet{position:fixed;left:0;right:0;bottom:0;background:#fff;border-radius:18px 18px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.25);z-index:10000;padding:14px 16px calc(18px + env(safe-area-inset-bottom));transform:translateY(105%);transition:transform .22s ease}
+#qc-sheet.open{transform:translateY(0)}
+#qc-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;opacity:0;pointer-events:none;transition:opacity .2s}
+#qc-backdrop.open{opacity:1;pointer-events:auto}
+#qc-input{width:100%;font-size:17px;padding:13px 14px;border:1.5px solid var(--border2);border-radius:var(--r);outline:none;margin-bottom:12px;box-sizing:border-box}
+#qc-input:focus{border-color:var(--accent)}
+.qc-cats{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.qc-cat{min-height:58px;border-radius:var(--r);border:none;cursor:pointer;font-size:15px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;padding:8px;text-align:center}
+.qc-cat:active{transform:scale(.96)}
+.qc-cat.last{outline:3px solid rgba(0,0,0,.18);outline-offset:-3px}
 .tab.active{color:#212529;border-top:2px solid #212529;background:#f8f9fa}
 .tab-dot{position:absolute;top:4px;right:calc(50% - 14px);width:7px;height:7px;border-radius:50%;background:#2b8a3e;display:none}
 .tab-content{display:none}.tab-content.active{display:block}
@@ -1253,9 +1265,9 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
   <div id="workflow-custom-editor" class="workflow-panel">
     <button class="back-btn" onclick="showWorkflowList()">← Back</button>
     <div style="font-size:16px;font-weight:600;margin-bottom:1rem" id="cfe-title">New Flow</div>
-    <div class="input-row"><label>Title</label><input type="text" id="cfe-title-inp" placeholder="e.g. Academic Concern Email" oninput="cfePreview()"/></div>
-    <div class="input-row"><label>Subtitle / description</label><input type="text" id="cfe-sub-inp" placeholder="e.g. For academic warnings · CC HoY" oninput="cfePreview()"/></div>
-    <div class="input-row"><label>Icon (emoji)</label><input type="text" id="cfe-icon-inp" placeholder="e.g. 📧 📋 ⚠️" style="width:80px" oninput="cfePreview()"/></div>
+    <div class="input-row"><label>Title</label><input type="text" id="cfe-title-inp" placeholder="e.g. Academic Concern Email"/></div>
+    <div class="input-row"><label>Subtitle / description</label><input type="text" id="cfe-sub-inp" placeholder="e.g. For academic warnings · CC HoY"/></div>
+    <div class="input-row"><label>Icon (emoji)</label><input type="text" id="cfe-icon-inp" placeholder="e.g. 📧 📋 ⚠️" style="width:80px"/></div>
     <div style="font-size:12px;font-weight:700;color:#495057;margin-bottom:.5rem;margin-top:.75rem">Email blocks</div>
     <div style="font-size:11px;color:#868e96;margin-bottom:.75rem">Each block generates a copyable email in the flow. Add as many as you need.</div>
     <div id="cfe-email-blocks"></div>
@@ -2154,6 +2166,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
   <button class="tab active" onclick="showTab('sched',this)"><span class="tab-icon"><svg class="ico"><use href="#i-cal"/></svg></span>Sched</button>
   <button class="tab" onclick="showTab('morning',this)"><span class="tab-icon"><svg class="ico"><use href="#i-sunrise"/></svg></span>8am<span class="tab-dot" id="dot-morning"></span></button>
   <button class="tab" onclick="showTab('lists',this)"><span class="tab-icon"><svg class="ico"><use href="#i-users"/></svg></span>Lists</button>
+  <button class="qc-fab" onclick="openQuickCapture()" aria-label="Quick add task"><svg class="ico" style="width:26px;height:26px"><use href="#i-plus"/></svg></button>
   <button class="tab" onclick="showTab('calendar',this)"><span class="tab-icon"><svg class="ico"><use href="#i-cal"/></svg></span>Cal</button>
   <button class="tab" onclick="showTab('workflows',this)"><span class="tab-icon"><svg class="ico"><use href="#i-mail"/></svg></span>Flows</button>
   <button class="tab" onclick="showTab('settings',this)"><span class="tab-icon"><svg class="ico"><use href="#i-gear"/></svg></span>Settings</button>
@@ -23191,7 +23204,7 @@ function closeArchiveModal(){document.getElementById('archive-modal').classList.
 function confirmArchive(){
   if(!archivePending)return;
   const dateLeft=gv('archive-date-left'),reason=gv('archive-reason');
-  ARCHIVED.push({name:archivePending,dateLeft,reason,dateRemoved:new Date().toISOString().split('T')[0]});
+  ARCHIVED.push({name:archivePending,dateLeft,reason,dateRemoved:_todayStr()});
   STUDENTS=STUDENTS.filter(s=>s.name!==archivePending);
   savePeople();renderSettingsPeople();closeArchiveModal();
 }
@@ -25397,7 +25410,9 @@ function openPrintView(){
 <div class="bot"><div class="sb"><div class="st">Key Expectations</div><ul class="el"><li>Student registration must be completed accurately and on time.</li><li>Tutors must be present and punctual for the full registration period.</li><li>Students should arrive promptly and be settled.</li><li>Morning PPT must be displayed clearly and used as directed.</li><li>No laptops, tablets, or phones unless explicitly instructed.</li><li>Students should be alert and engaged — no heads on desks or sleeping.</li><li>Correct uniform is expected and checked daily.</li></ul></div>
 <div class="sb"><div class="st">HSM Follow-Up Actions</div>${fuHTML}</div></div>
 <div class="ft"><span>Hawking House · Wycombe Abbey School Changzhou · 常州威雅学校</span><span>Generated: ${genDate}</span></div>
-</div></body></html>`);w.document.close();try{w.document.getElementById('logo').src=LOGO;}catch(e){}}
+</div>
+</body>
+</body></html>`);w.document.close();try{w.document.getElementById('logo').src=LOGO;}catch(e){}}
 }
 
 
@@ -25433,6 +25448,49 @@ function saveCalEvent(){
   try{localStorage.setItem('calCustomEvents',JSON.stringify(calCustomEvents));}catch(e){}
   closeCalAddModal();
   if(calView==='continuous')renderContinuous();else renderCalendar();
+}
+function openStudentCard(name){
+  const s=STUDENTS.find(x=>x.name===name)||{name};
+  const isBoarder=!!HAWKING_STATUS[name];
+  const exc=(window._lastExcusedMap||{})[name];
+  document.getElementById('sc-overlay')?.remove();
+  const ov=document.createElement('div');
+  ov.id='sc-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.onclick=e=>{if(e.target===ov)ov.remove();};
+  const room=(typeof BOARDER_ROOMS!=='undefined'&&Array.isArray(BOARDER_ROOMS))?(BOARDER_ROOMS.find(r=>(r.students||[]).includes(name))||{}).name:'';
+  ov.innerHTML='<div style="background:#fff;border-radius:var(--r);max-width:340px;width:100%;padding:18px 20px;box-shadow:0 10px 40px rgba(0,0,0,.3)">'
+    +'<div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:2px">'+name+'</div>'
+    +'<div style="font-size:11px;color:var(--text3);margin-bottom:10px">'+(s.tutor?('Tutor: '+s.tutor+' · '):'')+(isBoarder?('Boarder'+(room?' · '+room:'')):'Day student')+'</div>'
+    +(exc?('<div style="font-size:12px;background:var(--wrn-bg);color:var(--wrn-tx);border-radius:var(--rsm);padding:7px 10px;margin-bottom:10px">'+(exc.emoji||'')+' '+(exc.reason||'On leave')+(exc.returnPlanned?(' · back '+String(exc.returnPlanned).split('T')[0]):'')+'</div>'):'')
+    +'<button onclick="document.getElementById(\'sc-overlay\').remove()" class="btn-sec" style="width:100%;justify-content:center">Close</button></div>';
+  document.body.appendChild(ov);
+}
+function renderListsSearch(q){
+  q=(q||'').trim().toLowerCase();
+  const host=document.getElementById('hawking-list-content');
+  if(!host)return;
+  host.querySelectorAll('.hwk-row').forEach(r=>{
+    r.style.display=!q||r.textContent.toLowerCase().includes(q)?'':'none';
+  });
+}
+function openSlotRemainder(slotIdx,day,offset){
+  if(typeof offset==='number'&&offset!==ttWeekOffset){ttWeekOffset=offset;}
+  openEditModal(slotIdx,day,true);
+}
+function saveCalAddModal(){
+  if(!calAddDate)return;
+  const nameEl=document.getElementById('cal-add-name'),typeEl=document.getElementById('cal-add-type');
+  const name=(nameEl?nameEl.value:'').trim(),type=(typeEl?typeEl.value:'event');
+  if(!name){if(nameEl)nameEl.focus();return;}
+  if(!CAL_EVENTS[calAddDate])CAL_EVENTS[calAddDate]=[];
+  CAL_EVENTS[calAddDate].push({text:name,type,custom:true});
+  if(!calCustomEvents[calAddDate])calCustomEvents[calAddDate]=[];
+  calCustomEvents[calAddDate].push({text:name,type});
+  try{localStorage.setItem('calCustomEvents',JSON.stringify(calCustomEvents));supaSave('calCustomEvents',JSON.stringify(calCustomEvents));}catch(e){}
+  if(nameEl)nameEl.value='';
+  closeCalAddModal();
+  if(typeof calView!=='undefined'&&calView==='continuous')renderContinuous();else renderCalendar();
 }
 // ── WEEK TAB ──────────────────────────────────────────
 function getAORWeek(offset){
@@ -26221,7 +26279,7 @@ async function _updateSanctionsBadge(){
 async function renderSanctionsList(el){
   if(!el)return;
   el.innerHTML='<div style="padding:1rem;text-align:center;color:var(--text3);font-size:13px">Loading...</div>';
-  const today=new Date().toISOString().split('T')[0];
+  const today=_todayStr();
   // Get boarder names for filtering
   const boarderNames=new Set(STUDENTS.filter(s=>(HAWKING_STATUS[s.name]||{}).boarder).map(s=>s.name));
   try{
@@ -26283,7 +26341,7 @@ async function renderSanctionsList(el){
 
 async function markSanctionDone(id){
   try{
-    const today=new Date().toISOString().split('T')[0];
+    const today=_todayStr();
     const {data:rows}=await supa.from('boarding_penalties').select('id,penalty_date,infraction_date').eq('id',id);
     const p=rows&&rows[0];
     if(!p){
@@ -26312,7 +26370,7 @@ async function markSanctionDone(id){
 
 async function rollSanction(id){
   try{
-    const tomorrow=new Date(Date.now()+86400000).toISOString().split('T')[0];
+    const tomorrow=(()=>{const d=new Date(_todayStr()+'T12:00:00');d.setDate(d.getDate()+1);return d.toLocaleDateString('en-CA');})();
     await supa.from('boarding_penalties').update({penalty_date:tomorrow}).eq('id',id);
     showToastMsg('→ Moved to tomorrow','#6b7280');
     const el=document.getElementById('hawking-list-content');
@@ -26324,7 +26382,7 @@ async function renderAwayList(el){
   if(!el)return;
   el.innerHTML='<div style="padding:1rem;text-align:center;color:var(--text3);font-size:13px">Loading...</div>';
   const excusedMap=await getTodayExcusedMap();
-  const today=new Date().toISOString().split('T')[0];
+  const today=_todayStr();
   const _holidays=HOLIDAYS&&HOLIDAYS.length?HOLIDAYS:await loadHolidaysFromSupa(supa);
   const upcomingHol=getUpcomingHoliday(_holidays);
   const fmt=dt=>dt?new Date(dt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'';
@@ -26469,7 +26527,7 @@ async function renderHawkingRegister(el, preloadedMap){
   const excusedMap=preloadedMap||window._cachedExcusedMap||await getTodayExcusedMap();
   window._cachedExcusedMap=excusedMap; // cache for filter clicks
   // Load today's active penalties for badge display
-  const today=new Date().toISOString().split('T')[0];
+  const today=_todayStr();
   let _penaltyMap={};
   try{
     const {data}=await supa.from('boarding_penalties')
@@ -27628,7 +27686,7 @@ function addPoint(classId,studentName,val,e){
     student:studentName,
     classId,
     val:1,
-    date:now.toISOString().split('T')[0],
+    date:_todayStr(),
     time:now.toTimeString().slice(0,5)
   });
   saveListsData();
@@ -27681,7 +27739,7 @@ function saveNegModal(){
     classId:_negClassId,
     category:cat||'',
     reason,
-    date:now.toISOString().split('T')[0],
+    date:_todayStr(),
     time:now.toTimeString().slice(0,5)
   });
   saveListsData();closeNegModal();renderClassContent();
@@ -27726,7 +27784,7 @@ function removeNegEntry(logIndex){
 
 function renderPointsSummary(){
   const el=document.getElementById('points-summary-content');if(!el)return;
-  const today=new Date().toISOString().split('T')[0];
+  const today=_todayStr();
   // Map with original indices so we can delete by index
   const todayLog=POINTS_LOG.map((entry,i)=>({entry,i})).filter(({entry})=>entry.date===today);
   if(!todayLog.length){
@@ -27783,7 +27841,7 @@ function removeSummaryHP(studentName){
 }
 function clearOldPointsRecords(){
   const cutoff=new Date();cutoff.setDate(cutoff.getDate()-30);
-  const cutStr=cutoff.toISOString().split('T')[0];
+  const cutStr=cutoff.toLocaleDateString('en-CA');
   const before=POINTS_LOG.length;
   POINTS_LOG=POINTS_LOG.filter(e=>e.date>=cutStr);
   const removed=before-POINTS_LOG.length;
@@ -27930,7 +27988,7 @@ function recordTutorMeeting(slotIdx,day,weekOffset,tutors){
   const dayIdxMap={Mon:0,Tue:1,Wed:2,Thu:3,Fri:4,Sat:5,Sun:6};
   const meetDate=new Date(mon);
   meetDate.setDate(mon.getDate()+(dayIdxMap[day]||0));
-  const ds=meetDate.toISOString().split('T')[0];
+  const ds=meetDate.toLocaleDateString('en-CA');
   const id='tm_'+Date.now();
   // Remove any existing meeting at same slot+day+week
   TUTOR_MEETINGS=TUTOR_MEETINGS.filter(m=>!(m.slotIdx===slotIdx&&m.day===day&&m.weekOffset===weekOffset));
@@ -27945,7 +28003,7 @@ function renderTutorMeetingsList(){
     el.innerHTML='<div style="color:#868e96;font-size:13px;padding:1rem;text-align:center">No tutor meetings recorded yet.<br><span style="font-size:11px">Add a meeting via Schedule → Edit → 🤝 Tutor Meeting</span></div>';
     return;
   }
-  const today=new Date().toISOString().split('T')[0];
+  const today=_todayStr();
   const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
   // Group by month
@@ -28126,7 +28184,7 @@ function getTermFridays(){
   const d=new Date(start);
   d.setDate(d.getDate()+((5-d.getDay()+7)%7));
   while(d<=end){
-    fridays.push(d.toISOString().split('T')[0]);
+    fridays.push(d.toLocaleDateString('en-CA'));
     d.setDate(d.getDate()+7);
   }
   return fridays;
@@ -28192,7 +28250,7 @@ function renderDutiesPanel(){
   }
 
   // Friday rows — grouped by month, collapsible
-  const today=new Date().toISOString().split('T')[0];
+  const today=_todayStr();
   const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 
   // Group fridays by month
@@ -30802,7 +30860,7 @@ async function _undoDeparture(id){
 async function confirmDeparture(id){
   try{
     const now=new Date().toISOString();
-    const td=new Date().toISOString().split('T')[0];
+    const td=_todayStr();
     // Get student name
     const {data:leave}=await supa.from('boarding_leaves').select('student_name').eq('id',id).single();
     await supa.from('boarding_leaves').update({
@@ -30876,7 +30934,7 @@ async function confirmReturn(id){
 
     // Mark present: delete excused rows, upsert present for current session
     if(studentName){
-      const td=new Date().toISOString().split('T')[0];
+      const td=_todayStr();
       const now2=new Date().toISOString();
       const sess=getCurrentSession();
       // Remove excused rows added on departure
@@ -30939,7 +30997,7 @@ async function cancelLeave(id){
 async function _applyPendingPenalties(leaveId){
   // Find pending penalties linked to this leave and activate them
   try{
-    const today=new Date().toISOString().split('T')[0];
+    const today=_todayStr();
     const {data}=await supa.from('boarding_penalties')
       .select('id,student_name,infraction_type,penalty_type')
       .eq('leave_id',leaveId).eq('status','pending');
@@ -30959,7 +31017,7 @@ async function _applyPendingPenalties(leaveId){
 async function loadOneOffToday(){
   const el=document.getElementById('oneoff-list');
   if(!el){console.warn('oneoff-list not found in DOM');return;}
-  const today=new Date().toISOString().split('T')[0];
+  const today=_todayStr();
   try{
     const {data,error}=await supa.from('boarding_activity_instances')
       .select('*').eq('date',today).order('start_time');
@@ -30990,7 +31048,7 @@ async function loadOneOffToday(){
 function openAddOneOff(){
   populateLeaveStudentSelects();
   populateActivityTypeSelects();
-  const today=new Date().toISOString().split('T')[0];
+  const today=_todayStr();
   const el=document.getElementById('oneoff-date');if(el)el.value=today;
   document.getElementById('boarding-oneoff-modal').style.display='flex';
 }
@@ -31983,7 +32041,7 @@ function openGateMsg(opts={}) {
         <div style="display:flex;gap:8px">
           <div style="flex:1">
             <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">DATE</label>
-            <input id="gm-date" type="date" value="${now.toISOString().split('T')[0]}" oninput="updateGateMsg()"
+            <input id="gm-date" type="date" value="${_todayStr()}" oninput="updateGateMsg()"
               style="width:100%;background:#2c2c2e;border:1px solid #444;border-radius:8px;color:#fff;font-size:13px;padding:8px 10px">
           </div>
           <div style="flex:1">
@@ -32496,14 +32554,14 @@ async function toggleLeaveChecklist(leaveId, field, value, supaRef) {
 function isReturnToday(excuseInfo){
   if(!excuseInfo||!excuseInfo.returnPlanned)return false;
   if(excuseInfo.returnedAt)return false; // already returned
-  const today=new Date().toISOString().split('T')[0];
+  const today=_todayStr();
   return excuseInfo.returnPlanned.split('T')[0]===today;
 }
 
 
 function openAddLeaveModal(){
   document.getElementById('add-leave-modal').style.display='flex';
-  document.getElementById('al-start').value=new Date().toISOString().split('T')[0];
+  document.getElementById('al-start').value=_todayStr();
   document.getElementById('al-name').value='';
   document.getElementById('al-name').removeAttribute('data-selected');
 }
@@ -32845,13 +32903,13 @@ async function _brTogglePenalty(name, field){
           if(!cur){
             // Toggling ON — insert new penalty
             let penaltyDate=field==='lateSleep'
-              ?new Date(new Date().getTime()+86400000).toISOString().split('T')[0]
+              ?(()=>{const d=new Date(_todayStr()+'T12:00:00');d.setDate(d.getDate()+1);return d.toLocaleDateString('en-CA');})()
               :today;
             const {data:conflict}=await supa.from('boarding_penalties')
               .select('id').eq('student_name',name).eq('penalty_date',penaltyDate).in('status',['active','pending']);
             if(conflict&&conflict.length){
               const d=new Date(penaltyDate);d.setDate(d.getDate()+1);
-              penaltyDate=d.toISOString().split('T')[0];
+              penaltyDate=d.toLocaleDateString('en-CA');
             }
             await supa.from('boarding_penalties').insert({
               student_name:name,infraction_type:infraction,infraction_date:today,
@@ -33019,7 +33077,7 @@ function _brToggleCollapse(){
 let _fireOpen=false;
 let _fireSubmitted=false; // true only after fire register is submitted
 // Restore from localStorage if fire was submitted today
-try{if(localStorage.getItem('fireSubmittedDate')===new Date().toISOString().split('T')[0])_fireSubmitted=true;}catch(e){}
+try{if(localStorage.getItem('fireSubmittedDate')===_todayStr())_fireSubmitted=true;}catch(e){}
 let _fireState={};        // separate from _brState — fire drill only
 let _firePreSnapshot={};  // snapshot of _brState before fire drill started
 let _fireScopeAllHouse=false; // false = boarders only, true = all house
@@ -33914,15 +33972,60 @@ function initActiveMode(){
     </div>
   </div>
 </div>
+<div id="qc-backdrop" onclick="closeQuickCapture()"></div>
+<div id="qc-sheet">
+  <input id="qc-input" type="text" placeholder="What needs doing?" autocomplete="off"
+    onkeydown="if(event.key==='Enter')qcSaveLast();if(event.key==='Escape')closeQuickCapture()">
+  <div class="qc-cats" id="qc-cats"></div>
+</div>
+<script>
+function openQuickCapture(){
+  var cats=(S.planCategories&&S.planCategories.length?S.planCategories:[{id:'gen',name:'General',color:'#495057'}]);
+  var last=localStorage.getItem('qcLastCat')||'';
+  document.getElementById('qc-cats').innerHTML=cats.map(function(ct){
+    return '<button class="qc-cat'+(ct.id===last?' last':'')+'" style="background:'+ct.color+'" onclick="qcSave(&quot;'+ct.id+'&quot;)">'+ct.name+'</button>';
+  }).join('');
+  document.getElementById('qc-backdrop').classList.add('open');
+  document.getElementById('qc-sheet').classList.add('open');
+  var inp=document.getElementById('qc-input');
+  inp.value='';
+  setTimeout(function(){inp.focus();},240);
+}
+function closeQuickCapture(){
+  document.getElementById('qc-backdrop').classList.remove('open');
+  document.getElementById('qc-sheet').classList.remove('open');
+  document.getElementById('qc-input').blur();
+}
+function qcSave(catId){
+  var text=document.getElementById('qc-input').value.trim();
+  if(!text){document.getElementById('qc-input').focus();return;}
+  if(!S.planData)S.planData=[];
+  var dn=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  S.planData.push({id:'qc'+Date.now(),text:text,scope:'day',recur:null,recurDay:null,weekNum:null,
+    date:_todayStr(),day:dn[new Date().getDay()],time:null,cat:catId});
+  saveSettings();
+  try{localStorage.setItem('planData',JSON.stringify(S.planData));localStorage.setItem('qcLastCat',catId);}catch(e){}
+  closeQuickCapture();
+  var cat=(S.planCategories||[]).find(function(x){return x.id===catId;});
+  showToastMsg('\u2713 Added to '+(cat?cat.name:'plan'),'#16a34a');
+}
+function qcSaveLast(){
+  var last=localStorage.getItem('qcLastCat');
+  var cats=S.planCategories||[];
+  var ok=last&&cats.some(function(x){return x.id===last;});
+  qcSave(ok?last:(cats[0]?cats[0].id:'gen'));
+}
+</script>
+
 </body>
 </html><script>
 // ── REGISTRATION HISTORY CSV EXPORT ──────────────────────────────────────────
 async function exportRegistrationCSV(){
   try{
-    const today=new Date().toISOString().split('T')[0];
+    const today=_todayStr();
     // Get last 30 days
     const from=new Date();from.setDate(from.getDate()-30);
-    const fromISO=from.toISOString().split('T')[0];
+    const fromISO=from.toLocaleDateString('en-CA');
 
     const [regRes,penRes,nurseRes,leaveRes]=await Promise.all([
       supa.from('boarding_registrations').select('*').gte('register_date',fromISO).order('register_date').order('student_name'),
