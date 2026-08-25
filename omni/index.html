@@ -135,6 +135,19 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
 /* ── NAV ── */
 #nav{position:fixed;bottom:0;left:0;right:0;z-index:200;background:var(--sur);border-top:1px solid var(--bd);display:flex;padding-bottom:env(safe-area-inset-bottom)}
 .ntab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:7px 2px 5px;gap:2px;color:var(--tx4);font-size:8.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-top:2px solid transparent;transition:all .12s}
+.oqc-fab{width:50px;height:50px;border-radius:50%;background:var(--acc);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;margin-top:-20px;box-shadow:0 4px 14px rgba(0,0,0,.28);flex-shrink:0;align-self:flex-start}
+.oqc-fab:active{transform:scale(.93)}
+#oqc-bd{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;opacity:0;pointer-events:none;transition:opacity .2s}
+#oqc-bd.on{opacity:1;pointer-events:auto}
+#oqc-sheet{position:fixed;left:0;right:0;bottom:0;background:var(--sur);border-radius:18px 18px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.35);z-index:10000;padding:14px 16px calc(18px + env(safe-area-inset-bottom));transform:translateY(105%);transition:transform .22s ease}
+#oqc-sheet.on{transform:translateY(0)}
+#oqc-in{width:100%;font-size:17px;padding:13px 14px;border:1.5px solid var(--bd);border-radius:12px;outline:none;margin-bottom:11px;box-sizing:border-box;background:var(--bg);color:var(--tx)}
+#oqc-in:focus{border-color:var(--acc)}
+.oqc-tiles{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.oqc-t{min-height:58px;border-radius:12px;border:none;cursor:pointer;font-size:15px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;padding:8px;text-align:center}
+.oqc-t:active{transform:scale(.96)}
+.oqc-div{display:flex;align-items:center;gap:8px;margin:13px 0 9px;font-size:10px;font-weight:700;color:var(--tx4);text-transform:uppercase;letter-spacing:.07em}
+.oqc-div:before,.oqc-div:after{content:'';flex:1;height:1px;background:var(--bd)}
 .ntab.on{color:var(--acc);border-top-color:var(--acc);background:var(--sur2)}
 .ni{font-size:19px;line-height:1}
 
@@ -902,6 +915,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
   <button class="ntab on" data-tab="dashboard" onclick="switchTab('dashboard')"><span class="ni"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg></span><span>Dashboard</span></button>
   <button class="ntab" data-tab="planner" onclick="switchTab('planner')"><span class="ni"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1zm-1 5h16M8 3v4m8-4v4"/></svg></span><span>Planner</span></button>
   <button class="ntab" data-tab="wardrobe" onclick="switchTab('wardrobe')"><span class="ni"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3l4 2 4-2 5 4-2.5 3L17 8.5V21H7V8.5L5.5 10 3 7l5-4z"/></svg></span><span>Wardrobe</span></button>
+  <button class="oqc-fab" onclick="openOmniCapture()" aria-label="Quick add"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
   <button class="ntab" data-tab="gym" onclick="switchTab('gym')"><span class="ni"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h2m16 0h2M6 8v8m4-10v12m4-12v12m4-8v8"/></svg></span><span>Gym</span></button>
   <button class="ntab" data-tab="checklists" onclick="switchTab('checklists')"><span class="ni"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h2v2H4V6zm5 1h11M4 11h2v2H4v-2zm5 1h11M4 16h2v2H4v-2zm5 1h11"/></svg></span><span>Checklists</span></button>
 </nav>
@@ -1935,9 +1949,102 @@ function getTasksFor(dayOffset){
   return res;
 }
 
+// ══ CROSS-APP INBOX (Omni side) ═══════════════════════════════
+async function sendToWork(text,catHint,sticky){
+  try{
+    const{error}=await supaFrom('app_inbox').insert({
+      target_app:'work',text:text,category_hint:catHint||null,
+      sticky:!!sticky,source:'omni',consumed:false});
+    if(error)throw error;
+    return true;
+  }catch(e){console.warn('sendToWork failed',e.message);return false;}
+}
+async function drainOmniInbox(){
+  try{
+    const{data,error}=await supaFrom('app_inbox')
+      .select('*').eq('target_app','omni').eq('consumed',false);
+    if(error)throw error;
+    if(!data||!data.length)return;
+    const d=new Date();
+    const dateStr=d.toLocaleDateString('en-CA');
+    const ids=[];
+    data.forEach(row=>{
+      const sticky=!!row.sticky;
+      OTASKS.push({
+        id:'in_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+        text:row.text,
+        tier:sticky?3:1,
+        day:sticky?null:DS[d.getDay()],
+        recurring:false,
+        date:sticky?null:dateStr,
+        from:null,to:null,
+        taskTime:null,
+        src:'inbox'
+      });
+      ids.push(row.id);
+    });
+    await saveOmniTasks();
+    await supaFrom('app_inbox').update({consumed:true}).in('id',ids);
+    showToast('\u2713 '+ids.length+' task'+(ids.length>1?'s':'')+' from Work');
+    try{if(_curTab==='planner')renderDay();}catch(e){}
+    try{if(_curTab==='checklists'&&typeof renderCVTasks==='function')renderCVTasks();}catch(e){}
+  }catch(e){console.warn('drainOmniInbox',e.message);}
+}
+
+// ══ SHARED DONE-STATE SYNC (task_done table) ══════════════════
+let _doneHydrated=false;
+function _doneQueueAdd(key,val){
+  try{const q=JSON.parse(localStorage.getItem('_doneQueue')||'[]');
+    const i=q.findIndex(x=>x.key===key);
+    if(i>=0)q[i]={key,done:val};else q.push({key,done:val});
+    localStorage.setItem('_doneQueue',JSON.stringify(q));}catch(e){}
+}
+function _doneQueueClear(key){
+  try{const q=JSON.parse(localStorage.getItem('_doneQueue')||'[]');
+    localStorage.setItem('_doneQueue',JSON.stringify(q.filter(x=>x.key!==key)));}catch(e){}
+}
+async function _doneFlushQueue(){
+  let q=[];try{q=JSON.parse(localStorage.getItem('_doneQueue')||'[]');}catch(e){}
+  if(!q.length)return;
+  for(const item of q){
+    try{
+      const{error}=await supaFrom('task_done').upsert(
+        {key:item.key,done:item.done,updated_at:new Date().toISOString()},{onConflict:'key'});
+      if(!error)_doneQueueClear(item.key);
+    }catch(e){}
+  }
+}
+// Single entry point for every done-state write
+function setDone(key,val){
+  try{localStorage.setItem(key,val?'1':'0');}catch(e){}
+  _doneQueueAdd(key,val);
+  supaFrom('task_done').upsert({key,done:!!val,updated_at:new Date().toISOString()},{onConflict:'key'})
+    .then(({error})=>{if(!error)_doneQueueClear(key);},()=>{});
+}
+async function hydrateDoneState(){
+  try{
+    const{data,error}=await supaFrom('task_done').select('key,done');
+    if(error)throw error;
+    (data||[]).forEach(r=>{try{localStorage.setItem(r.key,r.done?'1':'0');}catch(e){}});
+    _doneHydrated=true;
+    await _doneFlushQueue();
+  }catch(e){console.warn('done hydrate failed',e.message);}
+}
+function _subscribeDoneRealtime(){
+  try{
+    supa.channel('task_done_rt_omni')
+      .on('postgres_changes',{event:'*',schema:'public',table:'task_done'},payload=>{
+        const r=payload.new||payload.old;if(!r||!r.key)return;
+        try{localStorage.setItem(r.key,(payload.new&&payload.new.done)?'1':'0');}catch(e){}
+        try{if(typeof renderDay==='function'&&_curTab==='planner')renderDay();}catch(e){}
+        try{if(typeof renderCVTasks==='function'&&_curTab==='checklists')renderCVTasks();}catch(e){}
+      }).subscribe();
+  }catch(e){}
+}
+
 function toggleDone(dk,cbEl){
   const cur=localStorage.getItem(dk)==='1';
-  localStorage.setItem(dk,cur?'0':'1');
+  setDone(dk,!cur);
   const done=!cur;
   cbEl.classList.toggle('on',done);
   cbEl.innerHTML=done?'<span style="color:var(--ok);font-size:11px">✓</span>':'';
@@ -3650,6 +3757,7 @@ function _afterUnlock(){
 }
 
 async function init(){
+  await hydrateDoneState();_subscribeDoneRealtime();drainOmniInbox();
   await loadSettings();
   setInterval(updateClock,1000);updateClock();
   // Load work data + tasks
@@ -5704,5 +5812,62 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW register failed:',e));
 }
 </script>
+<div id="oqc-bd" onclick="closeOmniCapture()"></div>
+<div id="oqc-sheet">
+  <input id="oqc-in" type="text" placeholder="What needs doing?" autocomplete="off"
+    onkeydown="if(event.key==='Enter')oqcSave(1);if(event.key==='Escape')closeOmniCapture()">
+  <div class="oqc-tiles">
+    <button class="oqc-t" style="background:var(--acc)" onclick="oqcSave(1)">Today</button>
+    <button class="oqc-t" style="background:#6b7280" onclick="oqcSave(3)">Ongoing</button>
+  </div>
+  <div class="oqc-div">Work</div>
+  <div class="oqc-tiles" id="oqc-wcats"></div>
+</div>
+<script>
+function openOmniCapture(){
+  var host=document.getElementById('oqc-wcats');
+  host.innerHTML=(WCATS||[]).map(function(ct){
+    return '<button class="oqc-t" style="background:'+ct.color+'" onclick="oqcSendWork(&quot;'+ct.id+'&quot;)">'+ct.name+'</button>';
+  }).join('');
+  document.getElementById('oqc-bd').classList.add('on');
+  document.getElementById('oqc-sheet').classList.add('on');
+  var i=document.getElementById('oqc-in');
+  i.value='';
+  setTimeout(function(){i.focus();},240);
+}
+function closeOmniCapture(){
+  document.getElementById('oqc-bd').classList.remove('on');
+  document.getElementById('oqc-sheet').classList.remove('on');
+  document.getElementById('oqc-in').blur();
+}
+async function oqcSave(tier){
+  var text=document.getElementById('oqc-in').value.trim();
+  if(!text){document.getElementById('oqc-in').focus();return;}
+  var d=new Date();
+  OTASKS.push({
+    id:'t_'+Date.now(),
+    text:text,
+    tier:tier,
+    day:tier===3?null:DS[d.getDay()],
+    recurring:false,
+    date:tier===3?null:d.toLocaleDateString('en-CA'),
+    from:null,to:null,taskTime:null
+  });
+  await saveOmniTasks();
+  closeOmniCapture();
+  showToast(tier===3?'\u2713 Added \u00B7 Ongoing':'\u2713 Added \u00B7 Today');
+  try{if(_curTab==='planner')renderDay();}catch(e){}
+  try{if(_curTab==='checklists'&&typeof renderCVTasks==='function')renderCVTasks();}catch(e){}
+}
+function oqcSendWork(catId){
+  var text=document.getElementById('oqc-in').value.trim();
+  if(!text){document.getElementById('oqc-in').focus();return;}
+  closeOmniCapture();
+  sendToWork(text,catId,false).then(function(ok){
+    showToast(ok?'\u2713 Sent to Work':'\u2717 Could not reach Work');
+  });
+}
+</script>
+
 </body>
 </html>
