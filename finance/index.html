@@ -1851,25 +1851,33 @@ function buildProjection(){
         }
       });
     }
-    jodBal=n2(jodBal+jodIn-jodOut); rmbBal=n2(rmbBal+rmbIn-rmbOut);
-    // Compute carry-over unpaid totals for this month (past months only)
+    // Compute carry-over unpaid totals — ONLY for the current month (i===0).
+    // They are deducted from this month's balance once; the chained balance
+    // then carries the effect into all future months automatically.
     var carryJOD=0,carryRMB=0;
-    var now2=today();
-    for(var ci=1;ci<=24;ci++){
-      var cMo=mo-ci,cYr=yr;while(cMo<1){cMo+=12;cYr--;}
-      if(cYr<2024)break;
-      var lastDayC=new Date(cYr,cMo,0);
-      if(now2<=lastDayC)continue;
-      var cItems=getCommitItemsForMonth(cYr,cMo);
-      if(!cItems.length)break;
-      cItems.forEach(function(item){
-        var cKey=cYr+'-'+cMo+'-'+item.id;
-        if(!tickState[cKey]){
-          if(item.currency==='JOD')carryJOD=n2(carryJOD+item.amount);
-          else carryRMB=n2(carryRMB+item.amount);
-        }
-      });
+    if(i===0){
+      var now2=today();
+      for(var ci=1;ci<=24;ci++){
+        var cMo=mo-ci,cYr=yr;while(cMo<1){cMo+=12;cYr--;}
+        if(cYr<2024)break;
+        var lastDayC=new Date(cYr,cMo,0);
+        if(now2<=lastDayC)continue;
+        var cItems=getCommitItemsForMonth(cYr,cMo);
+        if(!cItems.length)break;
+        cItems.forEach(function(item){
+          var cKey=cYr+'-'+cMo+'-'+item.id;
+          if(!tickState[cKey]&&item.type==='out'){
+            if(item.currency==='JOD')carryJOD=n2(carryJOD+item.amount);
+            else carryRMB=n2(carryRMB+item.amount);
+          }
+        });
+      }
+      jodOut=n2(jodOut+carryJOD);
+      rmbOut=n2(rmbOut+carryRMB);
+      trueJodOut=n2(trueJodOut+carryJOD);
+      trueRmbOut=n2(trueRmbOut+carryRMB);
     }
+    jodBal=n2(jodBal+jodIn-jodOut); rmbBal=n2(rmbBal+rmbIn-rmbOut);
     // Summary rows
     jodItems.push({l:'Net Arab Bank',v:(jodIn-jodOut>=0?'+':'')+fJOD(jodIn-jodOut),c:jodIn>=jodOut?'pos':'neg',bold:true});
     jodItems.push({l:'Arab Bank balance',v:fJOD(jodBal),c:jodBal>=getArabReserve()?'pos':'neg',bold:true,isBalance:true});
@@ -2634,7 +2642,7 @@ function renderCommitments(){
     var prePaidBadge=done&&isFut?'<span class="ctb" style="background:var(--grn-bg);color:var(--grn)">Pre-paid</span>':'';
     var receivedBadge=done&&c.type==='in'?'<span class="ctb" style="background:var(--grn-bg);color:var(--grn)">Received</span>':'';
     var modBadge=c.modified?'<span class="ctb" style="background:var(--amb-bg);color:var(--amb)">* Override</span>':'';
-    var carryBadge=isCarry?'<span class="carry-label">from '+c.carriedFrom+'</span>':'';
+    var carryBadge=isCarry?'<span class="carry-label">from '+(c.carryLabel||c.carriedFrom||'previous month')+'</span>':'';
 
     var subParts=[];
     if(done){if(c.type==='in')subParts.push('Received');else if(isFut)subParts.push('Pre-paid');else subParts.push('Confirmed');}
