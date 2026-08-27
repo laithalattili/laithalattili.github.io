@@ -1252,6 +1252,7 @@ function autosave(){
   // Stamp a new version immediately so startup pull won't overwrite this data
   var newVer=Date.now();
   try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState,catColors:S.catColors,budgetOrder:S.budgetOrder}));}catch(e){console.warn('save',e);}
+  try{localStorage.setItem('lf_ver',String(newVer));}catch(e){}
   if(typeof sbSchedulePush==='function')sbSchedulePush(newVer);
 }
 function makeSaveBtn(label){
@@ -5255,6 +5256,14 @@ function sbApplyRemote(remote){
   var remoteVer=remote.version||0;
   if(remoteVer&&remoteVer<=_sbLastPushedVer)return false;
   if(_sbLastLocalChange&&Date.now()-_sbLastLocalChange<5000)return false;
+  // Never let an OLDER remote overwrite newer local data (e.g. pre-refresh push failed).
+  var localVer=0;try{localVer=parseInt(localStorage.getItem('lf_ver')||'0',10)||0;}catch(e){}
+  if(remoteVer&&localVer&&remoteVer<localVer){
+    console.warn('[SYNC] remote older than local ('+remoteVer+' < '+localVer+') — re-pushing local');
+    if(typeof sbSchedulePush==='function')sbSchedulePush(localVer);
+    return false;
+  }
+  if(remoteVer&&localVer&&remoteVer===localVer)return false;
   var d=remote.data;
   if(!d)return false;
   if(d.S&&typeof d.S==='object')Object.assign(S,d.S);
@@ -5277,11 +5286,12 @@ function sbApplyRemote(remote){
   if(Array.isArray(d.budgetOrder))S.budgetOrder=d.budgetOrder;
   if(typeof syncHolidayBudgets==='function')syncHolidayBudgets();
   try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState,catColors:S.catColors,budgetOrder:S.budgetOrder}));}catch(ex){console.warn('save',ex);}
+  try{if(remoteVer)localStorage.setItem('lf_ver',String(remoteVer));}catch(ex){}
   return true;
 }
 
 async function sbPush(preStampedVer){
-  if(_sbSyncing)return;
+  if(_sbSyncing)return false;
   _sbSyncing=true;
   sbSetStatus('Pushing...','busy');
   try{
@@ -5301,9 +5311,10 @@ async function sbPush(preStampedVer){
     console.warn('SB push:',e.message);
     sbSetStatus('Push failed: '+e.message,'err');
     _sbSyncing=false;
-    return;
+    return false;
   }
   _sbSyncing=false;
+  return true;
 }
 
 async function sbPull(){
@@ -5340,8 +5351,9 @@ function sbSchedulePush(preStampedVer){
   _sbLastLocalChange=Date.now();
   clearTimeout(_sbPushTimer);
   _sbPushTimer=setTimeout(async function(){
-    await sbPush(preStampedVer);
-    _sbDirty=false;
+    var ok=await sbPush(preStampedVer);
+    if(ok){_sbDirty=false;}
+    else{setTimeout(function(){sbSchedulePush(preStampedVer);},3000);}
   },500);
 }
 
