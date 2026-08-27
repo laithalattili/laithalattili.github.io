@@ -80,6 +80,8 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .btn-sec .ico,.btn-pri .ico{width:12px;height:12px}
 .qc-fab{width:52px;height:52px;border-radius:50%;background:var(--accent);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;margin-top:-22px;box-shadow:0 4px 12px rgba(196,98,45,.4);flex-shrink:0;align-self:flex-start}
 .qc-fab:active{transform:scale(.93)}
+.plan-fab{background:#00205B;box-shadow:0 4px 12px rgba(0,32,91,.35);width:48px;height:48px;margin-top:-18px;margin-right:6px}
+.plan-fab.active{background:#fff;color:#00205B;border:2.5px solid #00205B;box-shadow:0 2px 8px rgba(0,32,91,.25)}
 #qc-sheet{position:fixed;left:0;right:0;bottom:0;background:#fff;border-radius:18px 18px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.25);z-index:10000;padding:14px 16px calc(18px + env(safe-area-inset-bottom));transform:translateY(105%);transition:transform .22s ease}
 #qc-sheet.open{transform:translateY(0)}
 #qc-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;opacity:0;pointer-events:none;transition:opacity .2s}
@@ -990,6 +992,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
     <div class="sh-actions">
       <button id="global-default-btn" onclick="saveGlobalDefault()" title="Save as default view" style="background:none;border:none;cursor:pointer;font-size:17px;padding:4px 6px;color:#444;line-height:1;border-radius:6px;-webkit-tap-highlight-color:transparent">★</button>
       <button id="global-wake-btn" onclick="amToggleWakeLock()" title="Keep screen on" style="background:none;border:none;cursor:pointer;font-size:17px;padding:4px 6px;color:#444;line-height:1;border-radius:6px;-webkit-tap-highlight-color:transparent">🔆</button>
+      <button id="topbar-settings-btn" onclick="showSettingsTab()" title="Settings" style="background:none;border:none;cursor:pointer;font-size:17px;padding:4px 6px;color:#444;line-height:1;border-radius:6px;-webkit-tap-highlight-color:transparent"><svg class="ico" style="width:17px;height:17px"><use href="#i-gear"/></svg></button>
       <button onclick="lockApp()" title="Lock" style="background:none;border:none;cursor:pointer;font-size:17px;padding:4px 6px;color:#444;line-height:1;border-radius:6px;-webkit-tap-highlight-color:transparent">🔒</button>
     </div>
   </div>
@@ -1069,7 +1072,6 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
     <div class="tt-toggle">
       <button class="tt-btn" id="tt-btn-full" onclick="setTTView('full',this)">Week</button>
       <button class="tt-btn" id="tt-btn-today" onclick="setTTView('today',this)">Day</button>
-      <button class="tt-btn" id="tt-btn-week" onclick="setTTView('week',this)">Plan</button>
     </div>
     <button id="tt-now-btn" onclick="ttGoNow()" title="Back to current week/day" style="display:none;font-size:11px;font-weight:700;padding:3px 10px;border:1.5px solid #f59f00;border-radius:6px;background:#fff8e6;cursor:pointer;color:#f59f00">Now</button>
     <button class="tt-show-all-btn" id="tt-collapse-past-btn" onclick="toggleCollapsePastOpt()" title="Collapse past slots" style="font-size:13px;min-width:32px">⬆</button>
@@ -1110,7 +1112,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
   </div>
   <div id="tt-today-slots"></div>
 </div>
-<div id="tt-week-view" style="display:none"></div>
+
   <div class="tt-legend">
     <div class="tt-legend-item"><div class="tt-legend-sw" style="background:#1d4ed8"></div><span style="color:#1d4ed8">Lesson</span></div>
     <div class="tt-legend-item"><div class="tt-legend-sw" style="background:#7c3aed"></div><span style="color:#7c3aed">Duty</span></div>
@@ -1206,6 +1208,10 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
 </div>
 
 <!-- WEEK -->
+<div id="tab-plan" class="tab-content" style="padding:12px 12px 90px">
+  <div id="tt-week-view"></div>
+</div>
+
 <div id="tab-week" class="tab-content" style="display:none!important">
   <div id="tutor-week-notice" class="today-pill" style="display:none">Tutor Meeting Week</div>
   <div class="section-label">AOR QTS</div>
@@ -2171,10 +2177,10 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
   <button class="tab active" onclick="showTab('sched',this)"><span class="tab-icon"><svg class="ico"><use href="#i-cal"/></svg></span>Sched</button>
   <button class="tab" onclick="showTab('morning',this)"><span class="tab-icon"><svg class="ico"><use href="#i-sunrise"/></svg></span>8am<span class="tab-dot" id="dot-morning"></span></button>
   <button class="tab" onclick="showTab('lists',this)"><span class="tab-icon"><svg class="ico"><use href="#i-users"/></svg></span>Lists</button>
+  <button class="qc-fab plan-fab" id="plan-fab" onclick="showPlanTab(this)" aria-label="Open plan"><svg class="ico" style="width:24px;height:24px"><use href="#i-clip"/></svg></button>
   <button class="qc-fab" onclick="openQuickCapture()" aria-label="Quick add task"><svg class="ico" style="width:26px;height:26px"><use href="#i-plus"/></svg></button>
   <button class="tab" onclick="showTab('calendar',this)"><span class="tab-icon"><svg class="ico"><use href="#i-cal"/></svg></span>Cal</button>
   <button class="tab" onclick="showTab('workflows',this)"><span class="tab-icon"><svg class="ico"><use href="#i-mail"/></svg></span>Flows</button>
-  <button class="tab" onclick="showTab('settings',this)"><span class="tab-icon"><svg class="ico"><use href="#i-gear"/></svg></span>Settings</button>
 </div>
 
 
@@ -23887,7 +23893,7 @@ function clearSlot(){
 
 let ttShowWeekend=false;try{ttShowWeekend=localStorage.getItem('ttShowWeekend')==='1';}catch(e){}
 function setTTView(v,btn){
-  if(v==='free')v='full'; // Free view removed — redirect to Full
+  if(v==='free'||v==='week')v='full'; // Free and Plan views removed from this toggle
   ttView=v;
   if(v==='today')tdDayOffset=0;
   document.querySelectorAll('.tt-btn').forEach(b=>b.classList.remove('active'));
@@ -23954,7 +23960,7 @@ function setDefaultView(){
   updateGlobalDefaultBtn();
 }
 function loadDefaultView(){
-  try{const v=localStorage.getItem('defaultTTView');if(v)ttView=v;}catch(e){}
+  try{let v=localStorage.getItem('defaultTTView');if(v==='week'){v='full';localStorage.setItem('defaultTTView','full');}if(v)ttView=v;}catch(e){}
 }
 function saveGlobalDefault(){
   const state={
@@ -23984,16 +23990,21 @@ function loadGlobalDefault(){
       // Never auto-restore to settings tab — it requires PIN each visit
       const safeTab=s.tab==='settings'?'sched':s.tab;
       _activeMainTab=safeTab;
-      // activate the right main tab
       const tabEl=document.querySelector(`.tab[onclick*="showTab('${safeTab}'"]`);
       document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
       document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      document.getElementById('plan-fab')?.classList.remove('active');
       const tc=document.getElementById('tab-'+safeTab);
       if(tc)tc.classList.add('active');
       if(tabEl)tabEl.classList.add('active');
+      // Plan lives on a FAB, not a .tab button
+      if(safeTab==='plan'){
+        document.getElementById('plan-fab')?.classList.add('active');
+        setTimeout(function(){try{renderWeekTasksView();}catch(e){}},300);
+      }
     }
     if(s.ttView){
-      ttView=s.ttView;
+      ttView=(s.ttView==='week'||s.ttView==='free')?'full':s.ttView;
       // Immediately apply view container visibility so it's correct before renderTimetable
       const tw=document.getElementById('tt-table-wrap');
       const tv=document.getElementById('tt-today-view');
@@ -27996,6 +28007,29 @@ function doBulkImport(){
 
 
 let _activeMainTab='sched';
+function showPlanTab(btn){
+  if(ttEditMode)lockEditMode();
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-plan').classList.add('active');
+  const pf=document.getElementById('plan-fab');if(pf)pf.classList.add('active');
+  _activeMainTab='plan';
+  renderWeekTasksView();
+  updateGlobalDefaultBtn();
+}
+function showSettingsTab(){
+  if(ttEditMode)lockEditMode();
+  const sb=document.getElementById('settings-locked'),sc=document.getElementById('settings-content');
+  if(sb)sb.style.display='block';
+  if(sc)sc.style.display='none';
+  setTimeout(populateLeaveStudentSelects,200);
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('plan-fab')?.classList.remove('active');
+  document.getElementById('tab-settings').classList.add('active');
+  _activeMainTab='settings';
+  updateGlobalDefaultBtn();
+}
 function showTab(name,btn){
   if(ttEditMode&&name!=='sched')lockEditMode();
   if(name==='settings'){
@@ -28006,7 +28040,8 @@ function showTab(name,btn){
   }
   document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  document.getElementById('tab-'+name).classList.add('active');btn.classList.add('active');
+  document.getElementById('plan-fab')?.classList.remove('active');
+  document.getElementById('tab-'+name).classList.add('active');if(btn)btn.classList.add('active');
   _activeMainTab=name;
   if(name==='sched')renderTimetable();
   if(name==='workflows')showWorkflowList();
