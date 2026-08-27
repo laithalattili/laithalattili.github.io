@@ -1577,6 +1577,25 @@ function toggleSettleCurView(sid){
 function fmtSettleTotal(s){var cur=s.totalCurrency||'JOD';var amt=s.totalJOD||0;if(cur==='JOD')return fJOD(amt);if(cur==='RMB')return fRMB(amt);if(cur==='GBP')return fGBP(amt);return amt.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+cur;}
 function fmtSettleAmt(amt,s){var cur=s.totalCurrency||'JOD';if(cur==='JOD')return fJOD(amt);if(cur==='RMB')return fRMB(amt);if(cur==='GBP')return fGBP(amt);return amt.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+cur;}
 
+function settlePhaseAmountByAcct(s,yr,mo){
+  // Per-account JOD-denominated totals for the month + which account the first
+  // in-range phase uses (for legacy tick-id continuity).
+  var rate=settleFxRate(s);var base=s.totalCurrency||'JOD';
+  var res={arab:0,boc:0,firstAcct:null};
+  safeArr(s.phases).forEach(function(ph){
+    var inRange=(yr>ph.startYr||(yr===ph.startYr&&mo>=ph.startMon))&&(yr<ph.endYr||(yr===ph.endYr&&mo<=ph.endMon));
+    if(!inRange)return;
+    var amt;
+    if(ph.currency===base){amt=ph.monthly;}
+    else if(base==='JOD'&&ph.currency==='RMB'){amt=n2(ph.monthly/rate);}
+    else if(base==='RMB'&&ph.currency==='JOD'){amt=n2(ph.monthly*rate);}
+    else{amt=toJOD(ph.monthly,ph.currency);}
+    var acct=(ph.account==='rmb'||ph.account==='boc')?'boc':'arab';
+    if(res.firstAcct===null)res.firstAcct=acct;
+    res[acct]=n2(res[acct]+amt);
+  });
+  return res;
+}
 function settlePhaseAmount(s,yr,mo){
   var total=0;
   var rate=settleFxRate(s);
@@ -1723,22 +1742,22 @@ function buildProjection(){
     // Settlement phases — check prePaidIds
     settlements.forEach(function(s){
       if(!s.active||s.type==='investment')return;
-      var phAmt=settlePhaseAmount(s,yr,mo);
-      if(phAmt>0){
-        var settleTickId='settle-'+s.id;
-        var isPrePaid=prePaidIds.indexOf(settleTickId)>=0;
-        // Use the active phase's account field — this is the authoritative source
-        // for which bank account and currency the payment comes from
-        var ph=safeArr(s.phases).find(function(p){var inRange=(yr>p.startYr||(yr===p.startYr&&mo>=p.startMon))&&(yr<p.endYr||(yr===p.endYr&&mo<=p.endMon));return inRange;});
-        var fromAcct=ph?ph.account:(s.divFundAccount||'arab');
-        if(fromAcct==='rmb'||fromAcct==='boc'){
-          if(!isPrePaid)rmbOut+=phAmt*S.jod2rmb;
-          rmbItems.push({l:s.name.split('-')[0].trim(),v:'-'+fRMB(phAmt*S.jod2rmb),c:'neg',sub:fJOD(phAmt),streamId:settleTickId,prePaid:isPrePaid});
+      var byAcct=settlePhaseAmountByAcct(s,yr,mo);
+      if(byAcct.arab<=0&&byAcct.boc<=0)return;
+      var baseName=s.name.split('-')[0].trim();
+      ['arab','boc'].forEach(function(acct){
+        var amt=byAcct[acct];if(amt<=0)return;
+        // Legacy tick id goes to the first-phase account; the other gets '-2'
+        var tickId=(acct===byAcct.firstAcct||byAcct[acct===('arab')?'boc':'arab']<=0)?('settle-'+s.id):('settle-'+s.id+'-2');
+        var isPrePaid=prePaidIds.indexOf(tickId)>=0;
+        if(acct==='boc'){
+          if(!isPrePaid)rmbOut+=amt*S.jod2rmb;
+          rmbItems.push({l:baseName,v:'-'+fRMB(amt*S.jod2rmb),c:'neg',sub:fJOD(amt),streamId:tickId,prePaid:isPrePaid});
         } else {
-          if(!isPrePaid)jodOut+=phAmt;
-          jodItems.push({l:s.name.split('-')[0].trim(),v:'-'+fJOD(phAmt),c:'neg',streamId:settleTickId,prePaid:isPrePaid});
+          if(!isPrePaid)jodOut+=amt;
+          jodItems.push({l:baseName,v:'-'+fJOD(amt),c:'neg',streamId:tickId,prePaid:isPrePaid});
         }
-      }
+      });
     });
     // One-off events — check prePaidIds
     safeArr(oneoffEvents).filter(function(ev){return !ev.settleId&&ev.year===yr&&ev.month===mo;}).forEach(function(ev){
@@ -2465,7 +2484,20 @@ function toggleTick(id){
       // Auto-record settlement payments for current month only
       settlements.forEach(function(s){
         var phAmt=settlePhaseAmount(s,commitMon.year,commitMon.month);
-        if(phAmt>0&&id==='settle-'+s.id){var ph2=safeArr(s.phases).find(function(p){var inR=(commitMon.year>p.startYr||(commitMon.year===p.startYr&&commitMon.month>=p.startMon))&&(commitMon.year<p.endYr||(commitMon.year===p.endYr&&commitMon.month<=p.endMon));return inR;});var fromAcct=ph2?ph2.account:(s.divFundAccount||'arab');var amtRaw=(fromAcct==='rmb'||fromAcct==='boc')?n2(phAmt*S.jod2rmb):phAmt;s.payments=safeArr(s.payments);s.payments.push({id:Date.now(),amtJOD:phAmt,amtRaw:amtRaw,currency:(fromAcct==='rmb'||fromAcct==='boc')?'RMB':'JOD',date:today().toISOString().split('T')[0],note:MNAMES[commitMon.month-1]+' '+commitMon.year+' (auto)',type:'regular',autoRecorded:true});}
+        if(phAmt>0&&(id==='settle-'+s.id||id==='settle-'+s.id+'-2')){
+          var byAcct2=settlePhaseAmountByAcct(s,commitMon.year,commitMon.month);
+          var isAlt=id==='settle-'+s.id+'-2';
+          // Legacy id → firstAcct portion (or the only non-zero one); '-2' → the other account
+          var acct2;
+          if(isAlt){acct2=byAcct2.firstAcct==='arab'?'boc':'arab';}
+          else{acct2=byAcct2.firstAcct||((byAcct2.boc>0)?'boc':'arab');if(byAcct2[acct2]<=0)acct2=acct2==='arab'?'boc':'arab';}
+          var portionJOD=byAcct2[acct2]||0;
+          if(portionJOD>0){
+            var isBoc2=acct2==='boc';
+            s.payments=safeArr(s.payments);
+            s.payments.push({id:Date.now(),amtJOD:portionJOD,amtRaw:isBoc2?n2(portionJOD*S.jod2rmb):portionJOD,currency:isBoc2?'RMB':'JOD',date:today().toISOString().split('T')[0],note:MNAMES[commitMon.month-1]+' '+commitMon.year+' (auto)',type:'regular',autoRecorded:true});
+          }
+        }
       });
     }
     // Future month: just mark as pre-paid (projection will exclude it)
@@ -2473,7 +2505,7 @@ function toggleTick(id){
     // Just remove the confirmation record — balance is manually managed
     delete confirmedDebits[cKey][id];
     // Also remove the auto-recorded settlement payment for this commitment
-    var settleId=id.indexOf('settle-')===0?id.slice(7):null;
+    var settleId=id.indexOf('settle-')===0?id.slice(7).replace(/-2$/,''):null;
     if(settleId){
       var st=settlements.find(function(x){return x.id===settleId;});
       if(st){
@@ -2517,7 +2549,17 @@ function getCommitItems(pyr,pmo){
   });
   var parentSt=streams.find(function(s){return s.isParents&&s.isCommitment;});
   if(parentSt&&streamDueInMonth(parentSt,yr,mo)){var pr=getParentForMonth(yr,mo);items.push({id:'parents',name:pr+' this month',amount:getStreamAmount(parentSt,yr,mo),currency:parentSt.currency,type:'out',method:'transfer',note:'Alternating Mother/Father'});}
-  settlements.forEach(function(s){if(!s.active)return;var phAmt=settlePhaseAmount(s,yr,mo);if(phAmt>0){var ph3=safeArr(s.phases).find(function(p){var inR=(yr>p.startYr||(yr===p.startYr&&mo>=p.startMon))&&(yr<p.endYr||(yr===p.endYr&&mo<=p.endMon));return inR;});var fromAcct=ph3?ph3.account:(s.divFundAccount||'arab');var dispAmt=(fromAcct==='rmb'||fromAcct==='boc')?n2(phAmt*S.jod2rmb):phAmt;var dispCur=(fromAcct==='rmb'||fromAcct==='boc')?'RMB':'JOD';items.push({id:'settle-'+s.id,name:s.name.split('-')[0].trim()+' payment',amount:dispAmt,currency:dispCur,type:'out',method:'settlement',note:fJOD(phAmt)+' JOD'+(fromAcct==='rmb'||fromAcct==='boc'?' from BOC':'')});}settleOneoffs(s,yr,mo).filter(function(ev){return ev.type==='expense';}).forEach(function(ev){items.push({id:'settle-ev-'+ev.id,name:(ev.label||s.name)+' - one-off',amount:ev.amount,currency:ev.currency,type:'out',method:'settlement',note:'One-off'});});});
+  settlements.forEach(function(s){if(!s.active)return;
+    var byAcct=settlePhaseAmountByAcct(s,yr,mo);
+    var baseName=s.name.split('-')[0].trim();
+    ['arab','boc'].forEach(function(acct){
+      var amt=byAcct[acct];if(amt<=0)return;
+      var otherAmt=byAcct[acct==='arab'?'boc':'arab'];
+      var tickId=(acct===byAcct.firstAcct||otherAmt<=0)?('settle-'+s.id):('settle-'+s.id+'-2');
+      var isBoc=acct==='boc';
+      items.push({id:tickId,name:baseName+' payment',amount:isBoc?n2(amt*S.jod2rmb):amt,currency:isBoc?'RMB':'JOD',type:'out',method:'settlement',note:fJOD(amt)+(isBoc?' from BOC':' from Arab Bank')});
+    });
+    settleOneoffs(s,yr,mo).filter(function(ev){return ev.type==='expense';}).forEach(function(ev){items.push({id:'settle-ev-'+ev.id,name:(ev.label||s.name)+' - one-off',amount:ev.amount,currency:ev.currency,type:'out',method:'settlement',note:'One-off'});});});
 
   // Holidays — daily budget shows in commitments for each active month
   try{
