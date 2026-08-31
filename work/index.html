@@ -97,6 +97,8 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .qc-sticky.on{background:#fffbe6;border-color:#ffe066;color:#7d5800}
 .qc-div{display:flex;align-items:center;gap:8px;margin:12px 0 9px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em}
 .qc-div:before,.qc-div:after{content:'';flex:1;height:1px;background:var(--border)}
+.qc-chip{font-size:12px;font-weight:700;padding:7px 12px;border-radius:14px;border:1.5px solid var(--border2);background:#fff;color:var(--text2);cursor:pointer}
+.qc-chip.on{background:#00205B;border-color:#00205B;color:#fff}
 .tab.active{color:#212529;border-top:2px solid #212529;background:#f8f9fa}
 .tab-dot{position:absolute;top:4px;right:calc(50% - 14px);width:7px;height:7px;border-radius:50%;background:#2b8a3e;display:none}
 .tab-content{display:none}.tab-content.active{display:block}
@@ -24461,24 +24463,15 @@ function renderTimetable(){
   });
   syncToolbarToggles();
 
-  const weekView=document.getElementById('tt-week-view');
-
+  // tt-week-view now lives in the Plan tab and is not managed here
   if(ttView==='today'){
     if(tableWrap)tableWrap.style.display='none';
     if(todayView)todayView.style.display='block';
-    if(weekView)weekView.style.display='none';
     renderTodayView();
-    return;
-  }
-  if(ttView==='week'){
-    if(tableWrap)tableWrap.style.display='none';
-    if(todayView)todayView.style.display='none';
-    if(weekView){weekView.style.display='block';renderWeekTasksView();}
     return;
   }
   if(tableWrap)tableWrap.style.display='block';
   if(todayView)todayView.style.display='none';
-  if(weekView)weekView.style.display='none';
 
   const showDates=true; // always show dates now we have holiday indicators
   const dayDates=DAYS.map((_,i)=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return d.getDate();});
@@ -25535,7 +25528,7 @@ function renderWeekTasksView(){
   // Migrate legacy AOR/House tasks from old key format into planData once
   _migrateLegacyTasks();
 
-  const tasks=(S.planData||[]);
+  const tasks=(S.planData||[]).filter(t=>!t.say);
   const cats=(S.planCategories||[{id:'aor',name:'AOR QTS',color:'#7c3aed'},{id:'prep',name:'Lesson Prep',color:'#1d4ed8'},{id:'house',name:'Housemaster',color:'#d97706'}]);
   const catMap={};cats.forEach(c=>{catMap[c.id]=c;});
 
@@ -25688,7 +25681,7 @@ function renderWeekTasksView(){
     }
   }
 
-  el.innerHTML=html;
+  el.innerHTML=renderToSaySection()+html;
 }
 
 function _todayDateStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
@@ -25929,6 +25922,20 @@ function _openCatModal(idx){
       </div>
       <input type="hidden" id="pcm-color" value="${existing?.color||'#7c3aed'}">
     </div>
+    <div class="input-row" style="margin-top:.75rem"><label style="font-size:12px">"Say" items are delivered by</label>
+      <select id="pcm-deliver" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 9px;border:1px solid var(--border);border-radius:8px;margin-top:4px">
+        ${[['none','Nothing special (just a list)'],['checklist','Checklist (tick when said)'],['tutor_email','Tutor email (by grade, from tutor list)'],['message','Message generator (copy text)']].map(([v,l])=>`<option value="${v}"${(existing?.deliver||'none')===v?' selected':''}>${l}</option>`).join('')}
+      </select>
+    </div>
+    <div class="input-row" style="margin-top:.75rem"><label style="font-size:12px">Show in Live mode on timetable category</label>
+      <select id="pcm-ttcat" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 9px;border:1px solid var(--border);border-radius:8px;margin-top:4px">
+        <option value="">— none —</option>
+        ${(()=>{const defs=getCatDefs();return Object.keys(defs).filter(k=>defs[k]&&defs[k].label&&!['empty','support'].includes(k)).map(k=>`<option value="${k}"${(existing?.ttCat||'')===k?' selected':''}>${defs[k].label}</option>`).join('');})()}
+      </select>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:.75rem;font-size:12px;cursor:pointer">
+      <input type="checkbox" id="pcm-teaching"${existing?.kind==='teaching'?' checked':''}> Teaching context (opens class / grade / general chips)
+    </label>
     <div style="display:flex;gap:.5rem;margin-top:1.25rem">
       <button onclick="document.getElementById('plan-cat-modal').remove()" style="flex:1;padding:9px;background:#f1f3f5;border:1px solid var(--border);border-radius:9px;font-size:13px;cursor:pointer">Cancel</button>
       <button onclick="savePlanCategory(${idx})" style="flex:1;padding:9px;background:#212529;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer">${existing?'Save':'Add'}</button>
@@ -25949,7 +25956,12 @@ function savePlanCategory(idx){
   if(!name)return;
   if(!S.planCategories)S.planCategories=[];
   const id=idx!=null?S.planCategories[idx].id:'pc'+Date.now();
-  const cat={id,name,color};
+  const cat={id,name,color,
+    deliver:document.getElementById('pcm-deliver')?.value||'none',
+    ttCat:document.getElementById('pcm-ttcat')?.value||'',
+    kind:document.getElementById('pcm-teaching')?.checked?'teaching':undefined};
+  if(!cat.kind)delete cat.kind;
+  if(!cat.ttCat)delete cat.ttCat;
   if(idx!=null)S.planCategories[idx]=cat;
   else S.planCategories.push(cat);
   saveSettings();try{localStorage.setItem('planData',JSON.stringify(S.planData||[]));localStorage.setItem('planCategories',JSON.stringify(S.planCategories||[]));}catch(e){}
@@ -26917,7 +26929,7 @@ function setHwkFilter(f,btn){
 }
 
 function hwkCollapseAll(collapse){
-  const grades=['G7','G8','G9','G10','G11','G12'];
+  const grades=getGrades();
   grades.forEach(gr=>{HWK_COLLAPSE_STATE[gr]=collapse;});
   // Also collapse/expand room keys
   BOARDER_ROOMS.forEach(r=>{HWK_COLLAPSE_STATE['room_'+r.id]=collapse;});
@@ -26931,7 +26943,7 @@ function hwkToggleAll(){
   // "open" = HWK_COLLAPSE_STATE[gr]===false
   // "closed/default" = anything else (true or undefined)
   // If any grade is currently open → collapse all. Otherwise expand all.
-  const grades=['G7','G8','G9','G10','G11','G12'].filter(gr=>
+  const grades=getGrades().filter(gr=>
     TUTORS.some(t=>t.grade===gr&&STUDENTS.some(s=>s.tutor===t.name))
   );
   const anyOpen=grades.some(gr=>HWK_COLLAPSE_STATE[gr]===false);
@@ -26943,7 +26955,7 @@ function hwkToggleAll(){
 function updateHwkToggleBtn(){
   const btn=document.getElementById('hwk-collapse-toggle-btn');
   if(!btn)return;
-  const grades=['G7','G8','G9','G10','G11','G12'];
+  const grades=getGrades();
   const anyOpen=grades.some(gr=>HWK_COLLAPSE_STATE[gr]===false);
   btn.textContent=anyOpen?'Collapse All':'Expand All';
 }
@@ -26997,7 +27009,7 @@ function renderHawkingList(){
     if(el)el.innerHTML=_grpToggle;
   }
 
-  const grades=['G7','G8','G9','G10','G11','G12'];
+  const grades=getGrades();
   let html='';
 
   grades.forEach(gr=>{
@@ -27678,6 +27690,299 @@ function removeStudent(classId,idx){
 // ── HOUSE POINTS & NEGATIVES ─────────────────────────
 let _negClassId=null,_negStudentName=null;
 const NEG_CATS=['Disruption','Device misuse','Sleeping','No homework','No effort'];
+
+// ══ LIVE MODE — context items for the current slot ═════════════════
+let _liveGrpOpen={};try{_liveGrpOpen=JSON.parse(localStorage.getItem('liveGrpOpen')||'{}');}catch(e){}
+function toggleLiveGroup(key){_liveGrpOpen[key]=_liveGrpOpen[key]===false?true:false;try{localStorage.setItem('liveGrpOpen',JSON.stringify(_liveGrpOpen));}catch(e){}
+  const el=document.getElementById('live-grp-'+key);if(el)el.style.display=_liveGrpOpen[key]===false?'none':'block';
+  const ar=document.getElementById('live-arr-'+key);if(ar)ar.textContent=_liveGrpOpen[key]===false?'\u25B8':'\u25BE';}
+function _liveDoneKey(t){const w=getWeekNumber(0);return t.scope==='sticky'?('plan_done_'+t.id):('plan_done_'+t.id+'_w'+w);}
+function liveTogglePoint(id,isSay){
+  if(isSay){archivePoint(id);}
+  else{const t=(S.planData||[]).find(x=>x.id===id);if(!t)return;const k=_liveDoneKey(t);setDone(k,localStorage.getItem(k)!=='1');}
+  _amLastCtxKey='';try{amRender();}catch(e){}
+}
+function _amContextItemsHtml(slotCat,linkedCls,label){
+  const ctxs=getContexts();const todayS=_todayStr();
+  const groups=[];
+  ctxs.forEach(ctx=>{
+    let say=[],doItems=[];
+    if(ctx.kind==='teaching'){
+      if(!linkedCls)return;
+      const cid=linkedCls.id||linkedCls.name;
+      say=getPoints(ctx.id).filter(t=>t.sub===cid||t.sub===linkedCls.name);
+      doItems=(S.planData||[]).filter(t=>!t.say&&t.cat===ctx.id&&(t.sub===cid||t.sub===linkedCls.name)&&(t.scope==='sticky'||t.date===todayS));
+      if(say.length||doItems.length)groups.push({ctx,say,doItems,key:ctx.id+'_'+cid,title:ctx.name+' \u00B7 '+linkedCls.name});
+      return;
+    }
+    if(!ctx.ttCat||ctx.ttCat!==slotCat)return;
+    say=getPoints(ctx.id);
+    doItems=(S.planData||[]).filter(t=>!t.say&&t.cat===ctx.id&&(t.scope==='sticky'||t.date===todayS));
+    if(say.length||doItems.length)groups.push({ctx,say,doItems,key:ctx.id,title:ctx.name});
+  });
+  if(!groups.length)return '';
+  return groups.map(g=>{
+    const open=_liveGrpOpen[g.key]!==false;
+    const row=(t,isSay)=>{const done=!isSay&&localStorage.getItem(_liveDoneKey(t))==='1';
+      return `<label style="display:flex;align-items:flex-start;gap:9px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer">
+        <input type="checkbox" ${done?'checked':''} onchange="liveTogglePoint('${t.id}',${isSay})" style="margin-top:2px;width:17px;height:17px;accent-color:${g.ctx.color}">
+        <span style="font-size:14px;color:${done?'#666':'#e5e7eb'};${done?'text-decoration:line-through;':''}line-height:1.35">${_esc(t.text)}${t.student?' <span style="font-size:10px;color:#93c5fd">\u{1F464} '+_esc(t.student)+'</span>':''}</span></label>`;};
+    return `<div style="margin:10px 12px 0;border:1px solid rgba(255,255,255,.1);border-left:4px solid ${g.ctx.color};border-radius:10px;background:rgba(255,255,255,.03)">
+      <div onclick="toggleLiveGroup('${g.key}')" style="display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer">
+        <span id="live-arr-${g.key}" style="color:#888;font-size:11px">${open?'\u25BE':'\u25B8'}</span>
+        <span style="font-size:12px;font-weight:800;color:${g.ctx.color};text-transform:uppercase;letter-spacing:.05em">${_esc(g.title)}</span>
+        <span style="font-size:10px;font-weight:700;background:${g.ctx.color};color:#fff;border-radius:9px;padding:1px 7px">${g.say.length+g.doItems.length}</span>
+      </div>
+      <div id="live-grp-${g.key}" style="display:${open?'block':'none'};padding:0 12px 8px">
+        ${g.say.length?'<div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;padding:4px 0 2px">To say</div>'+g.say.map(t=>row(t,true)).join(''):''}
+        ${g.doItems.length?'<div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;padding:8px 0 2px">To do</div>'+g.doItems.map(t=>row(t,false)).join(''):''}
+      </div></div>`;
+  }).join('');
+}
+
+// ══ TO SAY — plan page section, composers, history ═════════════════
+let _sayOpen={};try{_sayOpen=JSON.parse(localStorage.getItem('sayOpen')||'{}');}catch(e){}
+function _saySaveOpen(){try{localStorage.setItem('sayOpen',JSON.stringify(_sayOpen));}catch(e){}}
+function toggleSayGroup(id){_sayOpen[id]=!_sayOpen[id];_saySaveOpen();renderWeekTasksView();}
+function _esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function _pointRowHtml(t,ctx){
+  const tags=[];
+  if(t.student)tags.push('<span style="font-size:10px;background:#e0f2fe;color:#075985;border-radius:8px;padding:1px 7px">\u{1F464} '+_esc(t.student)+(t.tutor?' \u2192 '+_esc(t.tutor):'')+'</span>');
+  else if(t.grades&&t.grades.length)tags.push('<span style="font-size:10px;background:#f1f5f9;color:#475569;border-radius:8px;padding:1px 7px">'+t.grades.join(', ')+'</span>');
+  if(t.sub&&t.sub!=='general')tags.push('<span style="font-size:10px;background:#eef2ff;color:#3730a3;border-radius:8px;padding:1px 7px">'+_esc(t.sub)+'</span>');
+  if(t.via&&t.via.length)tags.push('<span style="font-size:10px;color:#6b7280">via '+t.via.map(v=>({tt:'tutor time',email:'email',teams:'Teams'})[v]||v).join(' + ')+'</span>');
+  return `<div class="say-row" style="display:flex;align-items:flex-start;gap:9px;padding:8px 0;border-bottom:1px solid #f1f5f9">
+    <input type="checkbox" onchange="archivePoint('${t.id}');renderWeekTasksView()" style="margin-top:3px;width:17px;height:17px;flex-shrink:0" title="Mark delivered">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13px;color:#111;line-height:1.35">${_esc(t.text)}</div>
+      ${tags.length?'<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:4px">'+tags.join('')+'</div>':''}
+    </div>
+    <button onclick="if(deletePoint('${t.id}'))renderWeekTasksView()" title="Delete" style="background:none;border:none;color:#cbd5e1;cursor:pointer;font-size:15px;padding:0 4px">\u00D7</button>
+  </div>`;
+}
+function renderToSaySection(){
+  const cats=getContexts();
+  let html='';
+  cats.forEach(ctx=>{
+    const pts=getPoints(ctx.id);
+    const arch=getPoints(ctx.id,{archived:true});
+    if(!pts.length&&!arch.length)return;
+    const open=_sayOpen[ctx.id]!==false;
+    let body='';
+    if(open){
+      if(ctx.kind==='teaching'){
+        const subs={};pts.forEach(t=>{const k=t.sub||'general';(subs[k]=subs[k]||[]).push(t);});
+        Object.keys(subs).sort().forEach(k=>{body+=`<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;padding:8px 0 2px">${_esc(k)}</div>`+subs[k].map(t=>_pointRowHtml(t,ctx)).join('');});
+      } else if(ctx.deliver==='tutor_email'){
+        const grade=pts.filter(t=>!t.student),stu=pts.filter(t=>t.student);
+        if(grade.length)body+='<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;padding:8px 0 2px">Grade notes</div>'+grade.map(t=>_pointRowHtml(t,ctx)).join('');
+        if(stu.length)body+='<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;padding:8px 0 2px">Student notes</div>'+stu.map(t=>_pointRowHtml(t,ctx)).join('');
+      } else body+=pts.map(t=>_pointRowHtml(t,ctx)).join('');
+      if(!pts.length)body+='<div style="font-size:12px;color:#9ca3af;padding:8px 0">Nothing pending.</div>';
+      // actions
+      let actions='';
+      if(ctx.deliver==='tutor_email'&&pts.length){
+        actions+=`<button class="btn-pri" onclick="composeTutorEmail('${ctx.id}')">\u2709 Compose</button>`;
+        if(pts.some(t=>t.student))actions+=`<button class="btn-sec" onclick="composeStudentNotes('${ctx.id}')">\u{1F464} Per tutor</button>`;
+      }
+      if(ctx.deliver==='message'&&pts.length)actions+=`<button class="btn-pri" onclick="composeMessage('${ctx.id}')">\u{1F4AC} Message</button>`;
+      if(pts.length)actions+=`<button class="btn-sec" onclick="archiveAll('${ctx.id}')">\u2713 Mark all delivered</button>`;
+      if(arch.length)actions+=`<button class="btn-sec" onclick="openSayHistory('${ctx.id}')">\u{1F5C4} History (${arch.length})</button>`;
+      if(actions)body+=`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">${actions}</div>`;
+    }
+    html+=`<div style="background:#fff;border:1px solid #e5e7eb;border-left:4px solid ${ctx.color};border-radius:10px;padding:10px 12px;margin-bottom:8px">
+      <div onclick="toggleSayGroup('${ctx.id}')" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <span style="font-size:11px;color:#9ca3af;width:12px">${open?'\u25BE':'\u25B8'}</span>
+        <span style="font-size:13px;font-weight:800;color:${ctx.color}">${_esc(ctx.name)}</span>
+        <span style="font-size:10px;font-weight:700;background:${ctx.color};color:#fff;border-radius:9px;padding:1px 7px">${pts.length}</span>
+      </div>${body}</div>`;
+  });
+  if(!html)return '';
+  return `<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:2px 0 8px">\u{1F4AC} To say</div>${html}</div>
+    <div style="font-size:11px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:6px 0 8px">\u2713 To do</div>`;
+}
+function archiveAll(ctxId){getPoints(ctxId).forEach(t=>archivePoint(t.id));renderWeekTasksView();}
+function openSayHistory(ctxId){
+  const ctx=getContext(ctxId);const arch=getPoints(ctxId,{archived:true}).sort((a,b)=>String(b.delivered_at||'').localeCompare(String(a.delivered_at||'')));
+  document.getElementById('say-hist')?.remove();
+  const ov=document.createElement('div');ov.id='say-hist';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10001;display:flex;align-items:flex-end;justify-content:center';
+  ov.onclick=e=>{if(e.target===ov)ov.remove();};
+  const fmt=iso=>{try{return new Date(iso).toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+new Date(iso).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}catch(e){return'';}};
+  ov.innerHTML=`<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:520px;max-height:75vh;overflow:auto;padding:14px 16px 24px">
+    <div style="font-size:14px;font-weight:800;margin-bottom:8px">${_esc(ctx?ctx.name:'')} \u00B7 delivered</div>
+    ${arch.length?arch.map(t=>`<div style="display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid #f1f5f9">
+      <div style="flex:1"><div style="font-size:13px;color:#374151">${_esc(t.text)}</div><div style="font-size:10px;color:#9ca3af">${fmt(t.delivered_at)}${t.student?' \u00B7 '+_esc(t.student):''}${t.grades&&t.grades.length?' \u00B7 '+t.grades.join(', '):''}</div></div>
+      <button class="btn-sec" style="padding:3px 8px" onclick="unarchivePoint('${t.id}');openSayHistory('${ctxId}');renderWeekTasksView()">\u21A9</button>
+      <button onclick="if(deletePoint('${t.id}')){openSayHistory('${ctxId}');renderWeekTasksView();}" style="background:none;border:none;color:#cbd5e1;cursor:pointer;font-size:15px">\u00D7</button>
+    </div>`).join(''):'<div style="font-size:12px;color:#9ca3af">Nothing delivered yet.</div>'}
+    <button class="btn-sec" style="width:100%;justify-content:center;margin-top:12px" onclick="document.getElementById('say-hist').remove()">Close</button></div>`;
+  document.body.appendChild(ov);
+}
+// ── Composers ──
+const VIA_OPTS=[['tt','Tutor time'],['email','Email tutees'],['teams','Teams group']];
+function composeTutorEmail(ctxId){
+  const pts=getPoints(ctxId).filter(t=>!t.student);
+  if(!pts.length){showToastMsg('No grade notes to send','#6b7280');return;}
+  document.getElementById('compose-ov')?.remove();
+  const ov=document.createElement('div');ov.id='compose-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10001;display:flex;align-items:flex-end;justify-content:center';
+  ov.onclick=e=>{if(e.target===ov)ov.remove();};
+  const grades=getGrades();
+  ov.innerHTML=`<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:520px;max-height:85vh;overflow:auto;padding:14px 16px 24px">
+    <div style="font-size:14px;font-weight:800;margin-bottom:4px">Tutor email</div>
+    <div style="font-size:11px;color:#6b7280;margin-bottom:10px">Set how tutors should pass each point on, then open the draft.</div>
+    ${pts.map(t=>`<div style="padding:8px 0;border-bottom:1px solid #f1f5f9">
+      <div style="font-size:13px;color:#111">${_esc(t.text)} <span style="font-size:10px;color:#6b7280">${(t.grades&&t.grades.length?t.grades:grades).join(', ')}</span></div>
+      <div style="display:flex;gap:5px;margin-top:5px;flex-wrap:wrap">${VIA_OPTS.map(([v,l])=>`<button class="qc-chip${(t.via||['tt']).includes(v)?' on':''}" style="padding:4px 10px;font-size:11px" onclick="toggleVia('${t.id}','${v}',this)">${l}</button>`).join('')}</div>
+    </div>`).join('')}
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin:12px 0 8px"><input type="checkbox" id="cmp-split"> One email per grade</label>
+    <div style="display:flex;gap:6px">
+      <button class="btn-pri" style="flex:1;justify-content:center;padding:10px" onclick="openTutorDraft('${ctxId}')">\u2709 Open draft</button>
+      <button class="btn-sec" style="flex:1;justify-content:center;padding:10px" onclick="archiveAll('${ctxId}');document.getElementById('compose-ov').remove()">\u2713 Mark all sent</button>
+    </div></div>`;
+  document.body.appendChild(ov);
+}
+function toggleVia(id,v,el){
+  const t=(S.planData||[]).find(x=>x.id===id);if(!t)return;
+  t.via=t.via||['tt'];
+  if(t.via.includes(v)){if(t.via.length>1)t.via=t.via.filter(x=>x!==v);}else t.via.push(v);
+  el.classList.toggle('on',t.via.includes(v));_savePlanNow();
+}
+function _tutorEmailBody(pts,gradesFilter){
+  const viaLbl=v=>({tt:'in tutor time',email:'by email',teams:'on the Teams group'})[v]||v;
+  const wk=getWeekNumber(0);
+  const byGrade={};
+  pts.forEach(t=>{const gs=(t.grades&&t.grades.length?t.grades:getGrades()).filter(g=>!gradesFilter||gradesFilter.includes(g));gs.forEach(g=>{(byGrade[g]=byGrade[g]||[]).push(t);});});
+  let body='Dear tutors,\n\nPlease share the following with your tutees this week:\n';
+  Object.keys(byGrade).sort((a,b)=>(parseInt(a.replace(/\D/g,''))||0)-(parseInt(b.replace(/\D/g,''))||0)).forEach(g=>{
+    body+='\n'+g+'\n';
+    byGrade[g].forEach(t=>{body+='\u2022 '+t.text+'  ['+(t.via||['tt']).map(viaLbl).join(' and ')+']\n';});
+  });
+  body+='\nThank you,\nLaith';
+  return {subject:'Tutor notes \u00B7 W'+wk,body,grades:Object.keys(byGrade)};
+}
+function openTutorDraft(ctxId){
+  const pts=getPoints(ctxId).filter(t=>!t.student);
+  const split=document.getElementById('cmp-split')?.checked;
+  const groups=split?getGrades().filter(g=>pts.some(t=>!t.grades||!t.grades.length||t.grades.includes(g))):[null];
+  groups.forEach((g,i)=>{
+    const d=_tutorEmailBody(pts,g?[g]:null);
+    if(!d.grades.length)return;
+    const to=tutorsForGrades(d.grades).map(t=>t.email).filter(Boolean).join(',');
+    const names=tutorsForGrades(d.grades).map(t=>t.name).join(', ');
+    const bodyFinal=(to?'':'To: '+names+'\n\n')+d.body;
+    setTimeout(()=>{window.open('mailto:'+encodeURIComponent(to)+'?subject='+encodeURIComponent(d.subject+(g?' \u00B7 '+g:''))+'&body='+encodeURIComponent(bodyFinal),'_blank');},i*700);
+  });
+}
+function composeStudentNotes(ctxId){
+  const pts=getPoints(ctxId).filter(t=>t.student);
+  const byTutor={};pts.forEach(t=>{(byTutor[t.tutor||'(no tutor)']=byTutor[t.tutor||'(no tutor)']||[]).push(t);});
+  document.getElementById('compose-ov')?.remove();
+  const ov=document.createElement('div');ov.id='compose-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10001;display:flex;align-items:flex-end;justify-content:center';
+  ov.onclick=e=>{if(e.target===ov)ov.remove();};
+  ov.innerHTML=`<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:520px;max-height:85vh;overflow:auto;padding:14px 16px 24px">
+    <div style="font-size:14px;font-weight:800;margin-bottom:4px">Student notes \u00B7 per tutor</div>
+    <div style="font-size:11px;color:#6b7280;margin-bottom:10px">Each tutor sees only their own tutees.</div>
+    ${Object.keys(byTutor).map(tn=>{const tut=(TUTORS||[]).find(x=>x.name===tn);const txt='Hi '+tn.split(' ')[0]+',\n\n'+byTutor[tn].map(t=>'\u2022 '+t.student+': '+t.text).join('\n')+'\n\nThanks,\nLaith';
+      return `<div style="padding:9px 0;border-bottom:1px solid #f1f5f9">
+        <div style="font-size:13px;font-weight:700;color:#111">${_esc(tn)} <span style="font-size:10px;color:#6b7280">${byTutor[tn].length} note${byTutor[tn].length>1?'s':''}</span></div>
+        <div style="font-size:11px;color:#6b7280;margin:3px 0 6px">${byTutor[tn].map(t=>_esc(t.student)+': '+_esc(t.text)).join('<br>')}</div>
+        <div style="display:flex;gap:6px"><button class="btn-sec" onclick="navigator.clipboard.writeText(${JSON.stringify(txt).replace(/"/g,'&quot;')}).then(()=>showToastMsg('Copied for ${_esc(tn.split(' ')[0])}','#16a34a'))">\u{1F4CB} Copy (Teams)</button>
+        ${tut&&tut.email?`<button class="btn-sec" onclick="window.open('mailto:${encodeURIComponent(tut.email)}?subject=${encodeURIComponent('Tutee note')}&body=${encodeURIComponent(txt)}','_blank')">\u2709 Email</button>`:''}
+        <button class="btn-sec" onclick="${byTutor[tn].map(t=>`archivePoint('${t.id}')`).join(';')};renderWeekTasksView();composeStudentNotes('${ctxId}')">\u2713 Sent</button></div>
+      </div>`;}).join('')}
+    <button class="btn-sec" style="width:100%;justify-content:center;margin-top:12px" onclick="document.getElementById('compose-ov').remove()">Close</button></div>`;
+  document.body.appendChild(ov);
+}
+function composeMessage(ctxId){
+  const ctx=getContext(ctxId);const pts=getPoints(ctxId);
+  const txt=(ctx?ctx.name:'')+' \u00B7 '+new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short'})+'\n'+pts.map(t=>'\u2022 '+t.text).join('\n');
+  navigator.clipboard.writeText(txt).then(()=>showToastMsg('\u{1F4CB} Copied \u00B7 paste into WeChat/Teams','#16a34a'),()=>prompt('Copy:',txt));
+}
+
+// ══ CONTEXTS / POINTS — core helpers ═══════════════════════════════
+// A "context" is a plan category. Extra fields:
+//   deliver : 'none'|'checklist'|'tutor_email'|'message'   (how Say items are delivered)
+//   ttCat   : timetable category id this context is tied to (shows in Live mode)
+//   kind    : 'teaching' → tile opens class/grade/general chips
+// A plan item with say:true is a point. Points are always sticky.
+//   sub     : for teaching: class id | grade | 'general'
+//   grades  : [..] for tutors
+//   via     : [..] set at compose (tt|email|teams)
+//   student, tutor : auto-tagged from text
+//   archived, delivered_at
+function getGrades(){
+  const s=new Set();
+  (TUTORS||[]).forEach(t=>{if(t.grade)s.add(String(t.grade).trim());});
+  (typeof CLASSES!=='undefined'?CLASSES:[]).forEach(c=>{if(c.grade)s.add(String(c.grade).trim());});
+  const arr=[...s].filter(Boolean);
+  const num=g=>parseInt(String(g).replace(/\D/g,''))||0;
+  arr.sort((a,b)=>num(a)-num(b));
+  return arr.length?arr:['G7','G8','G9','G10','G11','G12'];
+}
+function getContexts(){return S.planCategories||[];}
+function getContext(id){return getContexts().find(c=>c.id===id)||null;}
+function ensureDefaultContexts(){
+  if(!S.planCategories)S.planCategories=[];
+  const cats=S.planCategories;
+  const has=id=>cats.some(c=>c.id===id);
+  let changed=false;
+  // migrate legacy 'prep' → Teaching
+  const prep=cats.find(c=>c.id==='prep');
+  if(prep&&!prep.kind){prep.name='Teaching';prep.kind='teaching';prep.deliver=prep.deliver||'checklist';changed=true;
+    (S.planData||[]).forEach(t=>{if(t.cat==='prep'&&!t.sub)t.sub='general';});}
+  // migrate legacy 'house' → House Team
+  const house=cats.find(c=>c.id==='house');
+  if(house&&house.name==='Housemaster'){house.name='House Team';house.deliver=house.deliver||'checklist';changed=true;}
+  if(!has('mh')){cats.unshift({id:'mh',name:'Meeting - House',color:'#d97706',deliver:'checklist'});changed=true;}
+  if(!has('tutors')){cats.splice(1,0,{id:'tutors',name:'Tutors',color:'#0e7490',deliver:'tutor_email'});changed=true;}
+  if(!has('house')){cats.push({id:'house',name:'House Team',color:'#7c3aed',deliver:'checklist'});changed=true;}
+  if(!cats.some(c=>c.kind==='teaching')){cats.push({id:'teaching',name:'Teaching',color:'#1d4ed8',kind:'teaching',deliver:'checklist'});changed=true;}
+  cats.forEach(c=>{if(!c.deliver){c.deliver='none';changed=true;}});
+  if(changed){saveSettings();try{localStorage.setItem('planCategories',JSON.stringify(cats));localStorage.setItem('planData',JSON.stringify(S.planData||[]));}catch(e){}}
+}
+function _savePlanNow(){
+  saveSettings();
+  try{localStorage.setItem('planData',JSON.stringify(S.planData||[]));localStorage.setItem('planCategories',JSON.stringify(S.planCategories||[]));}catch(e){}
+}
+function getPoints(ctxId,opts){
+  opts=opts||{};
+  return (S.planData||[]).filter(t=>t.say&&t.cat===ctxId&&(!!t.archived===!!opts.archived)&&(opts.sub===undefined||t.sub===opts.sub));
+}
+function archivePoint(id){
+  const t=(S.planData||[]).find(x=>x.id===id);if(!t)return;
+  t.archived=true;t.delivered_at=new Date().toISOString();
+  setDone('plan_done_'+t.id,true);
+  _savePlanNow();
+}
+function unarchivePoint(id){
+  const t=(S.planData||[]).find(x=>x.id===id);if(!t)return;
+  t.archived=false;t.delivered_at=null;
+  setDone('plan_done_'+t.id,false);
+  _savePlanNow();
+}
+function deletePoint(id){
+  if(!confirm('Delete this point permanently?'))return false;
+  S.planData=(S.planData||[]).filter(x=>x.id!==id);
+  _savePlanNow();return true;
+}
+// Student tagging: exact full-name match anywhere in text
+function detectStudentInText(text){
+  const low=' '+String(text).toLowerCase()+' ';
+  const hits=(STUDENTS||[]).filter(s=>{if(!s.name)return false;const n=' '+s.name.toLowerCase();return low.includes(n+' ')||low.includes(n+',')||low.includes(n+'.');});
+  if(!hits.length)return null;
+  const s=hits.sort((a,b)=>b.name.length-a.name.length)[0];
+  const tut=(TUTORS||[]).find(t=>t.name===s.tutor)||null;
+  return {student:s.name,tutor:tut?tut.name:(s.tutor||null),grade:tut?tut.grade:null};
+}
+function tutorsForGrades(grades){
+  return (TUTORS||[]).filter(t=>grades.includes(String(t.grade).trim()));
+}
+function classesForContext(){
+  return (typeof CLASSES!=='undefined'?CLASSES:[]).map(c=>({id:c.id||c.name,name:c.name||c.id,grade:c.grade}));
+}
 
 // ══ CROSS-APP INBOX (work side) ═══════════════════════════════
 async function sendToOmni(text,sticky){
@@ -28735,7 +29040,7 @@ function initApp(){
   const sl=document.getElementById('settings-locked');if(sl)sl.style.display='flex';
   const sc=document.getElementById('settings-content');if(sc)sc.style.display='none';
   hydrateDoneState().then(()=>{_subscribeDoneRealtime();drainWorkInbox();try{if(_curTab==='week'&&typeof renderWeekTasksView==='function')renderWeekTasksView();}catch(e){}});
-  loadSettings();loadPeople();loadState();loadSlotNotes();loadHolidays();applyHolidaysToCalendar();loadCalCustomEvents();loadListsData();loadLinks();loadDuties();loadTutorMeetings();dsLoad();loadBoardingSettings();_subscribePenaltiesRealtime();loadNurseMap();loadCommentMap();
+  loadSettings();loadPeople();loadState();ensureDefaultContexts();loadSlotNotes();loadHolidays();applyHolidaysToCalendar();loadCalCustomEvents();loadListsData();loadLinks();loadDuties();loadTutorMeetings();dsLoad();loadBoardingSettings();_subscribePenaltiesRealtime();loadNurseMap();loadCommentMap();
   buildMorningChecks();restoreMCState();
   initWeekTab();checkTaskReset();renderCustomFlowsList();
   // Apply global default (overrides individual defaults)
@@ -33428,7 +33733,7 @@ function _renderFireRegister(){
   // Build sections
   let sectionsHtml='';
   let allPeople=[];
-  const gradeOrder=['G7','G8','G9','G10','G11','G12'];
+  const gradeOrder=getGrades();
 
   if(!_fireScopeAllHouse&&_fireBoarderGrouping==='room'){
     // Boarders by room
@@ -33560,7 +33865,7 @@ function amRender(){
   let lpHash='';if(isLessonCtx){try{const d=localStorage.getItem('lp_'+label);lpHash=d?String(d.length)+'_'+d.slice(-8):'';}catch(e){}}
   // Include today's points so HP/neg updates trigger rebuild
   const today=_todayStr();
-  const linkedCls=CLASSES.find(c=>c.id.toLowerCase()===label.toLowerCase());
+  const linkedCls=CLASSES.find(c=>c.id.toLowerCase()===label.toLowerCase())||CLASSES.find(c=>label.toLowerCase().startsWith(c.id.toLowerCase()+' '));
   const pointsHash=linkedCls?POINTS_LOG.filter(e=>e.date===today&&e.classId===linkedCls.id).map(e=>e.type[0]+e.student[0]+(e.val||1)).join(''):'' ;
   const rosterState=linkedCls?String(localStorage.getItem('am_roster_collapsed_'+linkedCls.id)||'0'):'';
   // Include tmtg notes hash so form edits trigger rebuild
@@ -33569,7 +33874,8 @@ function amRender(){
   // But skip rebuild if user is typing in an input inside the panel
   const _amFocused=document.activeElement&&document.getElementById('am-body')&&document.getElementById('am-body').contains(document.activeElement);
   const lessonSecond=isLessonCtx&&!_amFocused?new Date().getSeconds():'';
-  const ctxKey=`${dayName}_${slotIdx}_${liveLen}_${planLen}_${stateStr}_${lessonDoneStr}_${manualStart}_${isOverNow}_${lpHash}_${pointsHash}_${rosterState}_${tmtgHash}_${lessonSecond}`;
+  const _ptsHash=(S.planData||[]).filter(t=>t.say&&!t.archived).length+'_'+(S.planData||[]).length;
+  const ctxKey=`${dayName}_${slotIdx}_${liveLen}_${planLen}_${_ptsHash}_${stateStr}_${lessonDoneStr}_${manualStart}_${isOverNow}_${lpHash}_${pointsHash}_${rosterState}_${tmtgHash}_${lessonSecond}`;
 
   if(_amLastCtxKey!==ctxKey){
     _amLastCtxKey=ctxKey;
@@ -33620,6 +33926,12 @@ function amRender(){
         _brWrapper.innerHTML=_amBoardingRegisterHtml(_brType,m);
       });
     }
+    // Context items (points + today's tasks) for this slot
+    try{
+      const _slotCatId=(_custSlot2&&_custSlot2.cat)||(()=>{const d=getCatDefs();return Object.keys(d).find(k=>d[k]===cat)||tp||'';})();
+      const _ctxHtml=_amContextItemsHtml(_slotCatId,linkedCls,label);
+      if(_ctxHtml){const _w=document.createElement('div');_w.setAttribute('data-ctx-items','1');_w.innerHTML=_ctxHtml;body.appendChild(_w);}
+    }catch(e){console.warn('ctx items',e);}
   } else {
     // Tick only — update numbers without rebuilding DOM
     const{str,ot}=_fmtCd(rem);
@@ -34113,38 +34425,63 @@ function initActiveMode(){
 </div>
 <div id="qc-backdrop" onclick="closeQuickCapture()"></div>
 <div id="qc-sheet">
-  <input id="qc-input" type="text" placeholder="What needs doing?" autocomplete="off"
-    onkeydown="if(event.key==='Enter')qcSaveLast();if(event.key==='Escape')closeQuickCapture()">
-  <div class="qc-row">
-    <button id="qc-sticky" class="qc-sticky" onclick="qcToggleSticky()">Today</button>
+  <input id="qc-input" type="text" placeholder="What needs doing or saying?" autocomplete="off"
+    oninput="qcOnInput()" onkeydown="if(event.key==='Enter')qcEnter();if(event.key==='Escape')closeQuickCapture()">
+  <div id="qc-tag" style="display:none;margin:-6px 0 10px;font-size:11px"></div>
+  <div id="qc-step1">
+    <div class="qc-row"><button id="qc-sticky" class="qc-sticky" onclick="qcToggleSticky()">Today</button></div>
+    <div class="qc-cats" id="qc-cats"></div>
+    <div class="qc-div">Personal</div>
+    <div class="qc-cats"><button class="qc-cat" style="background:#6d4c9f;grid-column:1/-1" onclick="qcSendPersonal()">Send to Omni</button></div>
   </div>
-  <div class="qc-cats" id="qc-cats"></div>
-  <div class="qc-div">Personal</div>
-  <div class="qc-cats">
-    <button class="qc-cat" style="background:#6d4c9f;grid-column:1/-1" onclick="qcSendPersonal()">Send to Omni</button>
+  <div id="qc-step2" style="display:none">
+    <div id="qc-crumb" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px;color:var(--text3)">
+      <button onclick="qcBack()" class="btn-sec" style="padding:4px 9px">&#8592; Back</button><span id="qc-crumb-txt"></span>
+    </div>
+    <div id="qc-sub" style="display:none;margin-bottom:10px"></div>
+    <div id="qc-verbs" class="qc-cats" style="grid-template-columns:1fr 1fr">
+      <button class="qc-cat" id="qc-verb-do" style="background:#212529;min-height:70px" onclick="qcPickVerb('do')">Do<br><span style="font-size:11px;font-weight:500;opacity:.8">a task for me</span></button>
+      <button class="qc-cat" id="qc-verb-say" style="background:#0e7490;min-height:70px" onclick="qcPickVerb('say')">Say<br><span style="font-size:11px;font-weight:500;opacity:.8">a point to deliver</span></button>
+    </div>
+    <div id="qc-grades" style="display:none;margin-top:10px">
+      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Grades</div>
+      <div id="qc-grade-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
+      <button class="qc-cat" style="background:#0e7490;width:100%" onclick="qcSaveTutorsPoint()">Save for tutors</button>
+    </div>
   </div>
 </div>
 <script>
-var _qcSticky=false;
+var _qcSticky=false,_qcCtx=null,_qcSub=null,_qcVerb=null,_qcTag=null,_qcGradeSel=null;
 function qcToggleSticky(){
-  _qcSticky=!_qcSticky;
-  var b=document.getElementById('qc-sticky');
-  b.classList.toggle('on',_qcSticky);
-  b.textContent=_qcSticky?'\u{1F4CC} Sticky \u00B7 no date':'Today';
+  _qcSticky=!_qcSticky;var b=document.getElementById('qc-sticky');
+  b.classList.toggle('on',_qcSticky);b.textContent=_qcSticky?'\u{1F4CC} Sticky \u00B7 no date':'Today';
 }
+function qcOnInput(){
+  var t=document.getElementById('qc-input').value;
+  var hit=detectStudentInText(t);
+  var el=document.getElementById('qc-tag');
+  if(hit&&(!_qcTag||_qcTag.student!==hit.student)){_qcTag=hit;}
+  if(!hit)_qcTag=null;
+  if(_qcTag){
+    el.style.display='block';
+    el.innerHTML='<span style="display:inline-flex;align-items:center;gap:6px;background:#e0f2fe;color:#075985;border:1px solid #7dd3fc;border-radius:12px;padding:2px 8px 2px 10px">\u{1F464} '+_qcTag.student+(_qcTag.tutor?' \u00B7 tutor '+_qcTag.tutor:'')+' <b style="cursor:pointer;padding:0 2px" onclick="qcClearTag()">\u00D7</b></span>';
+  } else {el.style.display='none';el.innerHTML='';}
+}
+function qcClearTag(){_qcTag=null;document.getElementById('qc-tag').style.display='none';}
 function openQuickCapture(){
-  var cats=(S.planCategories&&S.planCategories.length?S.planCategories:[{id:'gen',name:'General',color:'#495057'}]);
+  _qcCtx=null;_qcSub=null;_qcVerb=null;_qcTag=null;_qcSticky=false;
+  var cats=getContexts();
   var last=localStorage.getItem('qcLastCat')||'';
   document.getElementById('qc-cats').innerHTML=cats.map(function(ct){
-    return '<button class="qc-cat'+(ct.id===last?' last':'')+'" style="background:'+ct.color+'" onclick="qcSave(&quot;'+ct.id+'&quot;)">'+ct.name+'</button>';
+    return '<button class="qc-cat'+(ct.id===last?' last':'')+'" style="background:'+ct.color+'" onclick="qcPickCtx(&quot;'+ct.id+'&quot;)">'+ct.name+'</button>';
   }).join('');
-  _qcSticky=false;
-  var sb=document.getElementById('qc-sticky');
-  if(sb){sb.classList.remove('on');sb.textContent='Today';}
+  var sb=document.getElementById('qc-sticky');sb.classList.remove('on');sb.textContent='Today';
+  document.getElementById('qc-step1').style.display='block';
+  document.getElementById('qc-step2').style.display='none';
+  document.getElementById('qc-tag').style.display='none';
   document.getElementById('qc-backdrop').classList.add('open');
   document.getElementById('qc-sheet').classList.add('open');
-  var inp=document.getElementById('qc-input');
-  inp.value='';
+  var inp=document.getElementById('qc-input');inp.value='';
   setTimeout(function(){inp.focus();},240);
 }
 function closeQuickCapture(){
@@ -34152,35 +34489,103 @@ function closeQuickCapture(){
   document.getElementById('qc-sheet').classList.remove('open');
   document.getElementById('qc-input').blur();
 }
-function qcSave(catId){
-  var text=document.getElementById('qc-input').value.trim();
-  if(!text){document.getElementById('qc-input').focus();return;}
+function qcBack(){
+  document.getElementById('qc-step1').style.display='block';
+  document.getElementById('qc-step2').style.display='none';
+  _qcCtx=null;_qcSub=null;_qcVerb=null;
+}
+function qcText(){return document.getElementById('qc-input').value.trim();}
+function qcPickCtx(id){
+  if(!qcText()){document.getElementById('qc-input').focus();return;}
+  _qcCtx=id;
+  var ctx=getContext(id);
+  var crumb=document.getElementById('qc-crumb-txt');crumb.textContent=ctx?ctx.name:id;
+  document.getElementById('qc-step1').style.display='none';
+  document.getElementById('qc-step2').style.display='block';
+  document.getElementById('qc-grades').style.display='none';
+  document.getElementById('qc-verbs').style.display='grid';
+  var subEl=document.getElementById('qc-sub');
+  if(ctx&&ctx.kind==='teaching'){
+    var lastSub=localStorage.getItem('qcLastSub_'+id)||'general';
+    _qcSub=lastSub;
+    var chips=[];
+    classesForContext().forEach(function(cl){chips.push({v:cl.id,l:cl.name});});
+    getGrades().forEach(function(g){chips.push({v:g,l:g+' prep'});});
+    chips.push({v:'general',l:'General'});
+    subEl.style.display='block';
+    subEl.innerHTML='<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Which</div><div style="display:flex;flex-wrap:wrap;gap:6px">'+
+      chips.map(function(ch){return '<button class="qc-chip'+(ch.v===_qcSub?' on':'')+'" data-v="'+ch.v+'" onclick="qcPickSub(&quot;'+ch.v+'&quot;,this)">'+ch.l+'</button>';}).join('')+'</div>';
+  } else {subEl.style.display='none';subEl.innerHTML='';_qcSub=null;}
+}
+function qcPickSub(v,el){
+  _qcSub=v;
+  document.querySelectorAll('#qc-sub .qc-chip').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-v')===v);});
+}
+function qcPickVerb(verb){
+  _qcVerb=verb;
+  var ctx=getContext(_qcCtx);
+  if(verb==='say'&&ctx&&ctx.deliver==='tutor_email'&&!_qcTag){
+    // grade selection step
+    _qcGradeSel=null; // null = all
+    var gs=getGrades();
+    document.getElementById('qc-grade-chips').innerHTML=gs.map(function(g){return '<button class="qc-chip on" data-g="'+g+'" onclick="qcToggleGrade(this)">'+g+'</button>';}).join('');
+    document.getElementById('qc-verbs').style.display='none';
+    document.getElementById('qc-grades').style.display='block';
+    return;
+  }
+  qcCommit(verb,null);
+}
+function qcToggleGrade(el){
+  var all=Array.from(document.querySelectorAll('#qc-grade-chips .qc-chip'));
+  var onCount=all.filter(function(b){return b.classList.contains('on');}).length;
+  if(onCount===all.length){all.forEach(function(b){b.classList.remove('on');});el.classList.add('on');}
+  else el.classList.toggle('on');
+  if(!all.some(function(b){return b.classList.contains('on');}))all.forEach(function(b){b.classList.add('on');});
+}
+function qcSaveTutorsPoint(){
+  var sel=Array.from(document.querySelectorAll('#qc-grade-chips .qc-chip.on')).map(function(b){return b.getAttribute('data-g');});
+  var all=document.querySelectorAll('#qc-grade-chips .qc-chip').length;
+  qcCommit('say',sel.length===all?null:sel);
+}
+function qcCommit(verb,grades){
+  var text=qcText();if(!text){document.getElementById('qc-input').focus();return;}
+  var ctx=getContext(_qcCtx);
   if(!S.planData)S.planData=[];
   var dn=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  S.planData.push({id:'qc'+Date.now(),text:text,scope:_qcSticky?'sticky':'day',recur:null,recurDay:null,weekNum:null,
-    date:_qcSticky?null:_todayStr(),day:_qcSticky?null:dn[new Date().getDay()],time:null,cat:catId});
-  saveSettings();
-  try{localStorage.setItem('planData',JSON.stringify(S.planData));localStorage.setItem('qcLastCat',catId);}catch(e){}
+  var item={id:'qc'+Date.now(),text:text,cat:_qcCtx,recur:null,recurDay:null,weekNum:null,time:null};
+  if(_qcSub)item.sub=_qcSub;
+  if(_qcTag){item.student=_qcTag.student;item.tutor=_qcTag.tutor;if(_qcTag.grade)item.grades=[_qcTag.grade];}
+  if(verb==='say'){
+    item.say=true;item.scope='sticky';item.date=null;item.day=null;item.archived=false;
+    if(grades)item.grades=grades;
+  } else {
+    item.scope=_qcSticky?'sticky':'day';
+    item.date=_qcSticky?null:_todayStr();item.day=_qcSticky?null:dn[new Date().getDay()];
+  }
+  S.planData.push(item);
+  _savePlanNow();
+  try{localStorage.setItem('qcLastCat',_qcCtx);localStorage.setItem('qcLastVerb',verb);if(_qcSub)localStorage.setItem('qcLastSub_'+_qcCtx,_qcSub);}catch(e){}
   closeQuickCapture();
-  var cat=(S.planCategories||[]).find(function(x){return x.id===catId;});
-  showToastMsg('\u2713 Added to '+(cat?cat.name:'plan'),'#16a34a');
+  showToastMsg((verb==='say'?'\u{1F4AC} ':'\u2713 ')+(ctx?ctx.name:'Saved')+(_qcSub&&_qcSub!=='general'?' \u00B7 '+_qcSub:''),verb==='say'?'#0e7490':'#16a34a');
+  try{if(_activeMainTab==='plan')renderWeekTasksView();}catch(e){}
 }
-function qcSaveLast(){
+function qcEnter(){
+  if(document.getElementById('qc-step2').style.display!=='none'){
+    if(document.getElementById('qc-grades').style.display!=='none'){qcSaveTutorsPoint();return;}
+    qcPickVerb(localStorage.getItem('qcLastVerb')||'do');return;
+  }
   var last=localStorage.getItem('qcLastCat');
-  var cats=S.planCategories||[];
+  var cats=getContexts();
   var ok=last&&cats.some(function(x){return x.id===last;});
-  qcSave(ok?last:(cats[0]?cats[0].id:'gen'));
+  qcPickCtx(ok?last:(cats[0]?cats[0].id:''));
 }
 function qcSendPersonal(){
-  var text=document.getElementById('qc-input').value.trim();
-  if(!text){document.getElementById('qc-input').focus();return;}
-  var sticky=_qcSticky;
-  closeQuickCapture();
-  sendToOmni(text,sticky).then(function(ok){
-    showToastMsg(ok?'\u2713 Sent to Omni':'\u2717 Could not reach Omni',ok?'#16a34a':'#dc2626');
-  });
+  var text=qcText();if(!text){document.getElementById('qc-input').focus();return;}
+  var sticky=_qcSticky;closeQuickCapture();
+  sendToOmni(text,sticky).then(function(ok){showToastMsg(ok?'\u2713 Sent to Omni':'\u2717 Could not reach Omni',ok?'#16a34a':'#dc2626');});
 }
 </script>
+
 
 
 </body>
