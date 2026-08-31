@@ -1725,7 +1725,7 @@ async function loadWorkData(){
       wd.forEach(row=>{
         const v=typeof row.value==='string'?JSON.parse(row.value):row.value;
         if(row.key==='settings'){
-          WTASKS=v.planData||[];
+          WTASKS=(v.planData||[]).filter(t=>!t.say&&!t.archived); // points (say) stay in the work app
           WCATS=v.planCategories||WCATS;
           // tt-weeks-date is the school week reference date
           if(v['tt-weeks-date']){
