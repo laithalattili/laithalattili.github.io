@@ -23867,6 +23867,7 @@ function saveSlot(){
   const _depSens=_depOn?(document.querySelector('input[name="dep-sensitivity"]:checked')?.value||null):null;
   const _rawTp=document.getElementById('edit-type').value||'free';
   const evtData={l:document.getElementById('edit-label').value||'',tp:(_rawTp==='empty'?'free':_rawTp),cat:catVal,recur:document.getElementById('edit-recur').value||'once',placedWeek:week,endSlotIdx,customStartTime,customEndTime,boarding_register,house_register,...(_depOn&&_depMins?{travel_mins:_depMins,sensitivity:_depSens}:{travel_mins:null,sensitivity:null})};
+  if(evtData.tp==='free'){evtData.boarding_register=false;evtData.house_register=false;}
   // Record label history for quick-fill suggestions
   _saveLabelHistory(evtData.l,evtData.tp,catVal);
   // Route by recurrence: weekly → ttDefaults (the slot's default state);
@@ -23885,8 +23886,9 @@ function saveSlot(){
       const dk=slotI+'_'+targetDay;
       const dData={...data};delete dData.recur;delete dData.placedWeek;
       ttDefaults[dk]=dData;
-      // Remove any once-override for this week so the new default shows immediately
-      delete ttCustom[_weekKey+'_'+slotI+'_'+targetDay];
+      // Remove any override for this week (new absolute key AND legacy relative key,
+      // including span continuations) so the new default shows immediately
+      _removeOverrideSpan(slotI,targetDay,_weekKey,week);
     } else {
       ttCustom[_weekKey+'_'+slotI+'_'+targetDay]=data;
     }
