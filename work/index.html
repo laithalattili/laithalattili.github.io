@@ -24231,7 +24231,7 @@ function renderTodayView(){
     if(ttShowExtended)return true; // extended view shows everything
     // Only hide if it's a pure sleep slot with no custom content
     const hasCustom=!!getCustomForWeek(offset,i,dayName);
-    const baseTp=(SLOTS[i][dayName]||{}).tp;
+    const baseTp=getBaseCell(i,dayName).tp;
     if(hasCustom)return true; // user assigned something here — show it
     if(baseTp!=='sleep')return true; // non-sleep extended slot — show it
     return false; // pure sleep slot, no custom — hide unless extended
@@ -24245,7 +24245,7 @@ function renderTodayView(){
     if(skippedIdxs.has(idx))return;
     const slot=SLOTS[idx];
     const custom=getCustomForWeek(offset,idx,dayName);
-    const base=slot[dayName];
+    const base=getBaseCell(idx,dayName);
     const cell=custom||base;
     if(!cell)return;
     // Handle hw off-week
@@ -24590,7 +24590,7 @@ function renderTimetable(){
     const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
     const hasAnyCustom=days.some(d=>!!getCustomForWeek(offset,i,d));
     if(hasAnyCustom)return true;
-    const hasNonSleepBase=days.some(d=>(SLOTS[i][d]||{}).tp!=='sleep');
+    const hasNonSleepBase=days.some(d=>getBaseCell(i,d).tp!=='sleep');
     if(hasNonSleepBase)return true;
     return false; // all days are pure sleep, no custom — hide
   });
@@ -24630,7 +24630,7 @@ function renderTimetable(){
     h+=`<tr class="${rc}">${timeCell}`;
     activeDays.forEach((d,di)=>{
       const custom=getCustomForWeek(offset,idx,d);
-      const base=slot[d];
+      const base=getBaseCell(idx,d);
       const cell=custom||base;
       const isCC=isCur&&di===todayDc;
       const isColToday=todayDc===di;
@@ -29707,7 +29707,7 @@ function dsRender(){
 function _dsHint(absIdx){
   const slot=SLOTS[absIdx];if(!slot)return '';
   const days=['Mon','Tue','Wed','Thu','Fri'];
-  const labels=days.map(d=>slot[d]&&slot[d].tp!=='free'&&slot[d].tp!=='sleep'?slot[d].l:'').filter(Boolean);
+  const labels=days.map(d=>{const cc=getCustomForWeek(0,absIdx,d)||getBaseCell(absIdx,d);return cc&&cc.tp!=='free'&&cc.tp!=='sleep'?cc.l:'';}).filter(Boolean);
   return labels.length?labels.slice(0,3).join(' · '):'—';
 }
 
