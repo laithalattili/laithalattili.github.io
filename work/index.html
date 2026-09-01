@@ -2132,6 +2132,10 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
         <button class="recur-btn" id="rb-weekly" onclick="setRecur('weekly',this)">Weekly</button>
         <button class="recur-btn" id="rb-biweekly" onclick="setRecur('biweekly',this)">Biweekly</button>
       </div>
+      <div id="edit-stop-repeat" style="display:none;margin-top:8px;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:12px;color:#9a3412">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="edit-stop-repeat-cb" checked> This slot currently repeats weekly. <b>Stop it repeating</b> (only this week keeps the new content)</label>
+        <div style="font-size:11px;color:#b45309;margin-top:4px;padding-left:24px">Untick to change just this week and keep the weekly version on other weeks.</div>
+      </div>
       <input type="hidden" id="edit-recur" value="once">
     </div>
 
@@ -23400,6 +23404,27 @@ function getEffectiveSlots(){
   });
 }
 
+
+// ── Base grid is structure only (times + Sleep). Real content lives in ttDefaults. ──
+function getBaseCell(idx,day){
+  const b=(SLOTS[idx]&&SLOTS[idx][day])||null;
+  if(!b)return {l:'',tp:'free'};
+  if(b.tp==='sleep')return b;
+  return {l:'',tp:'free'};
+}
+function migrateBaseToDefaults(){
+  try{if(localStorage.getItem('ttBaseMigrated')==='1')return;}catch(e){}
+  const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  let n=0;
+  SLOTS.forEach((row,idx)=>{DAYS.forEach(day=>{
+    const b=row[day];if(!b||!b.tp||b.tp==='sleep'||b.tp==='free')return;
+    const dk=idx+'_'+day;
+    if(!ttDefaults[dk]){ttDefaults[dk]={...b};n++;}
+  });});
+  try{localStorage.setItem('ttBaseMigrated','1');}catch(e){}
+  if(n){saveState();console.log('Migrated',n,'base timetable cells into editable defaults');}
+}
+
 function getCustomForWeek(offset,slotIdx,day){
   const absW=getWeekNumber(offset);
   // 1. This week's override (once event) — absolute week key
@@ -23447,7 +23472,7 @@ function getLive(){
 function getMergedEventInfo(live,offset){
   if(!live||live.currentIdx<0)return null;
   const dc=live.todayDc,day=DAYS[dc],ci=live.currentIdx;
-  const getCell=(idx)=>getCustomForWeek(offset,idx,day)||SLOTS[idx][day];
+  const getCell=(idx)=>getCustomForWeek(offset,idx,day)||getBaseCell(idx,day);
   const cur=getCell(ci);if(!cur)return null;
   const curLabel=cur.l,curTp=cur.tp;
   let endIdx=ci;
@@ -23460,7 +23485,7 @@ function getNextEvent(offset){
   if(di===0||di===6)return{label:'Week starts Mon '+SLOTS[0].t,until:''};
   for(let i=0;i<SLOTS.length;i++){
     if(t2m(getSlotTime(i))>nm){
-      const day=DN[di],cell=getCustomForWeek(offset,i,day)||SLOTS[i][day];
+      const day=DN[di],cell=getCustomForWeek(offset,i,day)||getBaseCell(i,day);
       if(cell)return{label:cell.l,until:SLOTS[i].t};
     }
   }
@@ -23515,7 +23540,7 @@ function openEditModal(slotIdx,day,_bypassEditMode){
   if(!ttEditMode&&!_bypassEditMode)return;
   editSlotInfo={slotIdx,day,week:ttWeekOffset,absWeek:getWeekNumber(ttWeekOffset)};
   const custom=getCustomForWeek(ttWeekOffset,slotIdx,day);
-  const base=SLOTS[slotIdx][day];
+  const base=getBaseCell(slotIdx,day);
   const cur=custom||base;
   const label=cur?cur.l:'';
   document.getElementById('edit-label').value=label;
@@ -23548,6 +23573,7 @@ function openEditModal(slotIdx,day,_bypassEditMode){
     else if(_hasDefault)_badge=' <span style="font-size:10px;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;border-radius:8px;padding:1px 7px">📌 Weekly default</span>';
     emsEl.innerHTML='W'+getWeekNumber(ttWeekOffset)+' · '+day+_badge;
   }
+  setTimeout(_updateStopRepeatUI,0);
   const dayOverride=document.getElementById('edit-day-override');
   if(dayOverride)dayOverride.value='';
   const timeOverride=document.getElementById('edit-time-override');
@@ -23708,7 +23734,7 @@ function _renderLabelSuggestions(cat){
   const builtInSugs={duty:['House Duty','Canteen Duty','Gym Duty','Sleep Duty','Free Time Duty','Night Duty'],go:['House Meeting','CPD','Training','AOR','Briefing'],support:['ABS Support','ZPL Support','1:1 Support'],lesson:[],tmtg:[],empty:['Free','Sleep','Break','Lunch','Dinner']};
   const base=(builtInSugs[cat]||[]);
   // Also add class names for lesson
-  const classSugs=cat==='lesson'?CLASSES.map(c=>c.id):[];
+  const classSugs=cat==='lesson'?CLASSES.map(c=>c.name||c.id):[];
   const all=[...new Set([...catHist,...classSugs,...base])];
   row.innerHTML=all.slice(0,8).map(s=>`<button onclick="document.getElementById('edit-label').value='${s}';editLabelInput('${s}')" style="font-size:11px;padding:2px 8px;border:1px solid #dee2e6;border-radius:12px;background:#f8f9fa;color:#495057;cursor:pointer">${s}</button>`).join('');
 }
@@ -23779,7 +23805,7 @@ function _saveLabelHistory(label,tp,cat){
 function _populateLabelSuggestions(val){
   const dl=document.getElementById('edit-label-suggestions');if(!dl)return;
   // Class names always appear first as suggestions
-  const classOpts=CLASSES.map(c=>c.id).filter(id=>!val||id.toLowerCase().includes(val.toLowerCase()));
+  const classOpts=CLASSES.map(c=>c.name||c.id).filter(id=>!val||id.toLowerCase().includes(val.toLowerCase()));
   const hist=_getLabelHistory();
   const histMatches=Object.values(hist)
     .filter(e=>!val||e.label.toLowerCase().includes(val.toLowerCase()))
@@ -23794,7 +23820,13 @@ function closeEditModal(){
   if(picker)picker.style.display='none';
 }
 function selectSwatch(tp,el){document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('selected'));el.classList.add('selected');document.getElementById('edit-type').value=tp;}
-function setRecur(val,btn){document.querySelectorAll('.recur-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');document.getElementById('edit-recur').value=val;}
+function setRecur(val,btn){document.querySelectorAll('.recur-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');document.getElementById('edit-recur').value=val;_updateStopRepeatUI();}
+function _updateStopRepeatUI(){
+  const box=document.getElementById('edit-stop-repeat');if(!box||!editSlotInfo)return;
+  const val=document.getElementById('edit-recur').value;
+  const hasDef=!!ttDefaults[editSlotInfo.slotIdx+'_'+editSlotInfo.day];
+  box.style.display=(hasDef&&val!=='weekly')?'block':'none';
+}
 function quickSlot(label,tp){
   document.getElementById('edit-label').value=label;
   document.getElementById('edit-type').value=tp;
@@ -23840,6 +23872,14 @@ function saveSlot(){
   // Route by recurrence: weekly → ttDefaults (the slot's default state);
   // once/biweekly → ttCustom (week-specific overrides)
   const _recurVal=evtData.recur||'once';
+  // Stop repeating: user changed a weekly default to once/biweekly and asked to end the repeat
+  if(_recurVal!=='weekly'){
+    const _cb=document.getElementById('edit-stop-repeat-cb');
+    const _box=document.getElementById('edit-stop-repeat');
+    if(_box&&_box.style.display!=='none'&&_cb&&_cb.checked){
+      _removeDefaultSpan(targetSlot,targetDay);
+    }
+  }
   const _writeEntry=(slotI,data)=>{
     if(_recurVal==='weekly'){
       const dk=slotI+'_'+targetDay;
@@ -23869,13 +23909,30 @@ function saveSlot(){
   if(picker)picker.style.display='none';
   saveState();closeEditModal();renderTimetable();
 }
+function _spanRoot(slotIdx,day,wk,week){
+  // If the clicked cell is a continuation of a span, act on the span's start slot
+  const e=ttCustom[wk+'_'+slotIdx+'_'+day]||ttCustom[week+'_'+slotIdx+'_'+day]||ttDefaults[slotIdx+'_'+day];
+  return (e&&e.isSpanContinue&&typeof e.spanStart==='number')?e.spanStart:slotIdx;
+}
+function _removeOverrideSpan(root,day,wk,week){
+  [wk,week].forEach(w=>{
+    delete ttCustom[w+'_'+root+'_'+day];
+    Object.keys(ttCustom).forEach(k=>{const p=k.split('_');const v=ttCustom[k];
+      if(p.length>=3&&String(p[0])===String(w)&&p[2]===day&&v&&v.isSpanContinue&&v.spanStart===root)delete ttCustom[k];});
+  });
+}
+function _removeDefaultSpan(root,day){
+  delete ttDefaults[root+'_'+day];
+  Object.keys(ttDefaults).forEach(k=>{const p=k.split('_');const v=ttDefaults[k];
+    if(p.length>=2&&p[1]===day&&v&&v.isSpanContinue&&v.spanStart===root)delete ttDefaults[k];});
+}
 function resetSlot(){
   // Reset = remove this week's override only → slot returns to its weekly default
   if(!editSlotInfo)return;
   const{slotIdx,day,week,absWeek}=editSlotInfo;
   const wk=absWeek??week;
-  delete ttCustom[wk+'_'+slotIdx+'_'+day];
-  delete ttCustom[week+'_'+slotIdx+'_'+day]; // legacy relative key too
+  const root=_spanRoot(slotIdx,day,wk,week);
+  _removeOverrideSpan(root,day,wk,week);
   saveState();closeEditModal();renderTimetable();
 }
 
@@ -23885,11 +23942,12 @@ function clearSlot(){
   if(!confirm('Clear this slot completely? It will become a free slot.'))return;
   const{slotIdx,day,week,absWeek}=editSlotInfo;
   const wk=absWeek??week;
-  delete ttCustom[wk+'_'+slotIdx+'_'+day];
-  delete ttCustom[week+'_'+slotIdx+'_'+day];
-  // Remove all other week overrides for this slot too
-  Object.keys(ttCustom).forEach(k=>{const p=k.split('_');if(p.length>=3&&parseInt(p[1])===slotIdx&&p[2]===day)delete ttCustom[k];});
-  delete ttDefaults[slotIdx+'_'+day];
+  const root=_spanRoot(slotIdx,day,wk,week);
+  // Every week's override for this span, plus the weekly default and its continuations
+  Object.keys(ttCustom).forEach(k=>{const p=k.split('_');const v=ttCustom[k];
+    if(p.length<3||p[2]!==day)return;
+    if(parseInt(p[1])===root||(v&&v.isSpanContinue&&v.spanStart===root))delete ttCustom[k];});
+  _removeDefaultSpan(root,day);
   saveState();closeEditModal();renderTimetable();
 }
 
@@ -24159,7 +24217,7 @@ function renderTodayView(){
   let nextIdx=-1;
   if(isToday&&curIdx>=0){
     for(let i=curIdx+1;i<SLOTS.length;i++){
-      const c=getCustomForWeek(offset,i,dayName)||SLOTS[i][dayName];
+      const c=getCustomForWeek(offset,i,dayName)||getBaseCell(i,dayName);
       if(c){nextIdx=i;break;}
     }
   }
@@ -27981,7 +28039,7 @@ function tutorsForGrades(grades){
   return (TUTORS||[]).filter(t=>grades.includes(String(t.grade).trim()));
 }
 function classesForContext(){
-  return (typeof CLASSES!=='undefined'?CLASSES:[]).map(c=>({id:c.id||c.name,name:c.name||c.id,grade:c.grade}));
+  return (typeof CLASSES!=='undefined'?CLASSES:[]).map(c=>({id:c.name||c.id,name:c.name||c.id,grade:c.grade}));
 }
 
 // ══ CROSS-APP INBOX (work side) ═══════════════════════════════
@@ -29040,7 +29098,7 @@ function initApp(){
   const sl=document.getElementById('settings-locked');if(sl)sl.style.display='flex';
   const sc=document.getElementById('settings-content');if(sc)sc.style.display='none';
   hydrateDoneState().then(()=>{_subscribeDoneRealtime();drainWorkInbox();try{if(_curTab==='week'&&typeof renderWeekTasksView==='function')renderWeekTasksView();}catch(e){}});
-  loadSettings();loadPeople();loadState();ensureDefaultContexts();loadSlotNotes();loadHolidays();applyHolidaysToCalendar();loadCalCustomEvents();loadListsData();loadLinks();loadDuties();loadTutorMeetings();dsLoad();loadBoardingSettings();_subscribePenaltiesRealtime();loadNurseMap();loadCommentMap();
+  loadSettings();loadPeople();loadState();migrateBaseToDefaults();ensureDefaultContexts();loadSlotNotes();loadHolidays();applyHolidaysToCalendar();loadCalCustomEvents();loadListsData();loadLinks();loadDuties();loadTutorMeetings();dsLoad();loadBoardingSettings();_subscribePenaltiesRealtime();loadNurseMap();loadCommentMap();
   buildMorningChecks();restoreMCState();
   initWeekTab();checkTaskReset();renderCustomFlowsList();
   // Apply global default (overrides individual defaults)
@@ -29935,7 +29993,7 @@ function snGetPlanned(week,idx,day,label){
   return tmpl?tmpl.bullets||[]:[]; 
 }
 function snSavePlanned(week,idx,day,bullets,recur){
-  const cell=getCustomForWeek(week,idx,day)||SLOTS[idx][day];
+  const cell=getCustomForWeek(week,idx,day)||getBaseCell(idx,day);
   const label=cell?cell.l:'';
   // Determine if this is a lesson plan (category is lesson OR lp_ key already exists)
   const cellCat=(cell||{}).cat||(cell||{}).tp||'free';
@@ -29972,7 +30030,7 @@ function snHasContent(idx,day,week){
   const k=_instanceKey(week,idx,day);
   if(_slotOutlines[k]){const i=_slotOutlines[k];return(i.planned&&i.planned.length)||(i.live&&i.live.length);}
   // check template for this cell label
-  const cell=getCustomForWeek(week,idx,day)||SLOTS[idx][day];
+  const cell=getCustomForWeek(week,idx,day)||getBaseCell(idx,day);
   if(cell){const t=snGetTemplate(cell.l);return t&&t.bullets&&t.bullets.length;}
   return false;
 }
@@ -30003,7 +30061,7 @@ let _editBullets=[]; // working copy for the editor
 let _editLiveBullets=[];
 
 function openSlotNotes(slotIdx,day,week,labelOverride){
-  const cell=getCustomForWeek(week,slotIdx,day)||SLOTS[slotIdx][day];
+  const cell=getCustomForWeek(week,slotIdx,day)||getBaseCell(slotIdx,day);
   const label=labelOverride||(cell?cell.l:'—');
   const tp=cell?cell.tp:'free';
   const cat=cell?(cell.cat||cell.tp):'free'; // use explicit cat, fall back to tp
@@ -30227,12 +30285,12 @@ function amGetCtx(){
   const dayName=DN[di],offset=ttWeekOffset;
   let ci=-1;for(let i=0;i<SLOTS.length;i++)if(nm>=t2m(getSlotTime(i)))ci=i;
   if(ci<0)return null;
-  const cell=getCustomForWeek(offset,ci,dayName)||SLOTS[ci][dayName];if(!cell)return null;
+  const cell=getCustomForWeek(offset,ci,dayName)||getBaseCell(ci,dayName);if(!cell)return null;
   let endIdx=ci;
-  for(let i=ci+1;i<SLOTS.length;i++){const c=getCustomForWeek(offset,i,dayName)||SLOTS[i][dayName];if(c&&c.l===cell.l&&c.tp===cell.tp)endIdx=i;else break;}
+  for(let i=ci+1;i<SLOTS.length;i++){const c=getCustomForWeek(offset,i,dayName)||getBaseCell(i,dayName);if(c&&c.l===cell.l&&c.tp===cell.tp)endIdx=i;else break;}
   const et=slotEndTime(endIdx),sm=t2m(getSlotTime(ci));
   // Use custom start/end time if set on this slot
-  const _cust=getCustomForWeek(offset,ci,dayName)||SLOTS[ci][dayName];
+  const _cust=getCustomForWeek(offset,ci,dayName)||getBaseCell(ci,dayName);
   const _custEt=_cust&&_cust.customEndTime?_cust.customEndTime:null;
   const _custSt=_cust&&_cust.customStartTime?_cust.customStartTime:null;
   const em=_custEt?t2m(_custEt):t2m(et);
@@ -30246,7 +30304,7 @@ function amGetNext(){
   const now=new Date(),di=now.getDay(),nm=now.getHours()*60+now.getMinutes()+now.getSeconds()/60;
   if(di===0&&nm<210)return null; // early Sunday morning before 3:30am
   const dn=DN[di],off=ttWeekOffset;
-  for(let i=0;i<SLOTS.length;i++){const sm=t2m(getSlotTime(i));if(sm<=nm)continue;const c=getCustomForWeek(off,i,dn)||SLOTS[i][dn];if(c&&isCommitment(c.cat||c.tp))return{label:c.l,tp:c.tp,st:getSlotTime(i),minUntil:sm-nm,cat:getCat(c.cat||c.tp)};}
+  for(let i=0;i<SLOTS.length;i++){const sm=t2m(getSlotTime(i));if(sm<=nm)continue;const c=getCustomForWeek(off,i,dn)||getBaseCell(i,dn);if(c&&isCommitment(c.cat||c.tp))return{label:c.l,tp:c.tp,st:getSlotTime(i),minUntil:sm-nm,cat:getCat(c.cat||c.tp)};}
   return null;
 }
 function _fmtCd(mins){
@@ -30774,7 +30832,7 @@ function _amLessonHtml(ctx,nowStr){
   let plan=[];try{const d=localStorage.getItem('lp_'+label);plan=d?JSON.parse(d):[];}catch(e){}
   if(!plan.length)plan=getLessonPlan(label); // fallback to legacy S.lessonPlans
   const done=getLessonDone(offset,slotIdx,dayName);
-  const linkedClass=CLASSES.find(c=>c.id.toLowerCase()===label.toLowerCase());
+  const linkedClass=CLASSES.find(c=>(c.name||'').toLowerCase()===label.toLowerCase()||c.id.toLowerCase()===label.toLowerCase());
   let html=`${_amTimeRow(nowStr,rem,et)}${_amProgBar(pct,st,et)}`;
   if(!plan.length){
     html+=`<div class="am-cl-section"><div class="am-cl-hdr"><span class="am-cl-title">Lesson Plan</span></div><div style="text-align:center;padding:.5rem;color:#555;font-size:12px">No plan yet for <strong style="color:#888">${_esc(label)}</strong>.<br><span style="font-size:11px">Add sections below.</span></div>${_amAddSectionHtml(label)}</div>`;
@@ -33865,7 +33923,7 @@ function amRender(){
   let lpHash='';if(isLessonCtx){try{const d=localStorage.getItem('lp_'+label);lpHash=d?String(d.length)+'_'+d.slice(-8):'';}catch(e){}}
   // Include today's points so HP/neg updates trigger rebuild
   const today=_todayStr();
-  const linkedCls=CLASSES.find(c=>c.id.toLowerCase()===label.toLowerCase())||CLASSES.find(c=>label.toLowerCase().startsWith(c.id.toLowerCase()+' '));
+  const _ll=label.toLowerCase();const linkedCls=CLASSES.find(c=>(c.name||'').toLowerCase()===_ll||c.id.toLowerCase()===_ll)||CLASSES.find(c=>_ll.startsWith((c.name||c.id).toLowerCase()+' ')||_ll.startsWith(c.id.toLowerCase()+' '));
   const pointsHash=linkedCls?POINTS_LOG.filter(e=>e.date===today&&e.classId===linkedCls.id).map(e=>e.type[0]+e.student[0]+(e.val||1)).join(''):'' ;
   const rosterState=linkedCls?String(localStorage.getItem('am_roster_collapsed_'+linkedCls.id)||'0'):'';
   // Include tmtg notes hash so form edits trigger rebuild
