@@ -99,6 +99,11 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .qc-div:before,.qc-div:after{content:'';flex:1;height:1px;background:var(--border)}
 .qc-chip{font-size:12px;font-weight:700;padding:7px 12px;border-radius:14px;border:1.5px solid var(--border2);background:#fff;color:var(--text2);cursor:pointer}
 .qc-chip.on{background:#00205B;border-color:#00205B;color:#fff}
+.qc-sublbl{font-size:9.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:9px 0 5px}
+.qc-sublbl:first-child{margin-top:0}
+.qc-chiprow{display:flex;flex-wrap:wrap;gap:6px}
+.qc-chip.solid{background:#eef2ff;border-color:#c7d2fe;color:#3730a3}
+.qc-chip.solid.on{background:#1d4ed8;border-color:#1d4ed8;color:#fff}
 .tab.active{color:#212529;border-top:2px solid #212529;background:#f8f9fa}
 .tab-dot{position:absolute;top:4px;right:calc(50% - 14px);width:7px;height:7px;border-radius:50%;background:#2b8a3e;display:none}
 .tab-content{display:none}.tab-content.active{display:block}
@@ -25840,6 +25845,7 @@ function _openPlanTaskModal(existing,defaultDay,defaultCat){
   const showDate  = t.scope==='day';
   const showRecur = t.scope==='recurring';
 
+  window._ptmTask=t;
   const modal=document.createElement('div');
   modal.id='plan-task-modal';
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:flex-end;justify-content:center';
@@ -25856,6 +25862,15 @@ function _openPlanTaskModal(existing,defaultDay,defaultCat){
     </div>
 
     <div style="margin-bottom:.75rem">
+      <label style="font-size:11px;font-weight:600;color:#495057;display:block;margin-bottom:4px">TYPE</label>
+      <div style="display:flex;gap:6px">
+        <button type="button" id="ptm-kind-do" onclick="ptmSetKind('do')" style="flex:1;font-size:13px;font-weight:700;padding:9px;border-radius:9px;cursor:pointer;border:1.5px solid ${t.say?'var(--border)':'#212529'};background:${t.say?'#fff':'#212529'};color:${t.say?'#495057':'#fff'}">To do</button>
+        <button type="button" id="ptm-kind-say" onclick="ptmSetKind('say')" style="flex:1;font-size:13px;font-weight:700;padding:9px;border-radius:9px;cursor:pointer;border:1.5px solid ${t.say?'#0e7490':'var(--border)'};background:${t.say?'#0e7490':'#fff'};color:${t.say?'#fff':'#495057'}">To say</button>
+      </div>
+      <input type="hidden" id="ptm-kind" value="${t.say?'say':'do'}">
+    </div>
+    <div id="ptm-say-row" style="margin-bottom:.75rem;${t.say?'':'display:none'}"></div>
+    <div id="ptm-scope-row" style="margin-bottom:.75rem;${t.say?'display:none':''}">
       <label style="font-size:11px;font-weight:600;color:#495057;display:block;margin-bottom:4px">SCOPE</label>
       <select id="ptm-scope" onchange="planModalScopeChange()"
         style="width:100%;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:9px;background:#fff">${scopeOpts}</select>
@@ -25891,7 +25906,7 @@ function _openPlanTaskModal(existing,defaultDay,defaultCat){
 
     <div style="margin-bottom:1.25rem">
       <label style="font-size:11px;font-weight:600;color:#495057;display:block;margin-bottom:4px">CATEGORY</label>
-      <select id="ptm-cat" style="width:100%;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:9px;background:#fff">${catOpts}</select>
+      <select id="ptm-cat" onchange="if(document.getElementById('ptm-kind').value==='say')ptmRenderSayFields()" style="width:100%;font-size:13px;padding:8px 10px;border:1.5px solid var(--border);border-radius:9px;background:#fff">${catOpts}</select>
     </div>
 
     <div style="display:flex;gap:.5rem">
@@ -25902,6 +25917,52 @@ function _openPlanTaskModal(existing,defaultDay,defaultCat){
   document.body.appendChild(modal);
   // Auto-focus text input
   setTimeout(()=>{const inp=document.getElementById('ptm-text');if(inp)inp.focus();},80);
+}
+
+// ── Task modal: Do ↔ Say switching ──
+function ptmSetKind(kind){
+  const hid=document.getElementById('ptm-kind');if(!hid)return;
+  hid.value=kind;
+  const isSay=kind==='say';
+  const bDo=document.getElementById('ptm-kind-do'),bSay=document.getElementById('ptm-kind-say');
+  if(bDo){bDo.style.background=isSay?'#fff':'#212529';bDo.style.color=isSay?'#495057':'#fff';bDo.style.borderColor=isSay?'var(--border)':'#212529';}
+  if(bSay){bSay.style.background=isSay?'#0e7490':'#fff';bSay.style.color=isSay?'#fff':'#495057';bSay.style.borderColor=isSay?'#0e7490':'var(--border)';}
+  ['ptm-scope-row','ptm-weekday-row','ptm-date-row','ptm-recur-row','ptm-time-row'].forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    if(isSay)el.style.display='none';
+    else if(id==='ptm-scope-row')el.style.display='';
+  });
+  if(!isSay)planModalScopeChange();
+  const sr=document.getElementById('ptm-say-row');
+  if(sr){sr.style.display=isSay?'':'none';if(isSay)ptmRenderSayFields();}
+}
+function ptmRenderSayFields(){
+  const sr=document.getElementById('ptm-say-row');if(!sr)return;
+  const catId=document.getElementById('ptm-cat')?.value||_ptmTask?.cat;
+  const ctx=getContext(catId);
+  const t=_ptmTask||{};
+  let h='';
+  if(ctx&&ctx.kind==='teaching'){
+    const cls=classesForContext().slice().sort((a,b)=>((parseInt(String(a.grade).replace(/\D/g,''))||0)-(parseInt(String(b.grade).replace(/\D/g,''))||0))||String(a.name).localeCompare(String(b.name)));
+    const cur=t.sub||'general';
+    h+='<label style="font-size:11px;font-weight:600;color:#495057;display:block;margin-bottom:4px">FOR</label>';
+    if(cls.length)h+='<div class="qc-sublbl">Classes</div><div class="qc-chiprow">'+cls.map(cl=>`<button type="button" class="qc-chip solid${cl.id===cur?' on':''}" data-sub="${cl.id}" onclick="ptmPickSub('${cl.id}',this)">${cl.name}</button>`).join('')+'</div>';
+    h+='<div class="qc-sublbl">Grade prep</div><div class="qc-chiprow">'+getGrades().map(g=>`<button type="button" class="qc-chip${g===cur?' on':''}" data-sub="${g}" onclick="ptmPickSub('${g}',this)">${g}</button>`).join('')+'</div>';
+    h+=`<div class="qc-chiprow" style="margin-top:8px"><button type="button" class="qc-chip${cur==='general'?' on':''}" data-sub="general" style="width:100%;justify-content:center" onclick="ptmPickSub('general',this)">General teaching</button></div>`;
+    h+=`<input type="hidden" id="ptm-sub" value="${cur}">`;
+  } else if(ctx&&ctx.deliver==='tutor_email'){
+    const sel=(t.grades&&t.grades.length)?t.grades:getGrades();
+    h+='<label style="font-size:11px;font-weight:600;color:#495057;display:block;margin-bottom:4px">GRADES</label><div class="qc-chiprow" id="ptm-grades">'+
+      getGrades().map(g=>`<button type="button" class="qc-chip${sel.includes(g)?' on':''}" data-g="${g}" onclick="this.classList.toggle('on')">${g}</button>`).join('')+'</div>';
+    if(t.student)h+=`<div style="font-size:11px;color:#075985;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:8px;padding:5px 9px;margin-top:8px">\u{1F464} ${t.student}${t.tutor?' \u00B7 tutor '+t.tutor:''}</div>`;
+  } else {
+    h+='<div style="font-size:11.5px;color:#6b7280;background:#f8f9fa;border:1px solid var(--border3);border-radius:8px;padding:8px 10px">Points stay on the list until you mark them delivered.</div>';
+  }
+  sr.innerHTML=h;
+}
+function ptmPickSub(v,el){
+  document.querySelectorAll('#ptm-say-row .qc-chip').forEach(b=>b.classList.toggle('on',b.getAttribute('data-sub')===v));
+  const hid=document.getElementById('ptm-sub');if(hid)hid.value=v;
 }
 
 function planModalScopeChange(){
@@ -25945,7 +26006,25 @@ function planSaveTask(id){
 
   if(!S.planData)S.planData=[];
   const idx=S.planData.findIndex(x=>x.id===id);
-  const task={id,text,scope,recur,recurDay,weekNum:wNum,date,day,time,cat};
+  const prev=idx>=0?S.planData[idx]:{};
+  const kind=document.getElementById('ptm-kind')?.value||(prev.say?'say':'do');
+  let task;
+  if(kind==='say'){
+    const ctx=getContext(cat);
+    task={...prev,id,text,cat,say:true,scope:'sticky',date:null,day:null,recur:null,recurDay:null,weekNum:null,time:null,
+      archived:prev.archived||false};
+    if(ctx&&ctx.kind==='teaching')task.sub=document.getElementById('ptm-sub')?.value||prev.sub||'general';
+    else delete task.sub;
+    if(ctx&&ctx.deliver==='tutor_email'&&!task.student){
+      const sel=Array.from(document.querySelectorAll('#ptm-grades .qc-chip.on')).map(b=>b.getAttribute('data-g'));
+      const all=document.querySelectorAll('#ptm-grades .qc-chip').length;
+      if(sel.length&&sel.length!==all)task.grades=sel; else delete task.grades;
+    }
+  } else {
+    task={...prev,id,text,scope,recur,recurDay,weekNum:wNum,date,day,time,cat};
+    delete task.say;delete task.archived;delete task.delivered_at;delete task.via;delete task.grades;
+    if(!(getContext(cat)||{}).kind)delete task.sub;
+  }
   if(idx>=0)S.planData[idx]=task;
   else S.planData.push(task);
 
@@ -25964,12 +26043,23 @@ function planDeleteTask(id){
 }
 
 // ── Plan Categories (Settings) ─────────────────────────
+
+function movePlanCategory(i,dir){
+  const cats=S.planCategories||[];const j=i+dir;
+  if(j<0||j>=cats.length)return;
+  const t=cats[i];cats[i]=cats[j];cats[j]=t;
+  _savePlanNow();renderPlanCategories();
+}
 function renderPlanCategories(){
   const el=document.getElementById('plan-categories-list');if(!el)return;
   const cats=S.planCategories||[];
   el.innerHTML=cats.map((cat,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:.5rem 1rem;border-bottom:.5px solid var(--border3)">
+    <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0">
+      <button onclick="movePlanCategory(${i},-1)" ${i===0?'disabled':''} style="font-size:9px;line-height:1;padding:2px 5px;background:#f8f9fa;border:1px solid var(--border);border-radius:4px;cursor:${i===0?'default':'pointer'};opacity:${i===0?'.3':'1'}">▲</button>
+      <button onclick="movePlanCategory(${i},1)" ${i===cats.length-1?'disabled':''} style="font-size:9px;line-height:1;padding:2px 5px;background:#f8f9fa;border:1px solid var(--border);border-radius:4px;cursor:${i===cats.length-1?'default':'pointer'};opacity:${i===cats.length-1?'.3':'1'}">▼</button>
+    </div>
     <div style="width:14px;height:14px;border-radius:50%;background:${cat.color};flex-shrink:0"></div>
-    <div style="flex:1;font-size:13px">${cat.name}</div>
+    <div style="flex:1;font-size:13px">${cat.name}${cat.deliver&&cat.deliver!=='none'?'<span style="font-size:9px;color:#0e7490;background:#ecfeff;border:1px solid #a5f3fc;border-radius:8px;padding:1px 6px;margin-left:6px">say</span>':''}</div>
     <button onclick="editPlanCategory(${i})" style="font-size:11px;padding:3px 10px;background:#f1f3f5;border:1px solid var(--border);border-radius:6px;cursor:pointer">Edit</button>
     <button onclick="deletePlanCategory(${i})" style="font-size:11px;padding:3px 10px;background:#fff0f0;border:1px solid #ffc9c9;border-radius:6px;cursor:pointer;color:#c92a2a">✕</button>
   </div>`).join('')||'<div style="padding:.75rem 1rem;font-size:12px;color:#868e96">No categories yet.</div>';
@@ -27831,6 +27921,7 @@ function _pointRowHtml(t,ctx){
       <div style="font-size:13px;color:#111;line-height:1.35">${_esc(t.text)}</div>
       ${tags.length?'<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:4px">'+tags.join('')+'</div>':''}
     </div>
+    <button onclick="planEditTask('${t.id}')" title="Edit" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:13px;padding:0 3px">✎</button>
     <button onclick="if(deletePoint('${t.id}'))renderWeekTasksView()" title="Delete" style="background:none;border:none;color:#cbd5e1;cursor:pointer;font-size:15px;padding:0 4px">\u00D7</button>
   </div>`;
 }
@@ -34546,8 +34637,9 @@ function openQuickCapture(){
   _qcCtx=null;_qcSub=null;_qcVerb=null;_qcTag=null;_qcSticky=false;
   var cats=getContexts();
   var last=localStorage.getItem('qcLastCat')||'';
-  document.getElementById('qc-cats').innerHTML=cats.map(function(ct){
-    return '<button class="qc-cat'+(ct.id===last?' last':'')+'" style="background:'+ct.color+'" onclick="qcPickCtx(&quot;'+ct.id+'&quot;)">'+ct.name+'</button>';
+  document.getElementById('qc-cats').innerHTML=cats.map(function(ct,i){
+    var full=(cats.length%2===1&&i===cats.length-1)?';grid-column:1/-1':'';
+    return '<button class="qc-cat'+(ct.id===last?' last':'')+'" style="background:'+ct.color+full+'" onclick="qcPickCtx(&quot;'+ct.id+'&quot;)">'+ct.name+'</button>';
   }).join('');
   var sb=document.getElementById('qc-sticky');sb.classList.remove('on');sb.textContent='Today';
   document.getElementById('qc-step1').style.display='block';
@@ -34587,8 +34679,15 @@ function qcPickCtx(id){
     getGrades().forEach(function(g){chips.push({v:g,l:g+' prep'});});
     chips.push({v:'general',l:'General'});
     subEl.style.display='block';
-    subEl.innerHTML='<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Which</div><div style="display:flex;flex-wrap:wrap;gap:6px">'+
-      chips.map(function(ch){return '<button class="qc-chip'+(ch.v===_qcSub?' on':'')+'" data-v="'+ch.v+'" onclick="qcPickSub(&quot;'+ch.v+'&quot;,this)">'+ch.l+'</button>';}).join('')+'</div>';
+    var _cls=classesForContext(),_grs=getGrades();
+    var _gnum=function(g){return parseInt(String(g).replace(/\D/g,''))||0;};
+    _cls=_cls.slice().sort(function(a,b){return _gnum(a.grade)-_gnum(b.grade)||String(a.name).localeCompare(String(b.name));});
+    var _mk=function(v,l,solid){return '<button class="qc-chip'+(solid?' solid':'')+(v===_qcSub?' on':'')+'" data-v="'+v+'" onclick="qcPickSub(&quot;'+v+'&quot;,this)">'+l+'</button>';};
+    var h='';
+    if(_cls.length)h+='<div class="qc-sublbl">Classes</div><div class="qc-chiprow">'+_cls.map(function(cl){return _mk(cl.id,cl.name,true);}).join('')+'</div>';
+    if(_grs.length)h+='<div class="qc-sublbl">Grade prep</div><div class="qc-chiprow">'+_grs.map(function(g){return _mk(g,g,false);}).join('')+'</div>';
+    h+='<div class="qc-chiprow" style="margin-top:8px">'+'<button class="qc-chip'+('general'===_qcSub?' on':'')+'" data-v="general" style="width:100%;justify-content:center" onclick="qcPickSub(&quot;general&quot;,this)">General teaching</button>'+'</div>';
+    subEl.innerHTML=h;
   } else {subEl.style.display='none';subEl.innerHTML='';_qcSub=null;}
 }
 function qcPickSub(v,el){
