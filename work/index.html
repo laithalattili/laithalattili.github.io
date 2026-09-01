@@ -23736,7 +23736,7 @@ function _renderLabelSuggestions(cat){
   // Also add class names for lesson
   const classSugs=cat==='lesson'?CLASSES.map(c=>c.name||c.id):[];
   const all=[...new Set([...catHist,...classSugs,...base])];
-  row.innerHTML=all.slice(0,8).map(s=>`<button onclick="document.getElementById('edit-label').value='${s}';editLabelInput('${s}')" style="font-size:11px;padding:2px 8px;border:1px solid #dee2e6;border-radius:12px;background:#f8f9fa;color:#495057;cursor:pointer">${s}</button>`).join('');
+  row.innerHTML=all.slice(0,8).map(s=>`<button onclick="document.getElementById('edit-label').value='${s}';editLabelInput('${s}');_applyQuickType('${s}')" style="font-size:11px;padding:2px 8px;border:1px solid #dee2e6;border-radius:12px;background:#f8f9fa;color:#495057;cursor:pointer">${s}</button>`).join('');
 }
 
 function selectEditCat(cat){
@@ -23801,6 +23801,17 @@ function _saveLabelHistory(label,tp,cat){
     const trimmed={};keys.forEach(k=>trimmed[k]=h[k]);
     localStorage.setItem('labelHistory',JSON.stringify(trimmed));
   }catch(e){}
+}
+
+// Quick chips under "Empty" map to a type so Lunch/Break/etc. aren't styled as free
+function _applyQuickType(s){
+  const cat=document.getElementById('edit-cat')?.value;
+  if(cat&&cat!=='empty')return;
+  const map={Free:'free',Sleep:'sleep',Break:'personal',Lunch:'personal',Dinner:'personal'};
+  const tp=map[s];if(!tp)return;
+  const t=document.getElementById('edit-type');if(t)t.value=tp;
+  if(tp==='free'){const l=document.getElementById('edit-label');if(l)l.value='';}
+  document.querySelectorAll('.swatch').forEach(el=>el.classList.toggle('selected',el.dataset&&el.dataset.tp===tp));
 }
 function _populateLabelSuggestions(val){
   const dl=document.getElementById('edit-label-suggestions');if(!dl)return;
@@ -23950,6 +23961,9 @@ function clearSlot(){
     if(p.length<3||p[2]!==day)return;
     if(parseInt(p[1])===root||(v&&v.isSpanContinue&&v.spanStart===root))delete ttCustom[k];});
   _removeDefaultSpan(root,day);
+  // Notes belong to the slot; a full Clear removes them too
+  try{delete slotNotes['perm_'+root+'_'+day];delete slotNotes['once_'+root+'_'+day+'_'+_todayStr()];
+    localStorage.setItem('slotNotes',JSON.stringify(slotNotes));supaSave('slotNotes',JSON.stringify(slotNotes));}catch(e){}
   saveState();closeEditModal();renderTimetable();
 }
 
