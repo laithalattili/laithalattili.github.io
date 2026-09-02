@@ -104,6 +104,8 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .qc-chiprow{display:flex;flex-wrap:wrap;gap:6px}
 .qc-chip.solid{background:#eef2ff;border-color:#c7d2fe;color:#3730a3}
 .qc-chip.solid.on{background:#1d4ed8;border-color:#1d4ed8;color:#fff}
+.plan-band{display:flex;align-items:center;gap:8px;padding:8px 11px;border-radius:9px;border:1px solid}
+.plan-band-count{font-size:10px;font-weight:700;color:#fff;border-radius:9px;padding:1px 7px}
 .tab.active{color:#212529;border-top:2px solid #212529;background:#f8f9fa}
 .tab-dot{position:absolute;top:4px;right:calc(50% - 14px);width:7px;height:7px;border-radius:50%;background:#2b8a3e;display:none}
 .tab-content{display:none}.tab-content.active{display:block}
@@ -118,9 +120,9 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .plan-view-toggle{display:flex;gap:6px;padding:.5rem 0 .25rem}
 .plan-tog-btn{flex:1;padding:7px 0;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:12px;font-weight:600;color:#495057;cursor:pointer;transition:all .15s}
 .plan-tog-btn.active{background:#212529;color:#fff;border-color:#212529}
-.plan-day-col{background:#fff;border:1px solid var(--border3);border-radius:10px;margin-bottom:.6rem;overflow:hidden}
-.plan-day-hdr{background:#f8f9fa;padding:.5rem .85rem;font-size:12px;font-weight:700;color:#495057;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border3)}
-.plan-day-hdr.today{background:#212529;color:#fff}
+.plan-day-col{background:#fff;border:1px solid #eef0f2;border-radius:9px;margin-bottom:6px;overflow:hidden}
+.plan-day-hdr{background:transparent;padding:8px 11px;font-size:12.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;justify-content:space-between;border-bottom:1px solid #f1f5f9}
+.plan-day-hdr.today{background:transparent;color:#7d5800;border-left:3px solid #f59f00;padding-left:8px}
 .plan-task-row{display:flex;align-items:flex-start;gap:8px;padding:.55rem .85rem;border-bottom:.5px solid var(--border3)}
 .plan-task-row:last-child{border-bottom:none}
 .plan-task-row input[type=checkbox]{margin-top:3px;flex-shrink:0;width:15px;height:15px;cursor:pointer}
@@ -128,11 +130,12 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .plan-task-label.done{color:#adb5bd;text-decoration:line-through}
 .plan-task-meta{font-size:10px;color:#adb5bd;margin-top:2px}
 .plan-task-cat-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px}
-.plan-cat-section{margin-bottom:.75rem}
-.plan-cat-hdr{display:flex;align-items:center;gap:8px;padding:.5rem .85rem;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.plan-cat-section{margin-bottom:6px}
+.plan-cat-section .plan-day-col{border-radius:0 0 9px 9px;margin-bottom:0}
+.plan-cat-hdr{display:flex;align-items:center;gap:8px;padding:8px 11px;font-size:12.5px;font-weight:700;background:#fff;border:1px solid #eef0f2;border-bottom:none;border-radius:9px 9px 0 0}
 .plan-add-btn{width:100%;padding:.55rem;border:1.5px dashed var(--border);border-radius:8px;background:transparent;color:#868e96;font-size:12px;cursor:pointer;margin-top:.3rem}
 .plan-add-btn:active{background:#f8f9fa}
-.plan-sticky-section{background:#fffbe6;border:1px solid #ffe066;border-radius:10px;margin-bottom:.6rem;overflow:hidden}
+.plan-sticky-section{background:#fff;border:1px solid #eef0f2;border-left:3px solid #ffd43b;border-radius:9px;margin-bottom:6px;overflow:hidden}
 .plan-sticky-hdr{padding:.5rem .85rem;font-size:11px;font-weight:700;color:#7d5800;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:6px;border-bottom:1px solid #ffe066}
 .task-text{font-size:13px;color:var(--text);line-height:1.5}
 .task-text.done{color:var(--text3);text-decoration:line-through}
@@ -307,8 +310,8 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 
 .tt-top{display:flex;align-items:center;gap:6px;margin-bottom:.6rem;flex-wrap:wrap}
 .tt-week-nav{display:flex;align-items:center;gap:6px;flex:1}
-#tt-top-bar{position:sticky;top:0;z-index:60;background:var(--bg);padding:6px 0;border-bottom:1px solid var(--border3)}
-#tt-thead-wrap{position:sticky;top:44px;z-index:55;background:#fff}
+#tt-top-bar{position:sticky;top:100px;z-index:60;background:var(--bg);padding:6px 0;border-bottom:1px solid var(--border3)}
+#tt-thead-wrap{position:sticky;top:calc(100px + 46px);z-index:55;background:#fff}
 .tt-dow{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .tt-dow.sel{background:#00205B!important;color:#fff!important;border-bottom:2px solid #00205B!important}
 .tt-week-btn{width:32px;height:32px;border-radius:50%;background:#fff;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;color:var(--text2);flex-shrink:0}
@@ -23340,6 +23343,34 @@ function _tdSelectedDow(){
   const active=ttShowWeekend?DAYS:DAYS.slice(0,5);
   return active.indexOf(dn);
 }
+
+function _renderDayHeaderBar(){
+  const theadTbl=document.getElementById('tt-thead-table');
+  if(!theadTbl)return;
+  const offset=ttWeekOffset;
+  const activeDays=ttShowWeekend?DAYS:DAYS.slice(0,5);
+  const mon=getWeekMondayFor(offset);
+  const todayStr=_todayStr();
+  const selDow=_tdSelectedDow();
+  const dayColPct=(100/activeDays.length);
+  let h='<colgroup><col style="width:34px">'+activeDays.map(()=>'<col style="width:'+dayColPct+'%">').join('')+'<col style="width:34px"></colgroup>';
+  h+='<thead><tr><th style="width:34px;font-size:8px;background:#f8f9fa">Time</th>';
+  activeDays.forEach((d,i)=>{
+    const dt=new Date(mon);dt.setDate(mon.getDate()+DAYS.indexOf(d));
+    const iso=dt.toLocaleDateString('en-CA');
+    const isToday=iso===todayStr;
+    const isSel=selDow===i;
+    const isWknd=(d==='Sat'||d==='Sun');
+    let st='';
+    if(isSel)st='background:#00205B;color:#fff;font-weight:700;border-bottom:2px solid #00205B';
+    else if(isToday)st='background:rgba(245,159,0,.08);color:#7d5800;font-weight:700;border-bottom:2px solid #f59f00';
+    else if(isWknd)st='background:#f0f0f5;color:#868e96';
+    const dl=`<br><span style="font-size:9px;font-weight:400;color:${isSel?'rgba(255,255,255,.85)':isToday?'#7d5800':'#868e96'}">${dt.getDate()}</span>`;
+    h+=`<th class="tt-dow" onclick="ttPickDay('${d}',${offset})" style="${st}">${d}${isToday?' \u25C6':''}${dl}</th>`;
+  });
+  h+='<th style="width:34px;font-size:8px;background:#f8f9fa">Time</th></tr></thead>';
+  theadTbl.innerHTML=h;
+}
 function ttPickDay(dayName,weekOffset){
   if(ttEditMode)return; // don't hijack taps while editing
   const active=ttShowWeekend?DAYS:DAYS.slice(0,5);
@@ -23349,7 +23380,7 @@ function ttPickDay(dayName,weekOffset){
   const target=new Date(mon);target.setDate(mon.getDate()+DAYS.indexOf(dayName));
   const todayD=new Date(_todayStr()+'T00:00:00');
   tdDayOffset=Math.round((target-todayD)/864e5);
-  ttWeekOffset=weekOffset;
+  _syncWeekToSelectedDay();
   if(ttView!=='today'){
     const btn=document.getElementById('tt-btn-today');
     setTTView('today',btn);
@@ -23375,7 +23406,18 @@ function ttNavWeek(dir){
 }
 function tdNavDay(dir){
   tdDayOffset+=dir;
+  _syncWeekToSelectedDay();
   renderTimetable();
+}
+function _syncWeekToSelectedDay(){
+  // Keep the shared day header on the week that contains the selected day
+  const t=new Date(_todayStr()+'T00:00:00');
+  t.setDate(t.getDate()+tdDayOffset);
+  const tMon=new Date(t);
+  const dow=t.getDay();                    // 0=Sun
+  tMon.setDate(t.getDate()-(dow===0?6:dow-1));
+  const curMon=getWeekMondayFor(0);
+  ttWeekOffset=Math.round((tMon-curMon)/(7*864e5));
 }
 
 const PERIODS={
@@ -24600,6 +24642,7 @@ function renderTimetable(){
   if(ttView==='today'){
     if(tableWrap)tableWrap.style.display='none';
     if(todayView)todayView.style.display='block';
+    _renderDayHeaderBar();   // keep the shared day picker in sync
     renderTodayView();
     return;
   }
@@ -25798,7 +25841,7 @@ function renderWeekTasksView(){
       html+=`<div class="plan-cat-section">
         <div class="plan-cat-hdr">
           <div style="width:10px;height:10px;border-radius:50%;background:${cat.color};flex-shrink:0"></div>
-          <span style="color:${cat.color}">${cat.name}</span>
+          <span style="color:var(--text);flex:1">${cat.name}</span><span style="font-size:10px;font-weight:700;color:${cat.color}">${catTasks.length}</span>
           <button onclick="planAddTask(null,'${cat.id}')" style="background:none;border:none;color:#ced4da;font-size:16px;cursor:pointer;margin-left:auto;line-height:1;padding:0">＋</button>
         </div>
         <div class="plan-day-col">${catTasks.map(taskCard).join('')}</div>
@@ -28012,27 +28055,30 @@ function renderToSaySection(){
       if(arch.length)actions+=`<button class="btn-sec" onclick="openSayHistory('${ctx.id}')">\u{1F5C4} History (${arch.length})</button>`;
       if(actions)body+=`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">${actions}</div>`;
     }
-    html+=`<div style="background:#fff;border:1px solid #e5e7eb;border-left:4px solid ${ctx.color};border-radius:10px;padding:10px 12px;margin-bottom:8px">
+    html+=`<div style="background:#fff;border:1px solid #eef0f2;border-radius:9px;padding:8px 11px;margin-bottom:6px">
       <div onclick="toggleSayGroup('${ctx.id}')" style="display:flex;align-items:center;gap:8px;cursor:pointer">
-        <span style="font-size:11px;color:#9ca3af;width:12px">${open?'\u25BE':'\u25B8'}</span>
-        <span style="font-size:13px;font-weight:800;color:${ctx.color}">${_esc(ctx.name)}</span>
-        <span style="font-size:10px;font-weight:700;background:${ctx.color};color:#fff;border-radius:9px;padding:1px 7px">${pts.length}</span>
+        <span style="font-size:10px;color:#c1c7cd;width:10px">${open?'\u25BE':'\u25B8'}</span>
+        <span style="width:8px;height:8px;border-radius:50%;background:${ctx.color};flex-shrink:0"></span>
+        <span style="font-size:12.5px;font-weight:700;color:var(--text);flex:1">${_esc(ctx.name)}</span>
+        <span style="font-size:10px;font-weight:700;color:${ctx.color}">${pts.length}</span>
       </div>${body}</div>`;
   });
   if(!html)return '';
   const total=getContexts().reduce((n,ct)=>n+getPoints(ct.id).length,0);
   const open=_sayOpen['__section']===true; // collapsed by default
-  return `<div style="margin-bottom:${open?'22px':'16px'}">
-      <div onclick="toggleSayGroup('__section')" style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:7px 10px;border-radius:9px;background:#ecfeff;border:1px solid #a5f3fc">
-        <span style="color:#0e7490;font-size:11px">${open?'\u25BE':'\u25B8'}</span>
-        <span style="font-size:11.5px;font-weight:800;color:#0e7490;text-transform:uppercase;letter-spacing:.08em">\u{1F4AC} To say</span>
-        <span style="font-size:10px;font-weight:700;background:#0e7490;color:#fff;border-radius:9px;padding:1px 7px">${total}</span>
+  const doCount=(S.planData||[]).filter(t=>!t.say).length;
+  return `<div style="margin-bottom:${open?'20px':'12px'}">
+      <div onclick="toggleSayGroup('__section')" class="plan-band" style="background:#ecfeff;border-color:#a5f3fc;cursor:pointer">
+        <span style="color:#0e7490;font-size:11px;width:11px">${open?'\u25BE':'\u25B8'}</span>
+        <span style="font-size:11.5px;font-weight:800;color:#0e7490;text-transform:uppercase;letter-spacing:.08em;flex:1">\u{1F4AC} To say</span>
+        <span class="plan-band-count" style="background:#0e7490">${total}</span>
       </div>
-      <div style="display:${open?'block':'none'};margin-top:8px">${html}</div>
+      <div style="display:${open?'block':'none'};padding:8px 0 0 10px;border-left:2px solid #a5f3fc;margin:8px 0 0 6px">${html}</div>
     </div>
-    <div style="border-top:1px solid var(--border3);margin:0 0 10px"></div>
-    <div style="display:flex;align-items:center;gap:8px;padding:2px 0 10px">
-      <span style="font-size:11.5px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.08em">\u2713 To do</span>
+    <div class="plan-band" style="background:#f8f9fa;border-color:var(--border3);margin-bottom:10px">
+      <span style="width:11px"></span>
+      <span style="font-size:11.5px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;flex:1">\u2713 To do</span>
+      <span class="plan-band-count" style="background:#868e96">${doCount}</span>
     </div>`;
 }
 function archiveAll(ctxId){getPoints(ctxId).forEach(t=>archivePoint(t.id));renderWeekTasksView();}
