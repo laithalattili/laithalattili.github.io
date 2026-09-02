@@ -24650,7 +24650,7 @@ function renderTimetable(){
     else if(holName) thStyle='background:#ffe0eb;color:#a61e4d;font-style:italic';
     else if(isWknd) thStyle='background:#f0f0f5;color:#868e96';
     const _selDow=(ttView==='today')?_tdSelectedDow():-1;
-    const _isSel=_selDow===di;
+    const _isSel=_selDow===i;
     if(_isSel)thStyle+=';background:#00205B;color:#fff;border-bottom:2px solid #00205B';
     h+=`<th class="tt-dow" onclick="ttPickDay('${d}',${offset})" title="Show this day" style="${thStyle}">${d}${isToday?' ◆':''}${dateLabel}${holLabel}</th>`;
   });
