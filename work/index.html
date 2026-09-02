@@ -307,6 +307,10 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 
 .tt-top{display:flex;align-items:center;gap:6px;margin-bottom:.6rem;flex-wrap:wrap}
 .tt-week-nav{display:flex;align-items:center;gap:6px;flex:1}
+#tt-top-bar{position:sticky;top:0;z-index:60;background:var(--bg);padding:6px 0;border-bottom:1px solid var(--border3)}
+#tt-thead-wrap{position:sticky;top:44px;z-index:55;background:#fff}
+.tt-dow{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.tt-dow.sel{background:#00205B!important;color:#fff!important;border-bottom:2px solid #00205B!important}
 .tt-week-btn{width:32px;height:32px;border-radius:50%;background:#fff;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;color:var(--text2);flex-shrink:0}
 .tt-week-label{font-size:12px;font-weight:600;color:var(--text);flex:1;text-align:center;line-height:1.3}
 .tt-week-dates{font-size:10px;color:var(--text3);text-align:center}
@@ -1065,14 +1069,15 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
 
 <!-- SCHED -->
 <div id="tab-sched" class="tab-content active">
-  <div class="tt-top">
+  <div class="tt-top" id="tt-top-bar">
     <div class="tt-week-nav">
-      <button class="tt-week-btn" onclick="ttNavWeek(-1)">‹</button>
-      <div>
+      <button class="tt-week-btn" onclick="ttNavWeek(-1)" aria-label="Previous">‹</button>
+      <div style="flex:1;text-align:center;min-width:0">
         <div class="tt-week-label" id="tt-week-label">W1</div>
         <div class="tt-week-dates" id="tt-week-dates"></div>
       </div>
-      <button class="tt-week-btn" onclick="ttNavWeek(1)">›</button>
+      <button class="tt-week-btn" id="tt-nav-now" onclick="ttGoNow()" title="Back to now" style="display:none;width:auto;padding:0 10px;border-radius:14px;background:#fff7e6;border-color:#f59f00;color:#7d5800;font-size:11px;font-weight:700;gap:3px">Now</button>
+      <button class="tt-week-btn" onclick="ttNavWeek(1)" aria-label="Next">›</button>
     </div>
   </div>
   <div class="tt-controls">
@@ -23325,6 +23330,33 @@ function isWeekA(){
   const d=Math.round((new Date()-getWeekARef())/(7*864e5));
   return d%2===0;
 }
+
+// ── Day header acts as a picker in both views ──
+function _tdSelectedDow(){
+  // index of the currently displayed Day-view day within the visible day columns
+  const info=(typeof getTodayViewDay==='function')?getTodayViewDay():null;
+  const dn=info?info.dayName:null;
+  if(!dn)return -1;
+  const active=ttShowWeekend?DAYS:DAYS.slice(0,5);
+  return active.indexOf(dn);
+}
+function ttPickDay(dayName,weekOffset){
+  if(ttEditMode)return; // don't hijack taps while editing
+  const active=ttShowWeekend?DAYS:DAYS.slice(0,5);
+  const di=active.indexOf(dayName);if(di<0)return;
+  // Work out the offset in days from today to that column
+  const mon=getWeekMondayFor(weekOffset);
+  const target=new Date(mon);target.setDate(mon.getDate()+DAYS.indexOf(dayName));
+  const todayD=new Date(_todayStr()+'T00:00:00');
+  tdDayOffset=Math.round((target-todayD)/864e5);
+  ttWeekOffset=weekOffset;
+  if(ttView!=='today'){
+    const btn=document.getElementById('tt-btn-today');
+    setTTView('today',btn);
+  } else {
+    renderTimetable();
+  }
+}
 function ttGoNow(){ttWeekOffset=0;tdDayOffset=0;renderTimetable();}
 function ttNavWeek(dir){
   if(ttEditMode)lockEditMode();
@@ -24189,6 +24221,21 @@ function getTodayViewDay(){
   return{dayName,date:new Date(target),weekOffset,isToday,nm:isToday?nm:-1};
 }
 
+
+// Compact points summary for the Day view — counts by audience, taps to Plan
+function _dayPointsSummaryHtml(dayName,offset){
+  const ctxs=getContexts();
+  const chips=[];
+  ctxs.forEach(ctx=>{
+    const pts=getPoints(ctx.id);
+    if(!pts.length)return;
+    chips.push(`<button onclick="showPlanTab(null)" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;border:1px solid ${ctx.color}33;background:${ctx.color}14;color:${ctx.color};cursor:pointer">${_esc(ctx.name)} <span style="background:${ctx.color};color:#fff;border-radius:8px;padding:0 6px">${pts.length}</span></button>`);
+  });
+  if(!chips.length)return '';
+  return `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 10px">
+    <span style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">\u{1F4AC} To say</span>
+    ${chips.join('')}</div>`;
+}
 function renderTodayView(){
   const info=getTodayViewDay();
   // Clear expanded past slots when day changes
@@ -24467,7 +24514,7 @@ function renderTodayView(){
     </div>`;
   }
 
-  el.innerHTML=html;
+  el.innerHTML=_dayPointsSummaryHtml(dayName,offset)+html;
   if(curIdx>=0)setTimeout(()=>{const s=document.getElementById('tslot-'+curIdx);if(s)s.scrollIntoView({behavior:'smooth',block:'center'});},100);
 }
 
@@ -24499,8 +24546,15 @@ function clearTodayNote(idx,day){
 
 // ── MAIN RENDER ───────────────────────────────────────
 function renderTimetable(){
+  var _off=(ttWeekOffset!==0||tdDayOffset!==0);
   var _nb=document.getElementById('tt-now-btn');
-  if(_nb)_nb.style.display=(ttWeekOffset!==0||tdDayOffset!==0)?'inline-block':'none';
+  if(_nb)_nb.style.display=_off?'inline-block':'none';
+  var _np=document.getElementById('tt-nav-now');
+  if(_np){
+    _np.style.display=_off?'flex':'none';
+    var _behind=(ttView==='today')?(tdDayOffset<0):(ttWeekOffset<0);
+    _np.textContent=(_behind?'\u2192 ':'\u2190 ')+'Now';
+  }
   const offset=ttWeekOffset;
   const wA=getWeekIsA(offset);
   const activeDays=ttShowWeekend?DAYS:DAYS.slice(0,5);
@@ -24595,7 +24649,10 @@ function renderTimetable(){
     if(isToday) thStyle='background:rgba(245,159,0,.08);color:#7d5800;font-weight:700;border-bottom:2px solid #f59f00';
     else if(holName) thStyle='background:#ffe0eb;color:#a61e4d;font-style:italic';
     else if(isWknd) thStyle='background:#f0f0f5;color:#868e96';
-    h+=`<th style="${thStyle}">${d}${isToday?' ◆':''}${dateLabel}${holLabel}</th>`;
+    const _selDow=(ttView==='today')?_tdSelectedDow():-1;
+    const _isSel=_selDow===di;
+    if(_isSel)thStyle+=';background:#00205B;color:#fff;border-bottom:2px solid #00205B';
+    h+=`<th class="tt-dow" onclick="ttPickDay('${d}',${offset})" title="Show this day" style="${thStyle}">${d}${isToday?' ◆':''}${dateLabel}${holLabel}</th>`;
   });
   h+='<th style="width:34px;font-size:8px;background:#f8f9fa">Time</th></tr></thead><tbody>';
 
@@ -27932,7 +27989,7 @@ function renderToSaySection(){
     const pts=getPoints(ctx.id);
     const arch=getPoints(ctx.id,{archived:true});
     if(!pts.length&&!arch.length)return;
-    const open=_sayOpen[ctx.id]!==false;
+    const open=_sayOpen[ctx.id]===true; // collapsed by default, remembered when opened
     let body='';
     if(open){
       if(ctx.kind==='teaching'){
@@ -27963,8 +28020,20 @@ function renderToSaySection(){
       </div>${body}</div>`;
   });
   if(!html)return '';
-  return `<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:2px 0 8px">\u{1F4AC} To say</div>${html}</div>
-    <div style="font-size:11px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:6px 0 8px">\u2713 To do</div>`;
+  const total=getContexts().reduce((n,ct)=>n+getPoints(ct.id).length,0);
+  const open=_sayOpen['__section']===true; // collapsed by default
+  return `<div style="margin-bottom:${open?'22px':'16px'}">
+      <div onclick="toggleSayGroup('__section')" style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:7px 10px;border-radius:9px;background:#ecfeff;border:1px solid #a5f3fc">
+        <span style="color:#0e7490;font-size:11px">${open?'\u25BE':'\u25B8'}</span>
+        <span style="font-size:11.5px;font-weight:800;color:#0e7490;text-transform:uppercase;letter-spacing:.08em">\u{1F4AC} To say</span>
+        <span style="font-size:10px;font-weight:700;background:#0e7490;color:#fff;border-radius:9px;padding:1px 7px">${total}</span>
+      </div>
+      <div style="display:${open?'block':'none'};margin-top:8px">${html}</div>
+    </div>
+    <div style="border-top:1px solid var(--border3);margin:0 0 10px"></div>
+    <div style="display:flex;align-items:center;gap:8px;padding:2px 0 10px">
+      <span style="font-size:11.5px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.08em">\u2713 To do</span>
+    </div>`;
 }
 function archiveAll(ctxId){getPoints(ctxId).forEach(t=>archivePoint(t.id));renderWeekTasksView();}
 function openSayHistory(ctxId){
@@ -34761,6 +34830,46 @@ function qcSendPersonal(){
 
 
 
+<script>
+// ── Swipe: change week in Week view, day in Day view ──
+(function(){
+  let sx=0,sy=0,st=0,tracking=false,scroller=null;
+  function onStart(e){
+    if(ttEditMode)return;
+    if(e.touches.length!==1)return;
+    const t=e.touches[0];
+    sx=t.clientX;sy=t.clientY;st=Date.now();tracking=true;
+    scroller=e.target.closest('#tt-table-wrap');
+  }
+  function onEnd(e){
+    if(!tracking)return;tracking=false;
+    if(ttEditMode)return;
+    const t=e.changedTouches&&e.changedTouches[0];if(!t)return;
+    const dx=t.clientX-sx,dy=t.clientY-sy,dt=Date.now()-st;
+    if(dt>700)return;                          // too slow to be a swipe
+    if(Math.abs(dx)<70)return;                 // too short
+    if(Math.abs(dx)<Math.abs(dy)*1.8)return;   // too vertical
+    // If the week grid can still scroll horizontally in that direction, let it
+    if(scroller){
+      const maxL=scroller.scrollWidth-scroller.clientWidth;
+      if(dx<0&&scroller.scrollLeft<maxL-2)return;
+      if(dx>0&&scroller.scrollLeft>2)return;
+    }
+    const dir=dx<0?1:-1;                       // swipe left = forward
+    if(ttView==='today')tdNavDay(dir);
+    else ttNavWeek(dir);
+  }
+  function bind(){
+    const host=document.getElementById('tab-sched');
+    if(!host||host._swipeBound)return;
+    host._swipeBound=true;
+    host.addEventListener('touchstart',onStart,{passive:true});
+    host.addEventListener('touchend',onEnd,{passive:true});
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);
+  else bind();
+})();
+</script>
 </body>
 </html><script>
 // ── REGISTRATION HISTORY CSV EXPORT ──────────────────────────────────────────
