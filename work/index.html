@@ -23379,14 +23379,16 @@ function ttPickDay(dayName,weekOffset){
   const mon=getWeekMondayFor(weekOffset);
   const target=new Date(mon);target.setDate(mon.getDate()+DAYS.indexOf(dayName));
   const todayD=new Date(_todayStr()+'T00:00:00');
-  tdDayOffset=Math.round((target-todayD)/864e5);
-  _syncWeekToSelectedDay();
+  const _pickedOffset=Math.round((target-todayD)/864e5);
   if(ttView!=='today'){
+    // Switch to Day view first — setTTView('today') resets tdDayOffset to 0,
+    // so the picked day must be applied AFTER the view switch, then re-render.
     const btn=document.getElementById('tt-btn-today');
     setTTView('today',btn);
-  } else {
-    renderTimetable();
   }
+  tdDayOffset=_pickedOffset;
+  _syncWeekToSelectedDay();
+  renderTimetable();
 }
 function ttGoNow(){ttWeekOffset=0;tdDayOffset=0;renderTimetable();}
 function ttNavWeek(dir){
