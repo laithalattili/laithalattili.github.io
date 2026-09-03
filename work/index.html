@@ -311,7 +311,10 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .tt-top{display:flex;align-items:center;gap:6px;margin-bottom:.6rem;flex-wrap:wrap}
 .tt-week-nav{display:flex;align-items:center;gap:6px;flex:1}
 #tt-top-bar{position:sticky;top:100px;z-index:60;background:var(--bg);padding:6px 0;border-bottom:1px solid var(--border3)}
-#tt-thead-wrap{position:sticky;top:194px;z-index:55;background:#fff}
+#tt-thead-wrap{position:sticky;top:146px;z-index:55;background:#fff}
+#tt-float-toggle .tt-btn.active{background:#00205B;color:#fff}
+.tt-week-btn.active{background:#00205B;color:#fff;border-color:#00205B}
+#tab-sched{padding-bottom:64px}
 .tt-dow{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .tt-dow.sel{background:#00205B!important;color:#fff!important;border-bottom:2px solid #00205B!important}
 .tt-week-btn{width:32px;height:32px;border-radius:50%;background:#fff;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;color:var(--text2);flex-shrink:0}
@@ -1054,7 +1057,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
     <div id="am-at-sug" class="at-sug at-sug-dark" style="display:none"></div>
   </div>
   <div id="am-day-pill" onclick="toggleAmDayPill()" style="display:none;align-items:center;gap:6px;margin:6px 12px 0;padding:6px 12px;border:1px solid rgba(245,159,0,.35);border-radius:14px;background:rgba(245,159,0,.08);color:#f59f00;font-size:11.5px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;width:fit-content">
-    \u{1F4AC} <span id="am-day-pill-n">0</span>&nbsp;to say today <span id="am-day-pill-car" style="font-size:9px">▸</span>
+    💬 <span id="am-day-pill-n">0</span>&nbsp;to say today <span id="am-day-pill-car" style="font-size:9px">▸</span>
   </div>
   <div id="am-day-pill-body" style="display:none;margin:6px 12px 0"></div>
   <div class="panel-body" id="am-body"></div>
@@ -1101,15 +1104,17 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       </div>
       <button class="tt-week-btn" id="tt-nav-now" onclick="ttGoNow()" title="Back to now" style="display:none;width:auto;padding:0 10px;border-radius:14px;background:#fff7e6;border-color:#f59f00;color:#7d5800;font-size:11px;font-weight:700;gap:3px">Now</button>
       <button class="tt-week-btn" onclick="ttNavWeek(1)" aria-label="Next">›</button>
+      <button class="edit-mode-btn" id="edit-mode-btn" style="display:none" onclick="ttEditMode?lockEditMode():requestEditMode()">✏️ Edit</button>
+      <button class="tt-week-btn" id="tt-collapse-past-btn" onclick="toggleCollapsePastOpt()" title="Collapse/show past slots" style="font-size:13px">⬆</button>
+      <button class="tt-week-btn" id="tt-options-btn" onclick="toggleTTOptions()" title="View options">⚙</button>
     </div>
   </div>
-  <div class="tt-controls" id="tt-controls">
-    <div class="tt-toggle">
-      <button class="tt-btn" id="tt-btn-full" onclick="setTTView('full',this)">Week</button>
-      <button class="tt-btn" id="tt-btn-today" onclick="setTTView('today',this)">Day</button>
+  <!-- Floating Week|Day toggle — bottom right, thumb reach; hides with the tab -->
+  <div id="tt-float-toggle" style="position:fixed;right:12px;bottom:calc(64px + env(safe-area-inset-bottom));z-index:199">
+    <div class="tt-toggle" style="flex:none;background:rgba(255,255,255,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 4px 18px rgba(0,0,0,.22);border:1px solid var(--border3)">
+      <button class="tt-btn" id="tt-btn-full" onclick="setTTView('full',this)" style="flex:none;padding:11px 20px">Week</button>
+      <button class="tt-btn" id="tt-btn-today" onclick="setTTView('today',this)" style="flex:none;padding:11px 20px">Day</button>
     </div>
-    <button class="edit-mode-btn" id="edit-mode-btn" style="display:none" onclick="ttEditMode?lockEditMode():requestEditMode()">✏️ Edit</button>
-    <button class="tt-show-all-btn" id="tt-options-btn" onclick="toggleTTOptions()" title="View options">⚙</button>
   </div>
   <!-- Options popover (hidden by default) -->
   <div id="tt-options-panel" style="display:none;background:#fff;border:1px solid var(--border);border-radius:var(--rsm);padding:.6rem .75rem;margin-bottom:.5rem;display:none">
@@ -1122,10 +1127,6 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       <label class="tt-opt-row" onclick="toggleExtendedOpt()">
         <span class="tt-opt-label">Show overnight (00:00–07:00 &amp; 23:00)</span>
         <div class="tt-opt-toggle" id="opt-toggle-ext"></div>
-      </label>
-      <label class="tt-opt-row" onclick="toggleCollapsePastOpt()">
-        <span class="tt-opt-label">Collapse past slots</span>
-        <div class="tt-opt-toggle" id="opt-toggle-past"></div>
       </label>
       <label class="tt-opt-row" onclick="toggleTTOptions();ttEditMode?lockEditMode():requestEditMode()" style="border-top:1px solid var(--border3);padding-top:.5rem;margin-top:.1rem">
         <span class="tt-opt-label">✏️ Edit timetable…</span>
@@ -29564,7 +29565,7 @@ function initApp(){
   settingsUnlocked=false;
   const sl=document.getElementById('settings-locked');if(sl)sl.style.display='flex';
   const sc=document.getElementById('settings-content');if(sc)sc.style.display='none';
-  hydrateDoneState().then(()=>{_subscribeDoneRealtime();drainWorkInbox();_noteFlushQueue();try{if(_curTab==='week'&&typeof renderWeekTasksView==='function')renderWeekTasksView();}catch(e){}});
+  hydrateDoneState().then(()=>{_subscribeDoneRealtime();drainWorkInbox();_noteFlushQueue();_fireRegFlushQueue();try{if(_curTab==='week'&&typeof renderWeekTasksView==='function')renderWeekTasksView();}catch(e){}});
   loadSettings();loadPeople();loadState();migrateBaseToDefaults();ensureDefaultContexts();loadSlotNotes();loadHolidays();applyHolidaysToCalendar();loadCalCustomEvents();loadListsData();loadLinks();loadDuties();loadTutorMeetings();dsLoad();loadBoardingSettings();_subscribePenaltiesRealtime();loadNurseMap();loadCommentMap();
   buildMorningChecks();restoreMCState();
   initWeekTab();checkTaskReset();renderCustomFlowsList();
@@ -34050,19 +34051,134 @@ try{if(localStorage.getItem('fireSubmittedDate')===_todayStr())_fireSubmitted=tr
 let _fireState={};        // separate from _brState — fire drill only
 let _firePreSnapshot={};  // snapshot of _brState before fire drill started
 let _fireScopeAllHouse=false; // false = boarders only, true = all house
+let _fireScopeClass=null;     // class id when registering a class (lesson scope)
 let _fireBoarderGrouping='grade'; // 'grade' | 'room'
+let _fireAmendId=null;        // id of a submitted register being amended
+let _fireViewingSub=null;     // id of a submitted register being viewed read-only
+// Restore last submitted marks so the Lists-tab fire overlay survives a reload
+try{if(_fireSubmitted){const _fs=JSON.parse(localStorage.getItem('fireLastState_'+_todayStr())||'null');if(_fs)_fireState=_fs;}}catch(e){}
+
+// ── Fire register persistence ─────────────────────────────────────
+function _fireClsName(id){const c=(CLASSES||[]).find(c=>c.id===id||(c.name||c.id)===id);return c?(c.name||c.id):String(id||'');}
+function _fireLiveCls(){
+  try{
+    const n=_liveClassName();if(!n)return null;
+    return (CLASSES||[]).find(c=>(c.name||c.id)===n||c.id===n)||null;
+  }catch(e){return null;}
+}
+// People list for the CURRENT scope (mirrors what _renderFireRegister shows)
+function _fireRoster(){
+  if(_fireScopeClass){
+    const cls=(CLASSES||[]).find(c=>c.id===_fireScopeClass||(c.name||c.id)===_fireScopeClass);
+    if(!cls)return[];
+    return (cls.students||[]).map(s=>{
+      const name=((s.preferred||'')+' '+(s.surname||'')).trim();
+      const hw=HAWKING_STATUS[name]||{};
+      return {name,type:hw.boarder?'boarder':'day'};
+    });
+  }
+  let people=[];
+  if(!_fireScopeAllHouse&&_fireBoarderGrouping==='room'){
+    const rm=_fireRoomMap();
+    Object.values(rm).forEach(names=>names.forEach(n=>{if(STUDENTS.find(s=>s.name===n))people.push({name:n,type:'boarder'});}));
+  }else{
+    const gm=_fireGradeMap();
+    Object.values(gm).forEach(arr=>people.push(...arr));
+    if(_fireScopeAllHouse&&TUTORS&&TUTORS.length)people.push(...TUTORS.map(t=>({name:t.name,type:'tutor'})));
+  }
+  return people;
+}
+// Draft: autosaved marks so an interruption/reload never loses a register in progress
+function _fireDraftSave(){
+  try{
+    if(!Object.keys(_fireState).length&&!_fireAmendId){localStorage.removeItem('fireDraft');return;}
+    localStorage.setItem('fireDraft',JSON.stringify({date:_brToday(),state:_fireState,scopeClass:_fireScopeClass,allHouse:_fireScopeAllHouse,grouping:_fireBoarderGrouping,amendId:_fireAmendId}));
+  }catch(e){}
+}
+function _fireDraftLoad(){try{const d=JSON.parse(localStorage.getItem('fireDraft')||'null');return (d&&d.date===_brToday())?d:null;}catch(e){return null;}}
+function _fireDraftClear(){try{localStorage.removeItem('fireDraft');}catch(e){}}
+// Submitted registers: local mirror per day + offline queue to Supabase fire_registers
+function _fireSubsKey(){return 'fireSubs_'+_brToday();}
+function _fireSubsToday(){try{return JSON.parse(localStorage.getItem(_fireSubsKey())||'[]');}catch(e){return[];}}
+function _fireSaveSubLocal(rec){
+  const subs=_fireSubsToday().filter(r=>r.id!==rec.id);subs.push(rec);
+  subs.sort((a,b)=>String(a.submitted_at).localeCompare(String(b.submitted_at)));
+  try{localStorage.setItem(_fireSubsKey(),JSON.stringify(subs));}catch(e){}
+}
+function _fireRegQueueAdd(rec){
+  try{const q=JSON.parse(localStorage.getItem('_fireRegQueue')||'[]');
+    const left=q.filter(r=>r.id!==rec.id);left.push(rec);
+    localStorage.setItem('_fireRegQueue',JSON.stringify(left));}catch(e){}
+}
+async function _fireRegFlushQueue(){
+  let q=[];try{q=JSON.parse(localStorage.getItem('_fireRegQueue')||'[]');}catch(e){}
+  if(!q.length)return;
+  const left=[];
+  for(const rec of q){
+    try{const{error}=await supa.from('fire_registers').upsert(rec);if(error)left.push(rec);}
+    catch(e){left.push(rec);}
+  }
+  try{localStorage.setItem('_fireRegQueue',JSON.stringify(left));}catch(e){}
+}
+// Pull today's registers submitted from other devices into the local mirror
+async function _fireMergeRemoteToday(){
+  try{
+    const{data,error}=await supa.from('fire_registers').select('*').eq('register_date',_brToday());
+    if(error||!data||!data.length)return;
+    let changed=false;
+    data.forEach(rec=>{
+      const local=_fireSubsToday().find(r=>r.id===rec.id);
+      if(!local||String(rec.amended_at||'')>String(local.amended_at||'')){_fireSaveSubLocal(rec);changed=true;}
+    });
+    if(changed&&_fireOpen)_renderFireRegister();
+  }catch(e){}
+}
+function _fireViewSub(id){_fireViewingSub=id;_renderFireRegister();}
+function _fireAmendSub(id){
+  const rec=_fireSubsToday().find(r=>r.id===id);if(!rec)return;
+  _fireViewingSub=null;_fireAmendId=id;
+  _fireState={};
+  (rec.entries||[]).forEach(e=>{if(e.status&&e.status!=='unset')_fireState[e.name]={status:e.status,updatedAt:rec.amended_at||rec.submitted_at};});
+  if(rec.scope==='class'){
+    const c=(CLASSES||[]).find(c=>(c.name||c.id)===rec.class_name||c.id===rec.class_name);
+    _fireScopeClass=c?c.id:rec.class_name;_fireScopeAllHouse=false;
+  }else{
+    _fireScopeClass=null;_fireScopeAllHouse=(rec.scope==='house');
+  }
+  _fireDraftSave();
+  _renderFireRegister();
+}
+function _fireDiscardDraft(){
+  if(!confirm('Discard the marks in this register?'))return;
+  _fireState={};_fireAmendId=null;_fireDraftClear();
+  _renderFireRegister();
+}
 
 function openFireRegister(){
-  _fireOpen=true;
+  _fireOpen=true;_fireViewingSub=null;
   // Don't reset _fireSubmitted here — keep revert button visible
   // until user explicitly reverts
   _firePreSnapshot=JSON.parse(JSON.stringify(_brState));
-  _fireState={};
-  _fireScopeAllHouse=false;
-  _fireBoarderGrouping='grade';
+  const draft=_fireDraftLoad();
+  if(draft&&(Object.keys(draft.state||{}).length||draft.amendId)){
+    // Resume an interrupted register exactly where it was left
+    _fireState=draft.state||{};
+    _fireScopeClass=draft.scopeClass||null;
+    _fireScopeAllHouse=!!draft.allHouse;
+    _fireBoarderGrouping=draft.grouping||'grade';
+    _fireAmendId=draft.amendId||null;
+  }else{
+    _fireState={};_fireAmendId=null;
+    const cls=_fireLiveCls();
+    _fireScopeClass=cls?cls.id:null; // during a lesson, that class is who you evacuate
+    _fireScopeAllHouse=false;
+    _fireBoarderGrouping='grade';
+  }
   _brLoadToday();
   _brSubscribeRealtime();
   _renderFireRegister();
+  _fireMergeRemoteToday();
+  _fireRegFlushQueue();
 }
 
 function _fireRestoreBody(){
@@ -34076,12 +34192,41 @@ function closeFireRegister(){
 }
 
 function submitFireRegister(){
+  // Snapshot the register as a durable record
+  const roster=_fireRoster();
+  const entries=roster.map(p=>({name:p.name,type:p.type,status:(_fireState[p.name]||{}).status||'unset'}));
+  const counts={present:0,absent:0,excused:0,unset:0};
+  entries.forEach(e=>{counts[e.status]=(counts[e.status]||0)+1;});
+  const nowIso=new Date().toISOString();
+  let rec=null;
+  if(_fireAmendId){
+    const prev=_fireSubsToday().find(r=>r.id===_fireAmendId);
+    if(prev)rec={...prev,entries,counts,amended_at:nowIso};
+  }
+  if(!rec){
+    rec={
+      id:(typeof crypto!=='undefined'&&crypto.randomUUID)?crypto.randomUUID():(_nid()+'-'+Date.now()),
+      register_date:_brToday(),submitted_at:nowIso,amended_at:null,
+      scope:_fireScopeClass?'class':(_fireScopeAllHouse?'house':'boarders'),
+      class_name:_fireScopeClass?_fireClsName(_fireScopeClass):null,
+      counts,entries,submitted_by:'HSM'
+    };
+  }
+  _fireSaveSubLocal(rec);
+  _fireRegQueueAdd(rec);
+  _fireRegFlushQueue();
+  _fireDraftClear();
+  const wasAmend=!!_fireAmendId;
+  _fireAmendId=null;
   _fireSubmitted=true;
-  // Persist across reload — store today's date
-  try{localStorage.setItem('fireSubmittedDate',_brToday());}catch(e){}
+  // Persist across reload — store today's date + the marks (for the Lists overlay)
+  try{
+    localStorage.setItem('fireSubmittedDate',_brToday());
+    localStorage.setItem('fireLastState_'+_brToday(),JSON.stringify(_fireState));
+  }catch(e){}
   _fireOpen=false;
   const t=document.createElement('div');
-  t.textContent='🔥 Fire register submitted';
+  t.textContent=wasAmend?'🔥 Fire register amended':'🔥 Fire register submitted';
   t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#22c55e;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:9999;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.3)';
   document.body.appendChild(t);
   setTimeout(()=>t.remove(),2500);
@@ -34129,6 +34274,8 @@ function _fireTap(name, status){
       changed_by:'HSM', session_type:'fire'
     }).then(()=>{},()=>{});
   }
+  // Autosave the in-progress register — an interruption must never lose marks
+  _fireDraftSave();
 }
 
 function _fireUpdateSectionCount(rowEl){
@@ -34163,9 +34310,10 @@ function _fireUpdateOverallCount(){
 }
 
 function revertFromFire(){
+  // Clears the Lists-tab fire overlay only — submitted register records are kept
   _fireState={};
   _fireSubmitted=false;
-  try{localStorage.removeItem('fireSubmittedDate');}catch(e){}
+  try{localStorage.removeItem('fireSubmittedDate');localStorage.removeItem('fireLastState_'+_brToday());}catch(e){}
   _brRefreshListsTab();
 }
 
@@ -34215,8 +34363,43 @@ function _fireToggleAllSections(){
 
 function _renderFireRegister(){
   const body=document.getElementById('am-body');if(!body)return;
-  const statColor={present:'#22c55e',absent:'#ef4444',excused:'#f59e0b','':'#555'};
-  const statBg={present:'rgba(34,197,94,.13)',absent:'rgba(239,68,68,.13)',excused:'rgba(245,158,11,.13)','':'transparent'};
+  const statColor={present:'#22c55e',absent:'#ef4444',excused:'#f59e0b','':'#555',unset:'#555'};
+  const statBg={present:'rgba(34,197,94,.13)',absent:'rgba(239,68,68,.13)',excused:'rgba(245,158,11,.13)','':'transparent',unset:'transparent'};
+
+  // ── Read-only viewer for a submitted register ──
+  if(_fireViewingSub){
+    const rec=_fireSubsToday().find(r=>r.id===_fireViewingSub);
+    if(!rec){_fireViewingSub=null;}
+    else{
+      const tm=(iso)=>{try{return new Date(iso).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}catch(e){return'';}};
+      const lbl=rec.scope==='class'?(rec.class_name||'Class'):rec.scope==='house'?'All House':'Boarders';
+      const order={absent:0,excused:1,unset:2,present:3};
+      const entries=(rec.entries||[]).slice().sort((a,b)=>(order[a.status]??9)-(order[b.status]??9)||a.name.localeCompare(b.name));
+      const statTxt={present:'✓ present',absent:'✗ ABSENT',excused:'~ excused',unset:'— not marked'};
+      body.style.padding='0';body.style.overflow='hidden';body.style.position='relative';
+      body.innerHTML=`<div id="am-fire-section" style="position:absolute;inset:0;display:flex;flex-direction:column;background:#111;overflow:hidden">
+        <div style="flex-shrink:0;background:rgba(220,38,38,.35);border-bottom:1px solid rgba(255,255,255,.1);padding:10px 14px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:13px;font-weight:700;color:#fca5a5;letter-spacing:.06em">🔥 SUBMITTED · ${tm(rec.submitted_at)}</span>
+            <span style="font-size:11px;color:#aaa"><span style="color:#22c55e">${(rec.counts||{}).present||0}✓</span> <span style="color:#ef4444">${(rec.counts||{}).absent||0}✗</span> <span style="color:#f59e0b">${(rec.counts||{}).excused||0}~</span> <span style="color:#777">${(rec.counts||{}).unset||0}·</span></span>
+          </div>
+          <div style="font-size:11px;color:#bbb;margin-top:2px">${lbl}${rec.amended_at?` · amended ${tm(rec.amended_at)}`:''}</div>
+        </div>
+        <div style="flex:1;overflow-y:auto">
+          ${entries.map((e,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.05);background:${statBg[e.status]||'transparent'}">
+            <span style="font-size:10px;color:#555;min-width:22px;text-align:right">${i+1}.</span>
+            <div style="flex:1;font-size:13px;color:#e0e0e0;font-weight:500">${e.name}</div>
+            <span style="font-size:11px;font-weight:700;color:${statColor[e.status]||'#555'}">${statTxt[e.status]||e.status}</span>
+          </div>`).join('')}
+        </div>
+        <div style="flex-shrink:0;padding:10px 14px;display:flex;gap:8px;background:#1a1a1a;border-top:1px solid rgba(255,255,255,.1)">
+          <button onclick="_fireViewingSub=null;_renderFireRegister()" style="flex:1;font-size:12px;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#aaa;cursor:pointer;font-weight:600">‹ Back</button>
+          ${rec.register_date===_brToday()?`<button onclick="_fireAmendSub('${rec.id}')" style="flex:1;font-size:12px;padding:10px;border-radius:8px;border:1px solid #f59e0b;background:rgba(245,158,11,.12);color:#f59e0b;cursor:pointer;font-weight:700">✎ Amend</button>`:''}
+        </div>
+      </div>`;
+      return;
+    }
+  }
 
   function makeRow(p,idx){
     const st=(_fireState[p.name]||{}).status||'';
@@ -34260,7 +34443,12 @@ function _renderFireRegister(){
   let allPeople=[];
   const gradeOrder=getGrades();
 
-  if(!_fireScopeAllHouse&&_fireBoarderGrouping==='room'){
+  if(_fireScopeClass){
+    // Class scope — the students of one class, one section
+    const people=_fireRoster();
+    allPeople.push(...people);
+    sectionsHtml+=makeSection(_fireClsName(_fireScopeClass).toUpperCase(),people,'_fireSec_cls','rgba(29,78,216,.3)');
+  } else if(!_fireScopeAllHouse&&_fireBoarderGrouping==='room'){
     // Boarders by room
     const rm=_fireRoomMap();
     Object.entries(rm).forEach(([roomName,names])=>{
@@ -34326,17 +34514,27 @@ function _renderFireRegister(){
       <div style="padding:0 14px 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <!-- Scope toggle -->
         <div style="display:flex;background:rgba(0,0,0,.3);border-radius:6px;padding:2px;gap:2px">
-          <button onclick="_fireScopeAllHouse=false;_renderFireRegister()" style="font-size:10px;padding:3px 10px;border-radius:4px;border:none;background:${!_fireScopeAllHouse?'rgba(255,255,255,.15)':'transparent'};color:${!_fireScopeAllHouse?'#fff':'#888'};cursor:pointer;font-weight:${!_fireScopeAllHouse?'700':'400'}">Boarders</button>
-          <button onclick="_fireScopeAllHouse=true;_renderFireRegister()" style="font-size:10px;padding:3px 10px;border-radius:4px;border:none;background:${_fireScopeAllHouse?'rgba(255,255,255,.15)':'transparent'};color:${_fireScopeAllHouse?'#fff':'#888'};cursor:pointer;font-weight:${_fireScopeAllHouse?'700':'400'}">All House</button>
+          ${(()=>{const lc=_fireLiveCls();const cid=_fireScopeClass||(lc?lc.id:null);
+            return cid?`<button onclick="_fireScopeClass='${String(cid).replace(/'/g,"\\'")}';_renderFireRegister()" style="font-size:10px;padding:3px 10px;border-radius:4px;border:none;background:${_fireScopeClass?'rgba(59,130,246,.35)':'transparent'};color:${_fireScopeClass?'#fff':'#888'};cursor:pointer;font-weight:${_fireScopeClass?'700':'400'}">${_fireClsName(cid)}</button>`:'';})()}
+          <button onclick="_fireScopeClass=null;_fireScopeAllHouse=false;_renderFireRegister()" style="font-size:10px;padding:3px 10px;border-radius:4px;border:none;background:${!_fireScopeAllHouse&&!_fireScopeClass?'rgba(255,255,255,.15)':'transparent'};color:${!_fireScopeAllHouse&&!_fireScopeClass?'#fff':'#888'};cursor:pointer;font-weight:${!_fireScopeAllHouse&&!_fireScopeClass?'700':'400'}">Boarders</button>
+          <button onclick="_fireScopeClass=null;_fireScopeAllHouse=true;_renderFireRegister()" style="font-size:10px;padding:3px 10px;border-radius:4px;border:none;background:${_fireScopeAllHouse&&!_fireScopeClass?'rgba(255,255,255,.15)':'transparent'};color:${_fireScopeAllHouse&&!_fireScopeClass?'#fff':'#888'};cursor:pointer;font-weight:${_fireScopeAllHouse&&!_fireScopeClass?'700':'400'}">All House</button>
         </div>
-        ${!_fireScopeAllHouse?`<!-- Group toggle -->
+        ${!_fireScopeAllHouse&&!_fireScopeClass?`<!-- Group toggle -->
         <div style="display:flex;background:rgba(0,0,0,.3);border-radius:6px;padding:2px;gap:2px">
           <button onclick="_fireBoarderGrouping='grade';_renderFireRegister()" style="font-size:10px;padding:3px 10px;border-radius:4px;border:none;background:${_fireBoarderGrouping==='grade'?'rgba(255,255,255,.15)':'transparent'};color:${_fireBoarderGrouping==='grade'?'#fff':'#888'};cursor:pointer;font-weight:${_fireBoarderGrouping==='grade'?'700':'400'}">Grade</button>
           <button onclick="_fireBoarderGrouping='room';_renderFireRegister()" style="font-size:10px;padding:3px 10px;border-radius:4px;border:none;background:${_fireBoarderGrouping==='room'?'rgba(255,255,255,.15)':'transparent'};color:${_fireBoarderGrouping==='room'?'#fff':'#888'};cursor:pointer;font-weight:${_fireBoarderGrouping==='room'?'700':'400'}">Room</button>
         </div>`:''}
-        <!-- Expand/collapse all — pushed to right -->
-        <button onclick="_fireToggleAllSections()" style="margin-left:auto;font-size:10px;padding:3px 10px;border-radius:5px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#bbb;cursor:pointer">${allExp?'Collapse All':'Expand All'}</button>
+        ${!_fireScopeClass?`<!-- Expand/collapse all — pushed to right -->
+        <button onclick="_fireToggleAllSections()" style="margin-left:auto;font-size:10px;padding:3px 10px;border-radius:5px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#bbb;cursor:pointer">${allExp?'Collapse All':'Expand All'}</button>`:''}
       </div>
+      ${(()=>{const subs=_fireSubsToday();if(!subs.length)return'';
+        const tm=iso=>{try{return new Date(iso).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}catch(e){return'';}};
+        return `<div style="padding:0 14px 8px;display:flex;gap:6px;flex-wrap:wrap">${subs.map(r=>{
+          const lbl=r.scope==='class'?(r.class_name||'Class'):r.scope==='house'?'All House':'Boarders';
+          const c=r.counts||{};
+          return `<button onclick="_fireViewSub('${r.id}')" style="font-size:10px;padding:3px 9px;border-radius:11px;border:1px solid rgba(34,197,94,.4);background:rgba(34,197,94,.12);color:#86efac;cursor:pointer">✅ ${tm(r.submitted_at)} · ${lbl} · ${c.present||0}✓${c.absent?` <span style='color:#f87171'>${c.absent}✗</span>`:''}${r.amended_at?' ·✎':''}</button>`;
+        }).join('')}</div>`;})()}
+      ${_fireAmendId?`<div style="padding:0 14px 8px"><span style="font-size:10px;color:#f59e0b;font-weight:700">✎ Amending the ${(()=>{const r=_fireSubsToday().find(x=>x.id===_fireAmendId);try{return r?new Date(r.submitted_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'';}catch(e){return'';}})()} register — Submit saves the correction</span></div>`:''}
     </div>
 
     <!-- SCROLLABLE LIST -->
@@ -34346,8 +34544,9 @@ function _renderFireRegister(){
 
     <!-- STICKY FOOTER -->
     <div style="flex-shrink:0;padding:10px 14px;display:flex;gap:8px;background:#1a1a1a;border-top:1px solid rgba(255,255,255,.1)">
-      <button onclick="closeFireRegister()" style="flex:1;font-size:12px;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#aaa;cursor:pointer;font-weight:600;-webkit-tap-highlight-color:transparent">✕ Cancel</button>
-      <button onclick="submitFireRegister()" style="flex:2;font-size:13px;padding:10px;border-radius:8px;border:none;background:#22c55e;color:#fff;cursor:pointer;font-weight:700;-webkit-tap-highlight-color:transparent">✓ Submit Fire Register</button>
+      <button onclick="closeFireRegister()" style="flex:1;font-size:12px;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#aaa;cursor:pointer;font-weight:600;-webkit-tap-highlight-color:transparent">✕ Close</button>
+      ${Object.keys(_fireState).length?`<button onclick="_fireDiscardDraft()" title="Discard marks" style="flex-shrink:0;font-size:12px;padding:10px 12px;border-radius:8px;border:1px solid rgba(239,68,68,.4);background:transparent;color:#f87171;cursor:pointer;font-weight:600;-webkit-tap-highlight-color:transparent">🗑</button>`:''}
+      <button onclick="submitFireRegister()" style="flex:2;font-size:13px;padding:10px;border-radius:8px;border:none;background:${_fireAmendId?'#f59e0b':'#22c55e'};color:#fff;cursor:pointer;font-weight:700;-webkit-tap-highlight-color:transparent">${_fireAmendId?'✓ Save Amended Register':'✓ Submit Fire Register'}</button>
     </div>
 
   </div>`;
