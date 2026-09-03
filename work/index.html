@@ -285,7 +285,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 /* TIMETABLE */
 /* ── STICKY BARS ──────────────────────────────────────── */
 /* Schedule: tt-controls (Week/Day/Plan toggle) sticky below header */
-.tt-controls{position:sticky;top:100px;z-index:50;background:#f0f2f5;padding:.3rem 0 .35rem;margin-bottom:.3rem}
+.tt-controls{position:sticky;top:146px;z-index:58;background:var(--bg);padding:.3rem 0 .35rem;margin-bottom:.3rem}
 
 /* Schedule Week view: sticky thead table above the scrollable body table */
 #tt-thead-wrap{position:sticky;top:148px;z-index:40;overflow-x:auto;scrollbar-width:none}
@@ -311,7 +311,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .tt-top{display:flex;align-items:center;gap:6px;margin-bottom:.6rem;flex-wrap:wrap}
 .tt-week-nav{display:flex;align-items:center;gap:6px;flex:1}
 #tt-top-bar{position:sticky;top:100px;z-index:60;background:var(--bg);padding:6px 0;border-bottom:1px solid var(--border3)}
-#tt-thead-wrap{position:sticky;top:calc(100px + 46px);z-index:55;background:#fff}
+#tt-thead-wrap{position:sticky;top:194px;z-index:55;background:#fff}
 .tt-dow{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .tt-dow.sel{background:#00205B!important;color:#fff!important;border-bottom:2px solid #00205B!important}
 .tt-week-btn{width:32px;height:32px;border-radius:50%;background:#fff;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;color:var(--text2);flex-shrink:0}
@@ -326,7 +326,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .tt-opt-toggle.on{background:#212529}
 .tt-opt-toggle.on::after{left:19px}
 .tt-toggle{display:flex;gap:3px;background:var(--bg3);border-radius:var(--rsm);padding:3px;flex:1}
-.tt-btn{flex:1;padding:7px 4px;font-size:11px;font-weight:500;border:none;border-radius:var(--rxs);background:none;color:var(--text2);cursor:pointer}
+.tt-btn{flex:1;padding:12px 4px;font-size:13px;font-weight:600;border:none;border-radius:var(--rxs);background:none;color:var(--text2);cursor:pointer;-webkit-tap-highlight-color:transparent}
 .tt-btn.active{background:#fff;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.1)}
 .edit-mode-btn{padding:7px 12px;font-size:11px;font-weight:600;border:1px solid var(--border);border-radius:var(--rsm);background:#fff;color:var(--text2);cursor:pointer;white-space:nowrap}
 .edit-mode-btn.editing{background:#fff9db;border-color:#ffd43b;color:#e67700}
@@ -812,6 +812,18 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .am-quick-inp{flex:1;background:#111;border:1px solid #222;border-radius:8px;color:#e0e0e0;font-size:13px;padding:7px 12px;font-family:inherit;outline:none}
 .am-quick-inp:focus{border-color:#333}
 .am-quick-inp::placeholder{color:#333}
+.am-quick-cap{position:relative}
+.at-sug{position:absolute;left:0;right:0;top:100%;z-index:10005;background:#fff;border:1px solid var(--border2);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);max-height:220px;overflow:auto;margin-top:3px}
+.at-sug.in-flow{position:static;box-shadow:none;margin:-6px 0 10px}
+.at-sug-row{padding:10px 12px;font-size:14px;color:#212529;cursor:pointer;border-bottom:1px solid #f1f3f5;display:flex;align-items:center;gap:8px;-webkit-tap-highlight-color:transparent}
+.at-sug-row:last-child{border-bottom:none}
+.at-sug-row:active,.at-sug-row:hover{background:#f1f5f9}
+.at-sug-cls{font-size:9px;font-weight:700;color:#0f766e;background:#ccfbf1;border-radius:8px;padding:1px 6px;flex-shrink:0}
+.at-sug-tut{font-size:10px;color:#adb5bd;margin-left:auto;flex-shrink:0}
+.at-sug-dark{background:#161616;border-color:#333;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.at-sug-dark .at-sug-row{color:#e0e0e0;border-bottom-color:#222}
+.at-sug-dark .at-sug-row:active,.at-sug-dark .at-sug-row:hover{background:#222}
+.at-sug-dark .at-sug-tut{color:#666}
 .am-quick-btn{background:#1a1a1a;border:1px solid #333;border-radius:8px;color:#888;font-size:16px;font-weight:700;padding:7px 14px;cursor:pointer;line-height:1}
 .am-quick-btn:active{background:#222}
 
@@ -1034,9 +1046,17 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
     </div>
   </div>
   <div class="am-quick-cap">
-    <input class="am-quick-inp" id="am-quick-inp" placeholder="Quick capture — press Enter to save as occurrence note" onkeydown="if(event.key==='Enter'&&this.value.trim()){amQuickCapture(this.value);this.value='';event.preventDefault();}">
+    <input class="am-quick-inp" id="am-quick-inp" placeholder="Quick capture — @ tags a student" autocomplete="off"
+      oninput="_atRender('am-quick-inp','am-at-sug')"
+      onblur="setTimeout(function(){var b=document.getElementById('am-at-sug');if(b){b.style.display='none';}},150)"
+      onkeydown="if(event.key==='Enter'){if(_atOpen('am-at-sug')){_atPickFirst('am-quick-inp','am-at-sug');event.preventDefault();}else if(this.value.trim()){amQuickCapture(this.value);this.value='';event.preventDefault();}}if(event.key==='Escape'&&_atOpen('am-at-sug')){_atHide('am-at-sug');event.stopPropagation();}">
     <button class="am-quick-btn" onclick="if(document.getElementById('am-quick-inp').value.trim()){amQuickCapture(document.getElementById('am-quick-inp').value);document.getElementById('am-quick-inp').value=''}">+</button>
+    <div id="am-at-sug" class="at-sug at-sug-dark" style="display:none"></div>
   </div>
+  <div id="am-day-pill" onclick="toggleAmDayPill()" style="display:none;align-items:center;gap:6px;margin:6px 12px 0;padding:6px 12px;border:1px solid rgba(245,159,0,.35);border-radius:14px;background:rgba(245,159,0,.08);color:#f59f00;font-size:11.5px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;width:fit-content">
+    \u{1F4AC} <span id="am-day-pill-n">0</span>&nbsp;to say today <span id="am-day-pill-car" style="font-size:9px">▸</span>
+  </div>
+  <div id="am-day-pill-body" style="display:none;margin:6px 12px 0"></div>
   <div class="panel-body" id="am-body"></div>
 </div>
 
@@ -1083,15 +1103,13 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       <button class="tt-week-btn" onclick="ttNavWeek(1)" aria-label="Next">›</button>
     </div>
   </div>
-  <div class="tt-controls">
+  <div class="tt-controls" id="tt-controls">
     <div class="tt-toggle">
       <button class="tt-btn" id="tt-btn-full" onclick="setTTView('full',this)">Week</button>
       <button class="tt-btn" id="tt-btn-today" onclick="setTTView('today',this)">Day</button>
     </div>
-    <button id="tt-now-btn" onclick="ttGoNow()" title="Back to current week/day" style="display:none;font-size:11px;font-weight:700;padding:3px 10px;border:1.5px solid #f59f00;border-radius:6px;background:#fff8e6;cursor:pointer;color:#f59f00">Now</button>
-    <button class="tt-show-all-btn" id="tt-collapse-past-btn" onclick="toggleCollapsePastOpt()" title="Collapse past slots" style="font-size:13px;min-width:32px">⬆</button>
+    <button class="edit-mode-btn" id="edit-mode-btn" style="display:none" onclick="ttEditMode?lockEditMode():requestEditMode()">✏️ Edit</button>
     <button class="tt-show-all-btn" id="tt-options-btn" onclick="toggleTTOptions()" title="View options">⚙</button>
-    <button class="edit-mode-btn" id="edit-mode-btn" onclick="ttEditMode?lockEditMode():requestEditMode()">✏️ Edit</button>
   </div>
   <!-- Options popover (hidden by default) -->
   <div id="tt-options-panel" style="display:none;background:#fff;border:1px solid var(--border);border-radius:var(--rsm);padding:.6rem .75rem;margin-bottom:.5rem;display:none">
@@ -1104,6 +1122,13 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       <label class="tt-opt-row" onclick="toggleExtendedOpt()">
         <span class="tt-opt-label">Show overnight (00:00–07:00 &amp; 23:00)</span>
         <div class="tt-opt-toggle" id="opt-toggle-ext"></div>
+      </label>
+      <label class="tt-opt-row" onclick="toggleCollapsePastOpt()">
+        <span class="tt-opt-label">Collapse past slots</span>
+        <div class="tt-opt-toggle" id="opt-toggle-past"></div>
+      </label>
+      <label class="tt-opt-row" onclick="toggleTTOptions();ttEditMode?lockEditMode():requestEditMode()" style="border-top:1px solid var(--border3);padding-top:.5rem;margin-top:.1rem">
+        <span class="tt-opt-label">✏️ Edit timetable…</span>
       </label>
     </div>
   </div>
@@ -23578,14 +23603,14 @@ function requestEditMode(){
   showInlinePin('Timetable Edit PIN',()=>{
     ttEditMode=true;
     const btn=document.getElementById('edit-mode-btn');
-    if(btn){btn.textContent='🔒 Lock';btn.classList.add('editing');}
+    if(btn){btn.textContent='🔒 Lock';btn.classList.add('editing');btn.style.display='inline-block';}
     renderTimetable();
   });
 }
 function lockEditMode(){
   ttEditMode=false;
   const btn=document.getElementById('edit-mode-btn');
-  if(btn){btn.textContent='✏️ Edit';btn.classList.remove('editing');}
+  if(btn){btn.textContent='✏️ Edit';btn.classList.remove('editing');btn.style.display='none';}
   renderTimetable();
 }
 
@@ -24267,18 +24292,46 @@ function getTodayViewDay(){
 
 
 // Compact points summary for the Day view — counts by audience, taps to Plan
+let _dayPtsOpen={};
+function toggleDayPts(id){_dayPtsOpen[id]=!_dayPtsOpen[id];renderTodayView();}
+function _dayPtsSaid(taskId){
+  archivePoint(taskId);
+  renderTodayView();
+  try{renderWeekTasksView();}catch(e){}
+}
+function _dayPtsToPlan(ctxId){
+  _sayOpen['__section']=true;_sayOpen[ctxId]=true;_saySaveOpen();
+  showPlanTab(null);
+}
 function _dayPointsSummaryHtml(dayName,offset){
   const ctxs=getContexts();
-  const chips=[];
+  const chips=[],panels=[];
   ctxs.forEach(ctx=>{
     const pts=getPoints(ctx.id);
     if(!pts.length)return;
-    chips.push(`<button onclick="showPlanTab(null)" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;border:1px solid ${ctx.color}33;background:${ctx.color}14;color:${ctx.color};cursor:pointer">${_esc(ctx.name)} <span style="background:${ctx.color};color:#fff;border-radius:8px;padding:0 6px">${pts.length}</span></button>`);
+    const open=!!_dayPtsOpen[ctx.id];
+    chips.push(`<button onclick="toggleDayPts('${ctx.id}')" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;border:1px solid ${ctx.color}${open?'':'33'};background:${open?ctx.color:ctx.color+'14'};color:${open?'#fff':ctx.color};cursor:pointer;-webkit-tap-highlight-color:transparent">${_esc(ctx.name)} <span style="background:${open?'rgba(255,255,255,.25)':ctx.color};color:#fff;border-radius:8px;padding:0 6px">${pts.length}</span> <span style="font-size:9px">${open?'▾':'▸'}</span></button>`);
+    if(open){
+      panels.push(`<div style="background:#fff;border:1px solid ${ctx.color}33;border-radius:9px;padding:4px 10px;margin-top:6px">
+        ${pts.map(t=>`<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid #f5f6f7">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;color:#212529;line-height:1.35">${_esc(t.text)}</div>
+            ${(t.student||((t.grades||[]).length)||t.sub)?`<div style="font-size:10px;color:#adb5bd;margin-top:2px">${t.student?'\u{1F464} '+_esc(t.student):''}${(t.grades||[]).length?((t.student?' · ':'')+t.grades.join(', ')):''}${t.sub?((t.student||(t.grades||[]).length?' · ':'')+_esc(t.sub)):''}</div>`:''}
+          </div>
+          <button onclick="_dayPtsSaid('${t.id}')" title="Mark as said" style="flex-shrink:0;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:7px;color:#16a34a;font-size:12px;font-weight:700;padding:4px 9px;cursor:pointer">✓ said</button>
+        </div>`).join('')}
+        <div style="padding:7px 0 4px;text-align:right">
+          <button onclick="_dayPtsToPlan('${ctx.id}')" style="background:none;border:none;font-size:11px;font-weight:700;color:${ctx.color};cursor:pointer">Open in Plan ›</button>
+        </div>
+      </div>`);
+    }
   });
   if(!chips.length)return '';
-  return `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 10px">
-    <span style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">\u{1F4AC} To say</span>
-    ${chips.join('')}</div>`;
+  return `<div style="margin:0 0 10px">
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+      <span style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">\u{1F4AC} To say</span>
+      ${chips.join('')}</div>
+    ${panels.join('')}</div>`;
 }
 function renderTodayView(){
   const info=getTodayViewDay();
@@ -24472,6 +24525,7 @@ function renderTodayView(){
   // Inject plan tasks for this day
   const _wNumDay=getWeekNumber(weekOffset);
   const _planTs=(S.planData||[]).filter(t=>{
+    if(t.say||t.archived)return false; // say-points live in the To say strip, not the task list
     if(t.scope==='sticky')return true;
     if(t.scope==='week')return t.weekNum===_wNumDay;
     if(t.scope==='week-day')return t.weekNum===_wNumDay&&t.day===dayName;
@@ -24588,8 +24642,23 @@ function clearTodayNote(idx,day){
   renderTodayView();
 }
 
+// Keep the sticky stack (week nav → toggle row → day header) aligned to real heights
+function _syncStickyTops(){
+  try{
+    const base=100; // fixed clock header height
+    const tb=document.getElementById('tt-top-bar');
+    const tc=document.getElementById('tt-controls');
+    const tw=document.getElementById('tt-thead-wrap');
+    if(!tb)return;
+    const h1=tb.offsetHeight;
+    if(tc){tc.style.top=(base+h1)+'px';if(tw)tw.style.top=(base+h1+tc.offsetHeight)+'px';}
+    else if(tw){tw.style.top=(base+h1)+'px';}
+  }catch(e){}
+}
+
 // ── MAIN RENDER ───────────────────────────────────────
 function renderTimetable(){
+  _syncStickyTops();
   var _off=(ttWeekOffset!==0||tdDayOffset!==0);
   var _nb=document.getElementById('tt-now-btn');
   if(_nb)_nb.style.display=_off?'inline-block':'none';
@@ -25920,7 +25989,9 @@ function renderWeekTasksView(){
     }
   }
 
-  el.innerHTML=renderToSaySection()+html;
+  const _doOpen=_sayOpen['__do']!==false;
+  el.innerHTML=renderToSaySection()
+    +(_doOpen?`<div style="border:1px solid var(--border3);border-top:none;border-radius:0 0 9px 9px;background:#fdfdfd;padding:10px 10px 4px;margin-bottom:10px">${html}</div>`:'');
 }
 
 function _todayDateStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
@@ -28067,7 +28138,11 @@ function _amContextItemsHtml(slotCat,linkedCls,label){
 // ══ TO SAY — plan page section, composers, history ═════════════════
 let _sayOpen={};try{_sayOpen=JSON.parse(localStorage.getItem('sayOpen')||'{}');}catch(e){}
 function _saySaveOpen(){try{localStorage.setItem('sayOpen',JSON.stringify(_sayOpen));}catch(e){}}
-function toggleSayGroup(id){_sayOpen[id]=!_sayOpen[id];_saySaveOpen();renderWeekTasksView();}
+function toggleSayGroup(id){
+  // '__do' is open-by-default (undefined = open), everything else closed-by-default
+  _sayOpen[id]=(id==='__do')?(_sayOpen[id]===false):!_sayOpen[id];
+  _saySaveOpen();renderWeekTasksView();
+}
 function _esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function _pointRowHtml(t,ctx){
   const tags=[];
@@ -28123,23 +28198,27 @@ function renderToSaySection(){
         <span style="font-size:10px;font-weight:700;color:${ctx.color}">${pts.length}</span>
       </div>${body}</div>`;
   });
-  if(!html)return '';
   const total=getContexts().reduce((n,ct)=>n+getPoints(ct.id).length,0);
   const open=_sayOpen['__section']===true; // collapsed by default
   const doCount=(S.planData||[]).filter(t=>!t.say).length;
-  return `<div style="margin-bottom:${open?'20px':'12px'}">
-      <div onclick="toggleSayGroup('__section')" class="plan-band" style="background:#ecfeff;border-color:#a5f3fc;cursor:pointer">
+  const doOpen=_sayOpen['__do']!==false; // open by default
+  let out='';
+  if(html){
+    out+=`<div style="margin-bottom:12px">
+      <div onclick="toggleSayGroup('__section')" class="plan-band" style="background:#ecfeff;border-color:#a5f3fc;cursor:pointer${open?';border-radius:9px 9px 0 0;border-bottom:none':''}">
         <span style="color:#0e7490;font-size:11px;width:11px">${open?'\u25BE':'\u25B8'}</span>
         <span style="font-size:11.5px;font-weight:800;color:#0e7490;text-transform:uppercase;letter-spacing:.08em;flex:1">\u{1F4AC} To say</span>
         <span class="plan-band-count" style="background:#0e7490">${total}</span>
       </div>
-      <div style="display:${open?'block':'none'};padding:8px 0 0 10px;border-left:2px solid #a5f3fc;margin:8px 0 0 6px">${html}</div>
-    </div>
-    <div class="plan-band" style="background:#f8f9fa;border-color:var(--border3);margin-bottom:10px">
-      <span style="width:11px"></span>
+      ${open?`<div style="border:1px solid #a5f3fc;border-top:none;border-radius:0 0 9px 9px;background:#f7feff;padding:10px 10px 4px">${html}</div>`:''}
+    </div>`;
+  }
+  out+=`<div onclick="toggleSayGroup('__do')" class="plan-band" style="background:#f8f9fa;border-color:var(--border3);cursor:pointer;${doOpen?'border-radius:9px 9px 0 0;border-bottom:none':'margin-bottom:10px'}">
+      <span style="color:#868e96;font-size:11px;width:11px">${doOpen?'\u25BE':'\u25B8'}</span>
       <span style="font-size:11.5px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;flex:1">\u2713 To do</span>
       <span class="plan-band-count" style="background:#868e96">${doCount}</span>
     </div>`;
+  return out;
 }
 function archiveAll(ctxId){getPoints(ctxId).forEach(t=>archivePoint(t.id));renderWeekTasksView();}
 function openSayHistory(ctxId){
@@ -28322,6 +28401,62 @@ function tutorsForGrades(grades){
 }
 function classesForContext(){
   return (typeof CLASSES!=='undefined'?CLASSES:[]).map(c=>({id:c.name||c.id,name:c.name||c.id,grade:c.grade}));
+}
+
+// ══ @ STUDENT SUGGESTIONS — type @ in a capture input to tag a student ═══
+function _atToken(inp){
+  const v=inp.value,pos=inp.selectionStart==null?v.length:inp.selectionStart;
+  const m=v.slice(0,pos).match(/@([^\s@]*)$/);
+  return m?{q:m[1].toLowerCase(),start:pos-m[0].length,end:pos}:null;
+}
+function _atCandidates(q){
+  const liveCls=(typeof _liveClassName==='function')?_liveClassName():null;
+  const cls=liveCls?(CLASSES||[]).find(c=>(c.name||c.id)===liveCls||c.id===liveCls):null;
+  const inCls=new Set();
+  if(cls)(cls.students||[]).forEach(s=>inCls.add((String(s.preferred||'')+' '+String(s.surname||'')).trim().toLowerCase()));
+  const hits=(STUDENTS||[]).filter(s=>{
+    if(!s.name)return false;
+    if(!q)return true;
+    const n=s.name.toLowerCase();
+    return n.startsWith(q)||n.split(/\s+/).some(w=>w.startsWith(q));
+  });
+  hits.sort((a,b)=>{
+    const ac=inCls.has(a.name.toLowerCase())?0:1,bc=inCls.has(b.name.toLowerCase())?0:1;
+    return ac!==bc?ac-bc:a.name.localeCompare(b.name);
+  });
+  return {list:hits.slice(0,8),inCls};
+}
+function _atRender(inpId,sugId){
+  const inp=document.getElementById(inpId),box=document.getElementById(sugId);
+  if(!inp||!box)return;
+  const tok=_atToken(inp);
+  if(!tok){_atHide(sugId);return;}
+  const{list,inCls}=_atCandidates(tok.q);
+  if(!list.length){_atHide(sugId);return;}
+  box.innerHTML=list.map(s=>
+    `<div class="at-sug-row" data-name="${_esc(s.name)}" onmousedown="event.preventDefault();_atPick('${inpId}','${sugId}',this.dataset.name)">`+
+    `<span>${_esc(s.name)}</span>`+
+    (inCls.has(s.name.toLowerCase())?'<span class="at-sug-cls">in class</span>':'')+
+    (s.tutor?`<span class="at-sug-tut">${_esc(s.tutor)}</span>`:'')+
+    `</div>`).join('');
+  box.style.display='block';
+}
+function _atHide(sugId){const b=document.getElementById(sugId);if(b){b.style.display='none';b.innerHTML='';}}
+function _atOpen(sugId){const b=document.getElementById(sugId);return !!(b&&b.style.display!=='none'&&b.firstChild);}
+function _atPickFirst(inpId,sugId){
+  const b=document.getElementById(sugId);const r=b&&b.querySelector('.at-sug-row');
+  if(r)_atPick(inpId,sugId,r.dataset.name);
+}
+function _atPick(inpId,sugId,name){
+  const inp=document.getElementById(inpId);if(!inp)return;
+  const tok=_atToken(inp),v=inp.value;
+  if(tok)inp.value=v.slice(0,tok.start)+name+' '+v.slice(tok.end);
+  else inp.value=(v?v.replace(/\s*$/,' '):'')+name+' ';
+  _atHide(sugId);
+  inp.focus();
+  const p=(tok?tok.start:inp.value.length-name.length-1)+name.length+1;
+  try{inp.setSelectionRange(p,p);}catch(e){}
+  if(inpId==='qc-input'&&typeof qcOnInput==='function')qcOnInput(); // full name now present → tag + note button light up
 }
 
 // ══ STUDENT NOTES — private timestamped observations ═══════════════
@@ -34220,8 +34355,46 @@ function _renderFireRegister(){
 
 // _fireSecToggle replaced by inline onclick in makeSection
 
+let _amDayPillOpen=false,_amDayPillHash='';
+function toggleAmDayPill(){
+  _amDayPillOpen=!_amDayPillOpen;
+  const car=document.getElementById('am-day-pill-car');if(car)car.textContent=_amDayPillOpen?'▾':'▸';
+  const bd=document.getElementById('am-day-pill-body');
+  if(bd){bd.style.display=_amDayPillOpen?'block':'none';}
+  _amDayPillHash='';_amDayPillTick();
+}
+function _amPillSaid(taskId){archivePoint(taskId);_amDayPillHash='';_amDayPillTick();try{renderWeekTasksView();}catch(e){}}
+function _amDayPillTick(){
+  const pill=document.getElementById('am-day-pill');if(!pill)return;
+  let total=0,groups=[];
+  try{
+    getContexts().forEach(ctx=>{
+      const pts=getPoints(ctx.id);
+      if(!pts.length)return;
+      total+=pts.length;groups.push({ctx,pts});
+    });
+  }catch(e){}
+  if(!total){pill.style.display='none';const bd=document.getElementById('am-day-pill-body');if(bd)bd.style.display='none';return;}
+  pill.style.display='inline-flex';
+  const n=document.getElementById('am-day-pill-n');if(n)n.textContent=total;
+  if(!_amDayPillOpen)return;
+  const hash=groups.map(g=>g.ctx.id+':'+g.pts.map(t=>t.id).join(',')).join('|');
+  if(hash===_amDayPillHash)return;
+  _amDayPillHash=hash;
+  const bd=document.getElementById('am-day-pill-body');if(!bd)return;
+  bd.innerHTML=groups.map(g=>`<div style="border:1px solid rgba(255,255,255,.1);border-left:4px solid ${g.ctx.color};border-radius:10px;background:rgba(255,255,255,.03);padding:7px 12px;margin-bottom:6px">
+    <div style="font-size:10.5px;font-weight:800;color:${g.ctx.color};text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">${_esc(g.ctx.name)} · ${g.pts.length}</div>
+    ${g.pts.map(t=>`<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;color:#e5e7eb;line-height:1.35">${_esc(t.text)}</div>
+        ${(t.student||((t.grades||[]).length)||t.sub)?`<div style="font-size:9.5px;color:#777;margin-top:1px">${t.student?_esc(t.student):''}${(t.grades||[]).length?((t.student?' · ':'')+t.grades.join(', ')):''}${t.sub?((t.student||(t.grades||[]).length?' · ':'')+_esc(t.sub)):''}</div>`:''}
+      </div>
+      <button onclick="_amPillSaid('${t.id}')" style="flex-shrink:0;background:none;border:1px solid rgba(34,197,94,.4);border-radius:7px;color:#22c55e;font-size:11px;font-weight:700;padding:3px 8px;cursor:pointer">✓</button>
+    </div>`).join('')}
+  </div>`).join('');
+}
 function amRender(){
-  const ctx=amGetCtx();_updateLiveBtn();_amAutoCheck();
+  const ctx=amGetCtx();_updateLiveBtn();_amAutoCheck();_amDayPillTick();
   const body=document.getElementById('am-body');if(!body)return;
   if(_fireOpen){if(!document.getElementById('am-fire-section'))_renderFireRegister();return;}
   const titleEl=document.getElementById('am-title'),subEl=document.getElementById('am-sub'),chip=document.getElementById('am-cat-chip');
@@ -34267,7 +34440,10 @@ function amRender(){
   const _ptsHash=(S.planData||[]).filter(t=>t.say&&!t.archived).length+'_'+(S.planData||[]).length;
   const ctxKey=`${dayName}_${slotIdx}_${liveLen}_${planLen}_${_ptsHash}_${stateStr}_${lessonDoneStr}_${manualStart}_${isOverNow}_${lpHash}_${pointsHash}_${rosterState}_${tmtgHash}_${lessonSecond}`;
 
-  if(_amLastCtxKey!==ctxKey){
+  // While the user is typing inside the panel, NEVER rebuild (it would destroy
+  // the focused input) — fall through to the in-place tick updates instead.
+  // Rebuild resumes on the first tick after focus leaves.
+  if(_amLastCtxKey!==ctxKey&&!_amFocused){
     _amLastCtxKey=ctxKey;
     if(titleEl)titleEl.textContent=label;
     if(subEl)subEl.textContent=`${st}–${et} · ${dayName}`;
@@ -34517,6 +34693,12 @@ function amQuickCapture(text){
   const live=snGetLive(ctx.offset,ctx.slotIdx,ctx.dayName).slice();
   live.push({id:_nid(),text:text.trim(),depth:0,live:true,addedAt:new Date().toISOString()});
   snSaveLive(ctx.offset,ctx.slotIdx,ctx.dayName,live);
+  // If a student is named in full (e.g. via @ tag), also file it on their profile
+  try{
+    const hit=detectStudentInText(text);
+    if(hit)addStudentNote(hit.student,text.trim(),_liveClassName()).then(ok=>
+      showToastMsg(ok?('\u{1F4DD} Noted · '+hit.student):('\u{1F4DD} Saved offline · '+hit.student),ok?'#0f766e':'#b45309'));
+  }catch(e){}
   _amLastCtxKey='';amRender();
   setTimeout(()=>{const i=document.getElementById('am-quick-inp');if(i){i.style.borderColor='#22c55e';setTimeout(()=>i.style.borderColor='',800);}},50);
 }
@@ -34844,8 +35026,11 @@ function initActiveMode(){
 </div>
 <div id="qc-backdrop" onclick="closeQuickCapture()"></div>
 <div id="qc-sheet">
-  <input id="qc-input" type="text" placeholder="What needs doing or saying?" autocomplete="off"
-    oninput="qcOnInput()" onkeydown="if(event.key==='Enter')qcEnter();if(event.key==='Escape')closeQuickCapture()">
+  <input id="qc-input" type="text" placeholder="What needs doing or saying? @ tags a student" autocomplete="off"
+    oninput="qcOnInput();_atRender('qc-input','qc-at-sug')"
+    onblur="setTimeout(function(){var b=document.getElementById('qc-at-sug');if(b){b.style.display='none';}},150)"
+    onkeydown="if(event.key==='Enter'){if(_atOpen('qc-at-sug')){_atPickFirst('qc-input','qc-at-sug');event.preventDefault();}else qcEnter();}if(event.key==='Escape'){if(_atOpen('qc-at-sug'))_atHide('qc-at-sug');else closeQuickCapture();}">
+  <div id="qc-at-sug" class="at-sug in-flow" style="display:none"></div>
   <div id="qc-tag" style="display:none;margin:-6px 0 10px;font-size:11px"></div>
   <div id="qc-step1">
     <button id="qc-note-btn" onclick="qcSaveNote()" style="display:none;width:100%;min-height:52px;border:none;border-radius:var(--r);background:#0f766e;color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px"></button>
