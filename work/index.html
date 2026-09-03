@@ -104,6 +104,8 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .qc-chiprow{display:flex;flex-wrap:wrap;gap:6px}
 .qc-chip.solid{background:#eef2ff;border-color:#c7d2fe;color:#3730a3}
 .qc-chip.solid.on{background:#1d4ed8;border-color:#1d4ed8;color:#fff}
+.plan-band{display:flex;align-items:center;gap:8px;padding:8px 11px;border-radius:9px;border:1px solid}
+.plan-band-count{font-size:10px;font-weight:700;color:#fff;border-radius:9px;padding:1px 7px}
 .tab.active{color:#212529;border-top:2px solid #212529;background:#f8f9fa}
 .tab-dot{position:absolute;top:4px;right:calc(50% - 14px);width:7px;height:7px;border-radius:50%;background:#2b8a3e;display:none}
 .tab-content{display:none}.tab-content.active{display:block}
@@ -118,9 +120,9 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .plan-view-toggle{display:flex;gap:6px;padding:.5rem 0 .25rem}
 .plan-tog-btn{flex:1;padding:7px 0;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:12px;font-weight:600;color:#495057;cursor:pointer;transition:all .15s}
 .plan-tog-btn.active{background:#212529;color:#fff;border-color:#212529}
-.plan-day-col{background:#fff;border:1px solid var(--border3);border-radius:10px;margin-bottom:.6rem;overflow:hidden}
-.plan-day-hdr{background:#f8f9fa;padding:.5rem .85rem;font-size:12px;font-weight:700;color:#495057;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border3)}
-.plan-day-hdr.today{background:#212529;color:#fff}
+.plan-day-col{background:#fff;border:1px solid #eef0f2;border-radius:9px;margin-bottom:6px;overflow:hidden}
+.plan-day-hdr{background:transparent;padding:8px 11px;font-size:12.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;justify-content:space-between;border-bottom:1px solid #f1f5f9}
+.plan-day-hdr.today{background:transparent;color:#7d5800;border-left:3px solid #f59f00;padding-left:8px}
 .plan-task-row{display:flex;align-items:flex-start;gap:8px;padding:.55rem .85rem;border-bottom:.5px solid var(--border3)}
 .plan-task-row:last-child{border-bottom:none}
 .plan-task-row input[type=checkbox]{margin-top:3px;flex-shrink:0;width:15px;height:15px;cursor:pointer}
@@ -128,11 +130,12 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .plan-task-label.done{color:#adb5bd;text-decoration:line-through}
 .plan-task-meta{font-size:10px;color:#adb5bd;margin-top:2px}
 .plan-task-cat-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px}
-.plan-cat-section{margin-bottom:.75rem}
-.plan-cat-hdr{display:flex;align-items:center;gap:8px;padding:.5rem .85rem;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.plan-cat-section{margin-bottom:6px}
+.plan-cat-section .plan-day-col{border-radius:0 0 9px 9px;margin-bottom:0}
+.plan-cat-hdr{display:flex;align-items:center;gap:8px;padding:8px 11px;font-size:12.5px;font-weight:700;background:#fff;border:1px solid #eef0f2;border-bottom:none;border-radius:9px 9px 0 0}
 .plan-add-btn{width:100%;padding:.55rem;border:1.5px dashed var(--border);border-radius:8px;background:transparent;color:#868e96;font-size:12px;cursor:pointer;margin-top:.3rem}
 .plan-add-btn:active{background:#f8f9fa}
-.plan-sticky-section{background:#fffbe6;border:1px solid #ffe066;border-radius:10px;margin-bottom:.6rem;overflow:hidden}
+.plan-sticky-section{background:#fff;border:1px solid #eef0f2;border-left:3px solid #ffd43b;border-radius:9px;margin-bottom:6px;overflow:hidden}
 .plan-sticky-hdr{padding:.5rem .85rem;font-size:11px;font-weight:700;color:#7d5800;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:6px;border-bottom:1px solid #ffe066}
 .task-text{font-size:13px;color:var(--text);line-height:1.5}
 .task-text.done{color:var(--text3);text-decoration:line-through}
@@ -307,6 +310,10 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 
 .tt-top{display:flex;align-items:center;gap:6px;margin-bottom:.6rem;flex-wrap:wrap}
 .tt-week-nav{display:flex;align-items:center;gap:6px;flex:1}
+#tt-top-bar{position:sticky;top:100px;z-index:60;background:var(--bg);padding:6px 0;border-bottom:1px solid var(--border3)}
+#tt-thead-wrap{position:sticky;top:calc(100px + 46px);z-index:55;background:#fff}
+.tt-dow{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.tt-dow.sel{background:#00205B!important;color:#fff!important;border-bottom:2px solid #00205B!important}
 .tt-week-btn{width:32px;height:32px;border-radius:50%;background:#fff;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;color:var(--text2);flex-shrink:0}
 .tt-week-label{font-size:12px;font-weight:600;color:var(--text);flex:1;text-align:center;line-height:1.3}
 .tt-week-dates{font-size:10px;color:var(--text3);text-align:center}
@@ -1065,14 +1072,15 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
 
 <!-- SCHED -->
 <div id="tab-sched" class="tab-content active">
-  <div class="tt-top">
+  <div class="tt-top" id="tt-top-bar">
     <div class="tt-week-nav">
-      <button class="tt-week-btn" onclick="ttNavWeek(-1)">‹</button>
-      <div>
+      <button class="tt-week-btn" onclick="ttNavWeek(-1)" aria-label="Previous">‹</button>
+      <div style="flex:1;text-align:center;min-width:0">
         <div class="tt-week-label" id="tt-week-label">W1</div>
         <div class="tt-week-dates" id="tt-week-dates"></div>
       </div>
-      <button class="tt-week-btn" onclick="ttNavWeek(1)">›</button>
+      <button class="tt-week-btn" id="tt-nav-now" onclick="ttGoNow()" title="Back to now" style="display:none;width:auto;padding:0 10px;border-radius:14px;background:#fff7e6;border-color:#f59f00;color:#7d5800;font-size:11px;font-weight:700;gap:3px">Now</button>
+      <button class="tt-week-btn" onclick="ttNavWeek(1)" aria-label="Next">›</button>
     </div>
   </div>
   <div class="tt-controls">
@@ -23325,6 +23333,61 @@ function isWeekA(){
   const d=Math.round((new Date()-getWeekARef())/(7*864e5));
   return d%2===0;
 }
+
+// ── Day header acts as a picker in both views ──
+function _tdSelectedDow(){
+  // index of the currently displayed Day-view day within the visible day columns
+  const info=(typeof getTodayViewDay==='function')?getTodayViewDay():null;
+  const dn=info?info.dayName:null;
+  if(!dn)return -1;
+  const active=ttShowWeekend?DAYS:DAYS.slice(0,5);
+  return active.indexOf(dn);
+}
+
+function _renderDayHeaderBar(){
+  const theadTbl=document.getElementById('tt-thead-table');
+  if(!theadTbl)return;
+  const offset=ttWeekOffset;
+  const activeDays=ttShowWeekend?DAYS:DAYS.slice(0,5);
+  const mon=getWeekMondayFor(offset);
+  const todayStr=_todayStr();
+  const selDow=_tdSelectedDow();
+  const dayColPct=(100/activeDays.length);
+  let h='<colgroup><col style="width:34px">'+activeDays.map(()=>'<col style="width:'+dayColPct+'%">').join('')+'<col style="width:34px"></colgroup>';
+  h+='<thead><tr><th style="width:34px;font-size:8px;background:#f8f9fa">Time</th>';
+  activeDays.forEach((d,i)=>{
+    const dt=new Date(mon);dt.setDate(mon.getDate()+DAYS.indexOf(d));
+    const iso=dt.toLocaleDateString('en-CA');
+    const isToday=iso===todayStr;
+    const isSel=selDow===i;
+    const isWknd=(d==='Sat'||d==='Sun');
+    let st='';
+    if(isSel)st='background:#00205B;color:#fff;font-weight:700;border-bottom:2px solid #00205B';
+    else if(isToday)st='background:rgba(245,159,0,.08);color:#7d5800;font-weight:700;border-bottom:2px solid #f59f00';
+    else if(isWknd)st='background:#f0f0f5;color:#868e96';
+    const dl=`<br><span style="font-size:9px;font-weight:400;color:${isSel?'rgba(255,255,255,.85)':isToday?'#7d5800':'#868e96'}">${dt.getDate()}</span>`;
+    h+=`<th class="tt-dow" onclick="ttPickDay('${d}',${offset})" style="${st}">${d}${isToday?' \u25C6':''}${dl}</th>`;
+  });
+  h+='<th style="width:34px;font-size:8px;background:#f8f9fa">Time</th></tr></thead>';
+  theadTbl.innerHTML=h;
+}
+function ttPickDay(dayName,weekOffset){
+  if(ttEditMode)return; // don't hijack taps while editing
+  const active=ttShowWeekend?DAYS:DAYS.slice(0,5);
+  const di=active.indexOf(dayName);if(di<0)return;
+  // Work out the offset in days from today to that column
+  const mon=getWeekMondayFor(weekOffset);
+  const target=new Date(mon);target.setDate(mon.getDate()+DAYS.indexOf(dayName));
+  const todayD=new Date(_todayStr()+'T00:00:00');
+  tdDayOffset=Math.round((target-todayD)/864e5);
+  _syncWeekToSelectedDay();
+  if(ttView!=='today'){
+    const btn=document.getElementById('tt-btn-today');
+    setTTView('today',btn);
+  } else {
+    renderTimetable();
+  }
+}
 function ttGoNow(){ttWeekOffset=0;tdDayOffset=0;renderTimetable();}
 function ttNavWeek(dir){
   if(ttEditMode)lockEditMode();
@@ -23343,7 +23406,18 @@ function ttNavWeek(dir){
 }
 function tdNavDay(dir){
   tdDayOffset+=dir;
+  _syncWeekToSelectedDay();
   renderTimetable();
+}
+function _syncWeekToSelectedDay(){
+  // Keep the shared day header on the week that contains the selected day
+  const t=new Date(_todayStr()+'T00:00:00');
+  t.setDate(t.getDate()+tdDayOffset);
+  const tMon=new Date(t);
+  const dow=t.getDay();                    // 0=Sun
+  tMon.setDate(t.getDate()-(dow===0?6:dow-1));
+  const curMon=getWeekMondayFor(0);
+  ttWeekOffset=Math.round((tMon-curMon)/(7*864e5));
 }
 
 const PERIODS={
@@ -24189,6 +24263,21 @@ function getTodayViewDay(){
   return{dayName,date:new Date(target),weekOffset,isToday,nm:isToday?nm:-1};
 }
 
+
+// Compact points summary for the Day view — counts by audience, taps to Plan
+function _dayPointsSummaryHtml(dayName,offset){
+  const ctxs=getContexts();
+  const chips=[];
+  ctxs.forEach(ctx=>{
+    const pts=getPoints(ctx.id);
+    if(!pts.length)return;
+    chips.push(`<button onclick="showPlanTab(null)" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;border:1px solid ${ctx.color}33;background:${ctx.color}14;color:${ctx.color};cursor:pointer">${_esc(ctx.name)} <span style="background:${ctx.color};color:#fff;border-radius:8px;padding:0 6px">${pts.length}</span></button>`);
+  });
+  if(!chips.length)return '';
+  return `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 10px">
+    <span style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">\u{1F4AC} To say</span>
+    ${chips.join('')}</div>`;
+}
 function renderTodayView(){
   const info=getTodayViewDay();
   // Clear expanded past slots when day changes
@@ -24467,7 +24556,7 @@ function renderTodayView(){
     </div>`;
   }
 
-  el.innerHTML=html;
+  el.innerHTML=_dayPointsSummaryHtml(dayName,offset)+html;
   if(curIdx>=0)setTimeout(()=>{const s=document.getElementById('tslot-'+curIdx);if(s)s.scrollIntoView({behavior:'smooth',block:'center'});},100);
 }
 
@@ -24499,8 +24588,15 @@ function clearTodayNote(idx,day){
 
 // ── MAIN RENDER ───────────────────────────────────────
 function renderTimetable(){
+  var _off=(ttWeekOffset!==0||tdDayOffset!==0);
   var _nb=document.getElementById('tt-now-btn');
-  if(_nb)_nb.style.display=(ttWeekOffset!==0||tdDayOffset!==0)?'inline-block':'none';
+  if(_nb)_nb.style.display=_off?'inline-block':'none';
+  var _np=document.getElementById('tt-nav-now');
+  if(_np){
+    _np.style.display=_off?'flex':'none';
+    var _behind=(ttView==='today')?(tdDayOffset<0):(ttWeekOffset<0);
+    _np.textContent=(_behind?'\u2192 ':'\u2190 ')+'Now';
+  }
   const offset=ttWeekOffset;
   const wA=getWeekIsA(offset);
   const activeDays=ttShowWeekend?DAYS:DAYS.slice(0,5);
@@ -24546,6 +24642,7 @@ function renderTimetable(){
   if(ttView==='today'){
     if(tableWrap)tableWrap.style.display='none';
     if(todayView)todayView.style.display='block';
+    _renderDayHeaderBar();   // keep the shared day picker in sync
     renderTodayView();
     return;
   }
@@ -24595,7 +24692,10 @@ function renderTimetable(){
     if(isToday) thStyle='background:rgba(245,159,0,.08);color:#7d5800;font-weight:700;border-bottom:2px solid #f59f00';
     else if(holName) thStyle='background:#ffe0eb;color:#a61e4d;font-style:italic';
     else if(isWknd) thStyle='background:#f0f0f5;color:#868e96';
-    h+=`<th style="${thStyle}">${d}${isToday?' ◆':''}${dateLabel}${holLabel}</th>`;
+    const _selDow=(ttView==='today')?_tdSelectedDow():-1;
+    const _isSel=_selDow===i;
+    if(_isSel)thStyle+=';background:#00205B;color:#fff;border-bottom:2px solid #00205B';
+    h+=`<th class="tt-dow" onclick="ttPickDay('${d}',${offset})" title="Show this day" style="${thStyle}">${d}${isToday?' ◆':''}${dateLabel}${holLabel}</th>`;
   });
   h+='<th style="width:34px;font-size:8px;background:#f8f9fa">Time</th></tr></thead><tbody>';
 
@@ -25537,23 +25637,81 @@ function saveCalEvent(){
   closeCalAddModal();
   if(calView==='continuous')renderContinuous();else renderCalendar();
 }
-function openStudentCard(name){
+async function openStudentCard(name){
   const s=STUDENTS.find(x=>x.name===name)||{name};
   const isBoarder=!!HAWKING_STATUS[name];
   const exc=(window._lastExcusedMap||{})[name];
+  const room=(typeof BOARDER_ROOMS!=='undefined'&&Array.isArray(BOARDER_ROOMS))?(BOARDER_ROOMS.find(r=>(r.students||[]).includes(name))||{}).name:'';
   document.getElementById('sc-overlay')?.remove();
   const ov=document.createElement('div');
   ov.id='sc-overlay';
-  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10001;display:flex;align-items:flex-end;justify-content:center';
   ov.onclick=e=>{if(e.target===ov)ov.remove();};
-  const room=(typeof BOARDER_ROOMS!=='undefined'&&Array.isArray(BOARDER_ROOMS))?(BOARDER_ROOMS.find(r=>(r.students||[]).includes(name))||{}).name:'';
-  ov.innerHTML='<div style="background:#fff;border-radius:var(--r);max-width:340px;width:100%;padding:18px 20px;box-shadow:0 10px 40px rgba(0,0,0,.3)">'
-    +'<div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:2px">'+name+'</div>'
-    +'<div style="font-size:11px;color:var(--text3);margin-bottom:10px">'+(s.tutor?('Tutor: '+s.tutor+' · '):'')+(isBoarder?('Boarder'+(room?' · '+room:'')):'Day student')+'</div>'
-    +(exc?('<div style="font-size:12px;background:var(--wrn-bg);color:var(--wrn-tx);border-radius:var(--rsm);padding:7px 10px;margin-bottom:10px">'+(exc.emoji||'')+' '+(exc.reason||'On leave')+(exc.returnPlanned?(' · back '+String(exc.returnPlanned).split('T')[0]):'')+'</div>'):'')
-    +'<button onclick="document.getElementById(\'sc-overlay\').remove()" class="btn-sec" style="width:100%;justify-content:center">Close</button></div>';
+  const shell=(inner)=>`<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:520px;max-height:86vh;overflow:auto;padding:14px 16px 26px">
+    <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
+      <div style="flex:1">
+        <div style="font-size:17px;font-weight:800;color:var(--text);line-height:1.2">${_esc(name)}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">${s.tutor?('Tutor: '+_esc(s.tutor)+' \u00B7 '):''}${isBoarder?('Boarder'+(room?' \u00B7 '+_esc(room):'')):'Day student'}</div>
+      </div>
+      <button onclick="document.getElementById('sc-overlay').remove()" style="background:none;border:none;font-size:22px;color:#adb5bd;cursor:pointer;line-height:1;padding:0 4px">\u2715</button>
+    </div>
+    ${exc?`<div style="font-size:12px;background:var(--wrn-bg);color:var(--wrn-tx);border-radius:8px;padding:7px 10px;margin-bottom:10px">${exc.emoji||''} ${_esc(exc.reason||'On leave')}${exc.returnPlanned?(' \u00B7 back '+String(exc.returnPlanned).split('T')[0]):''}</div>`:''}
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <input id="sc-note-inp" placeholder="Add a note\u2026" style="flex:1;font-size:14px;padding:9px 11px;border:1.5px solid var(--border2);border-radius:9px;outline:none"
+        onkeydown="if(event.key==='Enter')scAddNote('${_esc(name).replace(/'/g,"\\\\'")}')">
+      <button class="btn-pri" onclick="scAddNote('${_esc(name).replace(/'/g,"\\\\'")}')" style="padding:9px 14px">Save</button>
+    </div>
+    ${inner}</div>`;
+  ov.innerHTML=shell('<div style="font-size:12px;color:#9ca3af;padding:14px 0;text-align:center">Loading history\u2026</div>');
   document.body.appendChild(ov);
+
+  const fmtDT=iso=>{try{const d=new Date(iso);return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'})+' \u00B7 '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}catch(e){return'';}};
+  const fmtD=v=>{try{return new Date(String(v).split('T')[0]+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'});}catch(e){return String(v||'');}};
+  const sect=(title,count,body)=>body?`<div style="margin-bottom:12px">
+      <div style="font-size:10.5px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px">${title}${count!=null?' \u00B7 '+count:''}</div>
+      <div style="background:#fff;border:1px solid #eef0f2;border-radius:9px;overflow:hidden">${body}</div></div>`:'';
+  const row=(main,meta,extra)=>`<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 11px;border-bottom:1px solid #f5f6f7">
+      <div style="flex:1"><div style="font-size:13px;color:#212529;line-height:1.35">${main}</div>
+      ${meta?`<div style="font-size:10px;color:#adb5bd;margin-top:2px">${meta}</div>`:''}</div>${extra||''}</div>`;
+
+  let notes=[],pens=[],regs=[],leaves=[],med=[];
+  try{[notes,pens,regs,leaves,med]=await Promise.all([
+    getStudentNotes(name),
+    supa.from('boarding_penalties').select('*').eq('student_name',name).order('created_at',{ascending:false}).limit(40).then(r=>r.data||[],()=>[]),
+    supa.from('boarding_registrations').select('*').eq('student_name',name).in('status',['absent','late','excused']).order('register_date',{ascending:false}).limit(40).then(r=>r.data||[],()=>[]),
+    supa.from('boarding_leaves').select('*').eq('student_name',name).order('departure_planned',{ascending:false}).limit(20).then(r=>r.data||[],()=>[]),
+    supa.from('boarding_medical').select('*').eq('student_name',name).order('visit_date',{ascending:false}).limit(20).then(r=>r.data||[],()=>[])
+  ]);}catch(e){console.warn('student card',e);}
+
+  const esc=n=>String(n).replace(/'/g,"\\'");
+  let html='';
+  html+=sect('\u{1F4DD} Notes',notes.length,notes.length?notes.map(n=>row(_esc(n.text),fmtDT(n.created_at)+(n.context?' \u00B7 '+_esc(n.context):''),
+    `<button onclick="deleteStudentNote('${n.id}','${esc(name)}')" style="background:none;border:none;color:#dee2e6;cursor:pointer;font-size:15px;padding:0 2px">\u00D7</button>`)).join(''):row('<span style="color:#adb5bd">No notes yet.</span>',''));
+  const penLbl={late_wake:'Late wake',late_floor:'Late off floor',late_sleep:'Late to sleep',phone:'Phone',other:'Other'};
+  html+=sect('\u26A0 Sanctions',pens.length,pens.length?pens.slice(0,15).map(p=>row(
+    _esc(penLbl[p.infraction_type]||p.infraction_type||'Sanction')+(p.status?` <span style="font-size:10px;color:${p.status==='completed'?'#16a34a':p.status==='overdue'?'#dc2626':'#d97706'}">\u00B7 ${_esc(p.status)}</span>`:''),
+    fmtD(p.penalty_date||p.created_at)+(p.notes?' \u00B7 '+_esc(p.notes):''))).join(''):'');
+  html+=sect('\u{1F4CB} Attendance flags',regs.length,regs.length?regs.slice(0,15).map(r=>row(
+    _esc(String(r.status||'').toUpperCase())+(r.session_type?' \u00B7 '+_esc(r.session_type):''),fmtD(r.register_date))).join(''):'');
+  html+=sect('\u2708 Leaves',leaves.length,leaves.length?leaves.slice(0,10).map(l=>row(
+    _esc(l.leave_type||'leave'),fmtD(l.departure_planned)+(l.return_planned?' \u2192 '+fmtD(l.return_planned):''))).join(''):'');
+  html+=sect('\u{1F3E5} Nurse visits',med.length,med.length?med.slice(0,10).map(m=>row(
+    _esc(m.reason||m.notes||'Visit'),fmtD(m.visit_date))).join(''):'');
+
+  const cur=document.getElementById('sc-overlay');
+  if(cur)cur.innerHTML=shell(html);
 }
+function scAddNote(name){
+  const inp=document.getElementById('sc-note-inp');
+  const t=inp?inp.value.trim():'';
+  if(!t){if(inp)inp.focus();return;}
+  if(inp)inp.value='';
+  addStudentNote(name,t,_liveClassName()).then(function(ok){
+    showToastMsg(ok?'\u{1F4DD} Noted':'\u{1F4DD} Saved offline','#0f766e');
+    openStudentCard(name);
+  });
+}
+
 function renderListsSearch(q){
   q=(q||'').trim().toLowerCase();
   const host=document.getElementById('hawking-list-content');
@@ -25741,7 +25899,7 @@ function renderWeekTasksView(){
       html+=`<div class="plan-cat-section">
         <div class="plan-cat-hdr">
           <div style="width:10px;height:10px;border-radius:50%;background:${cat.color};flex-shrink:0"></div>
-          <span style="color:${cat.color}">${cat.name}</span>
+          <span style="color:var(--text);flex:1">${cat.name}</span><span style="font-size:10px;font-weight:700;color:${cat.color}">${catTasks.length}</span>
           <button onclick="planAddTask(null,'${cat.id}')" style="background:none;border:none;color:#ced4da;font-size:16px;cursor:pointer;margin-left:auto;line-height:1;padding:0">＋</button>
         </div>
         <div class="plan-day-col">${catTasks.map(taskCard).join('')}</div>
@@ -26628,7 +26786,7 @@ async function renderAwayList(el){
           const callOK = d?.parents_called;
           const lid = d?.id || '';
           return `<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:#fff;border-radius:6px;border:1px solid #f3f4f6">
-            <span style="flex:1;font-size:13px;font-weight:500;color:#111">${s.name}</span>
+            <span style="flex:1;font-size:13px;font-weight:500;color:#111">${_scName(s.name)}</span>
             ${lid ? `<button onclick="toggleLeaveChecklist('${lid}','form_submitted',${!formOK},supa).then(()=>renderAwayList(document.getElementById('hawking-list-content')))" 
               style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid ${formOK?'#16a34a':'#e5e7eb'};background:${formOK?'#f0fdf4':'#f9fafb'};color:${formOK?'#16a34a':'#9ca3af'};cursor:pointer" title="Form submitted">📋</button>
             <button onclick="toggleLeaveChecklist('${lid}','parents_called',${!callOK},supa).then(()=>renderAwayList(document.getElementById('hawking-list-content')))"
@@ -26930,7 +27088,7 @@ function _renderBoardersWithGroup(groupBy, existingHtml, el){
         <div class="hwk-row-main">
           <span class="hwk-num">${i+1}</span>
           <div class="hwk-info">
-            <div class="hwk-name">${name}</div>
+            <div class="hwk-name">${_scName(name)}</div>
             <div class="hwk-meta">${grade}${tutor?' · '+tutor:''}</div>
           </div>
         </div>
@@ -26946,7 +27104,7 @@ function _renderBoardersWithGroup(groupBy, existingHtml, el){
       html+=`<div class="hwk-row" onclick="openStudentCard('${s.name.replace(/'/g,"\'")}')">
         <div class="hwk-row-main">
           <span class="hwk-num">${i+1}</span>
-          <div class="hwk-info"><div class="hwk-name">${s.name}</div></div>
+          <div class="hwk-info"><div class="hwk-name">${_scName(s.name)}</div></div>
         </div>
       </div>`;
     });
@@ -27266,7 +27424,7 @@ function renderHawkingByRoom(el){
           const cn=st.cn?` (${st.cn})`:'';
           const gradeTag=tut?`<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:var(--bg3);color:var(--text3);border:1px solid var(--border)">${tut.grade}</span>`:'';
           html+=`<div class="student-row">
-            <div style="flex:1"><div class="stu-name">${name}<span style="font-size:10px;color:var(--text3)">${cn}</span></div></div>
+            <div style="flex:1"><div class="stu-name">${_scName(name)}<span style="font-size:10px;color:var(--text3)">${cn}</span></div></div>
             ${gradeTag}
           </div>`;
         });
@@ -27684,7 +27842,7 @@ function populateRoomBoarderList(selected){
     return`<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border3);cursor:pointer">
       <input type="checkbox" name="rm-boarder" value="${name}" ${checked?'checked':''} style="width:16px;height:16px;flex-shrink:0">
       <div>
-        <div style="font-size:13px;font-weight:500">${name}</div>
+        <div style="font-size:13px;font-weight:500">${_scName(name)}</div>
         ${sub?`<div style="font-size:10px;color:var(--text3)">${sub}</div>`:''}
       </div>
     </label>`;
@@ -27932,7 +28090,7 @@ function renderToSaySection(){
     const pts=getPoints(ctx.id);
     const arch=getPoints(ctx.id,{archived:true});
     if(!pts.length&&!arch.length)return;
-    const open=_sayOpen[ctx.id]!==false;
+    const open=_sayOpen[ctx.id]===true; // collapsed by default, remembered when opened
     let body='';
     if(open){
       if(ctx.kind==='teaching'){
@@ -27955,16 +28113,31 @@ function renderToSaySection(){
       if(arch.length)actions+=`<button class="btn-sec" onclick="openSayHistory('${ctx.id}')">\u{1F5C4} History (${arch.length})</button>`;
       if(actions)body+=`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">${actions}</div>`;
     }
-    html+=`<div style="background:#fff;border:1px solid #e5e7eb;border-left:4px solid ${ctx.color};border-radius:10px;padding:10px 12px;margin-bottom:8px">
+    html+=`<div style="background:#fff;border:1px solid #eef0f2;border-radius:9px;padding:8px 11px;margin-bottom:6px">
       <div onclick="toggleSayGroup('${ctx.id}')" style="display:flex;align-items:center;gap:8px;cursor:pointer">
-        <span style="font-size:11px;color:#9ca3af;width:12px">${open?'\u25BE':'\u25B8'}</span>
-        <span style="font-size:13px;font-weight:800;color:${ctx.color}">${_esc(ctx.name)}</span>
-        <span style="font-size:10px;font-weight:700;background:${ctx.color};color:#fff;border-radius:9px;padding:1px 7px">${pts.length}</span>
+        <span style="font-size:10px;color:#c1c7cd;width:10px">${open?'\u25BE':'\u25B8'}</span>
+        <span style="width:8px;height:8px;border-radius:50%;background:${ctx.color};flex-shrink:0"></span>
+        <span style="font-size:12.5px;font-weight:700;color:var(--text);flex:1">${_esc(ctx.name)}</span>
+        <span style="font-size:10px;font-weight:700;color:${ctx.color}">${pts.length}</span>
       </div>${body}</div>`;
   });
   if(!html)return '';
-  return `<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:2px 0 8px">\u{1F4AC} To say</div>${html}</div>
-    <div style="font-size:11px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:6px 0 8px">\u2713 To do</div>`;
+  const total=getContexts().reduce((n,ct)=>n+getPoints(ct.id).length,0);
+  const open=_sayOpen['__section']===true; // collapsed by default
+  const doCount=(S.planData||[]).filter(t=>!t.say).length;
+  return `<div style="margin-bottom:${open?'20px':'12px'}">
+      <div onclick="toggleSayGroup('__section')" class="plan-band" style="background:#ecfeff;border-color:#a5f3fc;cursor:pointer">
+        <span style="color:#0e7490;font-size:11px;width:11px">${open?'\u25BE':'\u25B8'}</span>
+        <span style="font-size:11.5px;font-weight:800;color:#0e7490;text-transform:uppercase;letter-spacing:.08em;flex:1">\u{1F4AC} To say</span>
+        <span class="plan-band-count" style="background:#0e7490">${total}</span>
+      </div>
+      <div style="display:${open?'block':'none'};padding:8px 0 0 10px;border-left:2px solid #a5f3fc;margin:8px 0 0 6px">${html}</div>
+    </div>
+    <div class="plan-band" style="background:#f8f9fa;border-color:var(--border3);margin-bottom:10px">
+      <span style="width:11px"></span>
+      <span style="font-size:11.5px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;flex:1">\u2713 To do</span>
+      <span class="plan-band-count" style="background:#868e96">${doCount}</span>
+    </div>`;
 }
 function archiveAll(ctxId){getPoints(ctxId).forEach(t=>archivePoint(t.id));renderWeekTasksView();}
 function openSayHistory(ctxId){
@@ -28147,6 +28320,56 @@ function tutorsForGrades(grades){
 }
 function classesForContext(){
   return (typeof CLASSES!=='undefined'?CLASSES:[]).map(c=>({id:c.name||c.id,name:c.name||c.id,grade:c.grade}));
+}
+
+// ══ STUDENT NOTES — private timestamped observations ═══════════════
+function _scName(n,cls,style){
+  const e=String(n).replace(/'/g,"\\'");
+  return `<span class="${cls||''}" onclick="event.stopPropagation();openStudentCard('${e}')" style="${style||''}cursor:pointer;-webkit-tap-highlight-color:transparent">${n}</span>`;
+}
+function _noteQueueAdd(rec){
+  try{const q=JSON.parse(localStorage.getItem('_noteQueue')||'[]');q.push(rec);
+    localStorage.setItem('_noteQueue',JSON.stringify(q));}catch(e){}
+}
+async function _noteFlushQueue(){
+  let q=[];try{q=JSON.parse(localStorage.getItem('_noteQueue')||'[]');}catch(e){}
+  if(!q.length)return;
+  const left=[];
+  for(const rec of q){
+    try{const{error}=await supa.from('student_notes').insert(rec);if(error)left.push(rec);}
+    catch(e){left.push(rec);}
+  }
+  try{localStorage.setItem('_noteQueue',JSON.stringify(left));}catch(e){}
+}
+async function addStudentNote(name,text,context){
+  const rec={student_name:name,text:text,context:context||null,created_at:new Date().toISOString()};
+  try{
+    const{error}=await supa.from('student_notes').insert(rec);
+    if(error)throw error;
+    return true;
+  }catch(e){_noteQueueAdd(rec);return false;}
+}
+async function getStudentNotes(name){
+  try{
+    const{data,error}=await supa.from('student_notes')
+      .select('*').eq('student_name',name).order('created_at',{ascending:false}).limit(200);
+    if(error)throw error;
+    return data||[];
+  }catch(e){console.warn('getStudentNotes',e.message);return [];}
+}
+async function deleteStudentNote(id,name){
+  if(!confirm('Delete this note?'))return;
+  try{await supa.from('student_notes').delete().eq('id',id);}catch(e){}
+  openStudentCard(name);
+}
+// Which class is live right now (used to tag notes captured during a lesson)
+function _liveClassName(){
+  try{
+    const ctx=amGetCtx();
+    if(!ctx)return null;
+    const cls=CLASSES.find(c=>(c.name||'').toLowerCase()===String(ctx.label).toLowerCase()||c.id.toLowerCase()===String(ctx.label).toLowerCase());
+    return cls?(cls.name||cls.id):null;
+  }catch(e){return null;}
 }
 
 // ══ CROSS-APP INBOX (work side) ═══════════════════════════════
@@ -28390,7 +28613,7 @@ function renderPointsSummary(){
   Object.entries(byStudent).forEach(([name,data])=>{
     html+=`<div class="points-summary-row">
       <div style="flex:1">
-        <div style="font-size:13px;font-weight:600">${name}</div>
+        <div style="font-size:13px;font-weight:600">${_scName(name)}</div>
         ${data.negList.map(({entry,i})=>`
           <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
             <span style="font-size:11px;color:#c92a2a;flex:1">− ${entry.category||'Negative'}${entry.reason?' · '+entry.reason:''} <span style="color:#adb5bd">${entry.time}</span></span>
@@ -29204,7 +29427,7 @@ function initApp(){
   settingsUnlocked=false;
   const sl=document.getElementById('settings-locked');if(sl)sl.style.display='flex';
   const sc=document.getElementById('settings-content');if(sc)sc.style.display='none';
-  hydrateDoneState().then(()=>{_subscribeDoneRealtime();drainWorkInbox();try{if(_curTab==='week'&&typeof renderWeekTasksView==='function')renderWeekTasksView();}catch(e){}});
+  hydrateDoneState().then(()=>{_subscribeDoneRealtime();drainWorkInbox();_noteFlushQueue();try{if(_curTab==='week'&&typeof renderWeekTasksView==='function')renderWeekTasksView();}catch(e){}});
   loadSettings();loadPeople();loadState();migrateBaseToDefaults();ensureDefaultContexts();loadSlotNotes();loadHolidays();applyHolidaysToCalendar();loadCalCustomEvents();loadListsData();loadLinks();loadDuties();loadTutorMeetings();dsLoad();loadBoardingSettings();_subscribePenaltiesRealtime();loadNurseMap();loadCommentMap();
   buildMorningChecks();restoreMCState();
   initWeekTab();checkTaskReset();renderCustomFlowsList();
@@ -30389,7 +30612,7 @@ function amGetCtx(){
   const now=new Date(),di=now.getDay(),nm=now.getHours()*60+now.getMinutes()+now.getSeconds()/60;
   // Use the actual calendar day — no past-midnight attribution
   if(di===0&&nm<60)return null; // only block very early Sunday (genuine edge case)
-  const dayName=DN[di],offset=ttWeekOffset;
+  const dayName=DN[di],offset=0; // Live mode is always the current week, regardless of browsing
   let ci=-1;for(let i=0;i<SLOTS.length;i++)if(nm>=t2m(getSlotTime(i)))ci=i;
   if(ci<0)return null;
   const cell=getCustomForWeek(offset,ci,dayName)||getBaseCell(ci,dayName);if(!cell)return null;
@@ -30816,7 +31039,7 @@ function _amRosterHtml(label){
     const hpCt=getTodayHPCount(cls.id,name);
     const negCt=getTodayNegCount(cls.id,name);
     return`<div class="am-stu-row">
-      <span class="am-stu-name">${name}</span>
+      <span class="am-stu-name">${_scName(name)}</span>
       <button class="am-stu-hp-btn" onclick="amAddHP('${cls.id}','${name}',event)">+</button>
       <span class="am-stu-hp-ct">${hpCt>0?hpCt:''}</span>
       <button class="am-stu-neg-btn" onclick="amOpenNeg('${cls.id}','${name}',event)">−</button>
@@ -34050,7 +34273,16 @@ function amRender(){
     // Check boarding flags — boarding register overrides empty/non-commit behaviour
     const _custForBR=getCustomForWeek(offset,slotIdx,dayName);
     const _isBoardingSlot=_custForBR&&(_custForBR.boarding_register||_custForBR.house_register);
-    if(!cat.commit&&!_isBoardingSlot){body.innerHTML=_amFreeHtml(nowStr);return;}
+    if(!cat.commit&&!_isBoardingSlot){
+      body.innerHTML=_amFreeHtml(nowStr)+_amSessionNotesHtml(offset,slotIdx,dayName);
+      try{
+        const _cs2=getCustomForWeek(offset,slotIdx,dayName);
+        const _scid=(_cs2&&_cs2.cat)||(()=>{const dd=getCatDefs();return Object.keys(dd).find(k=>dd[k]===cat)||tp||'';})();
+        const _ch=_amContextItemsHtml(_scid,null,label);
+        if(_ch){const _w=document.createElement('div');_w.innerHTML=_ch;body.appendChild(_w);}
+      }catch(e){}
+      return;
+    }
     if(!cat.commit&&_isBoardingSlot){
       if(titleEl)titleEl.textContent=label||(_custForBR.boarding_register?'Boarding Register':'House Register');
       if(subEl)subEl.textContent=`${st}–${et} · ${dayName}`;
@@ -34258,6 +34490,26 @@ function amDeleteLiveItem(id,e){
   snSaveLive(ctx.offset,ctx.slotIdx,ctx.dayName,live);
   _amLastCtxKey='';amRender();
 }
+
+function _amSessionNotesHtml(offset,slotIdx,dayName){
+  const live=snGetLive(offset,slotIdx,dayName).filter(b=>b.text&&b.text.trim());
+  if(!live.length)return '';
+  const fmt=iso=>{try{return new Date(iso).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}catch(e){return'';}};
+  return `<div style="margin:10px 12px 0;border:1px solid rgba(255,255,255,.1);border-left:4px solid #f59f00;border-radius:10px;background:rgba(255,255,255,.03);padding:8px 12px">
+    <div style="font-size:11px;font-weight:800;color:#f59f00;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">\u{1F4DD} Session notes</div>
+    ${live.map(b=>`<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06)">
+      <span style="font-size:10px;color:#888;margin-top:2px;flex-shrink:0">${b.addedAt?fmt(b.addedAt):''}</span>
+      <span style="flex:1;font-size:13.5px;color:#e5e7eb;line-height:1.35">${_esc(b.text)}</span>
+      <button onclick="amDeleteLiveNote('${b.id}')" style="background:none;border:none;color:#666;cursor:pointer;font-size:14px;padding:0 2px">\u00D7</button>
+    </div>`).join('')}</div>`;
+}
+function amDeleteLiveNote(id){
+  const ctx=amGetCtx();if(!ctx)return;
+  const live=snGetLive(ctx.offset,ctx.slotIdx,ctx.dayName).filter(b=>b.id!==id);
+  snSaveLive(ctx.offset,ctx.slotIdx,ctx.dayName,live);
+  _amLastCtxKey='';amRender();
+}
+
 function amQuickCapture(text){
   const ctx=amGetCtx();if(!ctx)return;
   const live=snGetLive(ctx.offset,ctx.slotIdx,ctx.dayName).slice();
@@ -34594,6 +34846,7 @@ function initActiveMode(){
     oninput="qcOnInput()" onkeydown="if(event.key==='Enter')qcEnter();if(event.key==='Escape')closeQuickCapture()">
   <div id="qc-tag" style="display:none;margin:-6px 0 10px;font-size:11px"></div>
   <div id="qc-step1">
+    <button id="qc-note-btn" onclick="qcSaveNote()" style="display:none;width:100%;min-height:52px;border:none;border-radius:var(--r);background:#0f766e;color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px"></button>
     <div class="qc-row"><button id="qc-sticky" class="qc-sticky" onclick="qcToggleSticky()">Today</button></div>
     <div class="qc-cats" id="qc-cats"></div>
     <div class="qc-div">Personal</div>
@@ -34627,10 +34880,24 @@ function qcOnInput(){
   var el=document.getElementById('qc-tag');
   if(hit&&(!_qcTag||_qcTag.student!==hit.student)){_qcTag=hit;}
   if(!hit)_qcTag=null;
+  const nb=document.getElementById('qc-note-btn');
+  if(nb){
+    if(_qcTag){nb.style.display='block';nb.textContent='\u{1F4DD} Note on '+_qcTag.student;}
+    else nb.style.display='none';
+  }
   if(_qcTag){
     el.style.display='block';
     el.innerHTML='<span style="display:inline-flex;align-items:center;gap:6px;background:#e0f2fe;color:#075985;border:1px solid #7dd3fc;border-radius:12px;padding:2px 8px 2px 10px">\u{1F464} '+_qcTag.student+(_qcTag.tutor?' \u00B7 tutor '+_qcTag.tutor:'')+' <b style="cursor:pointer;padding:0 2px" onclick="qcClearTag()">\u00D7</b></span>';
   } else {el.style.display='none';el.innerHTML='';}
+}
+function qcSaveNote(){
+  var text=qcText();
+  if(!text||!_qcTag){document.getElementById('qc-input').focus();return;}
+  var name=_qcTag.student, ctx=_liveClassName();
+  closeQuickCapture();
+  addStudentNote(name,text,ctx).then(function(ok){
+    showToastMsg(ok?('\u{1F4DD} Noted \u00B7 '+name):('\u{1F4DD} Saved offline \u00B7 '+name),ok?'#0f766e':'#b45309');
+  });
 }
 function qcClearTag(){_qcTag=null;document.getElementById('qc-tag').style.display='none';}
 function openQuickCapture(){
@@ -34645,6 +34912,7 @@ function openQuickCapture(){
   document.getElementById('qc-step1').style.display='block';
   document.getElementById('qc-step2').style.display='none';
   document.getElementById('qc-tag').style.display='none';
+  const _nb0=document.getElementById('qc-note-btn');if(_nb0)_nb0.style.display='none';
   document.getElementById('qc-backdrop').classList.add('open');
   document.getElementById('qc-sheet').classList.add('open');
   var inp=document.getElementById('qc-input');inp.value='';
@@ -34761,6 +35029,46 @@ function qcSendPersonal(){
 
 
 
+<script>
+// ── Swipe: change week in Week view, day in Day view ──
+(function(){
+  let sx=0,sy=0,st=0,tracking=false,scroller=null;
+  function onStart(e){
+    if(ttEditMode)return;
+    if(e.touches.length!==1)return;
+    const t=e.touches[0];
+    sx=t.clientX;sy=t.clientY;st=Date.now();tracking=true;
+    scroller=e.target.closest('#tt-table-wrap');
+  }
+  function onEnd(e){
+    if(!tracking)return;tracking=false;
+    if(ttEditMode)return;
+    const t=e.changedTouches&&e.changedTouches[0];if(!t)return;
+    const dx=t.clientX-sx,dy=t.clientY-sy,dt=Date.now()-st;
+    if(dt>700)return;                          // too slow to be a swipe
+    if(Math.abs(dx)<70)return;                 // too short
+    if(Math.abs(dx)<Math.abs(dy)*1.8)return;   // too vertical
+    // If the week grid can still scroll horizontally in that direction, let it
+    if(scroller){
+      const maxL=scroller.scrollWidth-scroller.clientWidth;
+      if(dx<0&&scroller.scrollLeft<maxL-2)return;
+      if(dx>0&&scroller.scrollLeft>2)return;
+    }
+    const dir=dx<0?1:-1;                       // swipe left = forward
+    if(ttView==='today')tdNavDay(dir);
+    else ttNavWeek(dir);
+  }
+  function bind(){
+    const host=document.getElementById('tab-sched');
+    if(!host||host._swipeBound)return;
+    host._swipeBound=true;
+    host.addEventListener('touchstart',onStart,{passive:true});
+    host.addEventListener('touchend',onEnd,{passive:true});
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);
+  else bind();
+})();
+</script>
 </body>
 </html><script>
 // ── REGISTRATION HISTORY CSV EXPORT ──────────────────────────────────────────
