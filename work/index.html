@@ -249,7 +249,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .cal-grid{display:grid;grid-template-columns:28px repeat(7,1fr);gap:1px}
 .cal-dow-row{display:grid;grid-template-columns:28px repeat(7,1fr);gap:1px;position:sticky;top:136px;z-index:30;background:#f0f2f5;padding:2px 0;margin-bottom:1px;border-bottom:1px solid var(--border)}
 .cal-month-block{position:relative}
-.cal-month-sticky{position:sticky;top:100px;z-index:20;background:#f0f2f5;padding-bottom:2px;margin-bottom:1px}
+.cal-month-sticky{position:sticky;top:var(--hdr-h,100px);z-index:20;background:#f0f2f5;padding-bottom:2px;margin-bottom:1px}
 .cal-dow-row-month{display:grid;grid-template-columns:28px repeat(7,1fr);gap:1px;border-bottom:1px solid var(--border);padding:2px 0}
 .cal-wnum{font-size:8px;font-weight:600;color:#adb5bd;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:3px 1px;line-height:1.2;cursor:default}
 .cal-wnum .wn{color:var(--text3);font-size:9px;font-weight:700}
@@ -299,19 +299,19 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 #tt-plan-sticky{position:sticky;top:148px;z-index:40;background:#f0f2f5;padding:.3rem 0 .2rem}
 
 /* Lists: subtab bar sticky */
-.lists-subtabs{position:sticky;top:100px;z-index:50;background:#f0f2f5;padding-top:.3rem;padding-bottom:.3rem;margin-bottom:.4rem}
+.lists-subtabs{position:sticky;top:var(--hdr-h,100px);z-index:50;background:#f0f2f5;padding-top:.3rem;padding-bottom:.3rem;margin-bottom:.4rem}
 
 /* Lists: second row sticky below subtab bar (~44px offset) */
 #hwk-toolbar{position:sticky;top:144px;z-index:40;background:#f0f2f5;padding-bottom:.4rem}
-#class-tabs-row{position:sticky;top:144px;z-index:40;background:#f0f2f5;padding-bottom:.3rem}
+#class-tabs-row{position:sticky;top:calc(var(--hdr-h,100px) + var(--lists-sub-h,44px));z-index:40;background:#f0f2f5;padding-bottom:.3rem}
 
 /* Cal: view toggle sticky */
-.cal-view-toggle{position:sticky;top:100px;z-index:50;background:#f0f2f5;padding-top:.3rem;margin-bottom:.5rem}
+.cal-view-toggle{position:sticky;top:var(--hdr-h,100px);z-index:50;background:#f0f2f5;padding-top:.3rem;margin-bottom:.5rem}
 
 .tt-top{display:flex;align-items:center;gap:6px;margin-bottom:.6rem;flex-wrap:wrap}
 .tt-week-nav{display:flex;align-items:center;gap:6px;flex:1}
-#tt-top-bar{position:sticky;top:100px;z-index:60;background:var(--bg);padding:6px 0;border-bottom:1px solid var(--border3)}
-#tt-thead-wrap{position:sticky;top:146px;z-index:55;background:#fff}
+#tt-top-bar{position:sticky;top:var(--hdr-h,100px);z-index:60;background:var(--bg);padding:6px 0;border-bottom:1px solid var(--border3)}
+#tt-thead-wrap{position:sticky;top:calc(var(--hdr-h,100px) + 46px);z-index:55;background:#fff}
 #tt-float-toggle .tt-btn.active{background:#00205B;color:#fff}
 .tt-week-btn.active{background:#00205B;color:#fff;border-color:#00205B}
 #tab-sched{padding-bottom:64px}
@@ -1041,11 +1041,15 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       <button id="am-lock-btn" onclick="amToggleLock()" title="Freeze screen" style="display:none;background:none;border:none;cursor:pointer;font-size:17px;padding:4px 6px;color:#444;line-height:1;border-radius:6px;-webkit-tap-highlight-color:transparent;position:relative;z-index:600;flex-shrink:0">🛡</button>
       <div id="am-extra-btns" style="display:flex;gap:4px;align-items:center;flex-shrink:0"></div>
     </div>
-    <div style="display:flex;align-items:center;gap:6px;width:100%">
+    <div style="display:flex;align-items:center;gap:6px;width:100%;position:relative">
       <span class="cat-chip" id="am-cat-chip" style="display:none"></span>
-      <button class="panel-hdr-btn" onclick="amExportDocx()" title="Export notes"><svg class="ico"><use href="#i-dl"/></svg> Export</button>
-      <button class="panel-hdr-btn" onclick="amOpenNotes()" title="Open plan for this slot"><svg class="ico"><use href="#i-doc"/></svg> Edit plan</button>
+      <button class="panel-hdr-btn" onclick="openHouseSheet()" title="My House — quick status"><svg class="ico"><use href="#i-home"/></svg> House</button>
       <button class="panel-hdr-btn" onclick="openFireRegister()" title="Fire register" style="background:#dc2626;color:#fff;border-color:#dc2626;font-weight:700"><svg class="ico"><use href="#i-flame"/></svg> Fire</button>
+      <button class="panel-hdr-btn" id="am-more-btn" onclick="toggleAmMoreMenu(event)" title="More" style="margin-left:auto;min-width:34px;justify-content:center;font-weight:700">⋯</button>
+      <div id="am-more-menu" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;z-index:700;background:#1c1c1c;border:1px solid #333;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.5);overflow:hidden;min-width:170px">
+        <button onclick="toggleAmMoreMenu();amOpenNotes()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;border-bottom:1px solid #262626;color:#e0e0e0;font-size:13px;padding:11px 14px;cursor:pointer;text-align:left"><svg class="ico"><use href="#i-doc"/></svg> Edit plan</button>
+        <button onclick="toggleAmMoreMenu();amExportDocx()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:#e0e0e0;font-size:13px;padding:11px 14px;cursor:pointer;text-align:left"><svg class="ico"><use href="#i-dl"/></svg> Export notes</button>
+      </div>
     </div>
   </div>
   <div class="am-quick-cap">
@@ -1112,8 +1116,8 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
   <!-- Floating Week|Day toggle — bottom right, thumb reach; hides with the tab -->
   <div id="tt-float-toggle" style="position:fixed;right:12px;bottom:calc(64px + env(safe-area-inset-bottom));z-index:199">
     <div class="tt-toggle" style="flex:none;background:rgba(255,255,255,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 4px 18px rgba(0,0,0,.22);border:1px solid var(--border3)">
-      <button class="tt-btn" id="tt-btn-full" onclick="setTTView('full',this)" style="flex:none;padding:11px 20px">Week</button>
-      <button class="tt-btn" id="tt-btn-today" onclick="setTTView('today',this)" style="flex:none;padding:11px 20px">Day</button>
+      <button class="tt-btn" id="tt-btn-full" onclick="setTTView('full',this)" style="flex:none;padding:12px 20px">Week</button>
+      <button class="tt-btn" id="tt-btn-today" onclick="setTTView('today',this)" style="flex:none;padding:12px 20px">Day</button>
     </div>
   </div>
   <!-- Options popover (hidden by default) -->
@@ -1206,7 +1210,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
   <!-- HAWKING PANEL -->
   <div id="lists-hawking" class="lists-panel active">
     <!-- Sub-tab bar -->
-    <div style="display:flex;border-bottom:2px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:15;overflow-x:auto">
+    <div id="hwk-stab-bar" style="display:flex;border-bottom:2px solid var(--border);background:var(--bg);position:sticky;top:calc(var(--hdr-h,100px) + var(--lists-sub-h,44px));z-index:45;overflow-x:auto">
       <button class="hwk-stab active" id="hwk-stab-tutees" onclick="setHwkFilter('tutees',this)"><svg class="ico"><use href="#i-users"/></svg> Tutees</button>
       <button class="hwk-stab" id="hwk-stab-register" onclick="setHwkFilter('register',this)"><svg class="ico"><use href="#i-clip"/></svg> Register</button>
       <button class="hwk-stab" id="hwk-stab-daily" onclick="setHwkFilter('daily',this)"><svg class="ico"><use href="#i-chart"/></svg> Daily</button>
@@ -1214,7 +1218,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       <button class="hwk-stab" id="hwk-stab-sanctions" onclick="setHwkFilter('sanctions',this)"><svg class="ico"><use href="#i-alert"/></svg> Sanctions<span id="hwk-sanctions-badge" style="display:none;background:#dc2626;color:#fff;font-size:9px;padding:1px 4px;border-radius:8px;margin-left:3px;font-weight:700"></span></button>
     </div>
     <!-- Scope toggle (All / Boarders) — shown on tutees/register/daily/away -->
-    <div id="hwk-scope-bar" style="display:flex;align-items:center;gap:6px;padding:7px 12px;border-bottom:1px solid var(--border);background:var(--bg);flex-wrap:wrap">
+    <div id="hwk-scope-bar" style="display:flex;align-items:center;gap:6px;padding:7px 12px;border-bottom:1px solid var(--border);background:var(--bg);flex-wrap:wrap;position:sticky;top:calc(var(--hdr-h,100px) + var(--lists-sub-h,44px) + var(--hwk-stab-h,40px));z-index:44">
       <div style="display:flex;gap:3px;background:var(--bg3);border-radius:var(--rsm);padding:2px">
         <button id="hwk-scope-all" onclick="setHwkScope('all')" style="padding:5px 14px;font-size:12px;font-weight:700;border:none;border-radius:4px;cursor:pointer;background:#fff;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.1)">All</button>
         <button id="hwk-scope-boarders" onclick="setHwkScope('boarders')" style="padding:5px 14px;font-size:12px;font-weight:700;border:none;border-radius:4px;cursor:pointer;background:none;color:var(--text3)">Boarders</button>
@@ -1501,7 +1505,13 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       </div>
       <div class="settings-section-body" id="ss-body-students">
       <div id="students-list"></div>
-      <div style="padding:.5rem 1rem"><button class="add-person-btn" onclick="openAddStudent()">+ Add Student</button></div>
+      <div style="padding:.5rem 1rem"><button class="add-person-btn" onclick="openAddStudent()">+ Add Student</button>
+        <div style="margin-top:.6rem">
+          <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:4px">Bulk Import / Update (merges by name — never deletes, keeps all profile data)</div>
+          <textarea id="house-import-text" rows="4" placeholder="One student per line:&#10;Name&#9;Tutor&#10;or just the name — iSAMS rows (Surname, Firstname, Preferred, …) also work" style="width:100%;box-sizing:border-box;font-size:11px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm);font-family:monospace;resize:vertical"></textarea>
+          <button onclick="doHouseBulkImport()" style="width:100%;margin-top:5px;padding:9px;background:var(--inf-bg);border:1px solid var(--inf-bd);border-radius:var(--rsm);font-size:12px;font-weight:600;color:var(--inf-tx);cursor:pointer">Import / Update House Students</button>
+        </div>
+      </div>
           </div>
     </div>
 
@@ -24643,10 +24653,35 @@ function clearTodayNote(idx,day){
   renderTodayView();
 }
 
+// Measure the REAL fixed-header height (clock + date + meta rows vary by device)
+// and publish it as --hdr-h; every sticky bar and the page top padding derive
+// from it. Also measures the Lists layer heights for the My House sticky stack.
+function _syncHeaderHeight(){
+  try{
+    const root=document.documentElement.style;
+    const h=document.getElementById('sticky-header');
+    if(h&&h.classList.contains('visible')){
+      const hh=Math.ceil(h.getBoundingClientRect().height);
+      if(hh>0){root.setProperty('--hdr-h',hh+'px');document.body.style.paddingTop=hh+'px';}
+    }
+    const ls=document.querySelector('.lists-subtabs');
+    if(ls){const lh=Math.ceil(ls.getBoundingClientRect().height);if(lh>0)root.setProperty('--lists-sub-h',lh+'px');}
+    const hs=document.getElementById('hwk-stab-bar');
+    if(hs){const sh=Math.ceil(hs.getBoundingClientRect().height);if(sh>0)root.setProperty('--hwk-stab-h',sh+'px');}
+  }catch(e){}
+}
+try{
+  window.addEventListener('resize',()=>{_syncHeaderHeight();if(typeof _syncStickyTops==='function')_syncStickyTops();});
+  window.addEventListener('orientationchange',()=>setTimeout(()=>{_syncHeaderHeight();if(typeof _syncStickyTops==='function')_syncStickyTops();},300));
+  const _shEl=document.getElementById('sticky-header');
+  if(_shEl&&typeof ResizeObserver!=='undefined')new ResizeObserver(()=>_syncHeaderHeight()).observe(_shEl);
+}catch(e){}
+
 // Keep the sticky stack (week nav → toggle row → day header) aligned to real heights
 function _syncStickyTops(){
   try{
-    const base=100; // fixed clock header height
+    _syncHeaderHeight();
+    const base=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--hdr-h'))||100;
     const tb=document.getElementById('tt-top-bar');
     const tc=document.getElementById('tt-controls');
     const tw=document.getElementById('tt-thead-wrap');
@@ -28500,6 +28535,113 @@ async function deleteStudentNote(id,name){
   try{await supa.from('student_notes').delete().eq('id',id);}catch(e){}
   openStudentCard(name);
 }
+// ══ LIVE HEADER ⋯ MENU ═════════════════════════════════════════════
+function toggleAmMoreMenu(e){
+  if(e)e.stopPropagation();
+  const m=document.getElementById('am-more-menu');if(!m)return;
+  m.style.display=(m.style.display!=='none')?'none':'block';
+}
+document.addEventListener('click',e=>{
+  const m=document.getElementById('am-more-menu');
+  if(m&&m.style.display!=='none'&&!m.contains(e.target)&&e.target.id!=='am-more-btn')m.style.display='none';
+});
+
+// ══ HOUSE STATUS SHEET — read-only quick view of today's register state ══
+// Same data the registers use (_brStateMerged + leave map); no write handlers.
+let _hsFilter='all',_hsGroup='grade';
+async function openHouseSheet(){
+  _hsFilter='all';
+  document.getElementById('hs-overlay')?.remove();
+  const ov=document.createElement('div');ov.id='hs-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:flex-end;justify-content:center';
+  ov.onclick=e=>{if(e.target===ov)ov.remove();};
+  ov.innerHTML=`<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:520px;height:88vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:12px 16px 8px;border-bottom:1px solid #eef0f2;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="flex:1;font-size:15px;font-weight:800;color:#111">👥 My House <span style="font-weight:500;color:#868e96;font-size:11px">· read-only</span></div>
+        <button onclick="document.getElementById('hs-overlay').remove()" style="background:none;border:none;font-size:20px;color:#adb5bd;cursor:pointer;padding:0 4px">✕</button>
+      </div>
+      <input id="hs-search" placeholder="Search name…" autocomplete="off" oninput="_hsRender()"
+        style="width:100%;box-sizing:border-box;font-size:15px;padding:9px 12px;border:1.5px solid var(--border2);border-radius:9px;outline:none;margin-top:8px">
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+        <div style="display:flex;gap:2px;background:var(--bg3);border-radius:7px;padding:2px">
+          ${['all','boarders','day'].map(f=>`<button id="hs-f-${f}" onclick="_hsFilter='${f}';_hsRender()" style="border:none;border-radius:5px;font-size:11px;font-weight:700;padding:5px 11px;cursor:pointer;background:none;color:var(--text3)">${f==='all'?'All':f==='boarders'?'Boarders':'Day'}</button>`).join('')}
+        </div>
+        <div style="display:flex;gap:2px;background:var(--bg3);border-radius:7px;padding:2px;margin-left:auto">
+          ${['grade','tutor'].map(g=>`<button id="hs-g-${g}" onclick="_hsGroup='${g}';_hsRender()" style="border:none;border-radius:5px;font-size:11px;font-weight:700;padding:5px 11px;cursor:pointer;background:none;color:var(--text3)">${g==='grade'?'By grade':'By tutor'}</button>`).join('')}
+        </div>
+      </div>
+      <div id="hs-updated" style="font-size:10px;color:#adb5bd;margin-top:6px">Loading latest register state…</div>
+    </div>
+    <div id="hs-body" style="flex:1;overflow-y:auto;padding:4px 0 20px;-webkit-overflow-scrolling:touch"></div>
+  </div>`;
+  document.body.appendChild(ov);
+  _hsRender();
+  try{
+    await _brLoadToday();
+    if(typeof getTodayExcusedMap==='function')window._cachedExcusedMap=await getTodayExcusedMap();
+  }catch(e){}
+  const upd=document.getElementById('hs-updated');
+  if(upd)upd.textContent='Live from register data · updated '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  _hsRender();
+}
+function _hsRender(){
+  const body=document.getElementById('hs-body');if(!body)return;
+  const q=(document.getElementById('hs-search')?.value||'').trim().toLowerCase();
+  ['all','boarders','day'].forEach(f=>{const b=document.getElementById('hs-f-'+f);if(b){const on=_hsFilter===f;b.style.background=on?'#fff':'none';b.style.color=on?'var(--text)':'var(--text3)';b.style.boxShadow=on?'0 1px 3px rgba(0,0,0,.1)':'none';}});
+  ['grade','tutor'].forEach(g=>{const b=document.getElementById('hs-g-'+g);if(b){const on=_hsGroup===g;b.style.background=on?'#fff':'none';b.style.color=on?'var(--text)':'var(--text3)';b.style.boxShadow=on?'0 1px 3px rgba(0,0,0,.1)':'none';}});
+  const exMap=window._cachedExcusedMap||{};
+  const merged=(typeof _brStateMerged!=='undefined'&&_brStateMerged)||{};
+  const stCol={present:'#16a34a',absent:'#dc2626',excused:'#d97706',late:'#d97706',unregistered:'#adb5bd'};
+  const stLbl={present:'Present',absent:'Absent',excused:'Excused',late:'Late',unregistered:'—'};
+  const students=(STUDENTS||[]).filter(s=>{
+    if(!s.name)return false;
+    const hw=HAWKING_STATUS[s.name]||{};
+    if(_hsFilter==='boarders'&&!hw.boarder)return false;
+    if(_hsFilter==='day'&&hw.boarder)return false;
+    if(q){const cn=(hw.cn||'').toLowerCase();if(!s.name.toLowerCase().includes(q)&&!cn.includes(q))return false;}
+    return true;
+  });
+  const effSt=name=>{
+    const st0=merged[name]||_brState[name]||{};
+    let st=st0.status||'unregistered';
+    const exc=exMap[name];
+    if(exc&&((exc.state==='excused')||(exc.type==='activity')||(exc.leave_type==='longterm')))st='excused';
+    return {st,st0,exc};
+  };
+  const row=s=>{
+    const hw=HAWKING_STATUS[s.name]||{};
+    const{st,st0,exc}=effSt(s.name);
+    const when=st0.updatedAt?_brFormatTime(st0.updatedAt):'';
+    const by=st0.updatedBy||'';
+    const sess=st0.session?(' · '+st0.session):'';
+    const away=(st==='excused'&&exc)?(' · '+(exc.emoji||'✈')+' '+(exc.reason||exc.leave_type||'away')):'';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid #f5f6f7">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13.5px;font-weight:600;color:#111">${_scName(s.name)} <span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:7px;background:${hw.boarder?'#e0f2fe':'#f1f5f9'};color:${hw.boarder?'#0369a1':'#64748b'}">${hw.boarder?'B':'D'}</span></div>
+        <div style="font-size:10px;color:#adb5bd">${_hsGroup==='grade'?(s.tutor||''):_getStudentGrade(s.name)}${when?(' · '+when+(by?' by '+_esc(by):'')+sess):' · not registered today'}${away}</div>
+      </div>
+      <span style="flex-shrink:0;font-size:11px;font-weight:800;color:${stCol[st]||'#adb5bd'}">${stLbl[st]||_esc(st)}</span>
+    </div>`;
+  };
+  let html='';
+  if(q){
+    html=students.map(row).join('')||'<div style="padding:20px;text-align:center;color:#adb5bd;font-size:13px">No matches.</div>';
+  }else{
+    const groups={};
+    students.forEach(s=>{const k=_hsGroup==='grade'?(_getStudentGrade(s.name)||'Unknown'):(s.tutor||'No tutor');(groups[k]=groups[k]||[]).push(s);});
+    const go=getGrades();
+    const keys=_hsGroup==='grade'?go.concat(Object.keys(groups).filter(k=>!go.includes(k))):Object.keys(groups).sort();
+    keys.forEach(k=>{
+      const arr=groups[k];if(!arr||!arr.length)return;
+      const pres=arr.filter(s=>effSt(s.name).st==='present').length;
+      html+=`<div style="position:sticky;top:0;background:#f8f9fa;padding:5px 16px;font-size:10px;font-weight:800;color:#868e96;text-transform:uppercase;letter-spacing:.06em;z-index:2">${_esc(k)} · ${pres}/${arr.length} present</div>`+arr.map(row).join('');
+    });
+    if(!html)html='<div style="padding:20px;text-align:center;color:#adb5bd;font-size:13px">No students.</div>';
+  }
+  body.innerHTML=html;
+}
+
 // Which class is live right now (used to tag notes captured during a lesson)
 function _liveClassName(){
   try{
@@ -28808,7 +28950,10 @@ function doBulkImport(){
   if(!targetId||!text){alert('Please select a class and paste some data.');return;}
   const cls=getClassById(targetId);if(!cls)return;
   const lines=text.split('\n').filter(l=>l.trim());
-  let added=0;
+  // Merge by name: re-importing the same list UPDATES students instead of duplicating them
+  const _k=s=>(((s.preferred||s.firstname||'')+'|'+(s.surname||'')).toLowerCase().trim());
+  const existing=new Map();cls.students.forEach((s,i)=>existing.set(_k(s),i));
+  let added=0,updated=0;
   lines.forEach(line=>{
     // Try tab first, then comma
     const parts=line.includes('\t')?line.split('\t'):line.split(',');
@@ -28822,18 +28967,70 @@ function doBulkImport(){
     const note=(parts[5]||'').trim();
     const lvRaw=(parts[6]||'').trim().toLowerCase();
     const level=lvRaw.includes('found')?1:lvRaw.includes('core')?2:lvRaw.includes('ext')?3:0;
-    cls.students.push({surname,firstname,preferred,house,gender,note,level});
-    added++;
+    const rec={surname,firstname,preferred,house,gender,note,level};
+    const idx=existing.get(_k(rec));
+    if(idx!==undefined){
+      // Existing student: refresh fields, keep anything the import doesn't carry
+      cls.students[idx]={...cls.students[idx],...rec};
+      updated++;
+    }else{
+      cls.students.push(rec);
+      existing.set(_k(rec),cls.students.length-1);
+      added++;
+    }
   });
-  if(added){
-    const total=cls.seating.rows*cls.seating.cols;
+  if(added||updated){
+    if(!cls.seating)cls.seating={rows:5,cols:6,seats:[]};
+    if(!Array.isArray(cls.seating.seats))cls.seating.seats=[];
+    const total=(cls.seating.rows||5)*(cls.seating.cols||6);
     while(cls.seating.seats.length<total)cls.seating.seats.push(null);
     saveListsData();
     document.getElementById('bulk-import-text').value='';
-    alert(`Imported ${added} student(s) into ${cls.name}.`);
+    alert(`${cls.name}: ${added} added, ${updated} updated (matched by name — no duplicates created).`);
     renderClassesSettings();
     if(currentClassId===targetId)renderTeachingTab();
   }else{alert('No students could be parsed. Check the format.');}
+}
+
+// House bulk import — MERGE by name, never deletes.
+// Accepts: "Name<TAB>Tutor" per line, "Name" alone, or iSAMS rows
+// (Surname, Firstname, Preferred, …) where the app name = Preferred + Surname.
+function doHouseBulkImport(){
+  const ta=document.getElementById('house-import-text');
+  const text=(ta?ta.value:'').trim();
+  if(!text){alert('Paste some student data first.');return;}
+  const lines=text.split('\n').filter(l=>l.trim());
+  let added=0,updated=0;const seen=new Set();
+  lines.forEach(line=>{
+    const parts=line.includes('\t')?line.split('\t').map(p=>p.trim()):line.split(',').map(p=>p.trim());
+    let name='',tutor='';
+    if(parts.length>=3){
+      // iSAMS-style: Surname, Firstname, Preferred[, House, Gender, Note, Level, Tutor?]
+      const surname=(parts[0]||'').replace(/\*/g,'');
+      const preferred=parts[2]||parts[1]||'';
+      name=(preferred+' '+surname).trim();
+      tutor=parts[7]||'';
+    }else{
+      name=parts[0]||'';
+      tutor=parts[1]||'';
+    }
+    if(!name)return;
+    seen.add(name.toLowerCase());
+    const ex=(STUDENTS||[]).find(s=>s.name.toLowerCase()===name.toLowerCase());
+    if(ex){
+      if(tutor&&ex.tutor!==tutor){ex.tutor=tutor;updated++;}
+    }else{
+      STUDENTS.push({name,tutor:tutor||''});
+      added++;
+    }
+  });
+  // Flag (never remove) students in the app who are absent from the paste
+  const missing=(STUDENTS||[]).filter(s=>s.name&&!seen.has(s.name.toLowerCase())).map(s=>s.name);
+  savePeople();
+  if(typeof renderSettingsPeople==='function')renderSettingsPeople();
+  if(ta)ta.value='';
+  alert(`House import: ${added} added, ${updated} tutor update(s). All existing profile data (notes, boarder status, rooms, history) is untouched — it is keyed by name.`
+    +(missing.length?`\n\nIn the app but NOT in your paste (kept — archive manually if they have left):\n${missing.join(', ')}`:''));
 }
 
 
@@ -28874,6 +29071,7 @@ function showTab(name,btn){
   document.getElementById('plan-fab')?.classList.remove('active');
   document.getElementById('tab-'+name).classList.add('active');if(btn)btn.classList.add('active');
   _activeMainTab=name;
+  try{setTimeout(_syncHeaderHeight,50);}catch(e){} // re-measure sticky layer heights for the tab now visible
   if(name==='sched')renderTimetable();
   if(name==='workflows')showWorkflowList();
   if(name==='lists'){renderHawkingList();renderTeachingTab();}
@@ -34635,14 +34833,23 @@ function amRender(){
   // For lesson slots, add current second so timer always rebuilds fresh
   // But skip rebuild if user is typing in an input inside the panel
   const _amFocused=document.activeElement&&document.getElementById('am-body')&&document.getElementById('am-body').contains(document.activeElement);
-  const lessonSecond=isLessonCtx&&!_amFocused?new Date().getSeconds():'';
   const _ptsHash=(S.planData||[]).filter(t=>t.say&&!t.archived).length+'_'+(S.planData||[]).length;
-  const ctxKey=`${dayName}_${slotIdx}_${liveLen}_${planLen}_${_ptsHash}_${stateStr}_${lessonDoneStr}_${manualStart}_${isOverNow}_${lpHash}_${pointsHash}_${rosterState}_${tmtgHash}_${lessonSecond}`;
+  // NOTE: no per-second component in this key any more. Rebuilding every second
+  // during lessons destroyed scroll position and focus; the tick branch below
+  // updates every time-sensitive element in place, and a section-boundary
+  // detector there forces a single rebuild when the active section changes.
+  const ctxKey=`${dayName}_${slotIdx}_${liveLen}_${planLen}_${_ptsHash}_${stateStr}_${lessonDoneStr}_${manualStart}_${isOverNow}_${lpHash}_${pointsHash}_${rosterState}_${tmtgHash}`;
 
   // While the user is typing inside the panel, NEVER rebuild (it would destroy
   // the focused input) — fall through to the in-place tick updates instead.
   // Rebuild resumes on the first tick after focus leaves.
   if(_amLastCtxKey!==ctxKey&&!_amFocused){
+    // Preserve scroll across rebuilds within the same slot (a state change,
+    // not a slot change — a new slot should start at the top)
+    const _slotKey=dayName+'_'+slotIdx;
+    const _keepScroll=(window._amLastSlotKey===_slotKey)?body.scrollTop:0;
+    window._amLastSlotKey=_slotKey;
+    if(_keepScroll)setTimeout(()=>{try{body.scrollTop=_keepScroll;}catch(e){}},0);
     _amLastCtxKey=ctxKey;
     if(titleEl)titleEl.textContent=label;
     if(subEl)subEl.textContent=`${st}–${et} · ${dayName}`;
@@ -34729,6 +34936,10 @@ function amRender(){
         const _fn=new Date(),_fnm=_fn.getHours()*60+_fn.getMinutes()+_fn.getSeconds()/60;
         const effectiveElapsed=manualStart?Math.max(0,(Date.now()-manualStart)/60000):Math.max(0,_fnm-t2m(getSlotTime(slotIdx)));
         const{segments}=pacingStateFromBullets(bullets,effectiveElapsed);
+        // Active-section boundary: force ONE rebuild so the highlight moves on
+        const _curSeg=(segments.find(s=>effectiveElapsed>=s.absStart&&effectiveElapsed<s.absStart+s.dur)||{})._bIdx;
+        if(window._amPrevSeg!==undefined&&window._amPrevSeg!==_curSeg&&!_amFocused)_amLastCtxKey='';
+        window._amPrevSeg=_curSeg;
         // Update all visible timer elements
         bullets.forEach((b,i)=>{
           const el=document.getElementById('lp-timer-'+i);if(!el)return;
