@@ -1510,6 +1510,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
         <div style="margin-top:.6rem">
           <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:4px">Bulk Import / Update (merges by name — never deletes, keeps all profile data)</div>
           <textarea id="house-import-text" rows="4" placeholder="One student per line. Formats:&#10;Surname&#9;Firstname&#9;Preferred&#9;24-Jan-2009 (17.7)&#9;M   ← iSAMS with DOB+gender&#10;Name&#9;Tutor   — or just the name" style="width:100%;box-sizing:border-box;font-size:11px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm);font-family:monospace;resize:vertical"></textarea>
+          <label style="display:flex;align-items:center;gap:7px;margin-top:5px;font-size:11.5px;color:var(--text2);cursor:pointer"><input type="checkbox" id="house-replace-chk" style="width:15px;height:15px">Replace whole list — anyone missing from the paste is <b>archived</b> automatically (never deleted; their notes and history are kept)</label>
           <button onclick="doHouseBulkImport()" style="width:100%;margin-top:5px;padding:9px;background:var(--inf-bg);border:1px solid var(--inf-bd);border-radius:var(--rsm);font-size:12px;font-weight:600;color:var(--inf-tx);cursor:pointer">Import / Update House Students</button>
         </div>
       </div>
@@ -29227,13 +29228,27 @@ function doHouseBulkImport(){
       added++;
     }
   });
-  // Flag (never remove) students in the app who are absent from the paste
+  // Students in the app but absent from the paste
   const missing=(STUDENTS||[]).filter(s=>s.name&&!seen.has(s.name.toLowerCase())).map(s=>s.name);
+  const replChk=document.getElementById('house-replace-chk');
+  let archivedN=0;
+  if(replChk&&replChk.checked&&missing.length){
+    if(confirm('Replace mode: '+missing.length+' student(s) are not in your paste and will be ARCHIVED (kept with all their history, just moved out of the active list):\n\n'+missing.join(', ')+'\n\nProceed?')){
+      missing.forEach(n=>{
+        ARCHIVED.push({name:n,dateLeft:_todayStr(),reason:'Not in replacement list import',dateRemoved:_todayStr()});
+      });
+      STUDENTS=STUDENTS.filter(s=>seen.has(s.name.toLowerCase()));
+      archivedN=missing.length;
+    }
+    replChk.checked=false;
+  }else if(replChk){replChk.checked=false;}
   savePeople();
   if(typeof renderSettingsPeople==='function')renderSettingsPeople();
   if(ta)ta.value='';
-  alert(`House import: ${added} added, ${updated} updated (tutor/DOB/gender). All existing profile data (notes, boarder status, rooms, history) is untouched — it is keyed by name.`
-    +(missing.length?`\n\nIn the app but NOT in your paste (kept — archive manually if they have left):\n${missing.join(', ')}`:''));
+  alert(`House import: ${added} added, ${updated} updated (tutor/DOB/gender)`
+    +(archivedN?`, ${archivedN} archived.`:'.')
+    +` All existing profile data (notes, boarder status, rooms, history) is untouched — it is keyed by name.`
+    +(!archivedN&&missing.length?`\n\nIn the app but NOT in your paste (kept — tick "Replace whole list" to archive them automatically):\n${missing.join(', ')}`:''));
 }
 
 
