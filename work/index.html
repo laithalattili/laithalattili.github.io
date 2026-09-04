@@ -23239,6 +23239,18 @@ function openAddTutor(){
   window._personMode='tutor';
   document.getElementById('person-modal').classList.add('open');
 }
+function openEditTutor(name){
+  const t=(TUTORS||[]).find(x=>x.name===name);if(!t)return;
+  document.getElementById('person-modal-title').textContent='Edit Tutor';
+  const esc=v=>String(v||'').replace(/"/g,'&quot;');
+  document.getElementById('person-modal-body').innerHTML=`
+    <div class="input-row"><label>Name</label><input type="text" id="pm-name" value="${esc(t.name)}"></div>
+    <div class="input-row"><label>Email</label><input type="text" id="pm-email" value="${esc(t.email)}"></div>
+    <div class="input-row"><label>Room</label><input type="text" id="pm-room" value="${esc(t.room)}" placeholder="e.g. A403"></div>
+    <div class="input-row"><label>Grade Group</label><input type="text" id="pm-grade" value="${esc(t.grade)}" placeholder="e.g. G7 or Sixth Form"></div>`;
+  window._personMode='tutor-edit';window._personEditName=name;
+  document.getElementById('person-modal').classList.add('open');
+}
 function _studentFieldsHtml(s){
   s=s||{};
   const tutorOpts='<option value=""'+(!s.tutor?' selected':'')+'>— none —</option>'+TUTORS.map(t=>`<option value="${t.name}"${s.tutor===t.name?' selected':''}>${t.name}</option>`).join('');
@@ -23278,6 +23290,13 @@ function savePersonModal(){
   if(window._personMode==='tutor'){
     const name=gv('pm-name').trim();if(!name)return;
     TUTORS.push({name,email:gv('pm-email').trim(),room:gv('pm-room').trim(),grade:gv('pm-grade').trim()});
+    savePeople();renderSettingsPeople();
+  }else if(window._personMode==='tutor-edit'){
+    const t=(TUTORS||[]).find(x=>x.name===window._personEditName);if(!t)return;
+    const newName=gv('pm-name').trim();if(!newName)return;
+    // Renaming a tutor is safe: propagate to every tutee's assignment
+    if(newName!==t.name){(STUDENTS||[]).forEach(s=>{if(s.tutor===t.name)s.tutor=newName;});t.name=newName;}
+    t.email=gv('pm-email').trim();t.room=gv('pm-room').trim();t.grade=gv('pm-grade').trim();
     savePeople();renderSettingsPeople();
   }else if(window._personMode==='student-edit'){
     const s=(STUDENTS||[]).find(x=>x.name===window._personEditName);if(!s)return;
@@ -23357,7 +23376,7 @@ function removeTutor(name){if(!confirm('Remove tutor '+name+'? Their students wi
 function renderSettingsPeople(){
   // Tutors
   const tl=document.getElementById('tutors-list');
-  if(tl)tl.innerHTML=TUTORS.map(t=>`<div class="person-item"><div><div class="person-name">${t.name}</div><div class="person-sub">${t.room} · ${t.grade} · ${t.email}</div></div><div class="person-btns"><button class="person-btn" style="border-color:#a5d8ff;color:#1971c2;background:#e7f5ff" onclick="openTuteePicker('${t.name.replace(/'/g,"\\'")}')">Tutees (${STUDENTS.filter(s=>s.tutor===t.name).length})</button><button class="person-btn danger" onclick="removeTutor('${t.name}')">Remove</button></div></div>`).join('');
+  if(tl)tl.innerHTML=TUTORS.map(t=>`<div class="person-item"><div><div class="person-name">${t.name}</div><div class="person-sub">${t.room} · ${t.grade} · ${t.email}</div></div><div class="person-btns"><button class="person-btn" style="border-color:#a5d8ff;color:#1971c2;background:#e7f5ff" onclick="openTuteePicker('${t.name.replace(/'/g,"\\'")}')">Tutees (${STUDENTS.filter(s=>s.tutor===t.name).length})</button><button class="person-btn" onclick="openEditTutor('${t.name.replace(/'/g,"\\'")}')">Edit</button><button class="person-btn danger" onclick="removeTutor('${t.name}')">Remove</button></div></div>`).join('');
   // Students
   const sl=document.getElementById('students-list');
   if(sl){
