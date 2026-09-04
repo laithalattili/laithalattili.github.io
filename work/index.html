@@ -1064,6 +1064,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
     💬 <span id="am-day-pill-n">0</span>&nbsp;to say today <span id="am-day-pill-car" style="font-size:9px">▸</span>
   </div>
   <div id="am-day-pill-body" style="display:none;margin:6px 12px 0"></div>
+  <div id="am-bday" style="display:none;margin:6px 12px 0;padding:6px 12px;border:1px solid rgba(236,72,153,.4);border-radius:14px;background:rgba(236,72,153,.1);color:#f472b6;font-size:11.5px;font-weight:700;width:fit-content"></div>
   <div class="panel-body" id="am-body"></div>
 </div>
 
@@ -1508,7 +1509,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       <div style="padding:.5rem 1rem"><button class="add-person-btn" onclick="openAddStudent()">+ Add Student</button>
         <div style="margin-top:.6rem">
           <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:4px">Bulk Import / Update (merges by name — never deletes, keeps all profile data)</div>
-          <textarea id="house-import-text" rows="4" placeholder="One student per line:&#10;Name&#9;Tutor&#10;or just the name — iSAMS rows (Surname, Firstname, Preferred, …) also work" style="width:100%;box-sizing:border-box;font-size:11px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm);font-family:monospace;resize:vertical"></textarea>
+          <textarea id="house-import-text" rows="4" placeholder="One student per line. Formats:&#10;Surname&#9;Firstname&#9;Preferred&#9;24-Jan-2009 (17.7)&#9;M   ← iSAMS with DOB+gender&#10;Name&#9;Tutor   — or just the name" style="width:100%;box-sizing:border-box;font-size:11px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm);font-family:monospace;resize:vertical"></textarea>
           <button onclick="doHouseBulkImport()" style="width:100%;margin-top:5px;padding:9px;background:var(--inf-bg);border:1px solid var(--inf-bd);border-radius:var(--rsm);font-size:12px;font-weight:600;color:var(--inf-tx);cursor:pointer">Import / Update House Students</button>
         </div>
       </div>
@@ -1784,6 +1785,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
             <option value="">Select class to import into...</option>
           </select>
           <textarea id="bulk-import-text" rows="5" placeholder="Paste tab-separated or comma-separated data here. Columns: Surname, Firstname, Preferred, House, Gender, Note, Level&#10;e.g. Zhang	SiBo	SiBo	Blake	M		" style="width:100%;font-size:11px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm);font-family:monospace;resize:vertical"></textarea>
+          <label style="display:flex;align-items:center;gap:7px;margin-top:5px;font-size:11.5px;color:var(--text2);cursor:pointer"><input type="checkbox" id="bulk-replace-chk" style="width:15px;height:15px">Replace existing list (clears the class roster first — otherwise merges by name)</label>
           <button onclick="doBulkImport()" style="width:100%;margin-top:5px;padding:9px;background:var(--inf-bg);border:1px solid var(--inf-bd);border-radius:var(--rsm);font-size:12px;font-weight:600;color:var(--inf-tx);cursor:pointer">Import Students</button>
         </div>
       </div>
@@ -23237,26 +23239,103 @@ function openAddTutor(){
   window._personMode='tutor';
   document.getElementById('person-modal').classList.add('open');
 }
+function _studentFieldsHtml(s){
+  s=s||{};
+  const tutorOpts='<option value=""'+(!s.tutor?' selected':'')+'>— none —</option>'+TUTORS.map(t=>`<option value="${t.name}"${s.tutor===t.name?' selected':''}>${t.name}</option>`).join('');
+  const hw=HAWKING_STATUS[s.name]||{};
+  return `
+    <div class="input-row"><label>Tutor</label><select id="pm-tutor-sel">${tutorOpts}</select></div>
+    <div class="input-row"><label>Date of birth</label><input type="date" id="pm-dob" value="${s.dob||''}"></div>
+    <div class="input-row"><label>Gender</label><select id="pm-gender"><option value=""${!s.gender?' selected':''}>—</option><option value="M"${s.gender==='M'?' selected':''}>M</option><option value="F"${s.gender==='F'?' selected':''}>F</option></select></div>
+    <div class="input-row"><label>Chinese name</label><input type="text" id="pm-cn" value="${(hw.cn||'').replace(/"/g,'&quot;')}" placeholder="Optional"></div>`;
+}
 function openAddStudent(){
-  const tutorOpts=TUTORS.map(t=>`<option value="${t.name}">${t.name}</option>`).join('');
   document.getElementById('person-modal-title').textContent='Add Student';
   document.getElementById('person-modal-body').innerHTML=`
-    <div class="input-row"><label>Name</label><input type="text" id="pm-name" placeholder="Full name"></div>
-    <div class="input-row"><label>Tutor</label><select id="pm-tutor-sel">${tutorOpts}</select></div>`;
-  window._personMode='student';
+    <div class="input-row"><label>Name</label><input type="text" id="pm-name" placeholder="Full name"></div>`+_studentFieldsHtml(null);
+  window._personMode='student';window._personEditName=null;
+  document.getElementById('person-modal').classList.add('open');
+}
+function openEditStudent(name){
+  const s=(STUDENTS||[]).find(x=>x.name===name);if(!s)return;
+  document.getElementById('person-modal-title').textContent='Edit Student';
+  document.getElementById('person-modal-body').innerHTML=`
+    <div class="input-row"><label>Name</label><input type="text" id="pm-name" value="${s.name.replace(/"/g,'&quot;')}" disabled title="Names key all history — renaming would orphan notes and registers"></div>`
+    +_studentFieldsHtml(s);
+  window._personMode='student-edit';window._personEditName=name;
   document.getElementById('person-modal').classList.add('open');
 }
 function closePersonModal(){document.getElementById('person-modal').classList.remove('open');}
+function _readStudentFields(target){
+  target.tutor=gv('pm-tutor-sel')||'';
+  const dob=gv('pm-dob');target.dob=dob||null;
+  target.gender=gv('pm-gender')||'';
+  const cn=gv('pm-cn').trim();
+  if(!HAWKING_STATUS[target.name])HAWKING_STATUS[target.name]={boarder:false,cn:''};
+  HAWKING_STATUS[target.name].cn=cn;
+}
 function savePersonModal(){
   if(window._personMode==='tutor'){
     const name=gv('pm-name').trim();if(!name)return;
     TUTORS.push({name,email:gv('pm-email').trim(),room:gv('pm-room').trim(),grade:gv('pm-grade').trim()});
     savePeople();renderSettingsPeople();
+  }else if(window._personMode==='student-edit'){
+    const s=(STUDENTS||[]).find(x=>x.name===window._personEditName);if(!s)return;
+    _readStudentFields(s);
+    savePeople();saveListsData();renderSettingsPeople();
   }else{
-    const name=gv('pm-name').trim(),tutor=gv('pm-tutor-sel');if(!name)return;
-    STUDENTS.push({name,tutor});savePeople();renderSettingsPeople();
+    const name=gv('pm-name').trim();if(!name)return;
+    const s={name,tutor:''};STUDENTS.push(s);
+    _readStudentFields(s);
+    savePeople();saveListsData();renderSettingsPeople();
   }
   closePersonModal();
+}
+
+// ── Tick-based tutee assignment ───────────────────────────────────
+function openTuteePicker(tutorName){
+  document.getElementById('tp-overlay')?.remove();
+  const ov=document.createElement('div');ov.id='tp-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:flex-end;justify-content:center';
+  ov.onclick=e=>{if(e.target===ov)ov.remove();};
+  const rows=(STUDENTS||[]).slice().sort((a,b)=>a.name.localeCompare(b.name)).map(s=>{
+    const mine=s.tutor===tutorName;
+    const other=s.tutor&&!mine;
+    return `<label class="tp-row" data-name="${_esc(s.name)}" style="display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid #f5f6f7;cursor:pointer">
+      <input type="checkbox" class="tp-chk" data-name="${_esc(s.name)}" ${mine?'checked':''} style="width:17px;height:17px;flex-shrink:0">
+      <span style="flex:1;font-size:13.5px;color:#111">${_esc(s.name)}</span>
+      ${other?`<span style="font-size:10px;color:#adb5bd">now: ${_esc(s.tutor)}</span>`:''}
+    </label>`;
+  }).join('');
+  ov.innerHTML=`<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:520px;height:80vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:12px 16px 8px;border-bottom:1px solid #eef0f2;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="flex:1;font-size:15px;font-weight:800;color:#111">Tutees of ${_esc(tutorName)}</div>
+        <button onclick="document.getElementById('tp-overlay').remove()" style="background:none;border:none;font-size:20px;color:#adb5bd;cursor:pointer;padding:0 4px">✕</button>
+      </div>
+      <input id="tp-search" placeholder="Filter names…" autocomplete="off"
+        oninput="document.querySelectorAll('#tp-overlay .tp-row').forEach(r=>{r.style.display=r.dataset.name.toLowerCase().includes(this.value.toLowerCase())?'flex':'none'})"
+        style="width:100%;box-sizing:border-box;font-size:14px;padding:8px 11px;border:1.5px solid var(--border2);border-radius:9px;outline:none;margin-top:8px">
+      <div style="font-size:10.5px;color:#adb5bd;margin-top:5px">Tick to assign to ${_esc(tutorName)} · unticking removes from this group · ticking a student who has another tutor reassigns them</div>
+    </div>
+    <div style="flex:1;overflow-y:auto">${rows||'<div style="padding:20px;text-align:center;color:#adb5bd;font-size:13px">No students yet.</div>'}</div>
+    <div style="flex-shrink:0;padding:10px 16px;display:flex;gap:8px;border-top:1px solid #eef0f2;background:#fff">
+      <button class="btn-sec" style="flex:1;justify-content:center" onclick="document.getElementById('tp-overlay').remove()">Cancel</button>
+      <button class="btn-pri" style="flex:2;justify-content:center" onclick="saveTuteePicker('${tutorName.replace(/'/g,"\\'")}')">Save tutees</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+function saveTuteePicker(tutorName){
+  const checks=document.querySelectorAll('#tp-overlay .tp-chk');
+  let changed=0;
+  checks.forEach(c=>{
+    const s=(STUDENTS||[]).find(x=>x.name===c.dataset.name);if(!s)return;
+    if(c.checked&&s.tutor!==tutorName){s.tutor=tutorName;changed++;}
+    else if(!c.checked&&s.tutor===tutorName){s.tutor='';changed++;}
+  });
+  document.getElementById('tp-overlay')?.remove();
+  if(changed){savePeople();renderSettingsPeople();showToastMsg('👥 '+changed+' tutee assignment(s) updated','#1971c2');}
 }
 let archivePending=null;
 function openArchiveStudent(name){
@@ -23278,10 +23357,37 @@ function removeTutor(name){if(!confirm('Remove tutor '+name+'? Their students wi
 function renderSettingsPeople(){
   // Tutors
   const tl=document.getElementById('tutors-list');
-  if(tl)tl.innerHTML=TUTORS.map(t=>`<div class="person-item"><div><div class="person-name">${t.name}</div><div class="person-sub">${t.room} · ${t.grade} · ${t.email}</div></div><div class="person-btns"><button class="person-btn danger" onclick="removeTutor('${t.name}')">Remove</button></div></div>`).join('');
+  if(tl)tl.innerHTML=TUTORS.map(t=>`<div class="person-item"><div><div class="person-name">${t.name}</div><div class="person-sub">${t.room} · ${t.grade} · ${t.email}</div></div><div class="person-btns"><button class="person-btn" style="border-color:#a5d8ff;color:#1971c2;background:#e7f5ff" onclick="openTuteePicker('${t.name.replace(/'/g,"\\'")}')">Tutees (${STUDENTS.filter(s=>s.tutor===t.name).length})</button><button class="person-btn danger" onclick="removeTutor('${t.name}')">Remove</button></div></div>`).join('');
   // Students
   const sl=document.getElementById('students-list');
-  if(sl)sl.innerHTML=STUDENTS.map(s=>`<div class="person-item"><div><div class="person-name">${s.name}</div><div class="person-sub">Tutor: ${s.tutor}</div></div><div class="person-btns"><button class="person-btn danger" onclick="openArchiveStudent('${s.name}')">Archive</button></div></div>`).join('');
+  if(sl){
+    // Consolidated house-student list: grouped by tutor, everything editable here
+    const groups={};
+    STUDENTS.forEach(s=>{const k=s.tutor||'No tutor';(groups[k]=groups[k]||[]).push(s);});
+    const keys=TUTORS.map(t=>t.name).filter(k=>groups[k]).concat(Object.keys(groups).filter(k=>!TUTORS.some(t=>t.name===k)).sort());
+    sl.innerHTML=keys.map(k=>{
+      const rows=groups[k].map(s=>{
+        const e=s.name.replace(/'/g,"\\'");
+        const hw=HAWKING_STATUS[s.name]||{};
+        const titles=(hw.titles||[]).join(', ');
+        const age=_ageFromDob(s.dob);
+        const meta=[s.dob?(_fmtDob(s.dob)+(age!=null?' · '+age:'')):null,s.gender||null,hw.cn||null].filter(Boolean).join(' · ');
+        return `<div class="person-item" style="padding:.5rem .75rem">
+          <div style="flex:1;min-width:0">
+            <div class="person-name">${s.name}${_isBirthdayToday(s.dob)?' 🎂':''}</div>
+            <div class="person-sub">${meta||'no details yet'}${titles?' · <span style="color:#b45309">'+titles+'</span>':''}</div>
+          </div>
+          <div class="person-btns" style="flex-wrap:wrap;justify-content:flex-end">
+            <button onclick="setBoarderStatus('${e}',${hw.boarder?'false':'true'},this)" title="Toggle boarder/day" style="font-size:10px;padding:3px 8px;border-radius:var(--rxs);border:1px solid ${hw.boarder?'#7dd3fc':'#ced4da'};background:${hw.boarder?'#e0f2fe':'var(--bg3)'};color:${hw.boarder?'#0369a1':'var(--text2)'};cursor:pointer;font-weight:700">${hw.boarder?'B':'D'}</button>
+            <button class="person-btn" onclick="editBoarderTitles('${e}')">Titles</button>
+            <button class="person-btn" onclick="openEditStudent('${e}')">Edit</button>
+            <button class="person-btn danger" onclick="openArchiveStudent('${e}')">Archive</button>
+          </div>
+        </div>`;
+      }).join('');
+      return `<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;padding:6px 12px 2px">${k} · ${groups[k].length}</div>`+rows;
+    }).join('')||'<div style="padding:.75rem 1rem;font-size:12px;color:#868e96">No students yet.</div>';
+  }
   // Archived
   const al=document.getElementById('archived-list');
   if(al){
@@ -25758,7 +25864,7 @@ async function openStudentCard(name){
     <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
       <div style="flex:1">
         <div style="font-size:17px;font-weight:800;color:var(--text);line-height:1.2">${_esc(name)}</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:2px">${s.tutor?('Tutor: '+_esc(s.tutor)+' \u00B7 '):''}${isBoarder?('Boarder'+(room?' \u00B7 '+_esc(room):'')):'Day student'}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">${s.tutor?('Tutor: '+_esc(s.tutor)+' \u00B7 '):''}${isBoarder?('Boarder'+(room?' \u00B7 '+_esc(room):'')):'Day student'}${s.dob?(' \u00B7 '+_fmtDob(s.dob)+' \u00B7 '+_ageFromDob(s.dob)+(_isBirthdayToday(s.dob)?' \uD83C\uDF82 today!':'')):''}</div>
       </div>
       <button onclick="document.getElementById('sc-overlay').remove()" style="background:none;border:none;font-size:22px;color:#adb5bd;cursor:pointer;line-height:1;padding:0 4px">\u2715</button>
     </div>
@@ -27977,7 +28083,13 @@ function deleteRoom(id){
 function closeRoomModal(){document.getElementById('room-modal').classList.remove('open');_roomEditId=null;}
 
 function renderBoarderSettings(){
-  const el=document.getElementById('boarder-settings-list');if(!el)return;
+  // Boarder/day, titles, DOB etc. are all managed in People → Students now.
+  const el=document.getElementById('boarder-settings-list');
+  if(el)el.innerHTML='<div style="font-size:12px;color:#868e96;padding:.25rem 0">Moved: boarder/day status, titles and student details are now all together in <b>People → Students</b>.</div>';
+  if(typeof renderSettingsPeople==='function')renderSettingsPeople();
+}
+function _renderBoarderSettingsLegacy(){
+  const el=null;if(!el)return;
   let html='';
   TUTORS.forEach(tut=>{
     const studs=STUDENTS.filter(s=>s.tutor===tut.name);
@@ -28024,8 +28136,23 @@ function renderClassesSettings(){
   if(sel){sel.innerHTML='<option value="">Select class to import into...</option>'+CLASSES.map(c=>`<option value="${c.id}">${c.name} (${c.students.length} students)</option>`).join('');}
   el.innerHTML=CLASSES.map(c=>`<div class="person-item">
     <div><div class="person-name">${c.name}</div><div class="person-sub">${c.grade} · ${c.students.length} students</div></div>
-    <div class="person-btns"><button class="person-btn" onclick="editClassInfo('${c.id}')">Edit</button><button class="person-btn danger" onclick="deleteClass('${c.id}')">Delete</button></div>
+    <div class="person-btns"><button class="person-btn" onclick="editClassInfo('${c.id}')">Edit</button>${c.students.length?`<button class="person-btn" style="border-color:#ffd8a8;color:#d9480f;background:#fff4e6" onclick="clearClassStudents('${c.id}')">Clear list</button>`:''}<button class="person-btn danger" onclick="deleteClass('${c.id}')">Delete</button></div>
   </div>`).join('');
+}
+
+// Empty a class roster without deleting the class (settings, plans, name kept)
+function clearClassStudents(classId){
+  const cls=getClassById(classId);if(!cls)return;
+  if(!confirm('Remove ALL '+cls.students.length+' students from '+cls.name+'?\n\nSeating and leave flags for this class are cleared too. The class itself, its timetable slots and lesson plans are kept.'))return;
+  cls.students=[];
+  if(!cls.seating)cls.seating={rows:5,cols:6,seats:[]};
+  cls.seating.seats=Array.isArray(cls.seating.seats)?cls.seating.seats.map(()=>null):[];
+  const newLeave={};
+  Object.entries(CLASS_LEAVE).forEach(([k,v])=>{if(!k.startsWith(classId+'_'))newLeave[k]=v;});
+  CLASS_LEAVE=newLeave;
+  saveListsData();
+  renderClassesSettings();
+  if(typeof currentClassId!=='undefined'&&currentClassId===classId&&typeof renderTeachingTab==='function')renderTeachingTab();
 }
 
 function openAddClassModal(){
@@ -28618,7 +28745,7 @@ function _hsRender(){
     const away=(st==='excused'&&exc)?(' · '+(exc.emoji||'✈')+' '+(exc.reason||exc.leave_type||'away')):'';
     return `<div style="display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid #f5f6f7">
       <div style="flex:1;min-width:0">
-        <div style="font-size:13.5px;font-weight:600;color:#111">${_scName(s.name)} <span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:7px;background:${hw.boarder?'#e0f2fe':'#f1f5f9'};color:${hw.boarder?'#0369a1':'#64748b'}">${hw.boarder?'B':'D'}</span></div>
+        <div style="font-size:13.5px;font-weight:600;color:#111">${_scName(s.name)}${_isBirthdayToday(s.dob)?' 🎂':''} <span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:7px;background:${hw.boarder?'#e0f2fe':'#f1f5f9'};color:${hw.boarder?'#0369a1':'#64748b'}">${hw.boarder?'B':'D'}</span></div>
         <div style="font-size:10px;color:#adb5bd">${_hsGroup==='grade'?(s.tutor||''):_getStudentGrade(s.name)}${when?(' · '+when+(by?' by '+_esc(by):'')+sess):' · not registered today'}${away}</div>
       </div>
       <span style="flex-shrink:0;font-size:11px;font-weight:800;color:${stCol[st]||'#adb5bd'}">${stLbl[st]||_esc(st)}</span>
@@ -28950,6 +29077,15 @@ function doBulkImport(){
   if(!targetId||!text){alert('Please select a class and paste some data.');return;}
   const cls=getClassById(targetId);if(!cls)return;
   const lines=text.split('\n').filter(l=>l.trim());
+  // Replace mode: start from an empty roster (seating + leave flags cleared too)
+  const _repl=document.getElementById('bulk-replace-chk');
+  if(_repl&&_repl.checked){
+    if(!confirm('Replace the whole list? The current '+cls.students.length+' student(s) in '+cls.name+' will be removed first.'))return;
+    cls.students=[];
+    if(cls.seating&&Array.isArray(cls.seating.seats))cls.seating.seats=cls.seating.seats.map(()=>null);
+    const _nl={};Object.entries(CLASS_LEAVE).forEach(([k,v])=>{if(!k.startsWith(targetId+'_'))_nl[k]=v;});CLASS_LEAVE=_nl;
+    _repl.checked=false;
+  }
   // Merge by name: re-importing the same list UPDATES students instead of duplicating them
   const _k=s=>(((s.preferred||s.firstname||'')+'|'+(s.surname||'')).toLowerCase().trim());
   const existing=new Map();cls.students.forEach((s,i)=>existing.set(_k(s),i));
@@ -28992,6 +29128,42 @@ function doBulkImport(){
   }else{alert('No students could be parsed. Check the format.');}
 }
 
+// ── House student DOB helpers ─────────────────────────────────────
+// iSAMS exports birthdays as "24-Jan-2009 (17.7)" — parse the date, ignore
+// the bracketed age (we compute age ourselves so it never goes stale).
+const _MONTHS={jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
+function _parseDobISams(str){
+  const m=String(str||'').trim().match(/^(\d{1,2})[-\/\s]([A-Za-z]{3,})[-\/\s](\d{4})/);
+  if(m){const mo=_MONTHS[m[2].slice(0,3).toLowerCase()];if(mo)return m[3]+'-'+mo+'-'+String(m[1]).padStart(2,'0');}
+  const iso=String(str||'').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(iso)return iso[0];
+  const dmy=String(str||'').trim().match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/);
+  if(dmy)return dmy[3]+'-'+String(dmy[2]).padStart(2,'0')+'-'+String(dmy[1]).padStart(2,'0');
+  return null;
+}
+function _looksLikeDob(str){return _parseDobISams(str)!==null;}
+function _ageFromDob(dob){
+  if(!dob)return null;
+  try{
+    const t=_todayStr().split('-').map(Number),b=String(dob).split('-').map(Number);
+    let a=t[0]-b[0];
+    if(t[1]<b[1]||(t[1]===b[1]&&t[2]<b[2]))a--;
+    return a;
+  }catch(e){return null;}
+}
+function _fmtDob(dob){
+  if(!dob)return'';
+  try{return new Date(dob+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}catch(e){return dob;}
+}
+function _isBirthdayToday(dob){
+  if(!dob)return false;
+  return _todayStr().slice(5)===String(dob).slice(5);
+}
+function _todaysBirthdays(){
+  return (STUDENTS||[]).filter(s=>s.dob&&_isBirthdayToday(s.dob))
+    .map(s=>({name:s.name,turns:_ageFromDob(s.dob)}));
+}
+
 // House bulk import — MERGE by name, never deletes.
 // Accepts: "Name<TAB>Tutor" per line, "Name" alone, or iSAMS rows
 // (Surname, Firstname, Preferred, …) where the app name = Preferred + Surname.
@@ -29003,13 +29175,21 @@ function doHouseBulkImport(){
   let added=0,updated=0;const seen=new Set();
   lines.forEach(line=>{
     const parts=line.includes('\t')?line.split('\t').map(p=>p.trim()):line.split(',').map(p=>p.trim());
-    let name='',tutor='';
+    let name='',tutor='',dob=null,gender='';
     if(parts.length>=3){
-      // iSAMS-style: Surname, Firstname, Preferred[, House, Gender, Note, Level, Tutor?]
+      // iSAMS-style: Surname, Firstname, Preferred, then either
+      //   DOB ("24-Jan-2009 (17.7)"), Gender          ← house profile export
+      // or House, Gender, Note, Level, Tutor?         ← legacy class-style row
       const surname=(parts[0]||'').replace(/\*/g,'');
       const preferred=parts[2]||parts[1]||'';
       name=(preferred+' '+surname).trim();
-      tutor=parts[7]||'';
+      if(_looksLikeDob(parts[3])){
+        dob=_parseDobISams(parts[3]);
+        gender=(parts[4]||'').trim().toUpperCase().slice(0,1);
+      }else{
+        tutor=parts[7]||'';
+        if(/^[MF]$/i.test((parts[4]||'').trim()))gender=(parts[4]||'').trim().toUpperCase();
+      }
     }else{
       name=parts[0]||'';
       tutor=parts[1]||'';
@@ -29018,9 +29198,13 @@ function doHouseBulkImport(){
     seen.add(name.toLowerCase());
     const ex=(STUDENTS||[]).find(s=>s.name.toLowerCase()===name.toLowerCase());
     if(ex){
-      if(tutor&&ex.tutor!==tutor){ex.tutor=tutor;updated++;}
+      let ch=false;
+      if(tutor&&ex.tutor!==tutor){ex.tutor=tutor;ch=true;}
+      if(dob&&ex.dob!==dob){ex.dob=dob;ch=true;}
+      if(gender&&ex.gender!==gender){ex.gender=gender;ch=true;}
+      if(ch)updated++;
     }else{
-      STUDENTS.push({name,tutor:tutor||''});
+      STUDENTS.push({name,tutor:tutor||'',dob:dob||null,gender:gender||''});
       added++;
     }
   });
@@ -29029,7 +29213,7 @@ function doHouseBulkImport(){
   savePeople();
   if(typeof renderSettingsPeople==='function')renderSettingsPeople();
   if(ta)ta.value='';
-  alert(`House import: ${added} added, ${updated} tutor update(s). All existing profile data (notes, boarder status, rooms, history) is untouched — it is keyed by name.`
+  alert(`House import: ${added} added, ${updated} updated (tutor/DOB/gender). All existing profile data (notes, boarder status, rooms, history) is untouched — it is keyed by name.`
     +(missing.length?`\n\nIn the app but NOT in your paste (kept — archive manually if they have left):\n${missing.join(', ')}`:''));
 }
 
@@ -34762,6 +34946,17 @@ function toggleAmDayPill(){
 }
 function _amPillSaid(taskId){archivePoint(taskId);_amDayPillHash='';_amDayPillTick();try{renderWeekTasksView();}catch(e){}}
 function _amDayPillTick(){
+  // Birthday banner — shows all day when a house student's birthday is today
+  try{
+    const bEl=document.getElementById('am-bday');
+    if(bEl){
+      const bs=_todaysBirthdays();
+      if(bs.length){
+        bEl.style.display='block';
+        bEl.innerHTML='🎂 '+bs.map(b=>_scName(b.name,'','color:#f472b6;font-weight:800;')+(b.turns!=null?' turns '+b.turns:'')).join(' · ')+' today';
+      }else bEl.style.display='none';
+    }
+  }catch(e){}
   const pill=document.getElementById('am-day-pill');if(!pill)return;
   let total=0,groups=[];
   try{
