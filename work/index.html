@@ -875,7 +875,8 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .edit-cat-chip:hover{opacity:.85}
 
 /* Settings groups */
-.settings-group-header{font-size:10px;font-weight:800;color:#adb5bd;text-transform:uppercase;letter-spacing:.12em;padding:.9rem 1rem .35rem;margin-top:.25rem}
+.settings-group-header{font-size:11px;font-weight:800;color:#334155;text-transform:uppercase;letter-spacing:.1em;padding:.55rem 1rem;margin:1.4rem 0 .6rem;background:#e9ecef;border-left:4px solid #00205B;border-radius:0 8px 8px 0}
+.settings-group-header:first-of-type{margin-top:.4rem}
 .settings-group-header:first-child{padding-top:.5rem;margin-top:0}
 
 .am-timing-btn{padding:5px 11px;font-size:11px;font-weight:600;border-radius:20px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);cursor:pointer;white-space:nowrap}
@@ -1489,7 +1490,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
     <div class="settings-group-header">👥 People</div>
     <div class="settings-section">
       <div class="settings-section-title" onclick="toggleSettingsSection('tutors',this)">
-        Tutors
+        <span>Tutors <span id="tutors-title-count" style="font-weight:600;color:#868e96;text-transform:none;letter-spacing:0"></span></span>
         <span id="ss-chev-tutors" style="font-size:12px;transition:transform .2s;display:inline-block">▼</span>
       </div>
       <div class="settings-section-body" id="ss-body-tutors">
@@ -1501,7 +1502,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
     <!-- Students -->
     <div class="settings-section">
       <div class="settings-section-title" onclick="toggleSettingsSection('students',this)">
-        Students
+        <span>Students <span id="students-title-count" style="font-weight:600;color:#868e96;text-transform:none;letter-spacing:0"></span></span>
         <span id="ss-chev-students" style="font-size:12px;transition:transform .2s;display:inline-block">▼</span>
       </div>
       <div class="settings-section-body" id="ss-body-students">
@@ -23381,13 +23382,22 @@ function renderSettingsPeople(){
   const tl=document.getElementById('tutors-list');
   if(tl)tl.innerHTML=TUTORS.map(t=>`<div class="person-item"><div><div class="person-name">${t.name}</div><div class="person-sub">${t.room} · ${t.grade} · ${t.email}</div></div><div class="person-btns"><button class="person-btn" style="border-color:#a5d8ff;color:#1971c2;background:#e7f5ff" onclick="openTuteePicker('${t.name.replace(/'/g,"\\'")}')">Tutees (${STUDENTS.filter(s=>s.tutor===t.name).length})</button><button class="person-btn" onclick="openEditTutor('${t.name.replace(/'/g,"\\'")}')">Edit</button><button class="person-btn danger" onclick="removeTutor('${t.name}')">Remove</button></div></div>`).join('');
   // Students
+  // Counts in the section titles
+  const tc=document.getElementById('tutors-title-count');if(tc)tc.textContent='· '+TUTORS.length;
+  const stc=document.getElementById('students-title-count');if(stc)stc.textContent='· '+STUDENTS.length;
   const sl=document.getElementById('students-list');
   if(sl){
-    // Consolidated house-student list: grouped by tutor, everything editable here
-    const groups={};
-    STUDENTS.forEach(s=>{const k=s.tutor||'No tutor';(groups[k]=groups[k]||[]).push(s);});
-    const keys=TUTORS.map(t=>t.name).filter(k=>groups[k]).concat(Object.keys(groups).filter(k=>!TUTORS.some(t=>t.name===k)).sort());
-    sl.innerHTML=keys.map(k=>{
+    // Consolidated house-student list: grade level first, tutor group within it
+    const byGrade={};
+    STUDENTS.forEach(s=>{const g=_getStudentGrade(s.name)||'No grade';(byGrade[g]=byGrade[g]||[]).push(s);});
+    const gOrder=getGrades();
+    const gKeys=gOrder.filter(g=>byGrade[g]).concat(Object.keys(byGrade).filter(g=>!gOrder.includes(g)).sort());
+    sl.innerHTML=gKeys.map(gk=>{
+      const gradeStudents=byGrade[gk];
+      const groups={};
+      gradeStudents.forEach(s=>{const k=s.tutor||'No tutor';(groups[k]=groups[k]||[]).push(s);});
+      const keys=TUTORS.map(t=>t.name).filter(k=>groups[k]).concat(Object.keys(groups).filter(k=>!TUTORS.some(t=>t.name===k)).sort());
+      const inner=keys.map(k=>{
       const rows=groups[k].map(s=>{
         const e=s.name.replace(/'/g,"\\'");
         const hw=HAWKING_STATUS[s.name]||{};
@@ -23407,7 +23417,9 @@ function renderSettingsPeople(){
           </div>
         </div>`;
       }).join('');
-      return `<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;padding:6px 12px 2px">${k} · ${groups[k].length}</div>`+rows;
+      return `<div style="font-size:10.5px;font-weight:700;color:var(--text3);letter-spacing:.03em;padding:5px 12px 2px 18px">${k} · ${groups[k].length}</div>`+rows;
+      }).join('');
+      return `<div style="font-size:11.5px;font-weight:800;color:#00205B;text-transform:uppercase;letter-spacing:.06em;padding:8px 12px 3px;background:#f1f5f9;border-bottom:1px solid var(--border3)">${gk} · ${gradeStudents.length}</div>`+inner;
     }).join('')||'<div style="padding:.75rem 1rem;font-size:12px;color:#868e96">No students yet.</div>';
   }
   // Archived
@@ -29987,15 +29999,16 @@ function settingsToggleAll(){
 }
 
 function restoreSettingsSections(){
-  try{const s=localStorage.getItem('settingsSections');if(s)_settingsSectionState=JSON.parse(s);}catch(e){}
-  // Default: all collapsed
+  // Every visit starts fully collapsed — no remembered open state.
+  // (Toggling still works within the visit; it just doesn't persist.)
+  _settingsSectionState={};
+  try{localStorage.removeItem('settingsSections');}catch(e){}
   const bodies=[...document.querySelectorAll('.settings-section-body')];
   bodies.forEach(b=>{
     const id=b.id.replace('ss-body-','');
-    const collapsed=_settingsSectionState[id]!==false; // default collapsed
     const chev=document.getElementById('ss-chev-'+id);
-    b.classList.toggle('collapsed',collapsed);
-    if(chev)chev.style.transform=collapsed?'rotate(-90deg)':'rotate(0deg)';
+    b.classList.add('collapsed');
+    if(chev)chev.style.transform='rotate(-90deg)';
   });
   const btn=document.getElementById('settings-collapse-btn');
   const anyOpen=bodies.some(b=>!b.classList.contains('collapsed'));
@@ -35522,7 +35535,7 @@ function initActiveMode(){
 <script>
 // Visible build number — must match the service worker's CACHE_NAME version.
 // Lets anyone confirm at a glance which build a device is actually running.
-const APP_BUILD='v224';
+const APP_BUILD='v225';
 try{document.getElementById('app-build-tag').textContent='build '+APP_BUILD;console.log('LA Work '+APP_BUILD);}catch(e){}
 </script>
 
