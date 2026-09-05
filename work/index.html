@@ -23258,6 +23258,7 @@ function _studentFieldsHtml(s){
   const hw=HAWKING_STATUS[s.name]||{};
   return `
     <div class="input-row"><label>Tutor</label><select id="pm-tutor-sel">${tutorOpts}</select></div>
+    <div class="input-row"><label>Grade</label><input type="text" id="pm-grade-stu" value="${(s.grade||'').replace(/"/g,'&quot;')}" placeholder="e.g. G11"></div>
     <div class="input-row"><label>Date of birth</label><input type="date" id="pm-dob" value="${s.dob||''}"></div>
     <div class="input-row"><label>Gender</label><select id="pm-gender"><option value=""${!s.gender?' selected':''}>—</option><option value="M"${s.gender==='M'?' selected':''}>M</option><option value="F"${s.gender==='F'?' selected':''}>F</option></select></div>
     <div class="input-row"><label>Chinese name</label><input type="text" id="pm-cn" value="${(hw.cn||'').replace(/"/g,'&quot;')}" placeholder="Optional"></div>`;
@@ -23281,6 +23282,7 @@ function openEditStudent(name){
 function closePersonModal(){document.getElementById('person-modal').classList.remove('open');}
 function _readStudentFields(target){
   target.tutor=gv('pm-tutor-sel')||'';
+  target.grade=(gv('pm-grade-stu')||'').trim();
   const dob=gv('pm-dob');target.dob=dob||null;
   target.gender=gv('pm-gender')||'';
   const cn=gv('pm-cn').trim();
@@ -35516,7 +35518,13 @@ function initActiveMode(){
     });
   }
 </script>
-<div style="text-align:center;padding:12px;font-size:10px;color:#aaa;border-top:1px solid var(--border3);margin-top:8px">© 2026 Laith Al-Attili · All rights reserved</div>
+<div style="text-align:center;padding:12px;font-size:10px;color:#aaa;border-top:1px solid var(--border3);margin-top:8px">© 2026 Laith Al-Attili · All rights reserved · <span id="app-build-tag"></span></div>
+<script>
+// Visible build number — must match the service worker's CACHE_NAME version.
+// Lets anyone confirm at a glance which build a device is actually running.
+const APP_BUILD='v224';
+try{document.getElementById('app-build-tag').textContent='build '+APP_BUILD;console.log('LA Work '+APP_BUILD);}catch(e){}
+</script>
 
 <!-- ADD LEAVE MODAL -->
 <div class="modal-overlay" id="boarding-leave-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
