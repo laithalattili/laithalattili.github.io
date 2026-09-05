@@ -1509,7 +1509,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       <div style="padding:.5rem 1rem"><button class="add-person-btn" onclick="openAddStudent()">+ Add Student</button>
         <div style="margin-top:.6rem">
           <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:4px">Bulk Import / Update (merges by name — never deletes, keeps all profile data)</div>
-          <textarea id="house-import-text" rows="4" placeholder="One student per line. Formats:&#10;Surname&#9;Firstname&#9;Preferred&#9;24-Jan-2009 (17.7)&#9;M   ← iSAMS with DOB+gender&#10;Name&#9;Tutor   — or just the name" style="width:100%;box-sizing:border-box;font-size:11px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm);font-family:monospace;resize:vertical"></textarea>
+          <textarea id="house-import-text" rows="4" placeholder="One student per line (iSAMS columns):&#10;Surname&#9;Forename&#9;Preferred&#9;24-Jan-2009 (17.7)&#9;11&#9;Hawking House&#9;M&#10;Year Group 11 is stored as G11. Bracketed ages are ignored. Name&#9;Tutor rows also work." style="width:100%;box-sizing:border-box;font-size:11px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm);font-family:monospace;resize:vertical"></textarea>
           <label style="display:flex;align-items:center;gap:7px;margin-top:5px;font-size:11.5px;color:var(--text2);cursor:pointer"><input type="checkbox" id="house-replace-chk" style="width:15px;height:15px">Replace whole list — anyone missing from the paste is <b>archived</b> automatically (never deleted; their notes and history are kept)</label>
           <button onclick="doHouseBulkImport()" style="width:100%;margin-top:5px;padding:9px;background:var(--inf-bg);border:1px solid var(--inf-bd);border-radius:var(--rsm);font-size:12px;font-weight:600;color:var(--inf-tx);cursor:pointer">Import / Update House Students</button>
         </div>
@@ -23318,7 +23318,7 @@ function openTuteePicker(tutorName){
   const ov=document.createElement('div');ov.id='tp-overlay';
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:flex-end;justify-content:center';
   ov.onclick=e=>{if(e.target===ov)ov.remove();};
-  const rows=(STUDENTS||[]).slice().sort((a,b)=>a.name.localeCompare(b.name)).map(s=>{
+  const rows=(STUDENTS||[]).filter(s=>!_isArchived(s.name)).sort((a,b)=>a.name.localeCompare(b.name)).map(s=>{
     const mine=s.tutor===tutorName;
     const other=s.tutor&&!mine;
     return `<label class="tp-row" data-name="${_esc(s.name)}" style="display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid #f5f6f7;cursor:pointer">
@@ -23391,7 +23391,7 @@ function renderSettingsPeople(){
         const hw=HAWKING_STATUS[s.name]||{};
         const titles=(hw.titles||[]).join(', ');
         const age=_ageFromDob(s.dob);
-        const meta=[s.dob?(_fmtDob(s.dob)+(age!=null?' · '+age:'')):null,s.gender||null,hw.cn||null].filter(Boolean).join(' · ');
+        const meta=[s.grade||null,s.dob?(_fmtDob(s.dob)+(age!=null?' · '+age:'')):null,s.gender||null,hw.cn||null].filter(Boolean).join(' · ');
         return `<div class="person-item" style="padding:.5rem .75rem">
           <div style="flex:1;min-width:0">
             <div class="person-name">${s.name}${_isBirthdayToday(s.dob)?' 🎂':''}</div>
@@ -28519,6 +28519,7 @@ function getGrades(){
   const s=new Set();
   (TUTORS||[]).forEach(t=>{if(t.grade)s.add(String(t.grade).trim());});
   (typeof CLASSES!=='undefined'?CLASSES:[]).forEach(c=>{if(c.grade)s.add(String(c.grade).trim());});
+  (typeof STUDENTS!=='undefined'?STUDENTS:[]).forEach(st=>{if(st.grade)s.add(String(st.grade).trim());});
   const arr=[...s].filter(Boolean);
   const num=g=>parseInt(String(g).replace(/\D/g,''))||0;
   arr.sort((a,b)=>num(a)-num(b));
@@ -28598,7 +28599,7 @@ function _atCandidates(q){
   const inCls=new Set();
   if(cls)(cls.students||[]).forEach(s=>inCls.add((String(s.preferred||'')+' '+String(s.surname||'')).trim().toLowerCase()));
   const hits=(STUDENTS||[]).filter(s=>{
-    if(!s.name)return false;
+    if(!s.name||_isArchived(s.name))return false;
     if(!q)return true;
     const n=s.name.toLowerCase();
     return n.startsWith(q)||n.split(/\s+/).some(w=>w.startsWith(q));
@@ -28698,6 +28699,7 @@ document.addEventListener('click',e=>{
 let _hsFilter='all',_hsGroup='grade';
 async function openHouseSheet(){
   _hsFilter='all';
+  _purgeArchivedFromActive();
   document.getElementById('hs-overlay')?.remove();
   const ov=document.createElement('div');ov.id='hs-overlay';
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:flex-end;justify-content:center';
@@ -28742,7 +28744,7 @@ function _hsRender(){
   const stCol={present:'#16a34a',absent:'#dc2626',excused:'#d97706',late:'#d97706',unregistered:'#adb5bd'};
   const stLbl={present:'Present',absent:'Absent',excused:'Excused',late:'Late',unregistered:'—'};
   const students=(STUDENTS||[]).filter(s=>{
-    if(!s.name)return false;
+    if(!s.name||_isArchived(s.name))return false;
     const hw=HAWKING_STATUS[s.name]||{};
     if(_hsFilter==='boarders'&&!hw.boarder)return false;
     if(_hsFilter==='day'&&hw.boarder)return false;
@@ -29180,8 +29182,20 @@ function _isBirthdayToday(dob){
   return _todayStr().slice(5)===String(dob).slice(5);
 }
 function _todaysBirthdays(){
-  return (STUDENTS||[]).filter(s=>s.dob&&_isBirthdayToday(s.dob))
+  return (STUDENTS||[]).filter(s=>s.dob&&_isBirthdayToday(s.dob)&&!_isArchived(s.name))
     .map(s=>({name:s.name,turns:_ageFromDob(s.dob)}));
+}
+
+// ── Archived students are authoritative: never show them anywhere ──
+function _isArchived(name){return (ARCHIVED||[]).some(a=>a.name===name);}
+// Cloud sync can race an archive done on another device (or an older cloud
+// copy can resurrect someone). Reconcile so ARCHIVED always wins.
+function _purgeArchivedFromActive(){
+  try{
+    const n=STUDENTS.length;
+    STUDENTS=STUDENTS.filter(s=>!_isArchived(s.name));
+    if(STUDENTS.length!==n)savePeople();
+  }catch(e){}
 }
 
 // House bulk import — MERGE by name, never deletes.
@@ -29195,17 +29209,26 @@ function doHouseBulkImport(){
   let added=0,updated=0;const seen=new Set();
   lines.forEach(line=>{
     const parts=line.includes('\t')?line.split('\t').map(p=>p.trim()):line.split(',').map(p=>p.trim());
-    let name='',tutor='',dob=null,gender='';
+    let name='',tutor='',dob=null,gender='',grade='',house='';
     if(parts.length>=3){
-      // iSAMS-style: Surname, Firstname, Preferred, then either
-      //   DOB ("24-Jan-2009 (17.7)"), Gender          ← house profile export
-      // or House, Gender, Note, Level, Tutor?         ← legacy class-style row
-      const surname=(parts[0]||'').replace(/\*/g,'');
+      // iSAMS-style: Surname, Forename, Preferred, then any of (in order):
+      //   DOB "24-Mar-2010 (16.6)", Year Group "11", House "Hawking House", Gender "M"
+      // Legacy class-style rows (House, Gender, Note, Level, Tutor) still work.
+      const surname=(parts[0]||'').replace(/\*/g,'').trim();
       const preferred=parts[2]||parts[1]||'';
-      name=(preferred+' '+surname).trim();
+      name=(preferred+' '+surname).trim().replace(/\s+/g,' ');
       if(_looksLikeDob(parts[3])){
         dob=_parseDobISams(parts[3]);
-        gender=(parts[4]||'').trim().toUpperCase().slice(0,1);
+        // Scan the remaining columns: a bare number is the NC Year Group
+        // (stored as G<number>, matching the app's grade labels), a single
+        // M/F is gender, anything else (e.g. "Hawking House") is the house.
+        for(let i=4;i<Math.min(parts.length,8);i++){
+          const p=(parts[i]||'').trim();
+          if(!p)continue;
+          if(/^\d{1,2}$/.test(p))grade='G'+parseInt(p,10);
+          else if(/^[MF]$/i.test(p))gender=p.toUpperCase();
+          else house=p;
+        }
       }else{
         tutor=parts[7]||'';
         if(/^[MF]$/i.test((parts[4]||'').trim()))gender=(parts[4]||'').trim().toUpperCase();
@@ -29222,9 +29245,11 @@ function doHouseBulkImport(){
       if(tutor&&ex.tutor!==tutor){ex.tutor=tutor;ch=true;}
       if(dob&&ex.dob!==dob){ex.dob=dob;ch=true;}
       if(gender&&ex.gender!==gender){ex.gender=gender;ch=true;}
+      if(grade&&ex.grade!==grade){ex.grade=grade;ch=true;}
+      if(house&&ex.house!==house){ex.house=house;ch=true;}
       if(ch)updated++;
     }else{
-      STUDENTS.push({name,tutor:tutor||'',dob:dob||null,gender:gender||''});
+      STUDENTS.push({name,tutor:tutor||'',dob:dob||null,gender:gender||'',grade:grade||'',house:house||''});
       added++;
     }
   });
@@ -29983,6 +30008,7 @@ function initApp(){
   const sc=document.getElementById('settings-content');if(sc)sc.style.display='none';
   hydrateDoneState().then(()=>{_subscribeDoneRealtime();drainWorkInbox();_noteFlushQueue();_fireRegFlushQueue();try{if(_curTab==='week'&&typeof renderWeekTasksView==='function')renderWeekTasksView();}catch(e){}});
   loadSettings();loadPeople();loadState();migrateBaseToDefaults();ensureDefaultContexts();loadSlotNotes();loadHolidays();applyHolidaysToCalendar();loadCalCustomEvents();loadListsData();loadLinks();loadDuties();loadTutorMeetings();dsLoad();loadBoardingSettings();_subscribePenaltiesRealtime();loadNurseMap();loadCommentMap();
+  _purgeArchivedFromActive(); // archived list always wins over a synced-back roster
   buildMorningChecks();restoreMCState();
   initWeekTab();checkTaskReset();renderCustomFlowsList();
   // Apply global default (overrides individual defaults)
@@ -34735,7 +34761,10 @@ function revertFromFire(){
 
 function _fireAllExpanded(){return Object.keys(_fireGradeMap()||{}).every(gr=>window['_fireSec_'+gr]!==false);}
 function _getStudentGrade(name){
-  // Primary: tutor grade
+  // Primary: the student's own grade (from the house import's Year Group column)
+  const _own=(STUDENTS||[]).find(s=>s.name===name);
+  if(_own&&_own.grade)return _own.grade;
+  // Then: tutor grade
   const tg=getTutorGrade(name);
   if(tg)return tg;
   // Fallback: scan CLASSES
@@ -34752,6 +34781,7 @@ function _fireGradeMap(){
   const gm={};
   const useBoardersOnly=!_fireScopeAllHouse;
   STUDENTS.forEach(s=>{
+    if(_isArchived(s.name))return;
     const hw=HAWKING_STATUS[s.name]||{};
     if(useBoardersOnly&&!hw.boarder)return;
     const gr=_getStudentGrade(s.name)||'Unknown';
