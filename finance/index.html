@@ -1008,6 +1008,7 @@ var S={
   schoolYearStart:8, // August = school year start
   // Salary routing
   salaryMode:'split',
+  customSplit:{rmbKeep:null},
   targetMonth:{yr:null,mo:null},
   surplusResetDate:null,
   mlFlowOpen:{jod:true,rmb:true},
@@ -1750,6 +1751,12 @@ function buildProjection(){
         var rmbAmt=salRMB?resolveStreamAmount(salRMB):0;
         if(!salRecRMB){rmbIn+=rmbAmt;trueRmbIn+=rmbAmt;rmbItems.push({l:salRMB.name,v:'+'+fRMB(rmbAmt),c:'pos',streamId:salRMB.id});}
         else{trueRmbIn+=rmbAmt;rmbItems.push({l:salRMB.name,v:'+'+fRMB(rmbAmt),c:'pos',streamId:salRMB.id,received:true});}
+      } else if(monthMode==='custom'){
+        var cs=customSplitAmounts(yr,mo);
+        if(!salRecJOD){jodIn+=cs.jod;trueJodIn+=cs.jod;jodItems.push({l:'Salary (custom \u2192 Arab)',v:'+'+fJOD(cs.jod),c:'pos',streamId:salJOD.id});}
+        else{trueJodIn+=cs.jod;jodItems.push({l:'Salary (custom \u2192 Arab)',v:'+'+fJOD(cs.jod),c:'pos',streamId:salJOD.id,received:true});}
+        if(!salRecRMB){rmbIn+=cs.rmbKeep;trueRmbIn+=cs.rmbKeep;rmbItems.push({l:'Salary (custom, BOC)',v:'+'+fRMB(cs.rmbKeep),c:'pos',streamId:salRMB.id});}
+        else{trueRmbIn+=cs.rmbKeep;rmbItems.push({l:'Salary (custom, BOC)',v:'+'+fRMB(cs.rmbKeep),c:'pos',streamId:salRMB.id,received:true});}
       } else {
         // full_rmb: all salary goes to BOC as RMB
         var fullAmt=S.salaryRMBFull||n2((salJOD?resolveStreamAmount(salJOD):0)*S.jod2rmb+(salRMB?resolveStreamAmount(salRMB):0));
@@ -2603,8 +2610,8 @@ function getCommitItems(pyr,pmo){
     var ov=streamOverrides.find(function(o){return o.streamId===s.id&&o.yr===yr&&o.mo===mo;});
     var amt;
     // Salary: use monthMode amounts
-    if(s.isSalaryJOD){amt=monthMode==='split'?(s.amount||0):0;if(amt===0)return;}
-    else if(s.isSalaryRMB){amt=monthMode==='split'?resolveStreamAmount(s):(S.salaryRMBFull||resolveStreamAmount(s));}
+    if(s.isSalaryJOD){amt=monthMode==='split'?(s.amount||0):(monthMode==='custom'?customSplitAmounts(yr,mo).jod:0);if(amt===0)return;}
+    else if(s.isSalaryRMB){amt=monthMode==='split'?resolveStreamAmount(s):(monthMode==='custom'?customSplitAmounts(yr,mo).rmbKeep:(S.salaryRMBFull||resolveStreamAmount(s)));}
     else{amt=ov?ov.amount:resolveStreamAmount(s);}
     // Budget-linked expense streams scale down during holidays
     if(s.type==='expense'&&safeArr(s.linkedBudgetCats).length>0){amt=n2(amt*nonHolidayFraction(yr,mo));}
@@ -2901,6 +2908,61 @@ function renderCommitments(){
   var jIn=items.filter(function(c){return c.type==='in'&&c.currency==='JOD';}).reduce(function(a,c){return a+c.amount;},0);
   var csEl=document.getElementById('c-summary');if(csEl)csEl.innerHTML=[{l:'JOD outflows',v:'-'+fJOD(jOut),c:'neg'},{l:'RMB outflows',v:'-'+fRMB(rOut),c:'neg'},{l:'JOD income',v:'+'+fJOD(jIn),c:'pos'},{l:'Net JOD',v:fJOD(jIn-jOut),c:jIn>=jOut?'pos':'neg'}].map(function(r){return'<div class="tr"><span class="tr-l">'+r.l+'</span><span class="tr-v '+r.c+'">'+r.v+'</span></div>';}).join('');
 }
+function salaryEffRate(){
+  // Legacy flat rate from split-mode defaults (fees included, rounded against you).
+  var full=S.salaryRMBFull||0;
+  var jSt=streams.find(function(s){return s.isSalaryJOD;});
+  var rSt=streams.find(function(s){return s.isSalaryRMB;});
+  var keep=rSt?(rSt.amount||0):0,jod=jSt?(jSt.amount||0):0;
+  var sent=full-keep;
+  var rate=(sent>0&&jod>0)?sent/jod:(S.jod2rmb||9.73);
+  return Math.ceil(rate*1000)/1000;
+}
+function fitTransferModel(){
+  // Learn transfer cost from logged real transfers.
+  // 0 logs → null (fall back to split-derived flat rate)
+  // 1 log  → flat rate from that transfer
+  // ≥2     → fixed fee + per-JOD rate via least squares: sent = fee + rate·jod
+  var logs=safeArr(S.transferLog).filter(function(t){return t.rmbSent>0&&t.jodReceived>0;});
+  if(!logs.length)return null;
+  if(logs.length===1){
+    var r1=logs[0].rmbSent/logs[0].jodReceived;
+    return {fee:0,rate:Math.ceil(r1*1000)/1000,n:1};
+  }
+  var n=logs.length,sx=0,sy=0,sxx=0,sxy=0;
+  logs.forEach(function(t){var x=t.jodReceived,y=t.rmbSent;sx+=x;sy+=y;sxx+=x*x;sxy+=x*y;});
+  var den=n*sxx-sx*sx;
+  var rate=den!==0?(n*sxy-sx*sy)/den:(sy/sx);
+  var fee=(sy-rate*sx)/n;
+  if(fee<0||rate<=0){ // degenerate fit → conservative flat rate (worst observed)
+    var worst=0;logs.forEach(function(t){var rr=t.rmbSent/t.jodReceived;if(rr>worst)worst=rr;});
+    return {fee:0,rate:Math.ceil(worst*1000)/1000,n:n,flat:true};
+  }
+  return {fee:Math.ceil(fee),rate:Math.ceil(rate*1000)/1000,n:n};
+}
+function predictJODFromSent(sent){
+  // Conservative JOD you'd receive for a given RMB send.
+  if(sent<=0)return {jod:0,effRate:salaryEffRate(),model:null};
+  var m=fitTransferModel();
+  if(!m){var r=salaryEffRate();return {jod:Math.max(0,Math.floor(sent/r)),effRate:r,model:null};}
+  var jod=Math.max(0,Math.floor((sent-m.fee)/m.rate));
+  var eff=jod>0?Math.ceil((sent/jod)*1000)/1000:m.rate;
+  return {jod:jod,effRate:eff,model:m};
+}
+function customSplitKeepFor(yr,mo){
+  var ov=S.customSplitOverrides||{};
+  var k=(yr!=null&&mo!=null)?ov[yr+'-'+mo]:undefined;
+  if(typeof k==='number'&&!isNaN(k))return k;
+  var rSt=streams.find(function(s){return s.isSalaryRMB;});
+  var defKeep=rSt?(rSt.amount||0):0;
+  return (S.customSplit&&typeof S.customSplit.rmbKeep==='number'&&!isNaN(S.customSplit.rmbKeep))?S.customSplit.rmbKeep:defKeep;
+}
+function customSplitAmounts(yr,mo){
+  var full=S.salaryRMBFull||0;
+  var keep=Math.max(0,Math.min(full,customSplitKeepFor(yr,mo)));
+  var p=predictJODFromSent(full-keep);
+  return {rmbKeep:n2(keep),jod:p.jod,rate:p.effRate,full:full,model:p.model,hasOverride:!!(yr!=null&&mo!=null&&(S.customSplitOverrides||{})[yr+'-'+mo]!=null)};
+}
 function getSalaryModeForMonth(yr,mo){
   // Check range-based phases first (most recently added takes priority)
   var phases=safeArr(S.salaryPhases);
@@ -2949,7 +3011,7 @@ function renderSalaryPhases(container){
     var fmSel=mkSel(MSHORT,MSHORT[(p.fromMo||p.mo||1)-1]);var fyInp=document.createElement('input');fyInp.type='number';fyInp.value=p.fromYr||p.yr||2026;fyInp.style.cssText='width:60px;font-size:11px;padding:2px;border-radius:4px';
     var tmSel=mkSel(MSHORT,MSHORT[(p.toMo||p.mo||12)-1]);var tyInp=document.createElement('input');tyInp.type='number';tyInp.value=p.toYr||p.yr||2026;tyInp.style.cssText='width:60px;font-size:11px;padding:2px;border-radius:4px';
     var modeSel=document.createElement('select');modeSel.style.cssText='font-size:11px;padding:2px 4px;border-radius:4px';
-    ['split','full_rmb'].forEach(function(v){var o=document.createElement('option');o.value=v;o.textContent=v==='split'?'Split':'All RMB';if(v===p.mode)o.selected=true;modeSel.appendChild(o);});
+    ['split','full_rmb','custom'].forEach(function(v){var o=document.createElement('option');o.value=v;o.textContent=v==='split'?'Split':v==='custom'?'Custom':'All RMB';if(v===p.mode)o.selected=true;modeSel.appendChild(o);});
     var savePhaseBtn=document.createElement('button');savePhaseBtn.className='btn btn-xs btn-p';savePhaseBtn.textContent='Save';
     savePhaseBtn.onclick=(function(pid,cont){return function(){
       var ph=safeArr(S.salaryPhases).find(function(x){return x.id===pid;});if(!ph)return;
@@ -3026,7 +3088,7 @@ function renderProjection(){
   var rc=document.createElement('div');rc.className='card';rc.style.marginBottom='10px';
   var rcTitle=document.createElement('div');rcTitle.style.cssText='font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:6px';rcTitle.textContent='Salary routing';rc.appendChild(rcTitle);
   var rBtns=document.createElement('div');rBtns.style.cssText='display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px';
-  [['split','Split (JOD + RMB)'],['full_rmb','All RMB \u2192 BOC']].forEach(function(opt){
+  [['split','Split (JOD + RMB)'],['full_rmb','All RMB \u2192 BOC'],['custom','Custom split']].forEach(function(opt){
     var b=document.createElement('button');b.className='btn btn-sm'+(S.salaryMode===opt[0]?' btn-p':'');
     b.textContent=opt[1];b.onclick=(function(m){return function(){setSalaryMode(m);};})(opt[0]);rBtns.appendChild(b);
   });
@@ -3051,6 +3113,98 @@ function renderProjection(){
   frInp.onchange=function(){S.salaryRMBFull=parseFloat(this.value)||0;autosave();};
   var frHint=document.createElement('span');frHint.style.cssText='font-size:11px;color:var(--ink3)';frHint.textContent='Actual RMB received when all salary routes to BOC. Leave 0 to auto-calculate.';
   frWrap.appendChild(frLbl);frWrap.appendChild(frInp);frWrap.appendChild(frHint);rc.appendChild(frWrap);
+  // ── Custom split panel: fee-aware linked inputs + live slider ──
+  (function(){
+    var cs=customSplitAmounts();
+    var cw=document.createElement('div');
+    cw.style.cssText='padding:10px;background:var(--bg);border-radius:var(--r);border:.5px solid '+(S.salaryMode==='custom'?'#a259f7':'var(--brd)')+';margin-bottom:10px';
+    var ct=document.createElement('div');ct.style.cssText='font-size:11px;font-weight:700;color:'+(S.salaryMode==='custom'?'#a259f7':'var(--ink3)')+';text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px';ct.textContent='Custom split';cw.appendChild(ct);
+    var rateLine=document.createElement('div');rateLine.style.cssText='font-size:11px;color:var(--ink3);margin-bottom:8px';
+    var mdl=fitTransferModel();
+    if(!mdl)rateLine.innerHTML='Effective rate <b class="mono">'+cs.rate.toFixed(3)+' Y/JOD</b> \u2014 derived from your split defaults (fees included, rounded against you; JOD floored). Log real transfers below and the app learns your actual costs.';
+    else if(mdl.n===1||mdl.flat)rateLine.innerHTML='Effective rate <b class="mono">'+mdl.rate.toFixed(3)+' Y/JOD</b> \u2014 from '+mdl.n+' logged transfer'+(mdl.n>1?'s':'')+'. Log another (different size) to learn the fixed-fee component.';
+    else rateLine.innerHTML='Fee model from '+mdl.n+' transfers: <b class="mono">~'+fRMB(mdl.fee)+' fixed + '+mdl.rate.toFixed(3)+' Y/JOD</b> \u2014 small sends priced honestly worse. Conservative rounding throughout.';
+    cw.appendChild(rateLine);
+    var grid=document.createElement('div');grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px';
+    function mkIn(lbl){var d=document.createElement('div');var l=document.createElement('label');l.textContent=lbl;l.style.cssText='display:block;font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:4px';var i=document.createElement('input');i.type='number';i.style.cssText='font-family:var(--mono);font-size:13px;width:100%';d.appendChild(l);d.appendChild(i);grid.appendChild(d);return i;}
+    var keepIn=mkIn('RMB stays in BOC');
+    var jodIn2=mkIn('JOD to Arab Bank');
+    cw.appendChild(grid);
+    var slider=document.createElement('input');slider.type='range';slider.min=0;slider.max=Math.max(0,cs.full);slider.step=10;slider.style.cssText='width:100%;accent-color:#a259f7';
+    cw.appendChild(slider);
+    var sliderLbl=document.createElement('div');sliderLbl.style.cssText='display:flex;justify-content:space-between;font-size:10px;color:var(--ink4);margin-top:2px';
+    sliderLbl.innerHTML='<span>All to Jordan</span><span>All stays in China</span>';cw.appendChild(sliderLbl);
+    function paint(c){keepIn.value=c.rmbKeep;jodIn2.value=c.jod;slider.value=c.rmbKeep;}
+    paint(cs);
+    var _csT=null;
+    function commitCustom(rerender){
+      autosave();
+      if(rerender){clearTimeout(_csT);_csT=setTimeout(function(){renderProjection();},120);}
+    }
+    slider.oninput=function(){
+      S.customSplit=S.customSplit||{};S.customSplit.rmbKeep=parseFloat(this.value)||0;
+      var c=customSplitAmounts();keepIn.value=c.rmbKeep;jodIn2.value=c.jod;
+    };
+    slider.onchange=function(){commitCustom(true);};
+    keepIn.onchange=function(){
+      S.customSplit=S.customSplit||{};S.customSplit.rmbKeep=parseFloat(this.value)||0;
+      paint(customSplitAmounts());commitCustom(true);
+    };
+    jodIn2.onchange=function(){
+      // From desired JOD, back out the RMB kept — ceil the RMB cost so the JOD stays achievable
+      var wantJOD=Math.max(0,parseFloat(this.value)||0);
+      var c0=customSplitAmounts();
+      var keep=Math.max(0,c0.full-Math.ceil(wantJOD*c0.rate));
+      S.customSplit=S.customSplit||{};S.customSplit.rmbKeep=keep;
+      paint(customSplitAmounts());commitCustom(true);
+    };
+    // ── Real transfer log — teaches the fee model ──
+    var tlHd=document.createElement('div');tlHd.style.cssText='font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin:10px 0 5px';tlHd.textContent='Real transfers (teaches the model)';
+    cw.appendChild(tlHd);
+    var logs=safeArr(S.transferLog).slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});
+    if(logs.length){
+      var tlList=document.createElement('div');tlList.style.cssText='margin-bottom:7px';
+      logs.forEach(function(t){
+        var r=document.createElement('div');r.style.cssText='display:flex;align-items:center;gap:8px;font-size:11px;padding:3px 0;border-bottom:.5px solid var(--brd)';
+        var eff=(t.rmbSent/t.jodReceived).toFixed(3);
+        r.innerHTML='<span style="color:var(--ink3)">'+(t.date||'?')+'</span><span class="mono" style="flex:1">'+fRMB(t.rmbSent)+' \u2192 '+fJOD(t.jodReceived)+'</span><span class="mono" style="color:var(--ink3)">'+eff+' Y/JOD</span>';
+        var del=document.createElement('button');del.className='btn btn-xs btn-d';del.textContent='Del';
+        del.onclick=(function(tid){return function(){if(!confirm('Remove this transfer record?'))return;S.transferLog=safeArr(S.transferLog).filter(function(x){return x.id!==tid;});autosave();sbPushNow();renderProjection();};})(t.id);
+        r.appendChild(del);tlList.appendChild(r);
+      });
+      cw.appendChild(tlList);
+    }
+    var tlRow=document.createElement('div');tlRow.style.cssText='display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap';
+    function tlIn(ph,w){var i=document.createElement('input');i.type='number';i.placeholder=ph;i.style.cssText='font-family:var(--mono);font-size:12px;width:'+w+'px';return i;}
+    var tlSent=tlIn('RMB sent',95),tlGot=tlIn('JOD received',95);
+    var tlBtn=document.createElement('button');tlBtn.className='btn btn-sm btn-p';tlBtn.textContent='Log transfer';
+    var tlDefWrap=document.createElement('label');tlDefWrap.style.cssText='display:flex;align-items:center;gap:5px;font-size:11px;color:var(--ink3);cursor:pointer';
+    var tlDefChk=document.createElement('input');tlDefChk.type='checkbox';tlDefChk.checked=true;tlDefChk.style.width='auto';
+    tlDefWrap.appendChild(tlDefChk);tlDefWrap.appendChild(document.createTextNode('update split defaults'));
+    tlBtn.onclick=function(){
+      var sent=parseFloat(tlSent.value)||0,got=parseFloat(tlGot.value)||0;
+      if(sent<=0||got<=0){alert('Enter both RMB sent and JOD received.');return;}
+      if(sent/got<5||sent/got>20){if(!confirm('Rate works out to '+(sent/got).toFixed(2)+' Y/JOD, which looks unusual. Log anyway?'))return;}
+      // Validation against the model's prior prediction
+      var pred=predictJODFromSent(sent);
+      var msg='';
+      if(pred.jod>0){var diff=got-pred.jod;var pctd=(diff/got*100);msg='Model predicted '+fJOD(pred.jod)+', you got '+fJOD(got)+' ('+(pctd>=0?'model '+Math.abs(pctd).toFixed(1)+'% pessimistic \u2014 good':'model '+Math.abs(pctd).toFixed(1)+'% optimistic \u2014 now corrected')+').';}
+      S.transferLog=safeArr(S.transferLog);
+      S.transferLog.push({id:Date.now(),date:today().toISOString().split('T')[0],rmbSent:sent,jodReceived:got});
+      if(tlDefChk.checked){
+        var full2=S.salaryRMBFull||0;
+        var sj2=streams.find(function(x){return x.isSalaryJOD;}),sr2=streams.find(function(x){return x.isSalaryRMB;});
+        if(sj2)sj2.amount=got;
+        if(sr2&&full2>0)sr2.amount=Math.max(0,n2(full2-sent));
+      }
+      autosave();sbPushNow();
+      if(msg)alert(msg);
+      renderProjection();
+    };
+    tlRow.appendChild(tlSent);tlRow.appendChild(tlGot);tlRow.appendChild(tlBtn);tlRow.appendChild(tlDefWrap);
+    cw.appendChild(tlRow);
+    rc.appendChild(cw);
+  })();
   // Salary routing phases
   var phasesTitle=document.createElement('div');phasesTitle.style.cssText='font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em';phasesTitle.textContent='Phase overrides (specific months)';rc.appendChild(phasesTitle);
   var phasesList=document.createElement('div');phasesList.id='salary-phases-list';rc.appendChild(phasesList);
@@ -3076,7 +3230,7 @@ function renderProjection(){
   fromYrInp.onchange=function(){if(singleChk.checked){toYrInp.value=this.value;}};
   singleChkWrap.appendChild(singleChk);singleChkWrap.appendChild(document.createTextNode('Single month'));
   var phModeSel=document.createElement('select');phModeSel.style.cssText='font-size:12px;padding:4px';
-  [{v:'split',l:'Split'},{v:'full_rmb',l:'All RMB'}].forEach(function(opt){var o=document.createElement('option');o.value=opt.v;o.textContent=opt.l;phModeSel.appendChild(o);});
+  [{v:'split',l:'Split'},{v:'full_rmb',l:'All RMB'},{v:'custom',l:'Custom'}].forEach(function(opt){var o=document.createElement('option');o.value=opt.v;o.textContent=opt.l;phModeSel.appendChild(o);});
   var phAddBtn=document.createElement('button');phAddBtn.className='btn btn-sm btn-p';phAddBtn.textContent='+ Add range';
   phAddBtn.onclick=function(){
     var fromMo=parseInt(fromMoSel.value,10);var fromYr=parseInt(fromYrInp.value,10)||now.getFullYear();
@@ -3147,6 +3301,7 @@ function renderProjection(){
       return p.yr===row.yr&&p.mo===row.mo;
     });
     if(monthSalMode==='full_rmb')chips+='<span class="m-chip tg-b">\uD83D\uDCB0 All RMB'+(hasPhaseOverride?' (phase)':'')+'</span>';
+    else if(monthSalMode==='custom')chips+='<span class="m-chip" style="background:rgba(162,89,247,.12);color:#a259f7">\uD83D\uDCB0 Custom split'+(hasPhaseOverride?' (phase)':'')+'</span>';
     else if(hasPhaseOverride)chips+='<span class="m-chip tg-g">\uD83D\uDCB0 Split (phase)</span>';
     var block=document.createElement('div');block.className='m-block';
     if(isTarget){
@@ -3256,6 +3411,39 @@ function renderProjection(){
     body.appendChild(inner);
     // Edit form container + add event
     var editContainer=document.createElement('div');editContainer.id='medit-'+idx;editContainer.style.padding='0 15px 6px';body.appendChild(editContainer);
+    // Custom-split per-month override row (future/current custom months, salary not yet received)
+    (function(){
+      var mMode=getSalaryModeForMonth(row.yr,row.mo);
+      if(mMode!=='custom')return;
+      var nowD=today();var nowK=nowD.getFullYear()*12+(nowD.getMonth()+1);
+      if(row.yr*12+row.mo<nowK)return;
+      var sj=streams.find(function(x){return x.isSalaryJOD;}),sr=streams.find(function(x){return x.isSalaryRMB;});
+      if(sj&&sr&&(isIncomeReceived(sj.id,row.yr,row.mo)||isIncomeReceived(sr.id,row.yr,row.mo)))return;
+      var mc=customSplitAmounts(row.yr,row.mo);
+      var wrap=document.createElement('div');
+      wrap.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 10px;margin-top:4px;background:rgba(162,89,247,.06);border:.5px solid rgba(162,89,247,.35);border-radius:var(--r);flex-wrap:wrap';
+      wrap.onclick=function(e){e.stopPropagation();};
+      var lbl=document.createElement('span');lbl.style.cssText='font-size:10px;font-weight:700;color:#a259f7;white-space:nowrap';lbl.textContent='CUSTOM SPLIT';
+      var sl=document.createElement('input');sl.type='range';sl.min=0;sl.max=Math.max(0,mc.full);sl.step=10;sl.value=mc.rmbKeep;
+      sl.style.cssText='flex:1;min-width:110px;accent-color:#a259f7';
+      var val=document.createElement('span');val.className='mono';val.style.cssText='font-size:11px;color:var(--ink2);white-space:nowrap';
+      function paintVal(c){val.textContent='BOC '+fRMB(c.rmbKeep)+' \u00b7 Arab '+fJOD(c.jod);}
+      paintVal(mc);
+      var rst=document.createElement('button');rst.className='btn btn-xs';rst.textContent='\u21ba default';
+      rst.style.display=mc.hasOverride?'inline-flex':'none';
+      sl.oninput=(function(y2,m2){return function(){
+        S.customSplitOverrides=S.customSplitOverrides||{};
+        S.customSplitOverrides[y2+'-'+m2]=parseFloat(this.value)||0;
+        paintVal(customSplitAmounts(y2,m2));rst.style.display='inline-flex';
+      };})(row.yr,row.mo);
+      sl.onchange=function(){autosave();setTimeout(function(){renderProjection();},80);};
+      rst.onclick=(function(y2,m2){return function(e){e.stopPropagation();
+        if(S.customSplitOverrides)delete S.customSplitOverrides[y2+'-'+m2];
+        autosave();renderProjection();
+      };})(row.yr,row.mo);
+      wrap.appendChild(lbl);wrap.appendChild(sl);wrap.appendChild(val);wrap.appendChild(rst);
+      body.appendChild(wrap);
+    })();
     var addRow=document.createElement('div');addRow.className='m-add-row';addRow.textContent='+ Add one-off event to '+row.label;
     addRow.onclick=function(e){e.stopPropagation();openMonths[idx]=true;inlineEvForms[idx]=!inlineEvForms[idx];var ief=document.getElementById('ief-'+idx);if(ief)ief.style.display=inlineEvForms[idx]?'block':'none';};
     body.appendChild(addRow);
@@ -3277,7 +3465,7 @@ function renderProjection(){
 }
 
 function setSalaryMode(mode){
-  if(mode!=='split'&&mode!=='full_rmb')return;
+  if(mode!=='split'&&mode!=='full_rmb'&&mode!=='custom')return;
   S.salaryMode=mode;
   // Ensure salary streams are both active — the projection engine handles routing per-month
   var salJOD=streams.find(function(s){return s.isSalaryJOD;});
