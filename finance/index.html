@@ -1486,31 +1486,35 @@ function settleLeftAtMonth(s,tyr,tmo){
   return Math.max(0,n2(left-planned));
 }
 function settlePlannedFuture(s){
+  // Sum of planned, not-yet-paid phase money: all future months, plus past
+  // months whose commitment tick is absent (those live in carry-over).
   var now=today();var total=0;
-  var rate=settleFxRate(s);
-  var base=s.totalCurrency||'JOD';
   var nowYr=now.getFullYear(),nowMo=now.getMonth()+1;
-  safeArr(s.phases).forEach(function(ph){
-    // Use month-level comparison so current month is included
-    var startYr=ph.startYr,startMo=ph.startMon;
-    var endYr=ph.endYr,endMo=ph.endMon;
-    if(startYr*12+startMo < nowYr*12+nowMo){startYr=nowYr;startMo=nowMo;}
-    for(var yr=startYr,mo=startMo;;){
-      if(yr*12+mo > endYr*12+endMo)break;
-      var amt;
-      if(ph.currency===base){amt=ph.monthly;}
-      else if(base==='JOD'&&ph.currency==='RMB'){amt=n2(ph.monthly/rate);}
-      else if(base==='RMB'&&ph.currency==='JOD'){amt=n2(ph.monthly*rate);}
-      else{
-        // Other currency (e.g. GBP): use settlement's fixed rate
-        var altC=settleAltCur(s);
-        if(ph.currency===altC){amt=n2(ph.monthly/rate);}
-        else{amt=n2(toJOD(ph.monthly,ph.currency)/Math.max(0.001,toJOD(1,base)));}
+  var phs=safeArr(s.phases);
+  if(phs.length){
+    var minK=Infinity,maxK=-Infinity;
+    phs.forEach(function(ph){
+      var sk=ph.startYr*12+ph.startMon,ek=ph.endYr*12+ph.endMon;
+      if(sk<minK)minK=sk;if(ek>maxK)maxK=ek;
+    });
+    if(maxK-minK<=120){
+      for(var k=minK;k<=maxK;k++){
+        var yr=Math.floor((k-1)/12),mo=k-yr*12;
+        var byAcct=settlePhaseAmountByAcct(s,yr,mo);
+        if(byAcct.arab<=0&&byAcct.boc<=0)continue;
+        var isPast=k<nowYr*12+nowMo;
+        ['arab','boc'].forEach(function(acct){
+          var amt=byAcct[acct];if(amt<=0)return;
+          if(isPast){
+            var otherAmt=byAcct[acct==='arab'?'boc':'arab'];
+            var tId=(acct===byAcct.firstAcct||otherAmt<=0)?('settle-'+s.id):('settle-'+s.id+'-2');
+            if(tickState[yr+'-'+mo+'-'+tId])return; // paid — already in settlePaid
+          }
+          total+=amt;
+        });
       }
-      total+=amt;
-      mo++;if(mo>12){mo=1;yr++;}
     }
-  });
+  }
   safeArr(oneoffEvents).forEach(function(ev){
     if(ev.settleId===s.id&&ev.type==='expense'){
       var evDate=new Date(ev.year,ev.month-1,1);
@@ -1581,7 +1585,7 @@ function settlePhaseAmountByAcct(s,yr,mo){
   // Per-account JOD-denominated totals for the month + which account the first
   // in-range phase uses (for legacy tick-id continuity).
   var rate=settleFxRate(s);var base=s.totalCurrency||'JOD';
-  var res={arab:0,boc:0,firstAcct:null};
+  var res={arab:0,boc:0,arabRaw:0,bocRaw:0,firstAcct:null};
   safeArr(s.phases).forEach(function(ph){
     var inRange=(yr>ph.startYr||(yr===ph.startYr&&mo>=ph.startMon))&&(yr<ph.endYr||(yr===ph.endYr&&mo<=ph.endMon));
     if(!inRange)return;
@@ -1593,6 +1597,9 @@ function settlePhaseAmountByAcct(s,yr,mo){
     var acct=(ph.account==='rmb'||ph.account==='boc')?'boc':'arab';
     if(res.firstAcct===null)res.firstAcct=acct;
     res[acct]=n2(res[acct]+amt);
+    // Native display amounts: keep the phase's own currency where it matches the account
+    if(acct==='boc')res.bocRaw=n2(res.bocRaw+(ph.currency==='RMB'?ph.monthly:n2(amt*S.jod2rmb)));
+    else res.arabRaw=n2(res.arabRaw+(ph.currency==='JOD'?ph.monthly:amt));
   });
   return res;
 }
@@ -1751,11 +1758,11 @@ function buildProjection(){
         var tickId=(acct===byAcct.firstAcct||byAcct[acct===('arab')?'boc':'arab']<=0)?('settle-'+s.id):('settle-'+s.id+'-2');
         var isPrePaid=prePaidIds.indexOf(tickId)>=0;
         if(acct==='boc'){
-          if(!isPrePaid)rmbOut+=amt*S.jod2rmb;
-          rmbItems.push({l:baseName,v:'-'+fRMB(amt*S.jod2rmb),c:'neg',sub:fJOD(amt),streamId:tickId,prePaid:isPrePaid});
+          if(!isPrePaid)rmbOut+=byAcct.bocRaw;
+          rmbItems.push({l:baseName,v:'-'+fRMB(byAcct.bocRaw),c:'neg',sub:fJOD(amt),streamId:tickId,prePaid:isPrePaid});
         } else {
-          if(!isPrePaid)jodOut+=amt;
-          jodItems.push({l:baseName,v:'-'+fJOD(amt),c:'neg',streamId:tickId,prePaid:isPrePaid});
+          if(!isPrePaid)jodOut+=byAcct.arabRaw;
+          jodItems.push({l:baseName,v:'-'+fJOD(byAcct.arabRaw),c:'neg',streamId:tickId,prePaid:isPrePaid});
         }
       });
     });
@@ -2495,7 +2502,7 @@ function toggleTick(id){
           if(portionJOD>0){
             var isBoc2=acct2==='boc';
             s.payments=safeArr(s.payments);
-            s.payments.push({id:Date.now(),amtJOD:portionJOD,amtRaw:isBoc2?n2(portionJOD*S.jod2rmb):portionJOD,currency:isBoc2?'RMB':'JOD',date:today().toISOString().split('T')[0],note:MNAMES[commitMon.month-1]+' '+commitMon.year+' (auto)',type:'regular',autoRecorded:true});
+            s.payments.push({id:Date.now(),amtJOD:portionJOD,amtRaw:isBoc2?byAcct2.bocRaw:byAcct2.arabRaw,currency:isBoc2?'RMB':'JOD',date:today().toISOString().split('T')[0],note:MNAMES[commitMon.month-1]+' '+commitMon.year+' (auto)',type:'regular',autoRecorded:true});
           }
         }
       });
@@ -2557,7 +2564,7 @@ function getCommitItems(pyr,pmo){
       var otherAmt=byAcct[acct==='arab'?'boc':'arab'];
       var tickId=(acct===byAcct.firstAcct||otherAmt<=0)?('settle-'+s.id):('settle-'+s.id+'-2');
       var isBoc=acct==='boc';
-      items.push({id:tickId,name:baseName+' payment',amount:isBoc?n2(amt*S.jod2rmb):amt,currency:isBoc?'RMB':'JOD',type:'out',method:'settlement',note:fJOD(amt)+(isBoc?' from BOC':' from Arab Bank')});
+      items.push({id:tickId,name:baseName+' payment',amount:isBoc?byAcct.bocRaw:byAcct.arabRaw,currency:isBoc?'RMB':'JOD',type:'out',method:'settlement',note:fJOD(amt)+(isBoc?' from BOC':' from Arab Bank')});
     });
     settleOneoffs(s,yr,mo).filter(function(ev){return ev.type==='expense';}).forEach(function(ev){items.push({id:'settle-ev-'+ev.id,name:(ev.label||s.name)+' - one-off',amount:ev.amount,currency:ev.currency,type:'out',method:'settlement',note:'One-off'});});});
 
@@ -3647,7 +3654,8 @@ function renderGenericSettle(s,container){
   safeArr(s.phases).forEach(function(ph,pi){
     var isOneOff=ph.oneOff;
     var mons=isOneOff?1:Math.max(0,(ph.endYr-ph.startYr)*12+(ph.endMon-ph.startMon)+1);
-    var phAmtJOD=(ph.currency==='RMB')?n2(ph.monthly/S.jod2rmb):ph.monthly;var phTotal=n2(phAmtJOD*mons);
+    var phRate=settleFxRate(s);
+    var phAmtJOD=(ph.currency==='RMB')?n2(ph.monthly/phRate):(ph.currency==='JOD'?ph.monthly:toJOD(ph.monthly,ph.currency));var phTotal=n2(phAmtJOD*mons);
     var pb=document.createElement('div');pb.className='phase-block';
     var phHead=document.createElement('div');phHead.className='phase-head';phHead.innerHTML='<div class="phase-title">Phase '+(pi+1)+': '+(isOneOff?MONTHS[ph.startMon-1]+' '+ph.startYr+' - one-off - '+fJOD(phTotal):MONTHS[ph.startMon-1]+' '+ph.startYr+' to '+MONTHS[ph.endMon-1]+' '+ph.endYr+' - '+mons+' months - '+fJOD(phTotal))+'</div>';
     var phDel=document.createElement('button');phDel.className='btn btn-xs btn-d';phDel.textContent='Del';phDel.onclick=(function(sid,phid){return function(){deletePhase(sid,phid);};})(s.id,ph.id);phHead.appendChild(phDel);pb.appendChild(phHead);
@@ -3662,7 +3670,7 @@ function renderGenericSettle(s,container){
     acctSel.onchange=(function(sid,phid,cs){return function(){updatePhase(sid,phid,'account',this.value);if(this.value==='arab'){cs.value='JOD';updatePhase(sid,phid,'currency','JOD');}else{cs.value='RMB';updatePhase(sid,phid,'currency','RMB');};};})(s.id,ph.id,curSel);
     phForm.appendChild(mkPhIg('Funded from',acctSel));
     // One-off toggle
-    var ooChk=document.createElement('input');ooChk.type='checkbox';ooChk.checked=!!isOneOff;ooChk.style.width='auto';ooChk.onchange=(function(sid,phid){return function(){updatePhase(sid,phid,'oneOff',this.checked);renderSettlement();};})(s.id,ph.id);var ooIg=document.createElement('div');ooIg.className='ig';var ooLbl=document.createElement('label');ooLbl.textContent='One-time only';ooIg.appendChild(ooLbl);var ooRow=document.createElement('div');ooRow.style.display='flex';ooRow.style.alignItems='center';ooRow.style.gap='7px';ooRow.appendChild(ooChk);var ooTxt=document.createElement('span');ooTxt.style.fontSize='12px';ooTxt.textContent='Single payment';ooRow.appendChild(ooTxt);ooIg.appendChild(ooRow);phForm.appendChild(ooIg);
+    var ooChk=document.createElement('input');ooChk.type='checkbox';ooChk.checked=!!isOneOff;ooChk.style.width='auto';ooChk.onchange=(function(sid,phid){return function(){updatePhase(sid,phid,'oneOff',this.checked);if(this.checked){var s2=settlements.find(function(x){return x.id===sid;});var p2=s2&&safeArr(s2.phases).find(function(p){return String(p.id)===String(phid);});if(p2){p2.endMon=p2.startMon;p2.endYr=p2.startYr;autosave();}}renderSettlement();};})(s.id,ph.id);var ooIg=document.createElement('div');ooIg.className='ig';var ooLbl=document.createElement('label');ooLbl.textContent='One-time only';ooIg.appendChild(ooLbl);var ooRow=document.createElement('div');ooRow.style.display='flex';ooRow.style.alignItems='center';ooRow.style.gap='7px';ooRow.appendChild(ooChk);var ooTxt=document.createElement('span');ooTxt.style.fontSize='12px';ooTxt.textContent='Single payment';ooRow.appendChild(ooTxt);ooIg.appendChild(ooRow);phForm.appendChild(ooIg);
     pb.appendChild(phForm);
     // Date range or single date
     var dateRow=document.createElement('div');dateRow.className='ig-row';
@@ -5216,6 +5224,8 @@ document.addEventListener('DOMContentLoaded',function(){
   });
   migrateBudgets();
   initCatColors();
+  // Heal one-off phases whose hidden end month drifted from start (caused double-counting)
+  try{safeArr(settlements).forEach(function(s){safeArr(s.phases).forEach(function(ph){if(ph.oneOff&&(ph.endMon!==ph.startMon||ph.endYr!==ph.startYr)){ph.endMon=ph.startMon;ph.endYr=ph.startYr;}});});}catch(e){}
   if(typeof syncHolidayBudgets==='function')syncHolidayBudgets();
   initBudgetOrder();
   // Auto-link discretionary stream to all budget categories if not yet linked
