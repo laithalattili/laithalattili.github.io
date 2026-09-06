@@ -1009,6 +1009,7 @@ var S={
   // Salary routing
   salaryMode:'split',
   customSplit:{rmbKeep:null},
+  salUI:{card:true,amounts:true,custom:true,phases:true},
   targetMonth:{yr:null,mo:null},
   surplusResetDate:null,
   mlFlowOpen:{jod:true,rmb:true},
@@ -3078,13 +3079,29 @@ function renderProjection(){
   var proj=buildProjection();pm.innerHTML='';
   // Salary routing card
   var rc=document.createElement('div');rc.className='card';rc.style.marginBottom='10px';
-  var rcTitle=document.createElement('div');rcTitle.style.cssText='font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:6px';rcTitle.textContent='Salary routing';rc.appendChild(rcTitle);
+  S.salUI=S.salUI||{card:true,amounts:true,custom:true,phases:true};
+  function salChev(open){return open?'\u2304':'\u203A';}
+  var rcHd=document.createElement('div');rcHd.style.cssText='display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none';
+  rcHd.innerHTML='<span style="font-size:13px;color:var(--ink4)" id="sal-card-chev">'+salChev(S.salUI.card!==false)+'</span><span style="font-size:12px;font-weight:700;color:var(--ink2)">Salary routing</span>';
+  var rcBody=document.createElement('div');rcBody.style.cssText='margin-top:8px;display:'+(S.salUI.card!==false?'block':'none');
+  rcHd.onclick=function(){S.salUI.card=rcBody.style.display==='none';rcBody.style.display=S.salUI.card?'block':'none';var c=document.getElementById('sal-card-chev');if(c)c.textContent=salChev(S.salUI.card);autosave();};
+  rc.appendChild(rcHd);rc.appendChild(rcBody);
+  function salSec(key,label){
+    var open=S.salUI[key]!==false;
+    var hd=document.createElement('div');hd.style.cssText='display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none;margin:10px 0 6px;font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em';
+    var ch=document.createElement('span');ch.style.cssText='font-size:12px;color:var(--ink4)';ch.textContent=salChev(open);
+    hd.appendChild(ch);hd.appendChild(document.createTextNode(label));
+    var bd=document.createElement('div');bd.style.display=open?'block':'none';
+    hd.onclick=function(){S.salUI[key]=bd.style.display==='none';bd.style.display=S.salUI[key]?'block':'none';ch.textContent=salChev(S.salUI[key]);autosave();};
+    rcBody.appendChild(hd);rcBody.appendChild(bd);
+    return bd;
+  }
   var rBtns=document.createElement('div');rBtns.style.cssText='display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px';
   [['split','Split (JOD + RMB)'],['full_rmb','All RMB \u2192 BOC'],['custom','Custom split']].forEach(function(opt){
     var b=document.createElement('button');b.className='btn btn-sm'+(S.salaryMode===opt[0]?' btn-p':'');
     b.textContent=opt[1];b.onclick=(function(m){return function(){setSalaryMode(m);};})(opt[0]);rBtns.appendChild(b);
   });
-  rc.appendChild(rBtns);
+  rcBody.appendChild(rBtns);
   // Split salary amount fields
   var splitWrap=document.createElement('div');splitWrap.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;padding:10px;background:var(--bg);border-radius:var(--r);border:.5px solid var(--brd)';
   var splitTitle=document.createElement('div');splitTitle.style.cssText='grid-column:1/-1;font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px';splitTitle.textContent='Split mode amounts';splitWrap.appendChild(splitTitle);
@@ -3098,19 +3115,19 @@ function renderProjection(){
   var salRMBst=streams.find(function(s){return s.isSalaryRMB;});rmbInp.value=salRMBst?(salRMBst.amount||''):'';rmbInp.placeholder='e.g. 4410';
   rmbInp.onchange=function(){var s=streams.find(function(x){return x.isSalaryRMB;});if(s){s.amount=parseFloat(this.value)||0;autosave();sbPushNow();}};
   rmbIg.appendChild(rmbL);rmbIg.appendChild(rmbInp);splitWrap.appendChild(rmbIg);
-  rc.appendChild(splitWrap);
+  var salAmtBody=salSec('amounts','Amounts');
+  salAmtBody.appendChild(splitWrap);
   var frWrap=document.createElement('div');frWrap.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap';
   var frLbl=document.createElement('label');frLbl.style.cssText='font-size:12px;color:var(--ink2);font-weight:600;white-space:nowrap';frLbl.textContent='Total RMB (All RMB mode)';
   var frInp=document.createElement('input');frInp.type='number';frInp.value=S.salaryRMBFull||'';frInp.placeholder='e.g. 26410';frInp.style.cssText='width:110px;font-size:13px;font-family:var(--mono)';
   frInp.onchange=function(){S.salaryRMBFull=parseFloat(this.value)||0;autosave();};
   var frHint=document.createElement('span');frHint.style.cssText='font-size:11px;color:var(--ink3)';frHint.textContent='Actual RMB received when all salary routes to BOC. Leave 0 to auto-calculate.';
-  frWrap.appendChild(frLbl);frWrap.appendChild(frInp);frWrap.appendChild(frHint);rc.appendChild(frWrap);
+  frWrap.appendChild(frLbl);frWrap.appendChild(frInp);frWrap.appendChild(frHint);salAmtBody.appendChild(frWrap);
   // ── Custom split panel: fee-aware linked inputs + live slider ──
   (function(){
     var cs=customSplitAmounts();
     var cw=document.createElement('div');
     cw.style.cssText='padding:10px;background:var(--bg);border-radius:var(--r);border:.5px solid '+(S.salaryMode==='custom'?'#a259f7':'var(--brd)')+';margin-bottom:10px';
-    var ct=document.createElement('div');ct.style.cssText='font-size:11px;font-weight:700;color:'+(S.salaryMode==='custom'?'#a259f7':'var(--ink3)')+';text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px';ct.textContent='Custom split';cw.appendChild(ct);
     var rateLine=document.createElement('div');rateLine.style.cssText='font-size:11px;color:var(--ink3);margin-bottom:8px';
     var mdl=fitTransferModel();
     if(!mdl)rateLine.innerHTML='Effective rate <b class="mono">'+cs.rate.toFixed(3)+' Y/JOD</b> \u2014 derived from your split defaults (fees included, rounded against you; JOD floored). Log real transfers below and the app learns your actual costs.';
@@ -3195,11 +3212,11 @@ function renderProjection(){
     };
     tlRow.appendChild(tlSent);tlRow.appendChild(tlGot);tlRow.appendChild(tlBtn);tlRow.appendChild(tlDefWrap);
     cw.appendChild(tlRow);
-    rc.appendChild(cw);
+    salSec('custom','Custom split & transfer log').appendChild(cw);
   })();
   // Salary routing phases
-  var phasesTitle=document.createElement('div');phasesTitle.style.cssText='font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em';phasesTitle.textContent='Phase overrides (specific months)';rc.appendChild(phasesTitle);
-  var phasesList=document.createElement('div');phasesList.id='salary-phases-list';rc.appendChild(phasesList);
+  var salPhBody=salSec('phases','Phase overrides (specific months)');
+  var phasesList=document.createElement('div');phasesList.id='salary-phases-list';salPhBody.appendChild(phasesList);
   renderSalaryPhases(phasesList);
   // Add phase row — range based
   var addPhaseRow=document.createElement('div');addPhaseRow.style.cssText='display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap;margin-top:8px;padding:8px;background:var(--bg);border-radius:var(--r)';
@@ -3240,9 +3257,9 @@ function renderProjection(){
   addPhaseRow.appendChild(singleChkWrap);
   addPhaseRow.appendChild(toLbl);addPhaseRow.appendChild(toMoSel);addPhaseRow.appendChild(toYrInp);
   addPhaseRow.appendChild(modeLbl);addPhaseRow.appendChild(phModeSel);addPhaseRow.appendChild(phAddBtn);
-  rc.appendChild(addPhaseRow);
+  salPhBody.appendChild(addPhaseRow);
   var phHint=document.createElement('div');phHint.style.cssText='font-size:10px;color:var(--ink4);margin-top:5px';phHint.textContent='Phase ranges override the global mode above for those months. Last added wins if ranges overlap.';
-  rc.appendChild(phHint);
+  salPhBody.appendChild(phHint);
   pm.appendChild(rc);
   // Controls row — single toggle button
   var anyOpen=Object.keys(openMonths).some(function(k){return openMonths[k];});
