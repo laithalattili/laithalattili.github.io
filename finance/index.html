@@ -461,6 +461,8 @@ input:focus,select:focus{border-color:var(--ink)}
     <div style="text-align:center;font-size:10px;font-weight:700;color:var(--grn);margin-top:2px;letter-spacing:.04em">LOG</div>
   </div>
   <div class="sticky-actions">
+    <button class="sbar-btn" id="undo-btn" onclick="doUndo()" title="Undo (Ctrl+Z)" style="opacity:.35">&#8630;</button>
+    <button class="sbar-btn" id="redo-btn" onclick="doRedo()" title="Redo (Ctrl+Shift+Z)" style="opacity:.35">&#8631;</button>
     <div id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:var(--ink4);cursor:pointer;flex-shrink:0;transition:background .3s" title="Sync status" onclick="showView('settings')"></div>
     <button class="sbar-btn" id="whatif-btn" onclick="toggleWhatIf()" title="What-if sandbox mode">&#128270;</button>
     <button class="sbar-btn" id="sticky-star" onclick="setDefaultToCurrentPage()" title="Set as default page">&#9733;</button>
@@ -1247,13 +1249,69 @@ function renderLogCurToggle(){
 }
 
 // ═══ SAVE / LOAD ═══
+// ── Undo/redo: hooked into autosave so every mutation is captured, no per-handler wiring ──
+var _undoStack=[],_redoStack=[],_undoLast=null,_undoSuppress=false,_undoLastPushTs=0;
+var UNDO_CAP=25;
+function snapshotState(){return JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState,catColors:S.catColors,budgetOrder:S.budgetOrder});}
+function applyStateStr(str){
+  var d;try{d=JSON.parse(str);}catch(e){return;}
+  if(d.S)S=d.S;
+  if(Array.isArray(d.streams))streams=d.streams;
+  streamOverrides=d.streamOverrides||[];settlements=d.settlements||[];
+  goldPieces=d.goldPieces||[];properties=d.properties||[];holidays=d.holidays||[];
+  expenses=d.expenses||[];oneoffEvents=d.oneoffEvents||[];
+  if(Array.isArray(d.snapshots))S.snapshots=d.snapshots;
+  tickState=d.tickState||{};parentSkips=d.parentSkips||[];confirmedDebits=d.confirmedDebits||{};
+  openMonths=d.openMonths||{};wishlistItems=d.wishlistItems||[];commitGroupState=d.commitGroupState||{};
+  if(d.catColors){S.catColors=d.catColors;CAT_COLORS=S.catColors;}
+  if(Array.isArray(d.budgetOrder))S.budgetOrder=d.budgetOrder;
+  if(typeof syncHolidayBudgets==='function')syncHolidayBudgets();
+}
+function updateUndoButtons(){
+  var u=document.getElementById('undo-btn'),r=document.getElementById('redo-btn');
+  if(u){u.disabled=!_undoStack.length;u.style.opacity=_undoStack.length?'1':'.35';}
+  if(r){r.disabled=!_redoStack.length;r.style.opacity=_redoStack.length?'1':'.35';}
+}
+function seedUndo(){_undoLast=snapshotState();_undoStack.length=0;_redoStack.length=0;updateUndoButtons();}
+function doUndo(){
+  if(!_undoStack.length)return;
+  _redoStack.push(snapshotState());
+  var prev=_undoStack.pop();
+  _undoSuppress=true;applyStateStr(prev);autosave();_undoSuppress=false;_undoLastPushTs=0;
+  safeShowView(currentPage);updateUndoButtons();
+}
+function doRedo(){
+  if(!_redoStack.length)return;
+  _undoStack.push(snapshotState());if(_undoStack.length>UNDO_CAP)_undoStack.shift();
+  var nxt=_redoStack.pop();
+  _undoSuppress=true;applyStateStr(nxt);autosave();_undoSuppress=false;_undoLastPushTs=0;
+  safeShowView(currentPage);updateUndoButtons();
+}
+document.addEventListener('keydown',function(e){
+  if(!(e.ctrlKey||e.metaKey)||e.key.toLowerCase()!=='z')return;
+  var t=e.target;if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT'||t.isContentEditable))return;
+  e.preventDefault();
+  if(e.shiftKey)doRedo();else doUndo();
+});
 function autosave(){
   if(typeof _whatIfActive!=="undefined"&&_whatIfActive)return;
   // Stamp a new version immediately so startup pull won't overwrite this data
   var newVer=Date.now();
-  try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState,catColors:S.catColors,budgetOrder:S.budgetOrder}));}catch(e){console.warn('save',e);}
+  var stateStr=snapshotState();
+  if(_undoSuppress){_undoLast=stateStr;}
+  else if(stateStr!==_undoLast){
+    if(_undoLast!==null){
+      var nowTs=Date.now();
+      // Merge rapid consecutive edits into one undo step
+      if(nowTs-_undoLastPushTs>800){_undoStack.push(_undoLast);if(_undoStack.length>UNDO_CAP)_undoStack.shift();_undoLastPushTs=nowTs;}
+      _redoStack.length=0;
+    }
+    _undoLast=stateStr;
+  }
+  try{localStorage.setItem('lf_data',stateStr);}catch(e){console.warn('save',e);}
   try{localStorage.setItem('lf_ver',String(newVer));}catch(e){}
   if(typeof sbSchedulePush==='function')sbSchedulePush(newVer);
+  if(typeof updateUndoButtons==='function')updateUndoButtons();
 }
 function makeSaveBtn(label){
   var btn=document.createElement('button');btn.className='btn btn-sm btn-p';btn.textContent=label||'Save';
@@ -3651,15 +3709,44 @@ function renderGenericSettle(s,container){
   // Phases
   var secPh=document.createElement('div');secPh.className='sec-label';secPh.textContent='Payment phases';container.appendChild(secPh);
   var phInfo=document.createElement('div');phInfo.className='info-box';phInfo.innerHTML='Each phase defines a monthly plan. "Funded from" sets which account pays. One-time payments: use the one-off toggle or add in Projection.';container.appendChild(phInfo);
-  safeArr(s.phases).forEach(function(ph,pi){
+  var sortedPhases=safeArr(s.phases).slice().sort(function(a,b){
+    var ak=(a.startYr||0)*12+(a.startMon||0),bk=(b.startYr||0)*12+(b.startMon||0);
+    if(ak!==bk)return ak-bk;
+    return ((a.endYr||0)*12+(a.endMon||0))-((b.endYr||0)*12+(b.endMon||0));
+  });
+  if(typeof window._phaseOpen==='undefined')window._phaseOpen={};
+  sortedPhases.forEach(function(ph,pi){
     var isOneOff=ph.oneOff;
     var mons=isOneOff?1:Math.max(0,(ph.endYr-ph.startYr)*12+(ph.endMon-ph.startMon)+1);
     var phRate=settleFxRate(s);
     var phAmtJOD=(ph.currency==='RMB')?n2(ph.monthly/phRate):(ph.currency==='JOD'?ph.monthly:toJOD(ph.monthly,ph.currency));var phTotal=n2(phAmtJOD*mons);
     var pb=document.createElement('div');pb.className='phase-block';
-    var phHead=document.createElement('div');phHead.className='phase-head';phHead.innerHTML='<div class="phase-title">Phase '+(pi+1)+': '+(isOneOff?MONTHS[ph.startMon-1]+' '+ph.startYr+' - one-off - '+fJOD(phTotal):MONTHS[ph.startMon-1]+' '+ph.startYr+' to '+MONTHS[ph.endMon-1]+' '+ph.endYr+' - '+mons+' months - '+fJOD(phTotal))+'</div>';
-    var phDel=document.createElement('button');phDel.className='btn btn-xs btn-d';phDel.textContent='Del';phDel.onclick=(function(sid,phid){return function(){deletePhase(sid,phid);};})(s.id,ph.id);phHead.appendChild(phDel);pb.appendChild(phHead);
-    var phForm=document.createElement('div');phForm.className='ig-row';
+    var isOpen=!!window._phaseOpen[ph.id];
+    var isBocPh=(ph.account==='rmb'||ph.account==='boc');
+    var natTotal=n2((ph.monthly||0)*mons);
+    var natStr=ph.currency==='RMB'?fRMB(natTotal):ph.currency==='JOD'?fJOD(natTotal):(natTotal+' '+ph.currency);
+    var MSH=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var dateStr=isOneOff?(MSH[ph.startMon-1]+' '+ph.startYr):(MSH[ph.startMon-1]+' '+ph.startYr+' \u2192 '+MSH[ph.endMon-1]+' '+ph.endYr);
+    var phHead=document.createElement('div');phHead.className='phase-head';phHead.style.cursor='pointer';
+    phHead.innerHTML='<div class="phase-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:0">'
+      +'<span style="font-size:14px;color:var(--ink4)">'+(isOpen?'\u2304':'\u203A')+'</span>'
+      +'<span style="font-size:10px;font-weight:700;color:var(--ink4)">'+(pi+1)+'</span>'
+      +'<span style="font-size:9px;font-weight:800;letter-spacing:.06em;padding:2px 6px;border-radius:4px;background:'+(isOneOff?'var(--amb-bg)':'var(--blu-bg)')+';color:'+(isOneOff?'var(--amb)':'var(--blu)')+'">'+(isOneOff?'ONE-OFF':'MONTHLY \u00d7'+mons)+'</span>'
+      +'<span class="mono" style="font-weight:700;font-size:13px">'+dateStr+'</span>'
+      +'<span style="margin-left:auto;display:flex;align-items:center;gap:6px">'
+      +'<span class="mono" style="font-weight:700;font-size:13px">'+natStr+'</span>'
+      +'<span style="font-size:10px;color:var(--ink3)">('+fJOD(phTotal)+')</span>'
+      +'<span style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;background:'+(isBocPh?'var(--blu-bg)':'var(--grn-bg)')+';color:'+(isBocPh?'var(--blu)':'var(--grn)')+'">'+(isBocPh?'BOC':'ARAB')+'</span>'
+      +'</span></div>';
+    var phDel=document.createElement('button');phDel.className='btn btn-xs btn-d';phDel.textContent='Del';phDel.onclick=(function(sid,phid){return function(e){e.stopPropagation();deletePhase(sid,phid);};})(s.id,ph.id);phHead.appendChild(phDel);pb.appendChild(phHead);
+    var phBody=document.createElement('div');phBody.style.display=isOpen?'block':'none';
+    phHead.onclick=(function(phid,bodyEl,headEl){return function(e){
+      if(e.target&&e.target.tagName==='BUTTON')return;
+      window._phaseOpen[phid]=!window._phaseOpen[phid];
+      bodyEl.style.display=window._phaseOpen[phid]?'block':'none';
+      var chev=headEl.querySelector('.phase-title span');if(chev)chev.textContent=window._phaseOpen[phid]?'\u2304':'\u203A';
+    };})(ph.id,phBody,phHead);
+    var phForm=document.createElement('div');phForm.className='ig-row';phForm.style.marginTop='8px';
     // Monthly amount
     function mkPhIg(lbl,el){var ig=document.createElement('div');ig.className='ig';var l=document.createElement('label');l.textContent=lbl;ig.appendChild(l);ig.appendChild(el);return ig;}
     var amtInp=document.createElement('input');amtInp.type='number';amtInp.value=ph.monthly;amtInp.onchange=(function(sid,phid){return function(){updatePhase(sid,phid,'monthly',this.value);};})(s.id,ph.id);phForm.appendChild(mkPhIg('Monthly amount',amtInp));
@@ -3671,7 +3758,7 @@ function renderGenericSettle(s,container){
     phForm.appendChild(mkPhIg('Funded from',acctSel));
     // One-off toggle
     var ooChk=document.createElement('input');ooChk.type='checkbox';ooChk.checked=!!isOneOff;ooChk.style.width='auto';ooChk.onchange=(function(sid,phid){return function(){updatePhase(sid,phid,'oneOff',this.checked);if(this.checked){var s2=settlements.find(function(x){return x.id===sid;});var p2=s2&&safeArr(s2.phases).find(function(p){return String(p.id)===String(phid);});if(p2){p2.endMon=p2.startMon;p2.endYr=p2.startYr;autosave();}}renderSettlement();};})(s.id,ph.id);var ooIg=document.createElement('div');ooIg.className='ig';var ooLbl=document.createElement('label');ooLbl.textContent='One-time only';ooIg.appendChild(ooLbl);var ooRow=document.createElement('div');ooRow.style.display='flex';ooRow.style.alignItems='center';ooRow.style.gap='7px';ooRow.appendChild(ooChk);var ooTxt=document.createElement('span');ooTxt.style.fontSize='12px';ooTxt.textContent='Single payment';ooRow.appendChild(ooTxt);ooIg.appendChild(ooRow);phForm.appendChild(ooIg);
-    pb.appendChild(phForm);
+    phBody.appendChild(phForm);
     // Date range or single date
     var dateRow=document.createElement('div');dateRow.className='ig-row';
     if(isOneOff){
@@ -3685,9 +3772,10 @@ function renderGenericSettle(s,container){
         dateRow.appendChild(mkPhIg(label+' month',mSel));dateRow.appendChild(mkPhIg(label+' year',yInp));
       });
     }
-    pb.appendChild(dateRow);
-    var phSum=document.createElement('div');phSum.style.cssText='font-size:12px;color:var(--ink3);margin-top:4px';phSum.textContent=(isOneOff?'One payment of ':mons+' months x ')+(ph.currency==='RMB'?fRMB(ph.monthly):fJOD(ph.monthly))+(isOneOff?'':' = '+fJOD(phTotal)+' JOD total');pb.appendChild(phSum);
-    pb.appendChild(makeSaveBtn('Save phase'));
+    phBody.appendChild(dateRow);
+    var phSum=document.createElement('div');phSum.style.cssText='font-size:12px;color:var(--ink3);margin-top:4px';phSum.textContent=(isOneOff?'One payment of ':mons+' months x ')+(ph.currency==='RMB'?fRMB(ph.monthly):fJOD(ph.monthly))+(isOneOff?'':' = '+fJOD(phTotal)+' total');phBody.appendChild(phSum);
+    phBody.appendChild(makeSaveBtn('Save phase'));
+    pb.appendChild(phBody);
     container.appendChild(pb);
   });
   var addPhBtn=document.createElement('button');addPhBtn.className='btn btn-sm';addPhBtn.textContent='+ Add phase';addPhBtn.style.marginBottom='12px';addPhBtn.onclick=function(){addPhase(s.id);};container.appendChild(addPhBtn);
@@ -3712,7 +3800,7 @@ function renderMotelSettle(s,container){
   else histCard.innerHTML='<div style="font-size:13px;color:var(--ink3)">No entries yet.</div>';container.appendChild(histCard);
 }
 function toggleHistoryPanel(id){var el=document.getElementById(id);if(el)el.style.display=el.style.display==='none'?'block':'none';}
-function addPhase(sid){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;s.phases=safeArr(s.phases);s.phases.push({id:Date.now(),monthly:0,currency:'JOD',account:'arab',startMon:today().getMonth()+1,startYr:today().getFullYear(),endMon:today().getMonth()+1,endYr:today().getFullYear(),oneOff:false});autosave();renderSettlement();}
+function addPhase(sid){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;s.phases=safeArr(s.phases);var _npId=Date.now();if(typeof window._phaseOpen==='undefined')window._phaseOpen={};window._phaseOpen[_npId]=true;s.phases.push({id:_npId,monthly:0,currency:'JOD',account:'arab',startMon:today().getMonth()+1,startYr:today().getFullYear(),endMon:today().getMonth()+1,endYr:today().getFullYear(),oneOff:false});autosave();renderSettlement();}
 function deletePhase(sid,phid){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;s.phases=safeArr(s.phases).filter(function(p){return String(p.id)!==String(phid);});autosave();renderSettlement();}
 function updatePhase(sid,phid,key,val){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;var ph=safeArr(s.phases).find(function(p){return String(p.id)===String(phid);});if(!ph)return;ph[key]=typeof val==='boolean'?val:(isNaN(val)||key==='currency'||key==='account'?val:parseFloat(val)||parseInt(val,10));autosave();}
 function addPayment(sid){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;var amt=parseFloat(document.getElementById('pay-amt-'+sid).value);if(!amt||amt<=0)return alert('Enter a valid amount.');var cur=document.getElementById('pay-cur-'+sid).value;var amtJOD=toJOD(amt,cur);s.payments=safeArr(s.payments);s.payments.push({id:Date.now(),amtJOD:n2(amtJOD),amtRaw:amt,currency:cur,date:document.getElementById('pay-date-'+sid).value||today().toISOString().split('T')[0],note:document.getElementById('pay-note-'+sid).value,type:document.getElementById('pay-type-'+sid).value});document.getElementById('pay-amt-'+sid).value='';document.getElementById('pay-note-'+sid).value='';autosave();renderSettlement();}
@@ -5224,6 +5312,7 @@ document.addEventListener('DOMContentLoaded',function(){
   });
   migrateBudgets();
   initCatColors();
+  setTimeout(function(){if(typeof seedUndo==='function')seedUndo();},1200);
   // Heal one-off phases whose hidden end month drifted from start (caused double-counting)
   try{safeArr(settlements).forEach(function(s){safeArr(s.phases).forEach(function(ph){if(ph.oneOff&&(ph.endMon!==ph.startMon||ph.endYr!==ph.startYr)){ph.endMon=ph.startMon;ph.endYr=ph.startYr;}});});}catch(e){}
   if(typeof syncHolidayBudgets==='function')syncHolidayBudgets();
@@ -5343,6 +5432,7 @@ function sbApplyRemote(remote){
   if(typeof syncHolidayBudgets==='function')syncHolidayBudgets();
   try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState,catColors:S.catColors,budgetOrder:S.budgetOrder}));}catch(ex){console.warn('save',ex);}
   try{if(remoteVer)localStorage.setItem('lf_ver',String(remoteVer));}catch(ex){}
+  _undoStack.length=0;_redoStack.length=0;_undoLast=null;if(typeof updateUndoButtons==='function')updateUndoButtons();
   return true;
 }
 
