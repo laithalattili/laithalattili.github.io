@@ -867,7 +867,8 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .lp-name{font-size:13px;font-weight:500;line-height:1.3;overflow:hidden}
 .lp-bar-bg{height:3px;background:#1a1a1a;border-radius:2px;overflow:hidden;margin-top:4px}
 .lp-bar{height:100%;border-radius:2px;transition:width .8s ease}
-.lp-timer{font-size:13px;font-family:'SF Mono','Courier New',monospace;font-weight:600;flex-shrink:0;font-variant-numeric:tabular-nums;min-width:52px;text-align:right}
+.lp-timer{font-size:16px;font-family:'SF Mono','Courier New',monospace;font-weight:700;flex-shrink:0;font-variant-numeric:tabular-nums;min-width:66px;text-align:right;letter-spacing:-.3px}
+.lp-current .lp-timer{font-size:22px;font-weight:700;min-width:78px;text-shadow:0 0 12px currentColor}
 
 /* Edit modal category chips */
 .edit-cat-chip{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:2px solid transparent;transition:all .15s;user-select:none}
@@ -24731,7 +24732,14 @@ function renderTodayView(){
            style="background:${bg};padding:.6rem .85rem;${curGlow}cursor:pointer">
         <div style="display:flex;align-items:center;gap:10px;width:100%">
           <div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px;min-width:68px;flex-shrink:0">${timeDisplay}${endDisplay}</div>
-          <div style="font-size:13px;font-weight:600;color:${tx};flex:1">${cell.l||''}</div>
+          <div style="font-size:13px;font-weight:600;color:${tx};flex:1">${cell.l||''}${(()=>{
+            // Make register / activity flags VISIBLE so a stray one can't hide
+            const f=[];
+            if(cell.boarding_register)f.push(['🛏','Boarding register','#7c3aed']);
+            if(cell.house_register)f.push(['🏠','House register','#7c3aed']);
+            if(cell.house_activity)f.push(['🎯','House activity','#0ea5e9']);
+            return f.map(([ic,t,c])=>`<span title="${t}" style="font-size:9px;margin-left:5px;padding:1px 5px;border-radius:7px;background:${c}1f;color:${c};border:1px solid ${c}55;font-weight:700">${ic}</span>`).join('');
+          })()}</div>
           ${notePreview}
         </div>
       </div>
@@ -34715,8 +34723,21 @@ function _amBoardingRegisterHtml(type,excusedMap){
 
   // Session header — always use current clock time, not slot start time
   const _sess=getCurrentSession();
-  _brCurrentSession=_sess; // sync global session state
-  const _sessLabel=getSessionLabel(_sess);
+  _brCurrentSession=_sess; // sync global session state (stored value stays 3-way for the boarding app)
+  // Display only: "morning" spans 07:15–19:00 in the stored model, so a register
+  // taken mid-afternoon was being labelled "Morning Clearance". Outside the real
+  // morning window, show a neutral label instead of a misleading one.
+  let _sessLabel=getSessionLabel(_sess);
+  try{
+    if(_sess==='morning'){
+      const _bs=_boardingSettings||{};
+      const _toM=t=>{const[h,m]=String(t).split(':');return parseInt(h)*60+parseInt(m);};
+      const _mStart=_toM(_bs.morningTime||'07:15');
+      const _mEnd=_mStart+(parseInt(_bs.morningWindowMins||150,10)); // default 2.5h
+      const _nowM=new Date().getHours()*60+new Date().getMinutes();
+      if(_nowM>_mEnd)_sessLabel='House Register';
+    }
+  }catch(e){}
   const _sessEmoji=getSessionEmoji(_sess);
   const _isMorning=_sess==='morning';
   const _isHoob=_sess==='hoob';
@@ -36145,7 +36166,7 @@ function initActiveMode(){
 <script>
 // Visible build number — must match the service worker's CACHE_NAME version.
 // Lets anyone confirm at a glance which build a device is actually running.
-const APP_BUILD='v231';
+const APP_BUILD='v233';
 try{document.getElementById('app-build-tag').textContent='build '+APP_BUILD;console.log('LA Work '+APP_BUILD);}catch(e){}
 </script>
 
