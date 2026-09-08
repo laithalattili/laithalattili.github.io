@@ -533,7 +533,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .lists-stab.active{background:#fff;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.1)}
 .lists-panel{display:none}.lists-panel.active{display:block}
 .class-tabs{display:flex;gap:3px;overflow-x:auto;margin-bottom:.75rem;padding-bottom:2px}
-.class-tab{padding:5px 10px;font-size:11px;font-weight:600;border:1px solid var(--border);border-radius:20px;background:#fff;color:var(--text2);cursor:pointer;white-space:nowrap;flex-shrink:0}
+.class-tab{padding:5px 9px;font-size:11px;font-weight:600;border:1px solid var(--border);border-radius:20px;background:#fff;color:var(--text2);cursor:pointer;white-space:nowrap;flex-shrink:0}
 .class-tab.active{background:#212529;color:#fff;border-color:#212529}
 .student-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border3);position:relative}
 .student-row:last-child{border-bottom:none}
@@ -1246,6 +1246,14 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
   <!-- TEACHING PANEL -->
   <div id="lists-teaching" class="lists-panel">
     <div class="class-tabs" id="class-tabs-row" style="overflow-x:auto;padding-bottom:3px"></div>
+    <!-- Compact sticky row: open class + count on the left, global search filling the rest -->
+    <div id="class-sticky-row" style="position:sticky;top:calc(var(--hdr-h,100px) + var(--lists-sub-h,44px) + var(--class-tabs-h,38px));z-index:43;background:var(--bg);display:flex;align-items:center;gap:8px;padding:5px 0 7px;border-bottom:1px solid var(--border3)">
+      <div id="class-sticky-title" style="font-size:12.5px;font-weight:800;color:var(--text);white-space:nowrap;flex-shrink:0"></div>
+      <input id="class-search-inp" type="text" placeholder="Search all classes…" autocomplete="off"
+        oninput="window._classSearch=this.value;_classSearchRerender()"
+        style="flex:1;min-width:0;font-size:13px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--rsm);outline:none;background:#fff;color:var(--text)">
+      <button id="class-search-clear" onclick="window._classSearch='';renderClassContent()" style="display:none;flex-shrink:0;font-size:11px;padding:5px 9px;border:1px solid var(--border);border-radius:var(--rsm);background:#fff;color:var(--text2);cursor:pointer">✕</button>
+    </div>
     <div id="teaching-class-content"></div>
   </div>
   <!-- TUTOR MEETINGS PANEL -->
@@ -27800,22 +27808,104 @@ function renderHawkingByRoom(el){
   renderHawkingTotals();
 }
 
+// Grade of a class: its own field, else the leading digits of its name (7A2 → G7)
+function _classGrade(c){
+  const g=String((c&&c.grade)||'').trim();
+  if(g)return g.toUpperCase().startsWith('G')?g.toUpperCase():('G'+g.replace(/\D/g,''));
+  const m=String((c&&(c.name||c.id))||'').match(/\d{1,2}/);
+  return m?('G'+m[0]):'—';
+}
+function _gradeNum(g){const m=String(g).match(/\d+/);return m?parseInt(m[0],10):99;}
+// Stable colour per grade so classes of the same year read as a set
+const _GRADE_COLORS=['#1d4ed8','#0f766e','#b45309','#7c3aed','#be123c','#0369a1','#4d7c0f','#a21caf'];
+function _gradeColor(g){
+  const n=_gradeNum(g);
+  if(n===99)return '#868e96';
+  return _GRADE_COLORS[n%_GRADE_COLORS.length];
+}
+// Classes sorted by grade so same-grade classes sit next to each other
+function _classesSorted(){
+  return (CLASSES||[]).slice().sort((a,b)=>
+    _gradeNum(_classGrade(a))-_gradeNum(_classGrade(b))||String(a.name||a.id).localeCompare(String(b.name||b.id)));
+}
 function renderTeachingTab(){
   const tabsEl=document.getElementById('class-tabs-row');
-  if(tabsEl)tabsEl.innerHTML=CLASSES.map(c=>`<button class="class-tab${c.id===currentClassId?' active':''}" onclick="switchClass('${c.id}',this)">${c.name}<span style="font-size:9px;opacity:.65;margin-left:3px">${c.students.length}</span></button>`).join('')
-    +`<button class="class-tab${currentClassId==='__points'?' active':''}" onclick="switchClass('__points',this)" style="background:${currentClassId==='__points'?'#212529':'#fff'};color:${currentClassId==='__points'?'#fff':'#495057'}">📊 Today</button>`;
+  if(tabsEl){
+    const todayOn=currentClassId==='__points';
+    // "Today" is a mode, not a class: own colour, pinned left, gap after it
+    const todayBtn=`<button class="class-tab${todayOn?' active':''}" onclick="switchClass('__points',this)" style="background:${todayOn?'#b45309':'#fffbeb'};color:${todayOn?'#fff':'#92400e'};border-color:${todayOn?'#b45309':'#fcd34d'};margin-right:8px">📊 Today</button>`;
+    tabsEl.innerHTML=todayBtn+_classesSorted().map(c=>{
+      const g=_classGrade(c),col=_gradeColor(g),on=c.id===currentClassId;
+      return `<button class="class-tab${on?' active':''}" onclick="switchClass('${String(c.id).replace(/'/g,"\\'")}',this)" title="${_esc(g)}"
+        style="background:${on?col:col+'12'};color:${on?'#fff':col};border-color:${on?col:col+'55'}">${_esc(c.name)}<span style="font-size:9px;opacity:.7;margin-left:3px">${c.students.length}</span></button>`;
+    }).join('');
+  }
   renderTeachingTotals();
   renderClassContent();
 }
 
 function switchClass(id,btn){
   currentClassId=id;
-  document.querySelectorAll('.class-tab').forEach(b=>b.classList.remove('active'));
-  if(btn)btn.classList.add('active');
-  renderClassContent();
+  // Choosing a class means "show me that class" — leave search results behind
+  window._classSearch='';
+  renderTeachingTab(); // rebuild pills so grade colours follow the active state
   updateGlobalDefaultBtn();
+  try{const t=document.getElementById('class-tabs-row');const a=t&&t.querySelector('.class-tab.active');if(a&&a.scrollIntoView)a.scrollIntoView({inline:'nearest',block:'nearest'});}catch(e){}
 }
 
+// Sticky row content: open class name + count, search value, clear button
+function _classSyncStickyRow(cls){
+  const t=document.getElementById('class-sticky-title');
+  if(t){
+    if(cls){
+      const g=_classGrade(cls);
+      t.innerHTML=`${_esc(cls.name)} <span style="font-weight:600;color:${_gradeColor(g)};font-size:10.5px">${_esc(g)}</span> <span style="font-weight:600;color:#adb5bd;font-size:10.5px">${cls.students.length}</span>`;
+    } else t.textContent='';
+  }
+  const inp=document.getElementById('class-search-inp');
+  if(inp&&inp.value!==(window._classSearch||''))inp.value=window._classSearch||'';
+  const cl=document.getElementById('class-search-clear');
+  if(cl)cl.style.display=(window._classSearch||'').trim()?'block':'none';
+  // measure the pill strip so the sticky row sits exactly beneath it
+  try{
+    const tabs=document.getElementById('class-tabs-row');
+    if(tabs){const h=Math.ceil(tabs.getBoundingClientRect().height);if(h>0)document.documentElement.style.setProperty('--class-tabs-h',h+'px');}
+  }catch(e){}
+}
+// Global search across every class — open class first, names open profiles
+function _classGlobalSearchHtml(q){
+  const groups=[];
+  const order=_classesSorted();
+  const cur=order.filter(c=>c.id===currentClassId);
+  const rest=order.filter(c=>c.id!==currentClassId);
+  [...cur,...rest].forEach(c=>{
+    const hits=(c.students||[]).filter(s=>
+      ((s.preferred||'')+' '+(s.surname||'')+' '+(s.firstname||'')).toLowerCase().includes(q));
+    if(hits.length)groups.push({c,hits});
+  });
+  if(!groups.length)return `<div style="text-align:center;padding:1.5rem 1rem;color:#adb5bd;font-size:13px">No student matches “${_esc(window._classSearch)}” in any class.</div>`;
+  const total=groups.reduce((n,g)=>n+g.hits.length,0);
+  let html=`<div style="font-size:10.5px;color:var(--text3);padding:2px 0 6px">${total} match${total===1?'':'es'} across ${groups.length} class${groups.length===1?'':'es'}</div>`;
+  groups.forEach(({c,hits})=>{
+    const g=_classGrade(c),col=_gradeColor(g);
+    html+=`<div style="margin-bottom:8px;border:1px solid ${col}33;border-radius:9px;overflow:hidden">
+      <div onclick="switchClass('${String(c.id).replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:6px;padding:5px 10px;background:${col}12;cursor:pointer">
+        <span style="font-size:11.5px;font-weight:800;color:${col}">${_esc(c.name)}</span>
+        <span style="font-size:9.5px;font-weight:700;color:${col};opacity:.75">${_esc(g)}</span>
+        <span style="font-size:10px;color:#adb5bd;margin-left:auto">${hits.length} match${hits.length===1?'':'es'} · open ›</span>
+      </div>
+      ${hits.map(s=>{
+        const nm=((s.preferred||'')+' '+(s.surname||'')).trim();
+        const lv=s.level||0;
+        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 11px;border-top:1px solid #f1f3f5">
+          <div style="flex:1;font-size:13px;color:#212529">${_scName(nm)}</div>
+          ${lv?`<span class="level-badge ${LEVEL_CLASSES[lv]}" style="pointer-events:none">${LEVEL_TITLES[lv].slice(0,1)}</span>`:''}
+        </div>`;
+      }).join('')}
+    </div>`;
+  });
+  return html;
+}
 // Re-render the class list on search input without losing focus/caret
 function _classSearchRerender(){
   const inp=document.getElementById('class-search-inp');
@@ -27826,8 +27916,12 @@ function _classSearchRerender(){
 }
 function renderClassContent(){
   const el=document.getElementById('teaching-class-content');if(!el)return;
-  if(window._classSearchFor!==currentClassId){window._classSearch='';window._classSearchFor=currentClassId;} // search resets per class
+  // (search is global now, so it deliberately survives switching class)
   if(currentClassId==='__points'){
+    const _q=(window._classSearch||'').trim().toLowerCase();
+    _classSyncStickyRow(null);
+    const _t=document.getElementById('class-sticky-title');if(_t)_t.innerHTML='<span style="color:#b45309">📊 Today</span>';
+    if(_q){el.innerHTML=_classGlobalSearchHtml(_q);return;} // search works from the Today view too
     el.innerHTML=`<div class="card" style="padding:.75rem"><div style="font-size:13px;font-weight:600;margin-bottom:.75rem">Today's House Points & Negatives</div><div id="points-summary-content"></div></div>`;
     renderPointsSummary();
     return;
@@ -27845,11 +27939,9 @@ function renderClassContent(){
 
   const _cq=(window._classSearch||'').trim().toLowerCase();
   let _hiddenBySearch=0;
+  // Searching is GLOBAL: results across every class, open class first
+  if(_cq&&!editMode){el.innerHTML=_classGlobalSearchHtml(_cq);_classSyncStickyRow(cls);return;}
   let stuHTML=cls.students.map((s,i)=>{
-    if(_cq){
-      const _full=((s.preferred||'')+' '+(s.surname||'')+' '+(s.firstname||'')).toLowerCase();
-      if(!_full.includes(_cq)){_hiddenBySearch++;return '';}
-    }
     const lv=s.level||0;
     const leave=CLASS_LEAVE[currentClassId+'_'+i]||null;
     const onLeave=leave&&leave.active;
@@ -27895,6 +27987,7 @@ function renderClassContent(){
   const editModeBtn=editMode
     ?`<button onclick="setClassEditMode(null)" style="font-size:11px;padding:3px 10px;border:1px solid #f59f00;border-radius:var(--rxs);background:#fff9db;color:#7d5800;cursor:pointer;font-weight:600">🔒 Lock</button>`
     :`<button onclick="setClassEditMode('${cls.id}')" style="font-size:11px;padding:3px 10px;border:1px solid var(--border);border-radius:var(--rxs);background:#fff;color:var(--text2);cursor:pointer">✏️ Edit</button>`;
+  _classSyncStickyRow(cls);
   const selBadge=selectedCount>0?`<span style="font-size:12px;font-weight:700;color:#1864ab;background:#dbeafe;padding:2px 8px;border-radius:10px;margin-left:6px">${selectedCount} selected</span>`:'';
   el.innerHTML=`<div class="card" style="padding:.75rem">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
@@ -27908,14 +28001,7 @@ function renderClassContent(){
       </div>
     </div>
     ${editMode?'':`<div style="font-size:10px;color:var(--text3);margin-bottom:.5rem">Tap name to open profile · Tap level badge to cycle</div>`}
-    ${editMode?'':`<div style="display:flex;gap:6px;align-items:center;margin-bottom:.5rem">
-      <input id="class-search-inp" type="text" placeholder="Search students in ${_esc(cls.name)}…" value="${_esc(window._classSearch||'')}" autocomplete="off"
-        oninput="window._classSearch=this.value;_classSearchRerender()"
-        style="flex:1;font-size:13px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--rsm);outline:none;background:#fff;color:var(--text)">
-      ${(window._classSearch||'').trim()?`<button onclick="window._classSearch='';renderClassContent()" style="font-size:11px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--rsm);background:#fff;color:var(--text2);cursor:pointer">Clear</button>`:''}
-    </div>`}
     <div>${stuHTML}</div>
-    ${(!editMode&&_cq&&_hiddenBySearch===cls.students.length)?`<div style="text-align:center;padding:1rem;color:#adb5bd;font-size:12px">No students match “${_esc(window._classSearch)}”.</div>`:''}
     ${editMode?`<button onclick="openAddStudentModal('${cls.id}')" style="margin-top:.6rem;width:100%;padding:7px;border:1px dashed var(--border);border-radius:var(--rsm);background:var(--bg2);color:var(--text2);font-size:12px;cursor:pointer">+ Add Student</button>`:''}
   </div>
   <div class="card" style="padding:.75rem">
@@ -36023,7 +36109,7 @@ function initActiveMode(){
 <script>
 // Visible build number — must match the service worker's CACHE_NAME version.
 // Lets anyone confirm at a glance which build a device is actually running.
-const APP_BUILD='v229';
+const APP_BUILD='v230';
 try{document.getElementById('app-build-tag').textContent='build '+APP_BUILD;console.log('LA Work '+APP_BUILD);}catch(e){}
 </script>
 
