@@ -36333,7 +36333,7 @@ function initActiveMode(){
 <script>
 // Visible build number — must match the service worker's CACHE_NAME version.
 // Lets anyone confirm at a glance which build a device is actually running.
-const APP_BUILD='v234';
+const APP_BUILD='v235';
 try{document.getElementById('app-build-tag').textContent='build '+APP_BUILD;console.log('LA Work '+APP_BUILD);}catch(e){}
 </script>
 
@@ -36707,38 +36707,64 @@ function qcSendPersonal(){
 <script>
 // ── Swipe: change week in Week view, day in Day view ──
 (function(){
-  let sx=0,sy=0,st=0,tracking=false,scroller=null;
-  function onStart(e){
-    if(ttEditMode)return;
-    if(e.touches.length!==1)return;
-    const t=e.touches[0];
-    sx=t.clientX;sy=t.clientY;st=Date.now();tracking=true;
-    scroller=e.target.closest('#tt-table-wrap');
+  let sx=0,sy=0,st=0,lx=0,ly=0,tracking=false,scroller=null;
+  // Bound at DOCUMENT level: binding to #tab-sched alone missed swipes that
+  // start on the page background below the grid, which is exactly where a
+  // thumb lands. We still only act while the Sched tab is actually showing.
+  function schedActive(){
+    const t=document.getElementById('tab-sched');
+    return !!(t&&t.classList.contains('active'));
   }
-  function onEnd(e){
-    if(!tracking)return;tracking=false;
-    if(ttEditMode)return;
-    const t=e.changedTouches&&e.changedTouches[0];if(!t)return;
-    const dx=t.clientX-sx,dy=t.clientY-sy,dt=Date.now()-st;
-    if(dt>700)return;                          // too slow to be a swipe
-    if(Math.abs(dx)<70)return;                 // too short
-    if(Math.abs(dx)<Math.abs(dy)*1.8)return;   // too vertical
-    // If the week grid can still scroll horizontally in that direction, let it
+  function overlayOpen(){
+    return !!document.querySelector('#day-menu-overlay,#hs-overlay,#sc-overlay,#tp-overlay,#duty-date-overlay,#duty-meta-overlay,#say-hist,.modal-overlay.open');
+  }
+  function onStart(e){
+    tracking=false;
+    if(ttEditMode||!schedActive()||overlayOpen())return;
+    if(!e.touches||e.touches.length!==1)return;
+    if(e.target&&e.target.closest&&e.target.closest('input,textarea,select,#qc-sheet,#am-panel'))return;
+    const t=e.touches[0];
+    sx=lx=t.clientX;sy=ly=t.clientY;st=Date.now();tracking=true;
+    scroller=(e.target&&e.target.closest)?e.target.closest('#tt-table-wrap'):null;
+  }
+  function onMove(e){
+    if(!tracking)return;
+    const t=e.touches&&e.touches[0];if(!t)return;
+    lx=t.clientX;ly=t.clientY;               // remembered so touchend/cancel always has a delta
+  }
+  function finish(x,y){
+    const dx=x-sx,dy=y-sy,dt=Date.now()-st;
+    if(dt>900)return;                          // too slow to be a swipe
+    if(Math.abs(dx)<60)return;                 // too short
+    if(Math.abs(dx)<Math.abs(dy)*1.5)return;   // too vertical
+    // Only defer to the grid when it genuinely has somewhere left to scroll
     if(scroller){
       const maxL=scroller.scrollWidth-scroller.clientWidth;
-      if(dx<0&&scroller.scrollLeft<maxL-2)return;
-      if(dx>0&&scroller.scrollLeft>2)return;
+      if(maxL>4){
+        if(dx<0&&scroller.scrollLeft<maxL-4)return;
+        if(dx>0&&scroller.scrollLeft>4)return;
+      }
     }
     const dir=dx<0?1:-1;                       // swipe left = forward
     if(ttView==='today')tdNavDay(dir);
     else ttNavWeek(dir);
   }
+  function onEnd(e){
+    if(!tracking)return;tracking=false;
+    if(ttEditMode||!schedActive())return;
+    const t=(e.changedTouches&&e.changedTouches[0])||null;
+    finish(t?t.clientX:lx,t?t.clientY:ly);     // fall back to last move position
+  }
+  function onCancel(){tracking=false;}         // browser took over the gesture
   function bind(){
+    if(document._swipeBound)return;
+    document._swipeBound=true;
+    document.addEventListener('touchstart',onStart,{passive:true});
+    document.addEventListener('touchmove',onMove,{passive:true});
+    document.addEventListener('touchend',onEnd,{passive:true});
+    document.addEventListener('touchcancel',onCancel,{passive:true});
     const host=document.getElementById('tab-sched');
-    if(!host||host._swipeBound)return;
-    host._swipeBound=true;
-    host.addEventListener('touchstart',onStart,{passive:true});
-    host.addEventListener('touchend',onEnd,{passive:true});
+    if(host)host._swipeBound=true;             // kept for the existing test hook
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);
   else bind();
