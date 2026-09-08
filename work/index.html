@@ -1066,6 +1066,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
   </div>
   <div id="am-day-pill-body" style="display:none;margin:6px 12px 0"></div>
   <div id="am-bday" style="display:none;margin:6px 12px 0;padding:6px 12px;border:1px solid rgba(236,72,153,.4);border-radius:14px;background:rgba(236,72,153,.1);color:#f472b6;font-size:11.5px;font-weight:700;width:fit-content"></div>
+  <div id="am-duty" style="display:none;margin:6px 12px 0;padding:6px 12px;border:1px solid rgba(56,189,248,.35);border-radius:14px;background:rgba(56,189,248,.09);color:#38bdf8;font-size:11.5px;font-weight:700;width:fit-content"></div>
   <div class="panel-body" id="am-body"></div>
 </div>
 
@@ -1113,6 +1114,13 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       <button class="edit-mode-btn" id="edit-mode-btn" style="display:none" onclick="ttEditMode?lockEditMode():requestEditMode()">✏️ Edit</button>
       <button class="tt-week-btn" id="tt-collapse-past-btn" onclick="toggleCollapsePastOpt()" title="Collapse/show past slots" style="font-size:13px">⬆</button>
       <button class="tt-week-btn" id="tt-options-btn" onclick="toggleTTOptions()" title="View options">⚙</button>
+    </div>
+  </div>
+  <!-- Sticky top toggle (always visible while scrolling) — mirrors the floating pill -->
+  <div class="tt-controls" id="tt-controls">
+    <div class="tt-toggle">
+      <button class="tt-btn" id="tt-btn-full-top" onclick="setTTView('full',this)">Week</button>
+      <button class="tt-btn" id="tt-btn-today-top" onclick="setTTView('today',this)">Day</button>
     </div>
   </div>
   <!-- Floating Week|Day toggle — bottom right, thumb reach; hides with the tab -->
@@ -1650,14 +1658,21 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       </div>
       <div id="det-times-editor" style="display:none;padding:.75rem 1rem;border-top:1px solid var(--border3)">
         <div style="font-size:11px;color:#868e96;margin-bottom:10px">These times appear in detention email bodies and flow titles.</div>
-        <div class="ig-row" style="flex-wrap:wrap;gap:8px;margin-bottom:10px">
-          <div class="ig" style="flex:1;min-width:100px"><label style="font-size:11px">Sat start</label><input type="time" id="det-sat-start-inp" style="font-size:13px;padding:6px 8px" onchange="saveDetTime()"/></div>
-          <div class="ig" style="flex:1;min-width:100px"><label style="font-size:11px">Sat end</label><input type="time" id="det-sat-end-inp" style="font-size:13px;padding:6px 8px" onchange="saveDetTime()"/></div>
-          <div class="ig" style="flex:1;min-width:100px"><label style="font-size:11px">Sat room</label><input type="text" id="det-sat-room-inp" placeholder="A201" style="font-size:13px;padding:6px 8px" oninput="saveDetTime()"/></div>
+        <div style="font-size:10.5px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin:2px 0 6px">Saturday detention</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-bottom:14px">
+          <label style="display:block"><span style="display:block;font-size:11px;color:var(--text3);margin-bottom:3px">Start</span>
+            <input type="time" id="det-sat-start-inp" onchange="saveDetTime()" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm)"></label>
+          <label style="display:block"><span style="display:block;font-size:11px;color:var(--text3);margin-bottom:3px">End</span>
+            <input type="time" id="det-sat-end-inp" onchange="saveDetTime()" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm)"></label>
+          <label style="display:block;grid-column:1/-1"><span style="display:block;font-size:11px;color:var(--text3);margin-bottom:3px">Room</span>
+            <input type="text" id="det-sat-room-inp" placeholder="A201" oninput="saveDetTime()" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm)"></label>
         </div>
-        <div class="ig-row" style="flex-wrap:wrap;gap:8px">
-          <div class="ig" style="flex:1;min-width:100px"><label style="font-size:11px">Weekday time</label><input type="time" id="det-wd-time-inp" style="font-size:13px;padding:6px 8px" onchange="saveDetTime()"/></div>
-          <div class="ig" style="flex:1;min-width:100px"><label style="font-size:11px">Weekday room</label><input type="text" id="det-wd-room-inp" placeholder="A201" style="font-size:13px;padding:6px 8px" oninput="saveDetTime()"/></div>
+        <div style="font-size:10.5px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin:2px 0 6px;padding-top:10px;border-top:1px solid var(--border3)">Weekday (morning) detention</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px">
+          <label style="display:block"><span style="display:block;font-size:11px;color:var(--text3);margin-bottom:3px">Time</span>
+            <input type="time" id="det-wd-time-inp" onchange="saveDetTime()" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm)"></label>
+          <label style="display:block"><span style="display:block;font-size:11px;color:var(--text3);margin-bottom:3px">Room</span>
+            <input type="text" id="det-wd-room-inp" placeholder="A201" oninput="saveDetTime()" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm)"></label>
         </div>
       </div>
           </div>
@@ -2139,6 +2154,10 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#495057">
         <input type="checkbox" id="edit-house-register" style="width:15px;height:15px;accent-color:#7c3aed;cursor:pointer">
         <span>House register <span style="color:#aaa;font-size:11px">(all house members)</span></span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#495057">
+        <input type="checkbox" id="edit-house-activity" style="width:15px;height:15px;accent-color:#0ea5e9;cursor:pointer">
+        <span>House activity <span style="color:#aaa;font-size:11px">(duty rota per occurrence)</span></span>
       </label>
     </div>
 
@@ -23872,6 +23891,8 @@ function openEditModal(slotIdx,day,_bypassEditMode){
   const hrEl=document.getElementById('edit-house-register');
   if(brEl)brEl.checked=!!(custom&&custom.boarding_register);
   if(hrEl)hrEl.checked=!!(custom&&custom.house_register);
+  const haEl=document.getElementById('edit-house-activity');
+  if(haEl)haEl.checked=!!(custom&&custom.house_activity);
   if(brEl&&hrEl){
     brEl.onchange=function(){if(this.checked)hrEl.checked=false;};
     hrEl.onchange=function(){if(this.checked)brEl.checked=false;};
@@ -24156,12 +24177,14 @@ function saveSlot(){
   const _hrEl=document.getElementById('edit-house-register');
   const boarding_register=!!((_brEl&&_brEl.checked));
   const house_register=!!((_hrEl&&_hrEl.checked));
+  const _haEl=document.getElementById('edit-house-activity');
+  const house_activity=!!((_haEl&&_haEl.checked));
   // Departure timing fields
   const _depOn=document.getElementById('edit-dep-toggle')?.checked;
   const _depMins=_depOn?parseInt(document.getElementById('edit-dep-mins')?.value||'0')||null:null;
   const _depSens=_depOn?(document.querySelector('input[name="dep-sensitivity"]:checked')?.value||null):null;
   const _rawTp=document.getElementById('edit-type').value||'free';
-  const evtData={l:document.getElementById('edit-label').value||'',tp:(_rawTp==='empty'?'free':_rawTp),cat:catVal,recur:document.getElementById('edit-recur').value||'once',placedWeek:week,endSlotIdx,customStartTime,customEndTime,boarding_register,house_register,...(_depOn&&_depMins?{travel_mins:_depMins,sensitivity:_depSens}:{travel_mins:null,sensitivity:null})};
+  const evtData={l:document.getElementById('edit-label').value||'',tp:(_rawTp==='empty'?'free':_rawTp),cat:catVal,recur:document.getElementById('edit-recur').value||'once',placedWeek:week,endSlotIdx,customStartTime,customEndTime,boarding_register,house_register,house_activity,...(_depOn&&_depMins?{travel_mins:_depMins,sensitivity:_depSens}:{travel_mins:null,sensitivity:null})};
   if(evtData.tp==='free'){evtData.boarding_register=false;evtData.house_register=false;}
   // Record label history for quick-fill suggestions
   _saveLabelHistory(evtData.l,evtData.tp,catVal);
@@ -24252,12 +24275,18 @@ function clearSlot(){
 }
 
 let ttShowWeekend=false;try{ttShowWeekend=localStorage.getItem('ttShowWeekend')==='1';}catch(e){}
+// Keep every Week|Day button in sync with ttView, wherever it lives
+function _syncViewToggles(){
+  const isDay=ttView==='today';
+  ['tt-btn-full','tt-btn-full-top'].forEach(id=>{const b=document.getElementById(id);if(b)b.classList.toggle('active',!isDay);});
+  ['tt-btn-today','tt-btn-today-top'].forEach(id=>{const b=document.getElementById(id);if(b)b.classList.toggle('active',isDay);});
+}
 function setTTView(v,btn){
   if(v==='free'||v==='week')v='full'; // Free and Plan views removed from this toggle
   ttView=v;
   if(v==='today')tdDayOffset=0;
-  document.querySelectorAll('.tt-btn').forEach(b=>b.classList.remove('active'));
-  if(btn)btn.classList.add('active');
+  // Two toggles (sticky top + floating pill) always show the same state
+  _syncViewToggles();
   const dayBtn=document.getElementById('tt-btn-days');
   if(dayBtn){dayBtn.classList.toggle('active',ttShowWeekend);dayBtn.textContent=ttShowWeekend?'5d':'7d';}
   updateDefaultBtn();
@@ -24362,6 +24391,18 @@ function loadGlobalDefault(){
         document.getElementById('plan-fab')?.classList.add('active');
         setTimeout(function(){try{renderWeekTasksView();}catch(e){}},300);
       }
+      // A late render during startup could steal the active tab back. Re-assert
+      // once the boot work has settled, but only if nothing else moved us since.
+      setTimeout(function(){
+        try{
+          if(_activeMainTab!==safeTab)return; // user navigated — leave them alone
+          const cur=document.querySelector('.tab-content.active');
+          if(cur&&cur.id==='tab-'+safeTab)return; // already correct
+          if(safeTab==='settings'&&typeof showSettingsTab==='function'){showSettingsTab();return;}
+          document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+          const tc2=document.getElementById('tab-'+safeTab);if(tc2)tc2.classList.add('active');
+        }catch(e){}
+      },400);
     }
     if(s.ttView){
       ttView=(s.ttView==='week'||s.ttView==='free')?'full':s.ttView;
@@ -24862,6 +24903,7 @@ function _syncStickyTops(){
 // ── MAIN RENDER ───────────────────────────────────────
 function renderTimetable(){
   _syncStickyTops();
+  _syncViewToggles();
   var _off=(ttWeekOffset!==0||tdDayOffset!==0);
   var _nb=document.getElementById('tt-now-btn');
   if(_nb)_nb.style.display=_off?'inline-block':'none';
@@ -27774,8 +27816,17 @@ function switchClass(id,btn){
   updateGlobalDefaultBtn();
 }
 
+// Re-render the class list on search input without losing focus/caret
+function _classSearchRerender(){
+  const inp=document.getElementById('class-search-inp');
+  const pos=inp?inp.selectionStart:null;
+  renderClassContent();
+  const nu=document.getElementById('class-search-inp');
+  if(nu){nu.focus();try{if(pos!=null)nu.setSelectionRange(pos,pos);}catch(e){}}
+}
 function renderClassContent(){
   const el=document.getElementById('teaching-class-content');if(!el)return;
+  if(window._classSearchFor!==currentClassId){window._classSearch='';window._classSearchFor=currentClassId;} // search resets per class
   if(currentClassId==='__points'){
     el.innerHTML=`<div class="card" style="padding:.75rem"><div style="font-size:13px;font-weight:600;margin-bottom:.75rem">Today's House Points & Negatives</div><div id="points-summary-content"></div></div>`;
     renderPointsSummary();
@@ -27792,7 +27843,13 @@ function renderClassContent(){
   if(window._classSelectedId!==currentClassId){window._classSelected={};window._classSelectedId=currentClassId;selected={};}
   let selectedCount=Object.values(selected).filter(Boolean).length;
 
+  const _cq=(window._classSearch||'').trim().toLowerCase();
+  let _hiddenBySearch=0;
   let stuHTML=cls.students.map((s,i)=>{
+    if(_cq){
+      const _full=((s.preferred||'')+' '+(s.surname||'')+' '+(s.firstname||'')).toLowerCase();
+      if(!_full.includes(_cq)){_hiddenBySearch++;return '';}
+    }
     const lv=s.level||0;
     const leave=CLASS_LEAVE[currentClassId+'_'+i]||null;
     const onLeave=leave&&leave.active;
@@ -27806,7 +27863,7 @@ function renderClassContent(){
     return`<div class="${rowCls}" id="stu-row-${i}">
       <div style="width:22px;font-size:11px;font-weight:700;color:var(--text3);flex-shrink:0;text-align:right;padding-right:4px">${i+1}</div>
       <div style="flex:1;min-width:0;cursor:pointer" onclick="toggleStuSelect('${currentClassId}',${i})">
-        <div class="stu-name">${s.preferred} ${s.surname}</div>
+        <div class="stu-name">${editMode?(s.preferred+' '+s.surname):_scName((s.preferred+' '+s.surname).trim())}</div>
         <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
           <span class="stu-house" style="font-size:10px">${s.house}</span>
           <span class="stu-gender" style="font-size:10px">${s.gender==='M'?'♂':'♀'}</span>
@@ -27850,8 +27907,15 @@ function renderClassContent(){
         ${editMode?`<button onclick="deleteClass('${cls.id}')" style="font-size:11px;padding:3px 8px;border:1px solid #ffa8a8;border-radius:var(--rxs);background:#fff5f5;color:#c92a2a;cursor:pointer">🗑 Class</button>`:''}
       </div>
     </div>
-    ${editMode?'':`<div style="font-size:10px;color:var(--text3);margin-bottom:.5rem">Tap name to select · Tap level badge to cycle</div>`}
+    ${editMode?'':`<div style="font-size:10px;color:var(--text3);margin-bottom:.5rem">Tap name to open profile · Tap level badge to cycle</div>`}
+    ${editMode?'':`<div style="display:flex;gap:6px;align-items:center;margin-bottom:.5rem">
+      <input id="class-search-inp" type="text" placeholder="Search students in ${_esc(cls.name)}…" value="${_esc(window._classSearch||'')}" autocomplete="off"
+        oninput="window._classSearch=this.value;_classSearchRerender()"
+        style="flex:1;font-size:13px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--rsm);outline:none;background:#fff;color:var(--text)">
+      ${(window._classSearch||'').trim()?`<button onclick="window._classSearch='';renderClassContent()" style="font-size:11px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--rsm);background:#fff;color:var(--text2);cursor:pointer">Clear</button>`:''}
+    </div>`}
     <div>${stuHTML}</div>
+    ${(!editMode&&_cq&&_hiddenBySearch===cls.students.length)?`<div style="text-align:center;padding:1rem;color:#adb5bd;font-size:12px">No students match “${_esc(window._classSearch)}”.</div>`:''}
     ${editMode?`<button onclick="openAddStudentModal('${cls.id}')" style="margin-top:.6rem;width:100%;padding:7px;border:1px dashed var(--border);border-radius:var(--rsm);background:var(--bg2);color:var(--text2);font-size:12px;cursor:pointer">+ Add Student</button>`:''}
   </div>
   <div class="card" style="padding:.75rem">
@@ -28641,7 +28705,14 @@ function deletePoint(id){
 // Student tagging: exact full-name match anywhere in text
 function detectStudentInText(text){
   const low=' '+String(text).toLowerCase()+' ';
-  const hits=(STUDENTS||[]).filter(s=>{if(!s.name)return false;const n=' '+s.name.toLowerCase();return low.includes(n+' ')||low.includes(n+',')||low.includes(n+'.');});
+  // Match house students AND students in classes you teach
+  const _pool=(STUDENTS||[]).slice();
+  const _seen=new Set(_pool.map(s=>String(s.name||'').toLowerCase()));
+  (CLASSES||[]).forEach(c=>(c.students||[]).forEach(st=>{
+    const nm=((st.preferred||'')+' '+(st.surname||'')).trim();
+    if(nm&&!_seen.has(nm.toLowerCase())){_seen.add(nm.toLowerCase());_pool.push({name:nm,tutor:''});}
+  }));
+  const hits=_pool.filter(s=>{if(!s.name)return false;const n=' '+s.name.toLowerCase();return low.includes(n+' ')||low.includes(n+',')||low.includes(n+'.');});
   if(!hits.length)return null;
   const s=hits.sort((a,b)=>b.name.length-a.name.length)[0];
   const tut=(TUTORS||[]).find(t=>t.name===s.tutor)||null;
@@ -28665,8 +28736,20 @@ function _atCandidates(q){
   const cls=liveCls?(CLASSES||[]).find(c=>(c.name||c.id)===liveCls||c.id===liveCls):null;
   const inCls=new Set();
   if(cls)(cls.students||[]).forEach(s=>inCls.add((String(s.preferred||'')+' '+String(s.surname||'')).trim().toLowerCase()));
-  const hits=(STUDENTS||[]).filter(s=>{
-    if(!s.name||_isArchived(s.name))return false;
+  // Pool = house students + students in classes you teach (deduped by name)
+  const pool=[];const seenNm=new Set();
+  (STUDENTS||[]).forEach(s=>{
+    if(!s.name||_isArchived(s.name))return;
+    seenNm.add(s.name.toLowerCase());pool.push({name:s.name,tutor:s.tutor,src:'house'});
+  });
+  (CLASSES||[]).forEach(c=>{
+    (c.students||[]).forEach(st=>{
+      const nm=((st.preferred||'')+' '+(st.surname||'')).trim();
+      if(!nm||seenNm.has(nm.toLowerCase()))return;
+      seenNm.add(nm.toLowerCase());pool.push({name:nm,tutor:'',src:(c.name||c.id)});
+    });
+  });
+  const hits=pool.filter(s=>{
     if(!q)return true;
     const n=s.name.toLowerCase();
     return n.startsWith(q)||n.split(/\s+/).some(w=>w.startsWith(q));
@@ -28688,7 +28771,7 @@ function _atRender(inpId,sugId){
     `<div class="at-sug-row" data-name="${_esc(s.name)}" onmousedown="event.preventDefault();_atPick('${inpId}','${sugId}',this.dataset.name)">`+
     `<span>${_esc(s.name)}</span>`+
     (inCls.has(s.name.toLowerCase())?'<span class="at-sug-cls">in class</span>':'')+
-    (s.tutor?`<span class="at-sug-tut">${_esc(s.tutor)}</span>`:'')+
+    (s.tutor?`<span class="at-sug-tut">${_esc(s.tutor)}</span>`:(s.src&&s.src!=='house'?`<span class="at-sug-tut">${_esc(s.src)}</span>`:''))+
     `</div>`).join('');
   box.style.display='block';
 }
@@ -29700,12 +29783,140 @@ function loadDuties(){
   catch(e){FRIDAY_DUTIES={};}
   try{const r=localStorage.getItem('fridayTermRange');if(r){const p=JSON.parse(r);FRIDAY_TERM_RANGE=p;}}
   catch(e){}
+  _dutyLoadExtras();
+  migrateHouseActivityFlag();
 }
 function saveDuties(){
   try{
     localStorage.setItem('nightDuties',JSON.stringify(NIGHT_DUTIES));
     localStorage.setItem('fridayDuties',JSON.stringify(FRIDAY_DUTIES));
     localStorage.setItem('fridayTermRange',JSON.stringify(FRIDAY_TERM_RANGE));
+    localStorage.setItem('dutyMeta',JSON.stringify(DUTY_META));
+    localStorage.setItem('dutyOverrides',JSON.stringify(DUTY_OVERRIDES));
+  }catch(e){}
+}
+
+// ══ DUTY ENGINE ════════════════════════════════════════════════════
+// NIGHT_DUTIES stays {tutorName: 'Mon'} (the recurring day).
+// DUTY_META holds per-tutor frequency/time plus the global windows.
+// DUTY_OVERRIDES holds per-date final name lists (one-off cover/extra).
+let DUTY_META={prepStart:'19:00',prepEnd:'20:30',boardStart:'18:00',boardEnd:'22:00',tutors:{}};
+let DUTY_OVERRIDES={}; // {'2026-09-11': ['Name', ...]} — prep duty for that date
+function _dutyLoadExtras(){
+  try{const m=localStorage.getItem('dutyMeta');if(m)DUTY_META=Object.assign(DUTY_META,JSON.parse(m));}catch(e){}
+  try{const o=localStorage.getItem('dutyOverrides');if(o)DUTY_OVERRIDES=JSON.parse(o);}catch(e){}
+  if(!DUTY_META.tutors)DUTY_META.tutors={};
+}
+function _dutyTutorMeta(name){
+  const m=DUTY_META.tutors[name]||{};
+  return {freq:m.freq||'weekly',start:m.start||DUTY_META.prepStart,end:m.end||DUTY_META.prepEnd};
+}
+function _dutySetTutorMeta(name,patch){
+  DUTY_META.tutors[name]=Object.assign(_dutyTutorMeta(name),patch);
+  saveDuties();
+}
+// Week A/B parity for a date, reusing the timetable's own week numbering
+function _dutyWeekIsA(dateStr){
+  try{
+    const d=new Date(dateStr+'T00:00:00'),t=new Date(_todayStr()+'T00:00:00');
+    const offset=Math.round((_mondayOf(d)-_mondayOf(t))/(7*864e5));
+    return getWeekIsA(offset);
+  }catch(e){return true;}
+}
+function _mondayOf(d){const x=new Date(d);const dw=x.getDay();x.setDate(x.getDate()-(dw===0?6:dw-1));x.setHours(0,0,0,0);return x;}
+// Who is on PREP duty for a given date (recurring rota, then any override)
+function dutyPrepFor(dateStr){
+  if(DUTY_OVERRIDES[dateStr])return DUTY_OVERRIDES[dateStr].slice();
+  const d=new Date(dateStr+'T00:00:00');
+  const dayName=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+  const isA=_dutyWeekIsA(dateStr);
+  return (TUTORS||[]).filter(t=>{
+    if(NIGHT_DUTIES[t.name]!==dayName)return false;
+    const f=_dutyTutorMeta(t.name).freq;
+    return f==='weekly'||(f==='A'&&isA)||(f==='B'&&!isA);
+  }).map(t=>t.name);
+}
+function dutyPrepIsOverridden(dateStr){return !!DUTY_OVERRIDES[dateStr];}
+function dutySetOverride(dateStr,names){DUTY_OVERRIDES[dateStr]=names.slice();saveDuties();}
+function dutyClearOverride(dateStr){delete DUTY_OVERRIDES[dateStr];saveDuties();}
+// Boarding team rostered today, read from the shared boarding_settings staff schedule
+function dutyBoardingTeamFor(dateStr){
+  const d=new Date(dateStr+'T00:00:00');
+  const dayName=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+  const out=[];
+  try{
+    const curWeek=getWeekNumber(0)||1;
+    (_boardingSettings.staff||[]).forEach(s=>{
+      const v=(s.schedule||{})[dayName];
+      if(v==='on')out.push(s.name||s.role);
+      else if(v==='alt'){
+        const anchor=s.altAnchor||curWeek;
+        if((curWeek-anchor)%2===0)out.push(s.name||s.role);
+      }
+    });
+  }catch(e){}
+  return out.filter(Boolean);
+}
+// House-activity slots for today: [{label, st, et, names}]
+function dutyActivitySlotsToday(){
+  const out=[];
+  try{
+    const dayName=DN[new Date().getDay()];
+    const ds=_todayStr();
+    for(let i=0;i<SLOTS.length;i++){
+      const c=getCustomForWeek(0,i,dayName)||getBaseCell(i,dayName);
+      if(!c||!c.house_activity)continue;
+      out.push({
+        label:c.l||'House activity',
+        st:c.customStartTime||getSlotTime(i),
+        et:c.customEndTime||slotEndTime(i),
+        names:(FRIDAY_DUTIES[ds]||[]).slice()
+      });
+    }
+  }catch(e){}
+  return out;
+}
+// All house-activity occurrences inside the duty term range (any weekday)
+function getActivityDates(){
+  const dates=[];
+  try{
+    const start=new Date(FRIDAY_TERM_RANGE.start+'T00:00:00');
+    const end=new Date(FRIDAY_TERM_RANGE.end+'T00:00:00');
+    if(isNaN(start)||isNaN(end))return dates;
+    const d=new Date(start);
+    let guard=0;
+    while(d<=end&&guard++<400){
+      const dayName=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+      const ds=d.toLocaleDateString('en-CA');
+      const wkOff=Math.round((_mondayOf(d)-_mondayOf(new Date(_todayStr()+'T00:00:00')))/(7*864e5));
+      for(let i=0;i<SLOTS.length;i++){
+        const c=getCustomForWeek(wkOff,i,dayName)||getBaseCell(i,dayName);
+        if(c&&c.house_activity){dates.push(ds);break;}
+      }
+      d.setDate(d.getDate()+1);
+    }
+  }catch(e){}
+  return dates;
+}
+// One-time migration: mark the existing Friday house-activity slot so the
+// generalized page keeps working with no setup.
+function migrateHouseActivityFlag(){
+  try{
+    if(localStorage.getItem('houseActivityMigrated')==='1')return;
+    let marked=0;
+    ['Fri'].forEach(day=>{
+      for(let i=0;i<SLOTS.length;i++){
+        const key=i+'_'+day;
+        const c=ttDefaults[key];
+        if(!c||c.house_activity)continue;
+        const lbl=String(c.l||'').toLowerCase();
+        if(lbl.includes('house activity')||lbl.includes('house act')||(lbl.includes('activity')&&lbl.includes('house'))){
+          c.house_activity=true;marked++;
+        }
+      }
+    });
+    if(marked)saveState();
+    localStorage.setItem('houseActivityMigrated','1');
   }catch(e){}
 }
 function buildDefaultNightDuties(){
@@ -29748,12 +29959,26 @@ function renderDutiesPanel(){
   const noduty=TUTORS.filter(t=>!NIGHT_DUTIES[t.name]);
 
   let html='<div class="duty-section">';
-  html+='<div class="duty-section-title">🌙 Boarding Night Duty · 19:15–20:30</div>';
+  html+=`<div class="duty-section-title">🌙 Boarding Night Duty</div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:.5rem;font-size:11px;color:var(--text3)">
+    <span>Default window</span>
+    <input type="time" value="${DUTY_META.prepStart}" onchange="DUTY_META.prepStart=this.value;saveDuties();renderDutiesPanel()" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--rxs)">
+    <span>to</span>
+    <input type="time" value="${DUTY_META.prepEnd}" onchange="DUTY_META.prepEnd=this.value;saveDuties();renderDutiesPanel()" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--rxs)">
+    <span style="margin-left:auto">Boarding team</span>
+    <input type="time" value="${DUTY_META.boardStart}" onchange="DUTY_META.boardStart=this.value;saveDuties();renderDutiesPanel()" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--rxs)">
+    <span>to</span>
+    <input type="time" value="${DUTY_META.boardEnd}" onchange="DUTY_META.boardEnd=this.value;saveDuties();renderDutiesPanel()" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--rxs)">
+  </div>`;
   dayOrder.forEach(day=>{
     const tutors=byDay[day]||[];
     html+=`<div class="duty-day-row">
       <div class="duty-day-label">${dayFull[day].slice(0,3)}</div>
-      <div class="duty-tutors">${tutors.map(n=>`<span class="duty-tutor-chip">${n.split(' ')[0]}</span>`).join('')||'<span style="color:#adb5bd;font-size:11px">None assigned</span>'}</div>
+      <div class="duty-tutors">${tutors.map(n=>{
+        const m=_dutyTutorMeta(n);
+        const fLbl=m.freq==='weekly'?'':(m.freq==='A'?' ·A':' ·B');
+        return `<span class="duty-tutor-chip" onclick="openDutyTutorMeta('${n.replace(/'/g,"\\'")}')" style="cursor:pointer" title="Frequency and time">${n.split(' ')[0]}<span style="opacity:.7;font-size:9px">${fLbl} ${m.start}</span></span>`;
+      }).join('')||'<span style="color:#adb5bd;font-size:11px">Noneassigned</span>'}</div>
       <button class="duty-edit-btn" onclick="openNightDutyEdit('${day}')">Edit</button>
     </div>`;
   });
@@ -29762,9 +29987,32 @@ function renderDutiesPanel(){
   }
   html+='</div>';
 
-  // ── Friday House Activity Section ─────────────────────
+  // ── Upcoming prep-duty dates (with one-off override support) ──
   html+='<div class="duty-section">';
-  html+='<div class="duty-section-title">🏠 Friday House Activity · 17:00–18:00</div>';
+  html+='<div class="duty-section-title">📆 Next 14 days · prep duty</div>';
+  {
+    const t0=new Date(_todayStr()+'T00:00:00');
+    for(let k=0;k<14;k++){
+      const d=new Date(t0);d.setDate(t0.getDate()+k);
+      const dn=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+      if(dn==='Sat'||dn==='Sun')continue;
+      const ds=d.toLocaleDateString('en-CA');
+      const names=dutyPrepFor(ds);
+      const ov=dutyPrepIsOverridden(ds);
+      if(!names.length&&!ov)continue;
+      html+=`<div class="duty-day-row" onclick="openDutyDateModal('${ds}')" style="cursor:pointer">
+        <div class="duty-day-label" style="min-width:64px">${dn} ${d.getDate()}/${d.getMonth()+1}</div>
+        <div class="duty-tutors">${names.map(n=>`<span class="duty-tutor-chip">${_esc(n.split(' ')[0])}</span>`).join('')||'<span style="color:#adb5bd;font-size:11px">Nobody</span>'}</div>
+        ${ov?'<span style="font-size:9px;font-weight:700;color:#b45309;background:#fef3c7;border-radius:7px;padding:1px 6px;flex-shrink:0">changed</span>':''}
+        <button class="duty-edit-btn" onclick="event.stopPropagation();openDutyDateModal('${ds}')">Edit</button>
+      </div>`;
+    }
+  }
+  html+='</div>';
+
+  // ── House Activity Section (any slot flagged "House activity") ──
+  html+='<div class="duty-section">';
+  html+='<div class="duty-section-title">🏠 House Activity duty</div>';
 
   // Term range editor
   html+=`<div style="display:flex;gap:6px;align-items:center;margin-bottom:.5rem;flex-wrap:wrap">
@@ -29775,7 +30023,7 @@ function renderDutiesPanel(){
   </div>`;
 
   // Tutor totals bar
-  const fridays=getTermFridays();
+  const fridays=getActivityDates();
   const tutorTotals={};
   TUTORS.forEach(t=>tutorTotals[t.name]=0);
   fridays.forEach(ds=>{
@@ -29826,7 +30074,7 @@ function renderDutiesPanel(){
         const countCls=isHoliday?'empty':count===0?'empty':count<3?'under':'ok';
         const countLabel=isHoliday?'🏖':'';
         const dateObj=new Date(ds+'T00:00:00');
-        const dateStr=dateObj.getDate()+' '+MONTHS[dateObj.getMonth()].slice(0,3);
+        const dateStr=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dateObj.getDay()]+' '+dateObj.getDate()+' '+MONTHS[dateObj.getMonth()].slice(0,3);
         let rowCls='friday-row';
         if(isHoliday)rowCls+=' fri-holiday';
         else if(!isPast&&count<3)rowCls+=' fri-under';
@@ -29857,6 +30105,70 @@ function renderDutiesPanel(){
 
 // Night duty edit
 let _nightDutyEditDay=null;
+// Per-tutor duty frequency + window
+function openDutyTutorMeta(name){
+  const m=_dutyTutorMeta(name);
+  document.getElementById('duty-meta-overlay')?.remove();
+  const ov=document.createElement('div');ov.id='duty-meta-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10001;display:flex;align-items:flex-end;justify-content:center';
+  ov.onclick=e=>{if(e.target===ov)ov.remove();};
+  const e=name.replace(/'/g,"\\'");
+  ov.innerHTML=`<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:520px;padding:16px 16px 26px">
+    <div style="font-size:15px;font-weight:800;margin-bottom:2px">${_esc(name)}</div>
+    <div style="font-size:11px;color:#868e96;margin-bottom:14px">Night duty frequency and time</div>
+    <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">FREQUENCY</div>
+    <div style="display:flex;gap:6px;margin-bottom:14px">
+      ${[['weekly','Every week'],['A','A weeks only'],['B','B weeks only']].map(([v,l])=>
+        `<button onclick="_dutySetTutorMeta('${e}',{freq:'${v}'});openDutyTutorMeta('${e}');renderDutiesPanel()" style="flex:1;font-size:12px;font-weight:700;padding:9px 4px;border-radius:8px;cursor:pointer;border:1.5px solid ${m.freq===v?'#00205B':'var(--border)'};background:${m.freq===v?'#00205B':'#fff'};color:${m.freq===v?'#fff':'var(--text2)'}">${l}</button>`).join('')}
+    </div>
+    <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">TIME WINDOW</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
+      <input type="time" id="dm-start" value="${m.start}" style="flex:1;font-size:14px;padding:8px;border:1px solid var(--border);border-radius:8px">
+      <span style="color:#868e96">to</span>
+      <input type="time" id="dm-end" value="${m.end}" style="flex:1;font-size:14px;padding:8px;border:1px solid var(--border);border-radius:8px">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-sec" style="flex:1;justify-content:center" onclick="document.getElementById('duty-meta-overlay').remove()">Cancel</button>
+      <button class="btn-pri" style="flex:2;justify-content:center" onclick="_dutySetTutorMeta('${e}',{start:document.getElementById('dm-start').value,end:document.getElementById('dm-end').value});document.getElementById('duty-meta-overlay').remove();renderDutiesPanel()">Save</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+// One-off duty for a specific date: pre-filled from the rota, freely edited
+function openDutyDateModal(ds){
+  const current=dutyPrepFor(ds);
+  const ov0=document.getElementById('duty-date-overlay');if(ov0)ov0.remove();
+  const ov=document.createElement('div');ov.id='duty-date-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10001;display:flex;align-items:flex-end;justify-content:center';
+  ov.onclick=e=>{if(e.target===ov)ov.remove();};
+  const d=new Date(ds+'T00:00:00');
+  const nice=d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short'});
+  const rows=(TUTORS||[]).map(t=>`<label style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid #f5f6f7;cursor:pointer">
+      <input type="checkbox" class="dd-chk" data-name="${_esc(t.name)}" ${current.includes(t.name)?'checked':''} style="width:17px;height:17px;flex-shrink:0">
+      <span style="flex:1;font-size:13.5px">${_esc(t.name)}</span>
+      ${NIGHT_DUTIES[t.name]?`<span style="font-size:10px;color:#adb5bd">normally ${_esc(NIGHT_DUTIES[t.name])}</span>`:''}
+    </label>`).join('');
+  ov.innerHTML=`<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:520px;height:76vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:14px 16px 10px;border-bottom:1px solid #eef0f2;flex-shrink:0">
+      <div style="font-size:15px;font-weight:800">${nice}</div>
+      <div style="font-size:11px;color:#868e96;margin-top:2px">Tick who is on duty this date only. The weekly rota is not changed.</div>
+      ${dutyPrepIsOverridden(ds)?`<button onclick="dutyClearOverride('${ds}');document.getElementById('duty-date-overlay').remove();renderDutiesPanel()" style="margin-top:8px;font-size:11px;font-weight:700;padding:5px 10px;border-radius:7px;border:1px solid #fbbf24;background:#fffbeb;color:#b45309;cursor:pointer">↩ Restore normal rota</button>`:''}
+    </div>
+    <div style="flex:1;overflow-y:auto">${rows||'<div style="padding:20px;text-align:center;color:#adb5bd;font-size:13px">No tutors yet.</div>'}</div>
+    <div style="flex-shrink:0;padding:10px 16px;display:flex;gap:8px;border-top:1px solid #eef0f2">
+      <button class="btn-sec" style="flex:1;justify-content:center" onclick="document.getElementById('duty-date-overlay').remove()">Cancel</button>
+      <button class="btn-pri" style="flex:2;justify-content:center" onclick="_dutySaveDate('${ds}')">Save for this date</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+function _dutySaveDate(ds){
+  const names=[...document.querySelectorAll('#duty-date-overlay .dd-chk')].filter(c=>c.checked).map(c=>c.dataset.name);
+  dutySetOverride(ds,names);
+  document.getElementById('duty-date-overlay')?.remove();
+  renderDutiesPanel();
+  showToastMsg('🌙 Duty set for this date','#0369a1');
+}
 function openNightDutyEdit(day){
   _nightDutyEditDay=day;
   const dayFull={Mon:'Monday',Tue:'Tuesday',Wed:'Wednesday',Thu:'Thursday',Fri:'Friday'};
@@ -31328,12 +31640,21 @@ function amGetCtx(){
   let ci=-1;for(let i=0;i<SLOTS.length;i++)if(nm>=t2m(getSlotTime(i)))ci=i;
   if(ci<0)return null;
   const cell=getCustomForWeek(offset,ci,dayName)||getBaseCell(ci,dayName);if(!cell)return null;
+  // Back-to-back slots with the same label+type are ONE commitment (e.g. a double
+  // lesson). Scan BOTH ways: forward for the true end, backward for the true start.
+  // Without the backward scan, the second half restarted the elapsed clock, the
+  // tick state and the session notes, because everything keys off slotIdx.
   let endIdx=ci;
   for(let i=ci+1;i<SLOTS.length;i++){const c=getCustomForWeek(offset,i,dayName)||getBaseCell(i,dayName);if(c&&c.l===cell.l&&c.tp===cell.tp)endIdx=i;else break;}
+  let rootIdx=ci;
+  for(let i=ci-1;i>=0;i--){const c=getCustomForWeek(offset,i,dayName)||getBaseCell(i,dayName);if(c&&c.l===cell.l&&c.tp===cell.tp)rootIdx=i;else break;}
+  ci=rootIdx; // every downstream key (notes, ticks, elapsed) uses the span root
   const et=slotEndTime(endIdx),sm=t2m(getSlotTime(ci));
   // Use custom start/end time if set on this slot
   const _cust=getCustomForWeek(offset,ci,dayName)||getBaseCell(ci,dayName);
-  const _custEt=_cust&&_cust.customEndTime?_cust.customEndTime:null;
+  // Start comes from the span's first slot, end from its last
+  const _custEnd=(endIdx!==ci)?(getCustomForWeek(offset,endIdx,dayName)||getBaseCell(endIdx,dayName)):_cust;
+  const _custEt=(_custEnd&&_custEnd.customEndTime)?_custEnd.customEndTime:(_cust&&_cust.customEndTime?_cust.customEndTime:null);
   const _custSt=_cust&&_cust.customStartTime?_cust.customStartTime:null;
   const em=_custEt?t2m(_custEt):t2m(et);
   const smEff=_custSt?t2m(_custSt):sm;
@@ -31907,7 +32228,15 @@ function _amLessonHtml(ctx,nowStr){
         <div class="lp-timer" style="color:${timerColor}">${timerStr}</div>
       </div>`;
     }).join('');
-    html+=`<div class="am-cl-section"><div class="am-cl-hdr"><span class="am-cl-title">Lesson Plan · ${totalPlanned}min</span><span style="font-size:10px;color:#555">${Math.round(elapsedMins)}min in</span></div>${rows}${_amAddSectionHtml(label)}</div>`;
+    // Quiet coverage line: only when something is actually timed
+    const _spanMins=Math.round(ctx.dur||0);
+    let _cov='';
+    if(totalPlanned>0&&_spanMins>0){
+      const d=_spanMins-totalPlanned;
+      if(d>=2)_cov=`<div style="font-size:10.5px;color:#6b7280;padding:2px 0 6px">${d} min of the ${_spanMins} min lesson unplanned</div>`;
+      else if(d<=-2)_cov=`<div style="font-size:10.5px;color:#a16207;padding:2px 0 6px">plan runs ${Math.abs(d)} min over the ${_spanMins} min lesson</div>`;
+    }
+    html+=`<div class="am-cl-section"><div class="am-cl-hdr"><span class="am-cl-title">Lesson Plan · ${totalPlanned}min</span><span style="font-size:10px;color:#555">${Math.round(elapsedMins)}min in</span></div>${_cov}${rows}${_amAddSectionHtml(label)}</div>`;
   }
   const live=snGetLive(offset,slotIdx,dayName);
   const liveItems=live.filter(b=>b.text.trim());
@@ -34328,6 +34657,9 @@ function _amBoardingRegisterHtml(type,excusedMap){
       const bg=statBg[st];
       globalIdx++;
       const _safeBrN=p.name.replace(/"/g,"&quot;");
+      // Staff must never read as a student mid-scroll: tint the row + tag it
+      const _isStaff=(TUTORS||[]).some(t=>t.name===p.name);
+      const _staffTag=_isStaff?'<span style="font-size:9px;padding:1px 5px;border-radius:6px;background:rgba(167,139,250,.2);color:#a78bfa;margin-left:6px;font-weight:700">Staff</span>':'';
       const _excTag=_exc?`<span style="font-size:10px;color:#f59e0b;display:block">${_exc.emoji} ${_exc.reason}</span>`:'';
       let _depBtn='';
       if(_exc&&_exc.type==='leave'){
@@ -34340,10 +34672,10 @@ function _amBoardingRegisterHtml(type,excusedMap){
           _depBtn=`<div style="margin-top:3px;display:flex;gap:4px;flex-wrap:wrap"><button onclick="_undoDeparture('${_lid2}')" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:transparent;color:#888;cursor:pointer">↩ Undo</button>${_retBtn2}</div>`;
         }
       }
-      rows+=`<div data-br-name="${_safeBrN}" style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.05);background:${bg}">
+      rows+=`<div data-br-name="${_safeBrN}" style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.05);background:${bg==='transparent'&&_isStaff?'rgba(167,139,250,.07)':bg}${_isStaff?';border-left:3px solid rgba(167,139,250,.5)':''}">
         <span style="font-size:10px;color:#555;min-width:22px;text-align:right;font-variant-numeric:tabular-nums">${globalIdx}.</span>
-        <div style="flex:1;font-size:13px;color:#e0e0e0;font-weight:500">
-          <span onclick="_brNameTap('${_safeBrN}')" style="cursor:pointer;border-bottom:1px dotted #666">${p.name}</span>
+        <div style="flex:1;font-size:13px;color:${_isStaff?'#c4b5fd':'#e0e0e0'};font-weight:${_isStaff?'600':'500'}">
+          <span onclick="_brNameTap('${_safeBrN}')" style="cursor:pointer;border-bottom:1px dotted #666">${p.name}</span>${_staffTag}
           ${(_nurseMap[p.name]||[]).length?'<span style="font-size:10px;color:#a855f7;margin-left:4px">🏥×'+(_nurseMap[p.name]||[]).length+'</span>':''}
           ${(_commentMap[p.name]||[]).length?'<span style="font-size:10px;color:#60a5fa;margin-left:4px">💬</span>':''}
           ${_excTag}${_depBtn}
@@ -35145,7 +35477,42 @@ function toggleAmDayPill(){
   _amDayPillHash='';_amDayPillTick();
 }
 function _amPillSaid(taskId){archivePoint(taskId);_amDayPillHash='';_amDayPillTick();try{renderWeekTasksView();}catch(e){}}
+// Duty strip: appears only inside the relevant windows (5 min either side),
+// merges concurrent duties into one line, invisible the rest of the time.
+function _amDutyTick(){
+  const el=document.getElementById('am-duty');if(!el)return;
+  try{
+    const now=new Date(),nm=now.getHours()*60+now.getMinutes();
+    const ds=_todayStr();
+    const M=5; // minutes of margin either side
+    const win=(s,e)=>{try{return nm>=t2m(s)-M&&nm<=t2m(e)+M;}catch(err){return false;}};
+    const parts=[];
+    // 1. House activity (window comes from the slot itself)
+    dutyActivitySlotsToday().forEach(a=>{
+      if(!win(a.st,a.et))return;
+      parts.push(`🏫 ${_esc(a.label)}: ${a.names.length?a.names.map(n=>_esc(n.split(' ')[0])).join(', '):'no one assigned'}`);
+    });
+    // 2. Prep / night duty
+    const prep=dutyPrepFor(ds);
+    if(prep.length){
+      const m=_dutyTutorMeta(prep[0]);
+      if(win(m.start,m.end)){
+        const rooms=prep.map(n=>{const t=(TUTORS||[]).find(x=>x.name===n);return _esc(n.split(' ')[0])+(t&&t.room?' ('+_esc(t.room)+')':'');});
+        parts.push(`🌙 Prep duty: ${rooms.join(', ')} · ${m.start}–${m.end}`);
+      }
+    }
+    // 3. Boarding team
+    if(win(DUTY_META.boardStart,DUTY_META.boardEnd)){
+      const team=dutyBoardingTeamFor(ds);
+      if(team.length)parts.push(`🏠 On duty: ${team.map(n=>_esc(String(n).split(' ')[0])).join(', ')}`);
+    }
+    if(!parts.length){el.style.display='none';el.innerHTML='';return;}
+    el.style.display='block';
+    el.innerHTML=parts.join(' <span style="color:#334155">·</span> ');
+  }catch(e){el.style.display='none';}
+}
 function _amDayPillTick(){
+  _amDutyTick();
   // Birthday banner — shows all day when a house student's birthday is today
   try{
     const bEl=document.getElementById('am-bday');
@@ -35435,9 +35802,8 @@ function _amChecklistHtml(planned,live,state,offset,slotIdx,dayName){
   html+=`<div class="cl-section-sep" style="color:#f59f00;margin-top:${planItems.length?'4px':'0'}">⊙ This occurrence</div>`;
   if(liveItems.length){
     liveItems.forEach(b=>html+=renderItem(b,true));
-  } else {
-    html+=`<div style="font-size:11px;color:#333;padding:4px 0 2px">Nothing added yet for this occurrence.</div>`;
   }
+  // (no "nothing added yet" text — the + note input below IS the empty state)
 
   html+=`<div class="am-live-add">
     <input class="am-live-input" id="am-live-inp" placeholder="+ note" onkeydown="if(event.key==='Enter'){amAddLiveItem();event.preventDefault();}">
@@ -35449,9 +35815,8 @@ function _amChecklistHtml(planned,live,state,offset,slotIdx,dayName){
 function _amEmptyPlanHtml(label){
   return`<div class="am-cl-section">
     <div class="cl-section-sep" style="color:#60a5fa;border-top:none;padding-top:0">↻ Recurring</div>
-    <div style="font-size:11px;color:#333;padding:4px 0 8px">No recurring plan yet. Tap <strong style="color:#888">📋 Edit plan</strong> to add bullet points.</div>
+    <div style="border:1px dashed #2a2a2a;border-radius:7px;height:22px;margin:3px 0 8px"></div>
     <div class="cl-section-sep" style="color:#f59f00">⊙ This occurrence</div>
-    <div style="font-size:11px;color:#333;padding:4px 0 2px">Nothing added yet for this occurrence.</div>
     <div class="am-live-add">
       <input class="am-live-input" id="am-live-inp" placeholder="+ note" onkeydown="if(event.key==='Enter'){amAddLiveItem();event.preventDefault();}">
       <button class="am-live-submit" onclick="amAddLiveItem()">+</button>
@@ -35533,7 +35898,6 @@ function _amFreeHtml(nowStr){
     <div class="am-free-lbl">Next commitment in</div>
     <div class="am-free-cd" id="am-free-cd-el">${str}</div>
     <div class="am-free-next"><strong style="color:${next.cat.color}">${_esc(next.label)}</strong> at ${next.st}</div>
-    <div style="font-size:11px;color:#666;margin-top:.4rem">${human} from now</div>
   </div>
   <div class="am-time-row" style="padding:.5rem 1rem"><div class="am-now-block"><div class="am-now-lbl">Now</div><div class="am-now-val" id="am-now-val-el">${nowStr}</div></div></div>
   ${_amNextHtml(next)}`;
@@ -35659,7 +36023,7 @@ function initActiveMode(){
 <script>
 // Visible build number — must match the service worker's CACHE_NAME version.
 // Lets anyone confirm at a glance which build a device is actually running.
-const APP_BUILD='v228';
+const APP_BUILD='v229';
 try{document.getElementById('app-build-tag').textContent='build '+APP_BUILD;console.log('LA Work '+APP_BUILD);}catch(e){}
 </script>
 
