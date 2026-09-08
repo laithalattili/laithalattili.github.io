@@ -1213,9 +1213,9 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
   <div id="lists-hawking" class="lists-panel active">
     <!-- Sub-tab bar -->
     <div id="hwk-stab-bar" style="display:flex;border-bottom:2px solid var(--border);background:var(--bg);position:sticky;top:calc(var(--hdr-h,100px) + var(--lists-sub-h,44px));z-index:45;overflow-x:auto">
-      <button class="hwk-stab active" id="hwk-stab-tutees" onclick="setHwkFilter('tutees',this)"><svg class="ico"><use href="#i-users"/></svg> Tutees</button>
-      <button class="hwk-stab" id="hwk-stab-register" onclick="setHwkFilter('register',this)"><svg class="ico"><use href="#i-clip"/></svg> Register</button>
-      <button class="hwk-stab" id="hwk-stab-daily" onclick="setHwkFilter('daily',this)"><svg class="ico"><use href="#i-chart"/></svg> Daily</button>
+      <!-- Tutees + Daily retired: the roster lives in the 👥 House sheet (live mode),
+           which also shows all three registration sessions as dots per student -->
+      <button class="hwk-stab active" id="hwk-stab-register" onclick="setHwkFilter('register',this)"><svg class="ico"><use href="#i-clip"/></svg> Register</button>
       <button class="hwk-stab" id="hwk-stab-away" onclick="setHwkFilter('away',this)"><svg class="ico"><use href="#i-plane"/></svg> Away</button>
       <button class="hwk-stab" id="hwk-stab-sanctions" onclick="setHwkFilter('sanctions',this)"><svg class="ico"><use href="#i-alert"/></svg> Sanctions<span id="hwk-sanctions-badge" style="display:none;background:#dc2626;color:#fff;font-size:9px;padding:1px 4px;border-radius:8px;margin-left:3px;font-weight:700"></span></button>
     </div>
@@ -1521,7 +1521,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
     <!-- Archived -->
     <div class="settings-section">
       <div class="settings-section-title" onclick="toggleSettingsSection('archived_students',this)">
-        Archived Students
+        <span>Archived Students <span id="archived-title-count" style="font-weight:600;color:#868e96;text-transform:none;letter-spacing:0"></span></span>
         <span id="ss-chev-archived_students" style="font-size:12px;transition:transform .2s;display:inline-block">▼</span>
       </div>
       <div class="settings-section-body" id="ss-body-archived_students">
@@ -23372,9 +23372,23 @@ function closeArchiveModal(){document.getElementById('archive-modal').classList.
 function confirmArchive(){
   if(!archivePending)return;
   const dateLeft=gv('archive-date-left'),reason=gv('archive-reason');
-  ARCHIVED.push({name:archivePending,dateLeft,reason,dateRemoved:_todayStr()});
+  // Keep a snapshot of the student record so a restore loses nothing
+  const snap=(STUDENTS||[]).find(s=>s.name===archivePending)||null;
+  ARCHIVED.push({name:archivePending,dateLeft,reason,dateRemoved:_todayStr(),rec:snap?{...snap}:null});
   STUDENTS=STUDENTS.filter(s=>s.name!==archivePending);
   savePeople();renderSettingsPeople();closeArchiveModal();
+}
+function restoreArchivedStudent(name){
+  const a=(ARCHIVED||[]).find(x=>x.name===name);if(!a)return;
+  if(!confirm('Restore '+name+' to the active house list?'))return;
+  ARCHIVED=ARCHIVED.filter(x=>x.name!==name);
+  if(!STUDENTS.some(s=>s.name===name))STUDENTS.push(a.rec?{...a.rec}:{name,tutor:''});
+  savePeople();renderSettingsPeople();
+}
+function deleteArchivedStudent(name){
+  if(!confirm('Permanently remove the archived record for '+name+'?\n\nTheir notes and history in the database are kept (keyed by name), but this archive entry is gone for good.'))return;
+  ARCHIVED=ARCHIVED.filter(x=>x.name!==name);
+  savePeople();renderSettingsPeople();
 }
 function removeTutor(name){if(!confirm('Remove tutor '+name+'? Their students will need to be reassigned.'))return;TUTORS=TUTORS.filter(t=>t.name!==name);savePeople();renderSettingsPeople();}
 function renderSettingsPeople(){
@@ -23423,10 +23437,23 @@ function renderSettingsPeople(){
     }).join('')||'<div style="padding:.75rem 1rem;font-size:12px;color:#868e96">No students yet.</div>';
   }
   // Archived
+  const ac=document.getElementById('archived-title-count');if(ac)ac.textContent='· '+ARCHIVED.length;
   const al=document.getElementById('archived-list');
   if(al){
     if(!ARCHIVED.length){al.innerHTML='<div style="padding:.75rem 1rem;font-size:12px;color:#868e96">No archived students.</div>';return;}
-    al.innerHTML=ARCHIVED.map(a=>`<div class="archived-item"><div class="archived-name">${a.name}</div><div class="archived-meta">Left: ${a.dateLeft||'—'} · Removed: ${a.dateRemoved||'—'}<br>Reason: ${a.reason||'—'}</div></div>`).join('');
+    al.innerHTML=ARCHIVED.map(a=>{
+      const e=a.name.replace(/'/g,"\\'");
+      return `<div class="archived-item" style="display:flex;align-items:flex-start;gap:8px">
+        <div style="flex:1;min-width:0">
+          <div class="archived-name">${a.name}</div>
+          <div class="archived-meta">Left: ${a.dateLeft||'—'} · Removed: ${a.dateRemoved||'—'}<br>Reason: ${a.reason||'—'}</div>
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0;padding-top:2px">
+          <button class="person-btn" onclick="restoreArchivedStudent('${e}')">↩ Restore</button>
+          <button class="person-btn danger" onclick="deleteArchivedStudent('${e}')">Delete</button>
+        </div>
+      </div>`;
+    }).join('');
   }
 }
 function requestSettingsPin(){
@@ -24320,8 +24347,8 @@ function loadGlobalDefault(){
     localStorage.removeItem('defaultTTView');
     if(s.liveOpen){setTimeout(function(){if(typeof amOpen!=='undefined')amOpen();},500);}
     if(s.tab){
-      // Never auto-restore to settings tab — it requires PIN each visit
-      const safeTab=s.tab==='settings'?'sched':s.tab;
+      // Settings is allowed as the default: it lands on its unlock screen
+      const safeTab=s.tab;
       _activeMainTab=safeTab;
       const tabEl=document.querySelector(`.tab[onclick*="showTab('${safeTab}'"]`);
       document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
@@ -27122,24 +27149,48 @@ async function renderAwayList(el){
   el.innerHTML=html;
 }
 
-async function renderHawkingRegister(el, preloadedMap){
-  const excusedMap=preloadedMap||window._cachedExcusedMap||await getTodayExcusedMap();
-  window._cachedExcusedMap=excusedMap; // cache for filter clicks
-  // Load today's active penalties for badge display
+// Today's register-badge penalties, cached 60s so renders never wait on it twice
+let _regPenCache={date:null,map:{},at:0};
+async function _fetchRegPenalties(){
   const today=_todayStr();
-  let _penaltyMap={};
+  if(_regPenCache.date===today&&Date.now()-_regPenCache.at<60000)return _regPenCache.map;
+  const m={};
   try{
     const {data}=await supa.from('boarding_penalties')
       .select('student_name,infraction_type,penalty_date,status')
       .in('status',['active','pending'])
       .neq('infraction_type','late_floor')
       .eq('infraction_date',today);
-    (data||[]).forEach(p=>{
-      if(!_penaltyMap[p.student_name])_penaltyMap[p.student_name]=[];
-      _penaltyMap[p.student_name].push(p);
-    });
+    (data||[]).forEach(p=>{(m[p.student_name]=m[p.student_name]||[]).push(p);});
+    _regPenCache={date:today,map:m,at:Date.now()};
   }catch(e){}
-
+  return m;
+}
+// PAINT FIRST: render instantly from cached data, refresh both queries in
+// parallel in the background, re-render once only if something changed.
+async function renderHawkingRegister(el, preloadedMap){
+  const cachedExc=preloadedMap||window._cachedExcusedMap||null;
+  const cachedPen=(_regPenCache.date===_todayStr())?_regPenCache.map:{};
+  _renderHawkingRegisterNow(el,cachedExc||{},cachedPen);
+  const token=(window._hrTok=(window._hrTok||0)+1);
+  try{
+    const[exc,pen]=await Promise.all([
+      preloadedMap?Promise.resolve(preloadedMap):getTodayExcusedMap(),
+      _fetchRegPenalties()
+    ]);
+    if(window._hrTok!==token)return; // a newer render superseded this one
+    const changed=JSON.stringify(exc)!==JSON.stringify(cachedExc)||JSON.stringify(pen)!==JSON.stringify(cachedPen);
+    window._cachedExcusedMap=exc;
+    if(changed){
+      const sy=window.scrollY;
+      _renderHawkingRegisterNow(el,exc,pen);
+      window.scrollTo(0,sy);
+    }
+  }catch(e){}
+}
+function _renderHawkingRegisterNow(el, excusedMap, _penaltyMap){
+  excusedMap=excusedMap||{};_penaltyMap=_penaltyMap||{};
+  const today=_todayStr();
   // Use _hwkScope to determine people list
   let people=[];
   STUDENTS.forEach((s,i)=>{
@@ -27385,7 +27436,7 @@ function renderTeachingTotals(){
   // No longer a row — count is shown inline in class header. Noop kept for compat.
 }
 
-let _hwkFilter=(()=>{try{return localStorage.getItem('hwkFilter')||'tutees';}catch{return 'tutees';}})();
+let _hwkFilter=(()=>{try{const f=localStorage.getItem('hwkFilter')||'register';return (f==='tutees'||f==='daily')?'register':f;}catch{return 'register';}})();
 let _hwkScope=(()=>{try{return localStorage.getItem('hwkScope')||'all';}catch{return 'all';}})(); // 'all' | 'boarders'
 let _boarderGrouping='grade'; // 'grade' | 'room'
 
@@ -27541,6 +27592,8 @@ function toggleHwkGrade(gr){
 
 function renderHawkingList(){
   const el=document.getElementById('hawking-list-content');if(!el)return;
+  // Tutees + Daily tabs are retired — anything restored from an old saved state lands on Register
+  if(_hwkFilter==='tutees'||_hwkFilter==='daily'||!_hwkFilter)_hwkFilter='register';
   document.querySelectorAll('.hwk-filter-btn').forEach(b=>b.classList.remove('active'));
   const activeBtn=document.getElementById('hwk-f-'+_hwkFilter);
   if(activeBtn)activeBtn.classList.add('active');
@@ -28711,8 +28764,22 @@ document.addEventListener('click',e=>{
 // ══ HOUSE STATUS SHEET — read-only quick view of today's register state ══
 // Same data the registers use (_brStateMerged + leave map); no write handlers.
 let _hsFilter='all',_hsGroup='grade';
+try{_hsFilter=localStorage.getItem('hsFilter')||'all';_hsGroup=localStorage.getItem('hsGroup')||'grade';}catch(e){}
+function _hsSetFilter(f){_hsFilter=f;try{localStorage.setItem('hsFilter',f);}catch(e){}_hsRender();}
+function _hsSetGroup(g){_hsGroup=g;try{localStorage.setItem('hsGroup',g);}catch(e){}_hsRender();}
+// Active/pending sanctions per student, cached 60s (shared with the sheet markers)
+let _penCache={date:null,map:{},at:0};
+async function _getPenaltyMap(){
+  const today=_todayStr();
+  if(_penCache.date===today&&Date.now()-_penCache.at<60000)return _penCache.map;
+  try{
+    const{data}=await supa.from('boarding_penalties').select('student_name,status').in('status',['active','pending']);
+    const m={};(data||[]).forEach(p=>{(m[p.student_name]=m[p.student_name]||[]).push(p);});
+    _penCache={date:today,map:m,at:Date.now()};
+  }catch(e){}
+  return _penCache.map;
+}
 async function openHouseSheet(){
-  _hsFilter='all';
   _purgeArchivedFromActive();
   document.getElementById('hs-overlay')?.remove();
   const ov=document.createElement('div');ov.id='hs-overlay';
@@ -28728,30 +28795,32 @@ async function openHouseSheet(){
         style="width:100%;box-sizing:border-box;font-size:15px;padding:9px 12px;border:1.5px solid var(--border2);border-radius:9px;outline:none;margin-top:8px">
       <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
         <div style="display:flex;gap:2px;background:var(--bg3);border-radius:7px;padding:2px">
-          ${['all','boarders','day'].map(f=>`<button id="hs-f-${f}" onclick="_hsFilter='${f}';_hsRender()" style="border:none;border-radius:5px;font-size:11px;font-weight:700;padding:5px 11px;cursor:pointer;background:none;color:var(--text3)">${f==='all'?'All':f==='boarders'?'Boarders':'Day'}</button>`).join('')}
+          ${['all','boarders','day','away'].map(f=>`<button id="hs-f-${f}" onclick="_hsSetFilter('${f}')" style="border:none;border-radius:5px;font-size:11px;font-weight:700;padding:5px 11px;cursor:pointer;background:none;color:var(--text3)">${f==='all'?'All':f==='boarders'?'Boarders':f==='day'?'Day':'Away'}</button>`).join('')}
         </div>
         <div style="display:flex;gap:2px;background:var(--bg3);border-radius:7px;padding:2px;margin-left:auto">
-          ${['grade','tutor'].map(g=>`<button id="hs-g-${g}" onclick="_hsGroup='${g}';_hsRender()" style="border:none;border-radius:5px;font-size:11px;font-weight:700;padding:5px 11px;cursor:pointer;background:none;color:var(--text3)">${g==='grade'?'By grade':'By tutor'}</button>`).join('')}
+          ${['grade','tutor'].map(g=>`<button id="hs-g-${g}" onclick="_hsSetGroup('${g}')" style="border:none;border-radius:5px;font-size:11px;font-weight:700;padding:5px 11px;cursor:pointer;background:none;color:var(--text3)">${g==='grade'?'By grade':'By tutor'}</button>`).join('')}
         </div>
       </div>
-      <div id="hs-updated" style="font-size:10px;color:#adb5bd;margin-top:6px">Loading latest register state…</div>
+      <div id="hs-updated" style="font-size:10px;color:#adb5bd;margin-top:6px;display:flex;justify-content:space-between;gap:8px"><span id="hs-summary">Loading latest register state…</span><span style="flex-shrink:0" title="Session dots: Morning · Prep · Hoob">M·P·H</span></div>
     </div>
     <div id="hs-body" style="flex:1;overflow-y:auto;padding:4px 0 20px;-webkit-overflow-scrolling:touch"></div>
   </div>`;
   document.body.appendChild(ov);
-  _hsRender();
+  _hsRender(); // paint instantly from cached data
   try{
-    await _brLoadToday();
-    if(typeof getTodayExcusedMap==='function')window._cachedExcusedMap=await getTodayExcusedMap();
+    // refresh everything in parallel, then re-render once
+    const jobs=[_brLoadToday(),_getPenaltyMap()];
+    if(typeof getTodayExcusedMap==='function')jobs.push(getTodayExcusedMap().then(m=>{window._cachedExcusedMap=m;}));
+    await Promise.all(jobs);
   }catch(e){}
-  const upd=document.getElementById('hs-updated');
-  if(upd)upd.textContent='Live from register data · updated '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const sm=document.getElementById('hs-summary');
+  if(sm)sm.dataset.fresh='1';
   _hsRender();
 }
 function _hsRender(){
   const body=document.getElementById('hs-body');if(!body)return;
   const q=(document.getElementById('hs-search')?.value||'').trim().toLowerCase();
-  ['all','boarders','day'].forEach(f=>{const b=document.getElementById('hs-f-'+f);if(b){const on=_hsFilter===f;b.style.background=on?'#fff':'none';b.style.color=on?'var(--text)':'var(--text3)';b.style.boxShadow=on?'0 1px 3px rgba(0,0,0,.1)':'none';}});
+  ['all','boarders','day','away'].forEach(f=>{const b=document.getElementById('hs-f-'+f);if(b){const on=_hsFilter===f;b.style.background=on?'#fff':'none';b.style.color=on?'var(--text)':'var(--text3)';b.style.boxShadow=on?'0 1px 3px rgba(0,0,0,.1)':'none';}});
   ['grade','tutor'].forEach(g=>{const b=document.getElementById('hs-g-'+g);if(b){const on=_hsGroup===g;b.style.background=on?'#fff':'none';b.style.color=on?'var(--text)':'var(--text3)';b.style.boxShadow=on?'0 1px 3px rgba(0,0,0,.1)':'none';}});
   const exMap=window._cachedExcusedMap||{};
   const merged=(typeof _brStateMerged!=='undefined'&&_brStateMerged)||{};
@@ -28762,6 +28831,7 @@ function _hsRender(){
     const hw=HAWKING_STATUS[s.name]||{};
     if(_hsFilter==='boarders'&&!hw.boarder)return false;
     if(_hsFilter==='day'&&hw.boarder)return false;
+    if(_hsFilter==='away'&&!exMap[s.name])return false;
     if(q){const cn=(hw.cn||'').toLowerCase();if(!s.name.toLowerCase().includes(q)&&!cn.includes(q))return false;}
     return true;
   });
@@ -28772,21 +28842,48 @@ function _hsRender(){
     if(exc&&((exc.state==='excused')||(exc.type==='activity')||(exc.leave_type==='longterm')))st='excused';
     return {st,st0,exc};
   };
+  const penMap=(_penCache.date===_todayStr())?_penCache.map:{};
+  const states=(typeof _brStates!=='undefined'&&_brStates)||{};
+  const dotCol={present:'#16a34a',absent:'#dc2626',excused:'#d97706',late:'#d97706'};
+  const dots=name=>['morning','prep','hoob'].map(k=>{
+    const st=((states[k]||{})[name]||{}).status||'';
+    return `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${dotCol[st]||'#d9dde3'}"></span>`;
+  }).join('');
+  const fmtRet=v=>{try{return new Date(String(v).split('T')[0]+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});}catch(e){return'';}};
   const row=s=>{
     const hw=HAWKING_STATUS[s.name]||{};
     const{st,st0,exc}=effSt(s.name);
     const when=st0.updatedAt?_brFormatTime(st0.updatedAt):'';
     const by=st0.updatedBy||'';
     const sess=st0.session?(' · '+st0.session):'';
-    const away=(st==='excused'&&exc)?(' · '+(exc.emoji||'✈')+' '+(exc.reason||exc.leave_type||'away')):'';
+    const ret=exc&&exc.returnPlanned?(' · back '+fmtRet(exc.returnPlanned)):'';
+    const away=(st==='excused'&&exc)?(' · '+(exc.emoji||'✈')+' '+(exc.reason||exc.leave_type||'away')+ret):'';
+    const sanc=(penMap[s.name]&&penMap[s.name].length)?` <span title="Active sanction" style="font-size:10px">⚠</span>`:'';
     return `<div style="display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid #f5f6f7">
       <div style="flex:1;min-width:0">
-        <div style="font-size:13.5px;font-weight:600;color:#111">${_scName(s.name)}${_isBirthdayToday(s.dob)?' 🎂':''} <span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:7px;background:${hw.boarder?'#e0f2fe':'#f1f5f9'};color:${hw.boarder?'#0369a1':'#64748b'}">${hw.boarder?'B':'D'}</span></div>
-        <div style="font-size:10px;color:#adb5bd">${_hsGroup==='grade'?(s.tutor||''):_getStudentGrade(s.name)}${when?(' · '+when+(by?' by '+_esc(by):'')+sess):' · not registered today'}${away}</div>
+        <div style="font-size:13.5px;font-weight:600;color:#111">${_scName(s.name)}${_isBirthdayToday(s.dob)?' 🎂':''}${sanc} <span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:7px;background:${hw.boarder?'#e0f2fe':'#f1f5f9'};color:${hw.boarder?'#0369a1':'#64748b'}">${hw.boarder?'B':'D'}</span></div>
+        <div style="font-size:10px;color:#adb5bd">${(()=>{
+          // Searching: full context (grade + tutor + tutor room). Otherwise the grouping's complement.
+          const tut=(TUTORS||[]).find(t=>t.name===s.tutor);
+          const room=tut&&tut.room?(' · '+_esc(tut.room)):'';
+          if(q)return _getStudentGrade(s.name)+(s.tutor?(' · '+_esc(s.tutor)+room):'');
+          return _hsGroup==='grade'?((s.tutor||'')+room):_getStudentGrade(s.name);
+        })()}${when?(' · '+when+(by?' by '+_esc(by):'')+sess):' · not registered today'}${away}</div>
       </div>
-      <span style="flex-shrink:0;font-size:11px;font-weight:800;color:${stCol[st]||'#adb5bd'}">${stLbl[st]||_esc(st)}</span>
+      <span style="flex-shrink:0;display:inline-flex;gap:3px;align-items:center;margin-right:2px">${dots(s.name)}</span>
+      <span style="flex-shrink:0;font-size:11px;font-weight:800;color:${stCol[st]||'#adb5bd'};min-width:52px;text-align:right">${stLbl[st]||_esc(st)}</span>
     </div>`;
   };
+  // Day summary across all active students (independent of the current filter)
+  try{
+    const sm=document.getElementById('hs-summary');
+    if(sm){
+      const all=(STUDENTS||[]).filter(s=>s.name&&!_isArchived(s.name));
+      let inN=0,awayN=0,unregN=0;
+      all.forEach(s=>{const r=effSt(s.name);if(r.st==='present')inN++;else if(r.st==='excused')awayN++;else if(r.st==='unregistered')unregN++;});
+      sm.textContent=`${inN} present · ${awayN} away/excused · ${unregN} not registered`+(sm.dataset.fresh?` · updated ${new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`:'');
+    }
+  }catch(e){}
   let html='';
   if(q){
     html=students.map(row).join('')||'<div style="padding:20px;text-align:center;color:#adb5bd;font-size:13px">No matches.</div>';
@@ -28794,11 +28891,30 @@ function _hsRender(){
     const groups={};
     students.forEach(s=>{const k=_hsGroup==='grade'?(_getStudentGrade(s.name)||'Unknown'):(s.tutor||'No tutor');(groups[k]=groups[k]||[]).push(s);});
     const go=getGrades();
-    const keys=_hsGroup==='grade'?go.concat(Object.keys(groups).filter(k=>!go.includes(k))):Object.keys(groups).sort();
+    let keys;
+    if(_hsGroup==='grade'){
+      keys=go.concat(Object.keys(groups).filter(k=>!go.includes(k)));
+    }else{
+      // Tutor groups in grade-level order (tutor's grade, then name)
+      const gIdx=g=>{const i=go.indexOf(String(g||'').trim());return i<0?99:i;};
+      keys=Object.keys(groups).sort((a,b)=>{
+        const ta=(TUTORS||[]).find(t=>t.name===a),tb=(TUTORS||[]).find(t=>t.name===b);
+        return gIdx(ta&&ta.grade)-gIdx(tb&&tb.grade)||a.localeCompare(b);
+      });
+    }
     keys.forEach(k=>{
       const arr=groups[k];if(!arr||!arr.length)return;
       const pres=arr.filter(s=>effSt(s.name).st==='present').length;
-      html+=`<div style="position:sticky;top:0;background:#f8f9fa;padding:5px 16px;font-size:10px;font-weight:800;color:#868e96;text-transform:uppercase;letter-spacing:.06em;z-index:2">${_esc(k)} · ${pres}/${arr.length} present</div>`+arr.map(row).join('');
+      let hdrLabel;
+      if(_hsGroup==='tutor'&&k!=='No tutor'){
+        const tut=(TUTORS||[]).find(t=>t.name===k);
+        hdrLabel=`<span style="font-size:12px;font-weight:800;color:#00205B;text-transform:none;letter-spacing:0">${_esc(k)}</span>`
+          +(tut&&tut.room?` <span style="font-size:9.5px;font-weight:700;color:#475569;background:#e2e8f0;border-radius:7px;padding:1px 7px;letter-spacing:0;text-transform:none">${_esc(tut.room)}</span>`:'')
+          +(tut&&tut.grade?` <span style="font-size:9.5px;color:#94a3b8;letter-spacing:0;text-transform:none">${_esc(tut.grade)}</span>`:'');
+      }else{
+        hdrLabel=_esc(k);
+      }
+      html+=`<div style="position:sticky;top:0;background:#f8f9fa;padding:5px 16px;font-size:10px;font-weight:800;color:#868e96;text-transform:uppercase;letter-spacing:.06em;z-index:2;display:flex;align-items:center;gap:5px"><span style="flex:1;display:flex;align-items:center;gap:5px">${hdrLabel}</span><span>${pres}/${arr.length} present</span></div>`+arr.map(row).join('');
     });
     if(!html)html='<div style="padding:20px;text-align:center;color:#adb5bd;font-size:13px">No students.</div>';
   }
@@ -29274,7 +29390,8 @@ function doHouseBulkImport(){
   if(replChk&&replChk.checked&&missing.length){
     if(confirm('Replace mode: '+missing.length+' student(s) are not in your paste and will be ARCHIVED (kept with all their history, just moved out of the active list):\n\n'+missing.join(', ')+'\n\nProceed?')){
       missing.forEach(n=>{
-        ARCHIVED.push({name:n,dateLeft:_todayStr(),reason:'Not in replacement list import',dateRemoved:_todayStr()});
+        const snap=(STUDENTS||[]).find(s=>s.name===n)||null;
+        ARCHIVED.push({name:n,dateLeft:_todayStr(),reason:'Not in replacement list import',dateRemoved:_todayStr(),rec:snap?{...snap}:null});
       });
       STUDENTS=STUDENTS.filter(s=>seen.has(s.name.toLowerCase()));
       archivedN=missing.length;
@@ -34066,6 +34183,8 @@ function _subscribePenaltiesRealtime(){
 // ── BOARDING REGISTER STATE (Supabase-synced) ────────────────
 let _brState={}; // current session {name:{status,updatedAt,updatedBy}}
 let _brStates={}; // all sessions {session:{name:{status,...}}}
+let _brStateMerged={}; // most recent registration per student across sessions
+                       // (declared here — reading it before the first load used to throw)
 let _brCurrentSession='prep';
 let _brCollapsed=false;
 let _brRealtimeSub=null;
@@ -34457,7 +34576,9 @@ function _brTap(name,status,sessionType){
   } else {
     _brRerender(); // fallback
   }
-  _brRefreshListsTab();
+  // Only refresh the Lists register when it is actually on screen — re-rendering
+  // a hidden tab (with its network fetches) on every tap competed with the UI.
+  if(_activeMainTab==='lists')_brRefreshListsTab();
   // Async Supabase sync with retry
   async function _syncBrTap(){
     const today=_brToday();
@@ -35149,8 +35270,11 @@ function amRender(){
       // Use cached map instantly, refresh in background
       body.innerHTML=_amBoardingRegisterHtml(_bType,window._lastExcusedMap||{});
       getTodayExcusedMap().then(excMap=>{
+        // Repaint only if the leave data actually changed — an unconditional
+        // late replace reset scroll and read as tap lag.
+        const changed=JSON.stringify(excMap)!==JSON.stringify(window._lastExcusedMap||{});
         window._lastExcusedMap=excMap;
-        body.innerHTML=_amBoardingRegisterHtml(_bType,excMap);
+        if(changed){const _sc=body.scrollTop;body.innerHTML=_amBoardingRegisterHtml(_bType,excMap);body.scrollTop=_sc;}
       });
       return;
     }
@@ -35171,14 +35295,14 @@ function amRender(){
       const _brType=_custSlot2.boarding_register?'boarding':'house';
       const _brWrapper=document.createElement('div');
       _brWrapper.setAttribute('data-br-section',_brType);
-      // Show loading placeholder immediately
-      _brWrapper.innerHTML='<div style="padding:1rem;text-align:center;color:#555;font-size:12px">Loading register...</div>';
+      // PAINT FIRST from the cached leave map; refresh in background if changed
+      _brWrapper.innerHTML=_amBoardingRegisterHtml(_brType,window._lastExcusedMap||window._cachedExcusedMap||{});
       body.appendChild(_brWrapper);
-      // Fetch fresh excused map then render
       getTodayExcusedMap().then(m=>{
+        const changed=JSON.stringify(m)!==JSON.stringify(window._lastExcusedMap||window._cachedExcusedMap||{});
         window._lastExcusedMap=m;
         window._cachedExcusedMap=m;
-        _brWrapper.innerHTML=_amBoardingRegisterHtml(_brType,m);
+        if(changed)_brWrapper.innerHTML=_amBoardingRegisterHtml(_brType,m);
       });
     }
     // Context items (points + today's tasks) for this slot
@@ -35535,7 +35659,7 @@ function initActiveMode(){
 <script>
 // Visible build number — must match the service worker's CACHE_NAME version.
 // Lets anyone confirm at a glance which build a device is actually running.
-const APP_BUILD='v225';
+const APP_BUILD='v228';
 try{document.getElementById('app-build-tag').textContent='build '+APP_BUILD;console.log('LA Work '+APP_BUILD);}catch(e){}
 </script>
 
