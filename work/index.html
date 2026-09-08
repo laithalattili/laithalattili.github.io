@@ -1067,7 +1067,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
   </div>
   <div id="am-day-pill-body" style="display:none;margin:6px 12px 0"></div>
   <div id="am-bday" style="display:none;margin:6px 12px 0;padding:6px 12px;border:1px solid rgba(236,72,153,.4);border-radius:14px;background:rgba(236,72,153,.1);color:#f472b6;font-size:11.5px;font-weight:700;width:fit-content"></div>
-  <div id="am-duty" style="display:none;margin:6px 12px 0;padding:6px 12px;border:1px solid rgba(56,189,248,.35);border-radius:14px;background:rgba(56,189,248,.09);color:#38bdf8;font-size:11.5px;font-weight:700;width:fit-content"></div>
+  <div id="am-duty" style="display:none;margin:6px 12px 0;padding:7px 12px;border:1px solid rgba(148,163,184,.22);border-radius:12px;background:rgba(30,41,59,.55)"></div>
   <div class="panel-body" id="am-body"></div>
 </div>
 
@@ -1142,6 +1142,9 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       <label class="tt-opt-row" onclick="toggleExtendedOpt()">
         <span class="tt-opt-label">Show overnight (00:00–07:00 &amp; 23:00)</span>
         <div class="tt-opt-toggle" id="opt-toggle-ext"></div>
+      </label>
+      <label class="tt-opt-row" onclick="toggleTTOptions();purgeLegacyBaseSlots()" style="border-top:1px solid var(--border3);padding-top:.5rem;margin-top:.1rem">
+        <span class="tt-opt-label">🧹 Remove old built-in timetable items…</span>
       </label>
       <label class="tt-opt-row" onclick="toggleTTOptions();ttEditMode?lockEditMode():requestEditMode()" style="border-top:1px solid var(--border3);padding-top:.5rem;margin-top:.1rem">
         <span class="tt-opt-label">✏️ Edit timetable…</span>
@@ -23597,10 +23600,123 @@ function _renderDayHeaderBar(){
     else if(isToday)st='background:rgba(245,159,0,.08);color:#7d5800;font-weight:700;border-bottom:2px solid #f59f00';
     else if(isWknd)st='background:#f0f0f5;color:#868e96';
     const dl=`<br><span style="font-size:9px;font-weight:400;color:${isSel?'rgba(255,255,255,.85)':isToday?'#7d5800':'#868e96'}">${dt.getDate()}</span>`;
-    h+=`<th class="tt-dow" onclick="ttPickDay('${d}',${offset})" style="${st}">${d}${isToday?' \u25C6':''}${dl}</th>`;
+    h+=`<th class="tt-dow" onclick="_dayMenuTap('${d}',${offset})" oncontextmenu="openDayMenu('${d}',${offset});event.preventDefault();" ontouchstart="_dayMenuStart('${d}',${offset})" ontouchend="_dayMenuEnd()" ontouchmove="_dayMenuEnd()" style="${st}">${d}${isToday?' \u25C6':''}${dl}</th>`;
   });
   h+='<th style="width:34px;font-size:8px;background:#f8f9fa">Time</th></tr></thead>';
   theadTbl.innerHTML=h;
+}
+// ══ DAY HEADER LONG-PRESS ═════════════════════════════════════════
+// Day-scoped actions. Off days are written through the EXISTING holidays
+// system rather than a parallel "off" flag, so there is one source of truth.
+let _dayMenuTimer=null,_dayMenuFired=false;
+function _dayMenuStart(dayName,weekOffset){
+  _dayMenuFired=false;
+  clearTimeout(_dayMenuTimer);
+  _dayMenuTimer=setTimeout(()=>{_dayMenuFired=true;openDayMenu(dayName,weekOffset);},550);
+}
+function _dayMenuEnd(){clearTimeout(_dayMenuTimer);}
+function _dayMenuTap(dayName,weekOffset){
+  clearTimeout(_dayMenuTimer);
+  if(_dayMenuFired){_dayMenuFired=false;return;} // long-press already handled it
+  ttPickDay(dayName,weekOffset);
+}
+function _dateForDay(dayName,weekOffset){
+  const mon=getWeekMondayFor(weekOffset||0);
+  const d=new Date(mon);d.setDate(mon.getDate()+DAYS.indexOf(dayName));
+  return d.toLocaleDateString('en-CA');
+}
+function openDayMenu(dayName,weekOffset){
+  const ds=_dateForDay(dayName,weekOffset);
+  const d=new Date(ds+'T00:00:00');
+  const nice=d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
+  const isOff=(typeof HOL_DATES!=='undefined')&&HOL_DATES.has(ds);
+  const offName=isOff?((CAL_EVENTS[ds]||[]).find(e=>e.type==='holiday')||{}).text||'Off':'';
+  document.getElementById('day-menu-overlay')?.remove();
+  const ov=document.createElement('div');ov.id='day-menu-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10001;display:flex;align-items:flex-end;justify-content:center';
+  ov.onclick=e=>{if(e.target===ov)ov.remove();};
+  const item=(icon,title,sub,fn,danger)=>`<button onclick="${fn}" style="display:flex;align-items:flex-start;gap:11px;width:100%;text-align:left;background:none;border:none;border-bottom:1px solid #f1f3f5;padding:13px 16px;cursor:pointer">
+    <span style="font-size:17px;line-height:1.1;flex-shrink:0">${icon}</span>
+    <span style="flex:1;min-width:0">
+      <span style="display:block;font-size:14px;font-weight:700;color:${danger?'#c92a2a':'#212529'}">${title}</span>
+      <span style="display:block;font-size:11px;color:#868e96;margin-top:1px">${sub}</span>
+    </span></button>`;
+  ov.innerHTML=`<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:520px;padding-bottom:22px;overflow:hidden">
+    <div style="padding:14px 16px 10px">
+      <div style="font-size:15px;font-weight:800;color:#111">${nice}</div>
+      <div style="font-size:11px;color:#868e96;margin-top:2px">${isOff?('Currently marked off: '+_esc(offName)):'Day actions'}</div>
+    </div>
+    ${isOff
+      ? item('↩','Remove the off-day','Put this day back to its normal timetable',`dayMenuUnsetOff('${ds}')`)
+      : item('🚫','Mark this day off','Training, camp, closure. Writes a holiday entry, so the whole app agrees',`dayMenuSetOff('${ds}')`)}
+    ${item('↺','Reset this day','Remove every one-off change and return to the weekly defaults',`dayMenuReset('${dayName}',${weekOffset||0})`,true)}
+    ${item('📋','Copy this day to…','Copy the slots on this day onto another weekday',`dayMenuCopy('${dayName}',${weekOffset||0})`)}
+    <div style="padding:12px 16px 0"><button class="btn-sec" style="width:100%;justify-content:center" onclick="document.getElementById('day-menu-overlay').remove()">Cancel</button></div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+function dayMenuSetOff(ds){
+  const name=prompt('Why is this day off? (shown across the app)','Off — no school');
+  if(name===null)return;
+  HOLIDAYS.push({name:name.trim()||'Off',start:ds,end:ds,custom:true});
+  saveHolidays();applyHolidaysToCalendar();
+  document.getElementById('day-menu-overlay')?.remove();
+  renderTimetable();
+  showToastMsg('🚫 Day marked off','#b45309');
+}
+function dayMenuUnsetOff(ds){
+  const before=HOLIDAYS.length;
+  HOLIDAYS=HOLIDAYS.filter(h=>!(h.start===ds&&h.end===ds));
+  if(HOLIDAYS.length===before){
+    alert('This day is part of a multi-day holiday. Edit it in Settings → Holidays.');
+    document.getElementById('day-menu-overlay')?.remove();return;
+  }
+  saveHolidays();applyHolidaysToCalendar();
+  document.getElementById('day-menu-overlay')?.remove();
+  renderTimetable();
+  showToastMsg('↩ Day restored','#0f766e');
+}
+function dayMenuReset(dayName,weekOffset){
+  const absW=getWeekNumber(weekOffset||0);
+  let n=0;
+  Object.keys(ttCustom).forEach(k=>{
+    const p=k.split('_');
+    if(p.length<3)return;
+    if(p[2]!==dayName)return;
+    if(parseInt(p[0],10)!==absW&&parseInt(p[0],10)!==(weekOffset||0))return;
+    delete ttCustom[k];n++;
+  });
+  if(!n){alert('No one-off changes on this day — it is already following the weekly defaults.');return;}
+  if(!confirm('Remove '+n+' one-off change(s) on this day? The weekly defaults are not touched.')){return;}
+  saveState();
+  document.getElementById('day-menu-overlay')?.remove();
+  renderTimetable();
+  showToastMsg('↺ Day reset to weekly defaults','#0f766e');
+}
+function dayMenuCopy(dayName,weekOffset){
+  const target=prompt('Copy '+dayName+"'s slots onto which day? (Mon, Tue, Wed, Thu, Fri, Sat, Sun)",'');
+  if(!target)return;
+  const t=target.trim().slice(0,3);
+  const norm=DAYS.find(d=>d.toLowerCase()===t.toLowerCase());
+  if(!norm){alert('Unknown day: '+target);return;}
+  if(norm===dayName){alert('That is the same day.');return;}
+  let n=0;
+  const src={};
+  for(let i=0;i<SLOTS.length;i++){
+    const c=getCustomForWeek(weekOffset||0,i,dayName);
+    if(c&&c.l)src[i]={...c};
+  }
+  const cnt=Object.keys(src).length;
+  if(!cnt){alert('Nothing to copy on '+dayName+'.');return;}
+  if(!confirm('Copy '+cnt+' slot(s) from '+dayName+' onto '+norm+' as weekly defaults?\n\nExisting '+norm+' defaults in those slots will be replaced.'))return;
+  Object.entries(src).forEach(([i,c])=>{
+    const cp={...c};delete cp.recur;delete cp.placedWeek;delete cp._fromBase;
+    ttDefaults[i+'_'+norm]=cp;n++;
+  });
+  saveState();
+  document.getElementById('day-menu-overlay')?.remove();
+  renderTimetable();
+  showToastMsg('📋 Copied '+n+' slot(s) to '+norm,'#0f766e');
 }
 function ttPickDay(dayName,weekOffset){
   if(ttEditMode)return; // don't hijack taps while editing
@@ -23724,17 +23840,56 @@ function getBaseCell(idx,day){
   if(b.tp==='sleep')return b;
   return {l:'',tp:'free'};
 }
+// One-time copy of the old hardcoded SLOTS grid into editable weekly defaults.
+// The guard MUST live inside the synced data: it used to be a localStorage-only
+// flag, so any device missing it (new browser, cleared site data, second phone)
+// re-ran the migration, saw a slot the user had deleted as merely "absent", and
+// helpfully recreated it — then synced the ghost back everywhere.
 function migrateBaseToDefaults(){
-  try{if(localStorage.getItem('ttBaseMigrated')==='1')return;}catch(e){}
+  if(ttDefaults&&ttDefaults.__baseMigrated)return;              // synced guard
+  const legacyDone=(()=>{try{return localStorage.getItem('ttBaseMigrated')==='1';}catch(e){return false;}})();
+  if(legacyDone){                                               // already done on this device pre-fix
+    ttDefaults.__baseMigrated={done:true,at:new Date().toISOString(),legacy:true};
+    saveState();
+    return;
+  }
   const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  let n=0;
+  let n=0;const created=[];
   SLOTS.forEach((row,idx)=>{DAYS.forEach(day=>{
     const b=row[day];if(!b||!b.tp||b.tp==='sleep'||b.tp==='free')return;
     const dk=idx+'_'+day;
-    if(!ttDefaults[dk]){ttDefaults[dk]={...b};n++;}
+    if(!ttDefaults[dk]){ttDefaults[dk]={...b,_fromBase:true};created.push(dk);n++;}
   });});
+  ttDefaults.__baseMigrated={done:true,at:new Date().toISOString(),created};
   try{localStorage.setItem('ttBaseMigrated','1');}catch(e){}
-  if(n){saveState();console.log('Migrated',n,'base timetable cells into editable defaults');}
+  saveState();
+  if(n)console.log('Migrated',n,'base timetable cells into editable defaults');
+}
+// Remove every remaining entry that came from the old built-in timetable
+function purgeLegacyBaseSlots(){
+  const meta=ttDefaults&&ttDefaults.__baseMigrated;
+  const keys=Object.keys(ttDefaults).filter(k=>k!=='__baseMigrated'&&ttDefaults[k]&&ttDefaults[k]._fromBase);
+  // Fall back to the recorded list for installs migrated before _fromBase existed
+  const listed=(meta&&Array.isArray(meta.created))?meta.created.filter(k=>ttDefaults[k]):[];
+  // Older installs carry no marker at all: match what is still identical to the
+  // old built-in grid (same slot, same day, same label, same type).
+  const matched=[];
+  Object.keys(ttDefaults).forEach(k=>{
+    if(k==='__baseMigrated')return;
+    const v=ttDefaults[k];if(!v)return;
+    const p=k.split('_');if(p.length<2)return;
+    const idx=parseInt(p[0],10),day=p.slice(1).join('_');
+    const b=(SLOTS[idx]&&SLOTS[idx][day])||null;
+    if(!b||!b.tp||b.tp==='sleep'||b.tp==='free')return;
+    if((v.l||'')===(b.l||'')&&(v.tp||'')===(b.tp||''))matched.push(k);
+  });
+  const all=[...new Set([...keys,...listed,...matched])];
+  if(!all.length){alert('No leftover items from the old built-in timetable were found.');return;}
+  const names=all.map(k=>{const p=k.split('_');const v=ttDefaults[k];return (v.l||'(untitled)')+' · '+p[1]+' '+(getSlotTime(parseInt(p[0]))||'');});
+  if(!confirm('Remove '+all.length+' leftover item(s) from the old built-in timetable?\n\n'+names.join('\n')+'\n\nAnything you created yourself is untouched.'))return;
+  all.forEach(k=>{delete ttDefaults[k];});
+  saveState();renderTimetable();
+  alert('Removed '+all.length+' leftover item(s).');
 }
 
 function getCustomForWeek(offset,slotIdx,day){
@@ -25027,7 +25182,7 @@ function renderTimetable(){
     const _selDow=(ttView==='today')?_tdSelectedDow():-1;
     const _isSel=_selDow===i;
     if(_isSel)thStyle+=';background:#00205B;color:#fff;border-bottom:2px solid #00205B';
-    h+=`<th class="tt-dow" onclick="ttPickDay('${d}',${offset})" title="Show this day" style="${thStyle}">${d}${isToday?' ◆':''}${dateLabel}${holLabel}</th>`;
+    h+=`<th class="tt-dow" onclick="_dayMenuTap('${d}',${offset})" oncontextmenu="openDayMenu('${d}',${offset});event.preventDefault();" ontouchstart="_dayMenuStart('${d}',${offset})" ontouchend="_dayMenuEnd()" ontouchmove="_dayMenuEnd()" title="Tap to open this day · long-press for day actions" style="${thStyle}">${d}${isToday?' ◆':''}${dateLabel}${holLabel}</th>`;
   });
   h+='<th style="width:34px;font-size:8px;background:#f8f9fa">Time</th></tr></thead><tbody>';
 
@@ -30053,7 +30208,8 @@ function renderDutiesPanel(){
   const noduty=TUTORS.filter(t=>!NIGHT_DUTIES[t.name]);
 
   let html='<div class="duty-section">';
-  html+=`<div class="duty-section-title">🌙 Boarding Night Duty</div>
+  html+=`<div class="duty-section-title">🌙 Weekly rota · boarding night duty</div>
+  <div style="font-size:10.5px;color:var(--text3);margin:-2px 0 8px">This is the pattern that repeats every week. Tap a tutor chip to set weekly / A weeks / B weeks and their time.</div>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:.5rem;font-size:11px;color:var(--text3)">
     <span>Default window</span>
     <input type="time" value="${DUTY_META.prepStart}" onchange="DUTY_META.prepStart=this.value;saveDuties();renderDutiesPanel()" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--rxs)">
@@ -30073,7 +30229,7 @@ function renderDutiesPanel(){
         const fLbl=m.freq==='weekly'?'':(m.freq==='A'?' ·A':' ·B');
         return `<span class="duty-tutor-chip" onclick="openDutyTutorMeta('${n.replace(/'/g,"\\'")}')" style="cursor:pointer" title="Frequency and time">${n.split(' ')[0]}<span style="opacity:.7;font-size:9px">${fLbl} ${m.start}</span></span>`;
       }).join('')||'<span style="color:#adb5bd;font-size:11px">Noneassigned</span>'}</div>
-      <button class="duty-edit-btn" onclick="openNightDutyEdit('${day}')">Edit</button>
+      <button class="duty-edit-btn" onclick="openNightDutyEdit('${day}')">Change rota</button>
     </div>`;
   });
   if(noduty.length){
@@ -30083,7 +30239,8 @@ function renderDutiesPanel(){
 
   // ── Upcoming prep-duty dates (with one-off override support) ──
   html+='<div class="duty-section">';
-  html+='<div class="duty-section-title">📆 Next 14 days · prep duty</div>';
+  html+='<div class="duty-section-title">📆 Upcoming · one-off changes</div>';
+  html+='<div style="font-size:10.5px;color:var(--text3);margin:-2px 0 8px">Cover and swaps for a single date. The weekly rota above is never changed by these.</div>';
   {
     const t0=new Date(_todayStr()+'T00:00:00');
     for(let k=0;k<14;k++){
@@ -30098,7 +30255,7 @@ function renderDutiesPanel(){
         <div class="duty-day-label" style="min-width:64px">${dn} ${d.getDate()}/${d.getMonth()+1}</div>
         <div class="duty-tutors">${names.map(n=>`<span class="duty-tutor-chip">${_esc(n.split(' ')[0])}</span>`).join('')||'<span style="color:#adb5bd;font-size:11px">Nobody</span>'}</div>
         ${ov?'<span style="font-size:9px;font-weight:700;color:#b45309;background:#fef3c7;border-radius:7px;padding:1px 6px;flex-shrink:0">changed</span>':''}
-        <button class="duty-edit-btn" onclick="event.stopPropagation();openDutyDateModal('${ds}')">Edit</button>
+        <button class="duty-edit-btn" onclick="event.stopPropagation();openDutyDateModal('${ds}')">Change this date</button>
       </div>`;
     }
   }
@@ -35593,29 +35750,39 @@ function _amDutyTick(){
     const ds=_todayStr();
     const M=5; // minutes of margin either side
     const win=(s,e)=>{try{return nm>=t2m(s)-M&&nm<=t2m(e)+M;}catch(err){return false;}};
+    // Each duty is its own row: icon, small uppercase role, names, muted time
     const parts=[];
+    const rowHtml=(icon,role,names,time,color)=>`<div style="display:flex;align-items:baseline;gap:7px;padding:2px 0">
+      <span style="flex-shrink:0">${icon}</span>
+      <span style="flex-shrink:0;font-size:9px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:${color};opacity:.85;min-width:62px">${role}</span>
+      <span style="flex:1;min-width:0;font-size:12.5px;font-weight:600;color:#e2e8f0">${names}</span>
+      ${time?`<span style="flex-shrink:0;font-size:10px;color:#64748b;font-variant-numeric:tabular-nums">${time}</span>`:''}
+    </div>`;
     // 1. House activity (window comes from the slot itself)
     dutyActivitySlotsToday().forEach(a=>{
       if(!win(a.st,a.et))return;
-      parts.push(`🏫 ${_esc(a.label)}: ${a.names.length?a.names.map(n=>_esc(n.split(' ')[0])).join(', '):'no one assigned'}`);
+      parts.push(rowHtml('🏫',_esc(a.label),
+        a.names.length?a.names.map(n=>_esc(n.split(' ')[0])).join(', '):'<span style="color:#64748b;font-weight:500">no one assigned</span>',
+        a.st+'–'+a.et,'#22d3ee'));
     });
     // 2. Prep / night duty
     const prep=dutyPrepFor(ds);
     if(prep.length){
       const m=_dutyTutorMeta(prep[0]);
       if(win(m.start,m.end)){
-        const rooms=prep.map(n=>{const t=(TUTORS||[]).find(x=>x.name===n);return _esc(n.split(' ')[0])+(t&&t.room?' ('+_esc(t.room)+')':'');});
-        parts.push(`🌙 Prep duty: ${rooms.join(', ')} · ${m.start}–${m.end}`);
+        const rooms=prep.map(n=>{const t=(TUTORS||[]).find(x=>x.name===n);return _esc(n.split(' ')[0])+(t&&t.room?' <span style="font-weight:500;color:#94a3b8">'+_esc(t.room)+'</span>':'');});
+        parts.push(rowHtml('🌙','Prep duty',rooms.join(', '),m.start+'–'+m.end,'#fbbf24'));
       }
     }
     // 3. Boarding team
     if(win(DUTY_META.boardStart,DUTY_META.boardEnd)){
       const team=dutyBoardingTeamFor(ds);
-      if(team.length)parts.push(`🏠 On duty: ${team.map(n=>_esc(String(n).split(' ')[0])).join(', ')}`);
+      if(team.length)parts.push(rowHtml('🏠','On duty',team.map(n=>_esc(String(n).split(' ')[0])).join(', '),
+        DUTY_META.boardStart+'–'+DUTY_META.boardEnd,'#60a5fa'));
     }
     if(!parts.length){el.style.display='none';el.innerHTML='';return;}
     el.style.display='block';
-    el.innerHTML=parts.join(' <span style="color:#334155">·</span> ');
+    el.innerHTML=parts.join(parts.length>1?'<div style="height:1px;background:rgba(255,255,255,.07);margin:3px 0"></div>':'');
   }catch(e){el.style.display='none';}
 }
 function _amDayPillTick(){
@@ -36166,7 +36333,7 @@ function initActiveMode(){
 <script>
 // Visible build number — must match the service worker's CACHE_NAME version.
 // Lets anyone confirm at a glance which build a device is actually running.
-const APP_BUILD='v233';
+const APP_BUILD='v234';
 try{document.getElementById('app-build-tag').textContent='build '+APP_BUILD;console.log('LA Work '+APP_BUILD);}catch(e){}
 </script>
 
