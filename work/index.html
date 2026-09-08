@@ -32309,9 +32309,9 @@ function _amLessonHtml(ctx,nowStr){
         <div class="lp-done-btn${isDone?' lp-done-active':''}" onclick="amLessonToggleDone('${label}',${offset},${slotIdx},'${dayName}','${sec.id}',${!isDone})">${isDone?'✓':''}</div>
         <div class="lp-body">
           <div class="lp-name" style="color:${textColor};${isCurSec?'font-size:15px;font-weight:700;':''}${isDone?'text-decoration:line-through;':''}">${isLate?'<span style="color:#ef4444;font-size:10px;margin-right:3px">⚠</span>':''}${_esc(sec.text||sec.name||'')}</div>
-          ${isCurSec?`<div class="lp-bar-bg"><div class="lp-bar" style="width:${barPct}%;background:${isLate?'#ef4444':'#22c55e'}"></div></div>`:''}
+          ${isCurSec?`<div class="lp-bar-bg"><div class="lp-bar" id="lpx-bar-${i}" style="width:${barPct}%;background:${isLate?'#ef4444':'#22c55e'}"></div></div>`:''}
         </div>
-        <div class="lp-timer" style="color:${timerColor}">${timerStr}</div>
+        <div class="lp-timer" id="lpx-timer-${i}" style="color:${timerColor}">${timerStr}</div>
       </div>`;
     }).join('');
     // Quiet coverage line: only when something is actually timed
@@ -35782,6 +35782,42 @@ function amRender(){
     // Update lesson section timers if in lesson mode
     if(cat.mode==='lesson'||tp==='lesson'){
       const bullets=snGetPlanned(offset,slotIdx,dayName,label);
+      // The lesson view renders from the lp_ plan (ids lpx-timer-N / lpx-bar-N).
+      // Tick those in place every second — without this the counters freeze,
+      // since the panel no longer rebuilds each second.
+      {
+        const manualStart0=getLessonStart(offset,slotIdx,dayName);
+        const _n0=new Date(),_nm0=_n0.getHours()*60+_n0.getMinutes()+_n0.getSeconds()/60;
+        const elapsed0=manualStart0?Math.max(0,(Date.now()-manualStart0)/60000):Math.max(0,_nm0-t2m(getSlotTime(slotIdx)));
+        let plan0=[];try{const d=localStorage.getItem('lp_'+label);plan0=d?JSON.parse(d):[];}catch(e){}
+        if(!plan0.length&&typeof getLessonPlan==='function')plan0=getLessonPlan(label)||[];
+        if(plan0.length&&typeof lessonPacingState==='function'){
+          const{sectionIdx,secRem}=lessonPacingState(plan0,elapsed0);
+          // Move the highlight on exactly once when the active section changes
+          if(window._amPrevSec!==undefined&&window._amPrevSec!==sectionIdx&&!_amFocused)_amLastCtxKey='';
+          window._amPrevSec=sectionIdx;
+          const done0=getLessonDone(offset,slotIdx,dayName)||{};
+          plan0.forEach((sec,i)=>{
+            const tEl=document.getElementById('lpx-timer-'+i);if(!tEl)return;
+            const secDur=sec.dur||0;
+            const isCur=i===sectionIdx;
+            if(isCur){
+              const isLate=secRem<0&&!done0[sec.id];
+              const tot=Math.round(Math.abs(secRem)*60),mm=Math.floor(tot/60),ss=tot%60;
+              tEl.textContent=(secRem<0?'+':'')+String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');
+              tEl.style.color=secRem<0?(secRem<-2?'#ef4444':'#f97316'):'#22c55e';
+              const bEl=document.getElementById('lpx-bar-'+i);
+              if(bEl&&secDur){
+                bEl.style.width=Math.min(100,Math.max(0,(1-(secRem/secDur))*100))+'%';
+                bEl.style.background=isLate?'#ef4444':'#22c55e';
+              }
+            }else{
+              tEl.textContent=secDur?secDur+'m':'-';
+              tEl.style.color=(i<sectionIdx)?'#333':'#444';
+            }
+          });
+        }
+      }
       if(bullets.length){
         const manualStart=getLessonStart(offset,slotIdx,dayName);
         const _fn=new Date(),_fnm=_fn.getHours()*60+_fn.getMinutes()+_fn.getSeconds()/60;
@@ -36109,7 +36145,7 @@ function initActiveMode(){
 <script>
 // Visible build number — must match the service worker's CACHE_NAME version.
 // Lets anyone confirm at a glance which build a device is actually running.
-const APP_BUILD='v230';
+const APP_BUILD='v231';
 try{document.getElementById('app-build-tag').textContent='build '+APP_BUILD;console.log('LA Work '+APP_BUILD);}catch(e){}
 </script>
 
