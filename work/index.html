@@ -2189,19 +2189,19 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
           <label style="font-size:11px;color:#6c757d;display:block;margin-bottom:5px">Sensitivity</label>
           <div style="display:flex;flex-direction:column;gap:4px" id="edit-dep-sensitivity">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#495057;padding:5px 8px;border:1px solid #dee2e6;border-radius:5px;background:#fff">
-              <input type="radio" name="dep-sensitivity" value="flight_intl" style="accent-color:#0d6efd"> ✈️ International flight
+              <input type="radio" name="dep-sensitivity" value="flight_intl" style="accent-color:#0d6efd" onchange="depSensPick(this.value)"> ✈️ International flight
             </label>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#495057;padding:5px 8px;border:1px solid #dee2e6;border-radius:5px;background:#fff">
-              <input type="radio" name="dep-sensitivity" value="flight_dom" style="accent-color:#0d6efd"> 🛫 Domestic flight
+              <input type="radio" name="dep-sensitivity" value="flight_dom" style="accent-color:#0d6efd" onchange="depSensPick(this.value)"> 🛫 Domestic flight
             </label>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#495057;padding:5px 8px;border:1px solid #dee2e6;border-radius:5px;background:#fff">
-              <input type="radio" name="dep-sensitivity" value="hard" style="accent-color:#0d6efd"> 🚆 Hard deadline (train/exam/interview)
+              <input type="radio" name="dep-sensitivity" value="hard" style="accent-color:#0d6efd" onchange="depSensPick(this.value)"> 🚆 Hard deadline (train/exam/interview)
             </label>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#495057;padding:5px 8px;border:1px solid #dee2e6;border-radius:5px;background:#fff">
-              <input type="radio" name="dep-sensitivity" value="scheduled" style="accent-color:#0d6efd"> 🎬 Scheduled (meeting/cinema)
+              <input type="radio" name="dep-sensitivity" value="scheduled" style="accent-color:#0d6efd" onchange="depSensPick(this.value)"> 🎬 Scheduled (meeting/cinema)
             </label>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#495057;padding:5px 8px;border:1px solid #dee2e6;border-radius:5px;background:#fff">
-              <input type="radio" name="dep-sensitivity" value="casual" style="accent-color:#0d6efd"> ☕ Casual (dinner/coffee)
+              <input type="radio" name="dep-sensitivity" value="casual" style="accent-color:#0d6efd" onchange="depSensPick(this.value)"> ☕ Casual (dinner/coffee)
             </label>
           </div>
         </div>
@@ -24084,6 +24084,16 @@ function toggleDepFields(){
   const fields=document.getElementById('edit-dep-fields');
   if(fields)fields.style.display=on?'flex':'none';
 }
+// Default travel minutes per sensitivity. Picking a sensitivity prefills the
+// minutes field — but never clobbers a hand-typed value (a value is treated as
+// hand-typed when it isn't one of these defaults).
+const DEP_DEFAULT_MINS={flight_intl:180,flight_dom:120,hard:60,scheduled:30,casual:15};
+function depSensPick(sens){
+  const inp=document.getElementById('edit-dep-mins');if(!inp)return;
+  const cur=parseInt(inp.value,10);
+  const isDefault=!inp.value||Object.values(DEP_DEFAULT_MINS).includes(cur);
+  if(isDefault&&DEP_DEFAULT_MINS[sens]!=null)inp.value=DEP_DEFAULT_MINS[sens];
+}
 
 function _renderEditCatChips(selectedCat){
   const el=document.getElementById('edit-cat-chips');if(!el)return;
@@ -24345,8 +24355,10 @@ function saveSlot(){
   const house_activity=!!((_haEl&&_haEl.checked));
   // Departure timing fields
   const _depOn=document.getElementById('edit-dep-toggle')?.checked;
-  const _depMins=_depOn?parseInt(document.getElementById('edit-dep-mins')?.value||'0')||null:null;
   const _depSens=_depOn?(document.querySelector('input[name="dep-sensitivity"]:checked')?.value||null):null;
+  // Empty minutes with a sensitivity chosen falls back to that sensitivity's
+  // default — previously the whole departure block was silently dropped.
+  const _depMins=_depOn?(parseInt(document.getElementById('edit-dep-mins')?.value||'0')||(_depSens?DEP_DEFAULT_MINS[_depSens]:null)||null):null;
   const _rawTp=document.getElementById('edit-type').value||'free';
   const evtData={l:document.getElementById('edit-label').value||'',tp:(_rawTp==='empty'?'free':_rawTp),cat:catVal,recur:document.getElementById('edit-recur').value||'once',placedWeek:week,endSlotIdx,customStartTime,customEndTime,boarding_register,house_register,house_activity,...(_depOn&&_depMins?{travel_mins:_depMins,sensitivity:_depSens}:{travel_mins:null,sensitivity:null})};
   if(evtData.tp==='free'){evtData.boarding_register=false;evtData.house_register=false;}
@@ -31888,7 +31900,16 @@ function amGetCtx(){
   // Use the actual calendar day — no past-midnight attribution
   if(di===0&&nm<60)return null; // only block very early Sunday (genuine edge case)
   const dayName=DN[di],offset=0; // Live mode is always the current week, regardless of browsing
-  let ci=-1;for(let i=0;i<SLOTS.length;i++)if(nm>=t2m(getSlotTime(i)))ci=i;
+  // Pick the current slot by EFFECTIVE start (customStartTime when set, else the
+  // grid time). A one-off placed at 14:30 on a 15:00 grid slot must become
+  // active at 14:30, not at 15:00 — grid-only selection kept it invisible for
+  // half an hour. Latest effective start <= now wins; ties go to the later slot.
+  let ci=-1,_ciEff=-1;
+  for(let i=0;i<SLOTS.length;i++){
+    const c=getCustomForWeek(offset,i,dayName)||getBaseCell(i,dayName);
+    const eff=(c&&c.customStartTime)?t2m(c.customStartTime):t2m(getSlotTime(i));
+    if(nm>=eff&&eff>=_ciEff){ci=i;_ciEff=eff;}
+  }
   if(ci<0)return null;
   const cell=getCustomForWeek(offset,ci,dayName)||getBaseCell(ci,dayName);if(!cell)return null;
   // Back-to-back slots with the same label+type are ONE commitment (e.g. a double
@@ -31917,9 +31938,23 @@ function amGetCtx(){
 function amGetNext(){
   const now=new Date(),di=now.getDay(),nm=now.getHours()*60+now.getMinutes()+now.getSeconds()/60;
   if(di===0&&nm<210)return null; // early Sunday morning before 3:30am
-  const dn=DN[di],off=ttWeekOffset;
-  for(let i=0;i<SLOTS.length;i++){const sm=t2m(getSlotTime(i));if(sm<=nm)continue;const c=getCustomForWeek(off,i,dn)||getBaseCell(i,dn);if(c&&isCommitment(c.cat||c.tp))return{label:c.l,tp:c.tp,st:getSlotTime(i),minUntil:sm-nm,cat:getCat(c.cat||c.tp)};}
-  return null;
+  // off is PINNED to 0: the live countdown always reads the current week.
+  // It used to follow ttWeekOffset, so browsing another week in the week view
+  // silently pointed the countdown at that week's cells for today's day name.
+  const dn=DN[di],off=0;
+  // Next event = earliest EFFECTIVE start (customStartTime when set) still
+  // ahead of now — scan all slots rather than returning the first grid hit,
+  // because a custom start can put a later-indexed slot earlier in the day.
+  let best=null;
+  for(let i=0;i<SLOTS.length;i++){
+    const c=getCustomForWeek(off,i,dn)||getBaseCell(i,dn);
+    if(!c||!isCommitment(c.cat||c.tp))continue;
+    const stStr=(c.customStartTime||getSlotTime(i));
+    const sm=t2m(stStr);
+    if(sm<=nm)continue;
+    if(!best||sm<best._sm)best={label:c.l,tp:c.tp,st:stStr,minUntil:sm-nm,cat:getCat(c.cat||c.tp),_sm:sm};
+  }
+  return best;
 }
 function _fmtCd(mins){
   const tot=Math.round(mins*60),ot=tot<0,ab=Math.abs(tot);
@@ -35359,10 +35394,22 @@ function _fireRestoreBody(){
   const body=document.getElementById('am-body');
   if(body){body.style.padding='';body.style.overflow='';body.style.position='';}
 }
-function closeFireRegister(){
+// Tear the fire register out of the live panel and force a full repaint.
+// amRender()'s in-place tick path skips rebuilding am-body when _amLastCtxKey
+// still matches (and when focus sits inside am-body — tapping a button focuses
+// it on Android), so without this the fire markup stayed on screen after
+// Close/Submit even though _fireOpen was already false.
+function _fireTeardown(){
   _fireOpen=false;
+  try{const ae=document.activeElement;const body=document.getElementById('am-body');
+    if(ae&&body&&body.contains(ae)&&ae.blur)ae.blur();}catch(e){}
+  const sec=document.getElementById('am-fire-section');if(sec)sec.remove();
   _fireRestoreBody();
-  setTimeout(()=>{amRender();_brRefreshListsTab();},0);
+  _amLastCtxKey='';
+}
+function closeFireRegister(){
+  _fireTeardown();
+  setTimeout(()=>{_amLastCtxKey='';amRender();_brRefreshListsTab();},0);
 }
 
 function submitFireRegister(){
@@ -35398,14 +35445,13 @@ function submitFireRegister(){
     localStorage.setItem('fireSubmittedDate',_brToday());
     localStorage.setItem('fireLastState_'+_brToday(),JSON.stringify(_fireState));
   }catch(e){}
-  _fireOpen=false;
+  _fireTeardown();
   const t=document.createElement('div');
   t.textContent=wasAmend?'🔥 Fire register amended':'🔥 Fire register submitted';
   t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#22c55e;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:9999;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.3)';
   document.body.appendChild(t);
   setTimeout(()=>t.remove(),2500);
-  _fireRestoreBody();
-  setTimeout(()=>{amRender();_brRefreshListsTab();},0);
+  setTimeout(()=>{_amLastCtxKey='';amRender();_brRefreshListsTab();},0);
 }
 
 function _fireTap(name, status){
@@ -36333,7 +36379,7 @@ function initActiveMode(){
 <script>
 // Visible build number — must match the service worker's CACHE_NAME version.
 // Lets anyone confirm at a glance which build a device is actually running.
-const APP_BUILD='v235';
+const APP_BUILD='v236';
 try{document.getElementById('app-build-tag').textContent='build '+APP_BUILD;console.log('LA Work '+APP_BUILD);}catch(e){}
 </script>
 
