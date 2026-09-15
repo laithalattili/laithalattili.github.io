@@ -199,43 +199,8 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .type-btn.active{background:#fff;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.1)}
 
 /* TUTOR BLOCKS */
-.tutor-block{background:#fff;border:1px solid var(--border3);border-radius:var(--r);margin-bottom:.6rem;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04)}
-.tutor-hdr{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:.7rem 1rem;user-select:none}
-.tutor-hdr-left{flex:1}
-.tutor-name{font-size:13px;font-weight:500;color:var(--text)}
-.tutor-room{font-size:11px;color:var(--text3)}
-.tutor-hdr-right{display:flex;align-items:center;gap:5px}
-.tutor-status{font-size:11px;padding:2px 7px;border-radius:20px;font-weight:500;flex-shrink:0}
-.st-empty{background:var(--bg3);color:var(--text3)}
-.st-partial{background:var(--wrn-bg);color:var(--wrn-tx)}
-.st-done{background:var(--suc-bg);color:var(--suc-tx)}
-.quick-btn{padding:3px 7px;font-size:10px;font-weight:600;border-radius:var(--rxs);border:1px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;white-space:nowrap;flex-shrink:0}
-.quick-btn.y-btn{border-color:#8ce99a;color:#2b8a3e;background:#f4fdf6}
-.quick-btn.abs-btn{border-color:#ced4da;color:#868e96}
-.tutor-detail{display:none;padding:0 1rem .75rem}
-.tutor-detail.open{display:block}
-.crit-item{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border3)}
-.crit-item:last-child{border-bottom:none}
-.crit-label{font-size:12px;color:var(--text2);flex:1;padding-right:8px}
-.yn-wrap{display:flex;gap:4px}
-.yn-btn{padding:4px 9px;font-size:11px;font-weight:500;border-radius:var(--rxs);border:1px solid #ced4da;background:#f8f9fa;color:#495057;cursor:pointer;min-width:34px;text-align:center}
-.yn-btn.active-y{background:#2b8a3e!important;border-color:#2b8a3e!important;color:#fff!important}
-.yn-btn.active-n{background:#c92a2a!important;border-color:#c92a2a!important;color:#fff!important}
-.yn-btn.active-na{background:#495057!important;border-color:#495057!important;color:#fff!important}
-.reset-btn{font-size:11px;color:var(--text3);background:none;border:1px solid var(--border3);border-radius:var(--rxs);padding:3px 8px;cursor:pointer;margin-top:6px}
-.comments-ta{width:100%;font-size:12px;padding:7px 9px;border-radius:var(--rsm);border:1px solid var(--border3);background:var(--bg2);color:var(--text);margin-top:8px;resize:none;font-family:inherit}
-.mark-all-y-btn{width:100%;padding:9px;background:#f4fdf6;border:1px solid #8ce99a;border-radius:var(--rsm);font-size:12px;font-weight:600;color:#2b8a3e;cursor:pointer;margin-bottom:.75rem}
-.gen-btn{width:100%;padding:13px;background:var(--inf-bg);border:1px solid var(--inf-bd);border-radius:var(--r);font-size:14px;font-weight:600;color:var(--inf-tx);cursor:pointer;margin-top:1rem}
-.print-btn2{width:100%;padding:11px;background:#fff;border:1px solid var(--border);border-radius:var(--r);font-size:13px;font-weight:500;color:var(--text);cursor:pointer;margin-top:.6rem}
-.email-mode-toggle{display:flex;gap:3px;margin-bottom:.75rem;background:var(--bg3);border-radius:var(--rsm);padding:3px}
-.email-mode-btn{flex:1;padding:6px 4px;font-size:11px;font-weight:500;border:none;border-radius:var(--rxs);background:none;color:var(--text2);cursor:pointer}
-.email-mode-btn.active{background:#fff;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.1)}
-.mc-footer{display:flex;align-items:center;justify-content:space-between;margin-top:.75rem;flex-wrap:wrap;gap:8px}
-.mc-gen-info{font-size:11px;color:var(--suc-tx);display:none}
-.reset-all-btn{font-size:12px;padding:6px 12px;background:none;border:1px solid var(--border);border-radius:var(--rsm);color:var(--text2);cursor:pointer}
 .date-row{display:flex;gap:8px;margin-bottom:.75rem;align-items:center}
 .date-row input{flex:1;font-size:13px;padding:9px 11px;border-radius:var(--rsm);border:1px solid var(--border);background:#fff;color:var(--text)}
-.date-reset-btn{font-size:11px;padding:5px 10px;background:#fff;border:1px solid var(--border);border-radius:var(--rsm);color:var(--text2);cursor:pointer;white-space:nowrap;flex-shrink:0}
 .today-pill{font-size:11px;background:var(--dng-bg);color:var(--dng-tx);padding:3px 10px;border-radius:20px;display:inline-block;margin-bottom:.5rem;border:1px solid var(--dng-bd)}
 
 /* CALENDAR */
@@ -1182,36 +1147,6 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
   </div>
 </div>
 
-<!-- 8AM -->
-<div id="tab-morning" class="tab-content">
-  <div style="font-size:16px;font-weight:600;margin-bottom:.25rem">Morning Check Sheet</div>
-  <div style="font-size:12px;color:#495057;margin-bottom:1rem">Hawking House · 08:00–08:20</div>
-  <div class="date-row">
-    <input type="date" id="mc-date-picker" onchange="setMcDate()" style="width:100%;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm);background:#fff;color:var(--text)">
-    <input type="hidden" id="mc-date" value="">
-    <div id="mc-date-display" style="font-size:11px;color:#495057;margin-top:3px"></div>
-    <button class="date-reset-btn" onclick="resetMcDate()">↺ Today</button>
-  </div>
-  <div class="date-row"><input type="text" id="mc-time" placeholder="Time Observed" value="07:59–08:10"></div>
-  <button class="mark-all-y-btn" onclick="markAllY()">✓ Mark All Tutors As Y</button>
-  <div id="tutor-checks"></div>
-  <div class="input-row" style="margin-top:.75rem">
-    <label>HSM Follow-Up Actions</label>
-    <div style="display:flex;flex-direction:column;gap:9px;margin-top:5px">
-      <label style="display:grid;grid-template-columns:18px 1fr;align-items:center;gap:9px;font-size:13px;color:#212529;cursor:pointer"><input type="checkbox" id="fu1"> <span>Verbal reminder given to tutor</span></label>
-      <label style="display:grid;grid-template-columns:18px 1fr;align-items:center;gap:9px;font-size:13px;color:#212529;cursor:pointer"><input type="checkbox" id="fu2"> <span>Follow-up email sent</span></label>
-      <label style="display:grid;grid-template-columns:18px 1fr;align-items:center;gap:9px;font-size:13px;color:#212529;cursor:pointer"><input type="checkbox" id="fu3"> <span>Logged for monitoring</span></label>
-      <label style="display:grid;grid-template-columns:18px 1fr;align-items:center;gap:9px;font-size:13px;color:#212529;cursor:pointer"><input type="checkbox" id="fu4"> <span>Escalated to Deputy Head Pastoral</span></label>
-    </div>
-  </div>
-  <div class="mc-footer">
-    <button class="reset-all-btn" onclick="resetAll()">↺ Reset All</button>
-    <div class="mc-gen-info" id="mc-gen-info"></div>
-  </div>
-  <button class="gen-btn" onclick="generateMorningEmail()">Generate Email To Wendy</button>
-  <div id="morning-email-out" style="display:none;margin-top:1rem"></div>
-</div>
-
 <!-- LISTS -->
 <div id="tab-lists" class="tab-content">
   <div class="lists-subtabs">
@@ -1381,6 +1316,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       <input type="date" id="sd-date-picker" onchange="setSDDate()" style="width:100%;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm);background:#fff;color:var(--text)">
       <div id="sd-date-display" style="font-size:12px;color:#495057;margin-top:4px"></div>
       <input type="hidden" id="sd-date" value="">
+      <button onclick="detLogAdd('sat')" style="margin-top:6px;width:100%;padding:8px;background:#fff7ed;border:1px solid #fdba74;border-radius:8px;font-size:12px;font-weight:700;color:#c2410c;cursor:pointer">🗂 Log this detention (shows in live mode on the day)</button>
     </div>
     <div class="input-row"><label>Reason</label>
       <div class="pills"><div class="pill" onclick="selectRP('sd','device',this)">Device Misuse / Confiscated</div><div class="pill" onclick="selectRP('sd','other',this)">Other</div></div>
@@ -1388,6 +1324,26 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       <input type="hidden" id="sd-reason" value="">
     </div>
     <div id="sd-steps"></div>
+  </div>
+  <div id="workflow-tutor-followup" class="workflow-panel">
+    <button class="back-btn" onclick="showWorkflowList()">← Back</button>
+    <div style="font-size:16px;font-weight:600;margin-bottom:.25rem">Tutor Time Follow-up</div>
+    <div style="font-size:12px;color:#495057;margin-bottom:1rem">A specific, dated reminder built from your tutor-time checks.</div>
+    <div class="input-row"><label>Tutor</label><div id="tf-tutor-chips" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px"></div></div>
+    <div class="input-row" style="display:flex;gap:8px;align-items:flex-end">
+      <div style="flex:1"><label>From</label><input type="date" id="tf-from"></div>
+      <div style="flex:1"><label>To</label><input type="date" id="tf-to"></div>
+    </div>
+    <div id="tf-since-note" style="font-size:11px;color:#868e96;margin:-4px 0 10px"></div>
+    <div style="margin-bottom:10px">
+      <button onclick="const e=document.getElementById('tf-tpl-box');e.style.display=e.style.display==='none'?'block':'none'" style="background:none;border:none;font-size:11px;font-weight:700;color:#0e7490;cursor:pointer;padding:0">✎ Edit phrasing ▾</button>
+      <div id="tf-tpl-box" style="display:none;margin-top:6px;display:none">
+        <div class="input-row"><label>Late / on-time phrasing</label><input type="text" id="tf-tpl-ontime"></div>
+        <div class="input-row"><label>Device phrasing</label><input type="text" id="tf-tpl-device"></div>
+        <div class="input-row"><label>Uniform phrasing</label><input type="text" id="tf-tpl-uniform"></div>
+      </div>
+    </div>
+    <div id="tf-out" style="font-size:12px;color:#868e96">Pick a tutor to build the email.</div>
   </div>
   <div id="workflow-week-det" class="workflow-panel">
     <button class="back-btn" onclick="showWorkflowList()">← Back</button>
@@ -1402,6 +1358,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       <input type="date" id="wd-date-picker" onchange="setWDDate()" style="width:100%;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm);background:#fff;color:var(--text)">
       <div id="wd-date-display" style="font-size:12px;color:#495057;margin-top:4px"></div>
       <input type="hidden" id="wd-date" value="">
+      <button onclick="detLogAdd('wd')" style="margin-top:6px;width:100%;padding:8px;background:#fff7ed;border:1px solid #fdba74;border-radius:8px;font-size:12px;font-weight:700;color:#c2410c;cursor:pointer">🗂 Log this detention (shows in live mode on the day)</button>
     </div>
     <div class="input-row"><label>Reason</label>
       <div class="pills"><div class="pill" onclick="selectRP('wd','3neg',this)">3 Negatives In One Day</div><div class="pill" onclick="selectRP('wd','truancy',this)">Truancy</div><div class="pill" onclick="selectRP('wd','other',this)">Other</div></div>
@@ -1557,22 +1514,6 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
         <span id="ss-chev-contacts___emails" style="font-size:12px;transition:transform .2s;display:inline-block">▼</span>
       </div>
       <div class="settings-section-body" id="ss-body-contacts___emails">
-      <div class="settings-item" onclick="openSettingsEdit('wendy-email')">
-        <div><div class="settings-item-label">Wendy (Morning Check)</div><div class="settings-item-sub">wendy.zhu@waiscz.com</div></div>
-        <span class="settings-item-arrow">›</span>
-      </div>
-      <div class="settings-edit-panel" id="edit-wendy-email">
-        <div class="input-row"><label>Email</label><input type="text" id="val-wendy-email" value="wendy.zhu@waiscz.com"></div>
-        <button class="settings-save-btn" onclick="saveSettingsVal('wendy-email')">Save</button>
-      </div>
-      <div class="settings-item" onclick="openSettingsEdit('kris-email')">
-        <div><div class="settings-item-label">Kris (CC)</div><div class="settings-item-sub">Kristan.Proudman@waiscz.com</div></div>
-        <span class="settings-item-arrow">›</span>
-      </div>
-      <div class="settings-edit-panel" id="edit-kris-email">
-        <div class="input-row"><label>Email</label><input type="text" id="val-kris-email" value="Kristan.Proudman@waiscz.com"></div>
-        <button class="settings-save-btn" onclick="saveSettingsVal('kris-email')">Save</button>
-      </div>
       <div class="settings-item" onclick="openSettingsEdit('liaison-email')">
         <div><div class="settings-item-label">Hawking Liaison</div><div class="settings-item-sub">hawkingliaison@waiscz.com</div></div>
         <span class="settings-item-arrow">›</span>
@@ -1592,31 +1533,6 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
           </div>
     </div>
 
-    <!-- Morning Check - under Boarding, see below -->
-    <div class="settings-section">
-      <div class="settings-section-title" onclick="toggleSettingsSection('morning_check',this)">
-        Morning Check
-        <span id="ss-chev-morning_check" style="font-size:12px;transition:transform .2s;display:inline-block">▼</span>
-      </div>
-      <div class="settings-section-body" id="ss-body-morning_check">
-      <div class="settings-item" onclick="openSettingsEdit('mc-title')">
-        <div><div class="settings-item-label">Sheet Title</div><div class="settings-item-sub">HSM Morning Tutor Time Check Sheet</div></div>
-        <span class="settings-item-arrow">›</span>
-      </div>
-      <div class="settings-edit-panel" id="edit-mc-title">
-        <div class="input-row"><label>Title</label><input type="text" id="val-mc-title" value="HSM Morning Tutor Time Check Sheet"></div>
-        <button class="settings-save-btn" onclick="saveSettingsVal('mc-title')">Save</button>
-      </div>
-      <div class="settings-item" onclick="openSettingsEdit('mc-default-time')">
-        <div><div class="settings-item-label">Default Time Observed</div><div class="settings-item-sub">07:59–08:10</div></div>
-        <span class="settings-item-arrow">›</span>
-      </div>
-      <div class="settings-edit-panel" id="edit-mc-default-time">
-        <div class="input-row"><label>Default Time</label><input type="text" id="val-mc-default-time" value="07:59–08:10"></div>
-        <button class="settings-save-btn" onclick="saveSettingsVal('mc-default-time')">Save</button>
-      </div>
-          </div>
-    </div>
 
     <!-- Timetable -->
     <div class="settings-section">
@@ -1662,6 +1578,69 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
         </div>
         <button onclick="dsResetToFactory()" style="width:100%;margin-top:6px;padding:8px;background:var(--dng-bg);border:1px solid var(--dng-bd);border-radius:var(--rsm);font-size:11px;font-weight:600;color:var(--dng-tx);cursor:pointer">Reset to App Factory Defaults</button>
         <div style="font-size:10px;color:#adb5bd;margin-top:6px">"Save as My Default" stores the current structure so you can always reset back to it. Factory reset returns to the original WAS Changzhou timetable.</div>
+      </div>
+      <!-- FIRE REGISTER HISTORY -->
+      <div class="settings-item" onclick="toggleFireHistory()">
+        <div><div class="settings-item-label">Fire Register History</div><div class="settings-item-sub" id="fire-hist-sub">View and export submitted fire registers</div></div>
+        <span class="settings-item-arrow">›</span>
+      </div>
+      <div id="fire-hist-editor" style="display:none;padding:.75rem 1rem;border-top:1px solid var(--border3)">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+          <input type="date" id="fh-from" style="font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rsm);flex:1;min-width:120px">
+          <span style="color:#adb5bd;font-size:11px">to</span>
+          <input type="date" id="fh-to" style="font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rsm);flex:1;min-width:120px">
+          <button onclick="fhLoad()" style="padding:7px 14px;background:#212529;color:#fff;border:none;border-radius:var(--rsm);font-size:12px;font-weight:600;cursor:pointer">Load</button>
+        </div>
+        <div id="fh-actions" style="display:none;gap:6px;margin-bottom:8px">
+          <button onclick="fhExportWord()" style="flex:1;padding:8px;background:var(--suc-bg);border:1px solid var(--suc-bd);border-radius:var(--rsm);font-size:12px;font-weight:600;color:var(--suc-tx);cursor:pointer">📄 Word report</button>
+          <button onclick="fhExportCsv()" style="flex:1;padding:8px;background:#eff6ff;border:1px solid #93c5fd;border-radius:var(--rsm);font-size:12px;font-weight:600;color:#1d4ed8;cursor:pointer">📊 CSV</button>
+        </div>
+        <div id="fh-list" style="font-size:12px;color:#868e96">Pick a range and press Load.</div>
+      </div>
+      <!-- TUTOR CHECK REPORT -->
+      <div class="settings-item" onclick="toggleTcReport()">
+        <div><div class="settings-item-label">Tutor Check Report</div><div class="settings-item-sub" id="tcr-sub">Summary and exception log from tutor-time checks</div></div>
+        <span class="settings-item-arrow">›</span>
+      </div>
+      <div id="tcr-editor" style="display:none;padding:.75rem 1rem;border-top:1px solid var(--border3)">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+          <input type="date" id="tcr-from" style="font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rsm);flex:1;min-width:120px">
+          <span style="color:#adb5bd;font-size:11px">to</span>
+          <input type="date" id="tcr-to" style="font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rsm);flex:1;min-width:120px">
+          <button onclick="tcrLoad()" style="padding:7px 14px;background:#212529;color:#fff;border:none;border-radius:var(--rsm);font-size:12px;font-weight:600;cursor:pointer">Load</button>
+        </div>
+        <div id="tcr-actions" style="display:none;gap:6px;margin-bottom:8px">
+          <button onclick="tcrExportWord()" style="flex:1;padding:8px;background:var(--suc-bg);border:1px solid var(--suc-bd);border-radius:var(--rsm);font-size:12px;font-weight:600;color:var(--suc-tx);cursor:pointer">📄 Word report</button>
+          <button onclick="tcrExportCsv()" style="flex:1;padding:8px;background:#eff6ff;border:1px solid #93c5fd;border-radius:var(--rsm);font-size:12px;font-weight:600;color:#1d4ed8;cursor:pointer">📊 CSV</button>
+        </div>
+        <div id="tcr-list" style="font-size:12px;color:#868e96">Pick a range and press Load.</div>
+      </div>
+      <!-- HOUSE REGISTER HISTORY -->
+      <div class="settings-item" onclick="toggleHouseHistory()">
+        <div><div class="settings-item-label">House Register History</div><div class="settings-item-sub" id="hh-sub">View and export past house/boarding registers</div></div>
+        <span class="settings-item-arrow">›</span>
+      </div>
+      <div id="hh-editor" style="display:none;padding:.75rem 1rem;border-top:1px solid var(--border3)">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+          <input type="date" id="hh-from" style="font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rsm);flex:1;min-width:120px">
+          <span style="color:#adb5bd;font-size:11px">to</span>
+          <input type="date" id="hh-to" style="font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--rsm);flex:1;min-width:120px">
+          <button onclick="hhLoad()" style="padding:7px 14px;background:#212529;color:#fff;border:none;border-radius:var(--rsm);font-size:12px;font-weight:600;cursor:pointer">Load</button>
+        </div>
+        <div id="hh-actions" style="display:none;gap:6px;margin-bottom:8px">
+          <button onclick="hhExportWord()" style="flex:1;padding:8px;background:var(--suc-bg);border:1px solid var(--suc-bd);border-radius:var(--rsm);font-size:12px;font-weight:600;color:var(--suc-tx);cursor:pointer">📄 Word report</button>
+          <button onclick="hhExportCsv()" style="flex:1;padding:8px;background:#eff6ff;border:1px solid #93c5fd;border-radius:var(--rsm);font-size:12px;font-weight:600;color:#1d4ed8;cursor:pointer">📊 CSV</button>
+        </div>
+        <div id="hh-list" style="font-size:12px;color:#868e96">Pick a range and press Load.</div>
+      </div>
+      <!-- FLAGGED SLOTS AUDIT -->
+      <div class="settings-item" onclick="toggleFlagAudit()">
+        <div><div class="settings-item-label">Flagged Slots</div><div class="settings-item-sub" id="flag-audit-sub">Every slot carrying a register / activity / tutor-check flag</div></div>
+        <span class="settings-item-arrow">›</span>
+      </div>
+      <div id="flag-audit-editor" style="display:none;padding:.75rem 1rem;border-top:1px solid var(--border3)">
+        <div style="font-size:11px;color:#868e96;margin-bottom:8px">Flags make a slot show a register, duty rota or tutor checklist in live mode. If one appears where you don't expect it, the leftover flag is in this list. Clear removes the flag only — the event itself stays.</div>
+        <div id="flag-audit-list"></div>
       </div>
       <!-- DETENTION TIMES -->
       <div class="settings-item" onclick="toggleDetTimesEditor()">
@@ -2171,6 +2150,10 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
         <input type="checkbox" id="edit-house-activity" style="width:15px;height:15px;accent-color:#0ea5e9;cursor:pointer">
         <span>House activity <span style="color:#aaa;font-size:11px">(duty rota per occurrence)</span></span>
       </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#495057">
+        <input type="checkbox" id="edit-tutor-check" style="width:15px;height:15px;accent-color:#0e7490;cursor:pointer">
+        <span>Tutor check <span style="color:#aaa;font-size:11px">(staff checklist in live mode)</span></span>
+      </label>
     </div>
 
     <!-- Departure timing (commitment slots only) -->
@@ -2265,7 +2248,6 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
 </div>
 <div class="tabs">
   <button class="tab active" onclick="showTab('sched',this)"><span class="tab-icon"><svg class="ico"><use href="#i-cal"/></svg></span>Sched</button>
-  <button class="tab" onclick="showTab('morning',this)"><span class="tab-icon"><svg class="ico"><use href="#i-sunrise"/></svg></span>8am<span class="tab-dot" id="dot-morning"></span></button>
   <button class="tab" onclick="showTab('lists',this)"><span class="tab-icon"><svg class="ico"><use href="#i-users"/></svg></span>Lists</button>
   <button class="qc-fab plan-fab" id="plan-fab" onclick="showPlanTab(this)" aria-label="Open plan"><svg class="ico" style="width:24px;height:24px"><use href="#i-clip"/></svg></button>
   <button class="qc-fab" onclick="openQuickCapture()" aria-label="Quick add task"><svg class="ico" style="width:26px;height:26px"><use href="#i-plus"/></svg></button>
@@ -2511,12 +2493,12 @@ const supa=supabase.createClient(SUPA_URL,SUPA_KEY);
 const SUPA_TABLE='work_app_data';
 
 // Keys that should sync to Supabase (everything important)
-const SYNC_KEYS=['settings','tutors','students','archived','mcState','ttCustom','ttDefaults',
+const SYNC_KEYS=['settings','tutors','students','archived','ttCustom','ttDefaults',
   'slotNotes','calCustomEvents','hawkingStatus','classData','classLeave','pointsLog',
   'boarderRooms','hwkCollapseState','nightDuties','fridayDuties','fridayTermRange',
   'linksData','holidaysData','schoolYear','tutorMeetings','globalDefault',
   'ttCollapsePast','ttShowExtended','ttShowWeekend','settingsSections','planData','planCategories',
-  'dayStructure','dayStructureDefault','slotOutlines','categoryDefs','lessonPlans','lessonDone'];
+  'dayStructure','dayStructureDefault','slotOutlines','categoryDefs','lessonPlans','lessonDone','tutorChecks','detLog'];
 
 // UI synced separately (pin_ts stays local only — security)
 
@@ -2574,18 +2556,13 @@ window._LOGO_URI="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1B
 // ── CONSTANTS ─────────────────────────────────────────
 const CORRECT_PIN='399111';
 const PIN_REMEMBER_MS=7*24*60*60*1000;
-const MC_TITLE_DEFAULT='HSM Morning Tutor Time Check Sheet';
 const SIG='\n\n——\nLaith Alattili | 雷斯·阿拉提利\nHousemaster of Hawking House | 舍监 (院长)\nEngineering Design and Technology Teacher | 工程设计与技术教师\n\nWAS Changzhou | 常州威雅学校\nNo.9 Huanhu North Road, Wujin District, Changzhou, Jiangsu, P.R. China\n中国江苏省常州市武进区环湖北路9号\n📞 +86 135 8456 3483 | www.waiscz.com';
 const AOR_START=new Date('2026-04-28');
 
 // ── SETTINGS STORAGE ──────────────────────────────────
 let S={
-  'wendy-email':'wendy.zhu@waiscz.com',
-  'kris-email':'Kristan.Proudman@waiscz.com',
   'liaison-email':'hawkingliaison@waiscz.com',
   'retention-cc':'Kristan.Proudman@waiscz.com; wendy.zhu@waiscz.com; david.fosu@waiscz.com; fanny.fang@waiscz.com; Richard.Su@waiscz.com; yue.shi@be.co',
-  'mc-title':MC_TITLE_DEFAULT,
-  'mc-default-time':'07:59–08:10',
   'tt-w1-date':'2026-05-11',
   'det-sat-start':'13:30',
   'det-sat-end':'15:30',
@@ -23222,11 +23199,10 @@ function sLink(label,key){const urls={'rc':'https://beedu.sharepoint.com/:x:/r/s
 function firstName(n){return(n||'').split(' ')[0];}
 
 // ── PERSISTENCE ───────────────────────────────────────
-const mcState={};
-function saveState(){try{localStorage.setItem('mcState',JSON.stringify(mcState));localStorage.setItem('ttCustom',JSON.stringify(ttCustom));supaSave('ttCustom',JSON.stringify(ttCustom));localStorage.setItem('ttDefaults',JSON.stringify(ttDefaults));supaSave('ttDefaults',JSON.stringify(ttDefaults));}catch(e){}}
+// saveState: the timetable's save path. (mcState — the retired 8am sheet — no longer rides along.)
+function saveState(){try{localStorage.setItem('ttCustom',JSON.stringify(ttCustom));supaSave('ttCustom',JSON.stringify(ttCustom));localStorage.setItem('ttDefaults',JSON.stringify(ttDefaults));supaSave('ttDefaults',JSON.stringify(ttDefaults));}catch(e){}}
 function loadState(){
   try{
-    const mc=localStorage.getItem('mcState');if(mc)Object.assign(mcState,JSON.parse(mc));
     const tc=localStorage.getItem('ttCustom');if(tc)Object.assign(ttCustom,JSON.parse(tc));
     const td=localStorage.getItem('ttDefaults');if(td)Object.assign(ttDefaults,JSON.parse(td));
     // One-time migration: move recur='weekly' entries from ttCustom → ttDefaults
@@ -23897,14 +23873,13 @@ function getCustomForWeek(offset,slotIdx,day){
   // 1. This week's override (once event) — absolute week key
   const direct=ttCustom[absW+'_'+slotIdx+'_'+day];
   if(direct)return direct;
-  // 1b. Legacy relative-offset key ('once' only shows on its placed week)
-  const legacy=ttCustom[offset+'_'+slotIdx+'_'+day];
-  if(legacy){
-    if(!legacy.recur||legacy.recur==='once'){
-      const pw=legacy.placedWeek??offset;
-      if(pw===offset)return legacy;
-    } else return legacy;
-  }
+  // Legacy relative-offset keys are NO LONGER consulted. Every save has used
+  // absolute week keys for a long time, and the two namespaces collide: with a
+  // Week-1 reference near today, absolute week numbers are small integers, so
+  // an absolute key like '0_10_Thu' also reads as "relative offset 0" — and a
+  // once-event saved under it rode along on EVERY current week's Thursday
+  // instead of expiring with its week. Truly ancient relative once-entries are
+  // stale by definition; dropping the branch retires them with the bug.
   // 2. Biweekly entries (alternate weeks from placement)
   for(const[key,val]of Object.entries(ttCustom)){
     if(!val||val.recur!=='biweekly')continue;
@@ -24057,6 +24032,8 @@ function openEditModal(slotIdx,day,_bypassEditMode){
   if(hrEl)hrEl.checked=!!(custom&&custom.house_register);
   const haEl=document.getElementById('edit-house-activity');
   if(haEl)haEl.checked=!!(custom&&custom.house_activity);
+  const tcEl=document.getElementById('edit-tutor-check');
+  if(tcEl)tcEl.checked=!!(custom&&custom.tutor_check);
   if(brEl&&hrEl){
     brEl.onchange=function(){if(this.checked)hrEl.checked=false;};
     hrEl.onchange=function(){if(this.checked)brEl.checked=false;};
@@ -24353,6 +24330,7 @@ function saveSlot(){
   const house_register=!!((_hrEl&&_hrEl.checked));
   const _haEl=document.getElementById('edit-house-activity');
   const house_activity=!!((_haEl&&_haEl.checked));
+  const tutor_check=!!(document.getElementById('edit-tutor-check')?.checked);
   // Departure timing fields
   const _depOn=document.getElementById('edit-dep-toggle')?.checked;
   const _depSens=_depOn?(document.querySelector('input[name="dep-sensitivity"]:checked')?.value||null):null;
@@ -24360,7 +24338,7 @@ function saveSlot(){
   // default — previously the whole departure block was silently dropped.
   const _depMins=_depOn?(parseInt(document.getElementById('edit-dep-mins')?.value||'0')||(_depSens?DEP_DEFAULT_MINS[_depSens]:null)||null):null;
   const _rawTp=document.getElementById('edit-type').value||'free';
-  const evtData={l:document.getElementById('edit-label').value||'',tp:(_rawTp==='empty'?'free':_rawTp),cat:catVal,recur:document.getElementById('edit-recur').value||'once',placedWeek:week,endSlotIdx,customStartTime,customEndTime,boarding_register,house_register,house_activity,...(_depOn&&_depMins?{travel_mins:_depMins,sensitivity:_depSens}:{travel_mins:null,sensitivity:null})};
+  const evtData={l:document.getElementById('edit-label').value||'',tp:(_rawTp==='empty'?'free':_rawTp),cat:catVal,recur:document.getElementById('edit-recur').value||'once',placedWeek:week,endSlotIdx,customStartTime,customEndTime,boarding_register,house_register,house_activity,tutor_check,...(_depOn&&_depMins?{travel_mins:_depMins,sensitivity:_depSens}:{travel_mins:null,sensitivity:null})};
   if(evtData.tp==='free'){evtData.boarding_register=false;evtData.house_register=false;}
   // Record label history for quick-fill suggestions
   _saveLabelHistory(evtData.l,evtData.tp,catVal);
@@ -24553,7 +24531,8 @@ function loadGlobalDefault(){
     if(s.liveOpen){setTimeout(function(){if(typeof amOpen!=='undefined')amOpen();},500);}
     if(s.tab){
       // Settings is allowed as the default: it lands on its unlock screen
-      const safeTab=s.tab;
+      // 'morning' (the removed 8am sheet) falls back to the schedule
+      const safeTab=s.tab==='morning'?'sched':s.tab;
       _activeMainTab=safeTab;
       const tabEl=document.querySelector(`.tab[onclick*="showTab('${safeTab}'"]`);
       document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
@@ -24905,20 +24884,20 @@ function renderTodayView(){
             if(cell.boarding_register)f.push(['🛏','Boarding register','#7c3aed']);
             if(cell.house_register)f.push(['🏠','House register','#7c3aed']);
             if(cell.house_activity)f.push(['🎯','House activity','#0ea5e9']);
+            if(cell.tutor_check)f.push(['👁','Tutor check','#0e7490']);
+            const _pn=_tpCount(slotDateStr,tStart);
+            if(_pn)f.push(['📌'+_pn,'Planned tasks','#f59f00']);
             return f.map(([ic,t,c])=>`<span title="${t}" style="font-size:9px;margin-left:5px;padding:1px 5px;border-radius:7px;background:${c}1f;color:${c};border:1px solid ${c}55;font-weight:700">${ic}</span>`).join('');
+          })()}${(()=>{
+            // Duty names visible on any day, not only inside the live window
+            const chips=_dutyChipsFor(slotDateStr,t2m(tStart),t2m(tEnd));
+            return chips.length?`<div style="font-size:10px;font-weight:600;color:${tx};opacity:.75;margin-top:2px">${chips.map(_esc).join(' · ')}</div>`:'';
           })()}</div>
           ${notePreview}
         </div>
       </div>
       <div class="today-note-area" id="tnote-${idx}" style="background:#f8f9fa;padding:.5rem .85rem .6rem;border-top:1px solid rgba(0,0,0,.08)">
-        <textarea class="today-note-ta" id="tnote-ta-${idx}" rows="2" placeholder="Add a note for this slot...">${note}</textarea>
-        <div class="today-note-btns">
-          <button class="today-note-save" onclick="saveTodayNote(${idx},'${dayName}')">Save</button>
-          <button class="today-note-clear" onclick="clearTodayNote(${idx},'${dayName}')">Clear</button>
-          <label class="today-note-recur">
-            <input type="checkbox" id="tnote-perm-${idx}" ${slotNotes['perm_'+idx+'_'+dayName]?'checked':''}> Permanent
-          </label>
-        </div>
+        ${_tpPanelHtml(slotDateStr,tStart,idx)}
       </div>
       ${pHtml}
     </div>`;
@@ -24928,6 +24907,7 @@ function renderTodayView(){
   const _wNumDay=getWeekNumber(weekOffset);
   const _planTs=(S.planData||[]).filter(t=>{
     if(t.say||t.archived)return false; // say-points live in the To say strip, not the task list
+    if(_tpAnchorFuture(t))return false; // planned into a coming period — lives in its slot
     if(t.scope==='sticky')return true;
     if(t.scope==='week')return t.weekNum===_wNumDay;
     if(t.scope==='week-day')return t.weekNum===_wNumDay&&t.day===dayName;
@@ -25329,7 +25309,13 @@ function renderTimetable(){
       const _pSlots=getPersonalSlotsForDay(d,dayDateStrs[activeDays.indexOf(d)]).filter(function(ps){const ss=t2m(ps.start_time),se=t2m(ps.end_time),cs=t2m(getSlotTime(idx));const ce=idx+1<SLOTS.length?t2m(getSlotTime(idx+1)):cs+30;return ss<ce&&se>cs;});
       const _pHtml=_pSlots.length?_pSlots.map(function(ps){return '<span class="personal-pill" onclick="openOmni(event)">👤 '+ps.start_time+'–'+ps.end_time+'</span>';}).join(''):'';
       const _spanCls=isCleanSpan?' span-cell':'';
-      h+=`${tdOpen}<div class="tt-inner${_spanCls} c-${cell.tp}${half}${customClass}${ttEditMode?' editable':''}" style="${cb}${_catStyle}" onclick="${_cellClick}" ontouchstart="${_longPress}" ontouchend="${_longPressEnd}" ontouchmove="${_longPressEnd}">${label}${noteHtml}${outlineDot}</div>`+_pHtml+`</td>`;
+      // Flag badges — same truth the day view shows, so a flagged slot is
+      // visible from the week grid too (stale flags were invisible here before)
+      const _tpDs=dayDateStrs[activeDays.indexOf(d)];
+      const _tpN=_tpDs?_tpCount(_tpDs,(cell&&cell.customStartTime)||getSlotTime(idx)):0;
+      const _fb=(cell.boarding_register?'🛏':'')+(cell.house_register?'🏠':'')+(cell.house_activity?'🎯':'')+(cell.tutor_check?'👁':'')+(_tpN?'📌':'');
+      const _fbHtml=_fb?`<div data-flag-badge style="font-size:7.5px;line-height:1.1;margin-top:1px;opacity:.92">${_fb}</div>`:'';
+      h+=`${tdOpen}<div class="tt-inner${_spanCls} c-${cell.tp}${half}${customClass}${ttEditMode?' editable':''}" style="${cb}${_catStyle}" onclick="${_cellClick}" ontouchstart="${_longPress}" ontouchend="${_longPressEnd}" ontouchmove="${_longPressEnd}">${label}${noteHtml}${_fbHtml}${outlineDot}</div>`+_pHtml+`</td>`;
       }
     });
     h+=timeCellR+'</tr>';
@@ -25687,420 +25673,6 @@ function showCalEvs(ds,day,year,month,evt){
 }
 function calNav(dir){calMonth+=dir;if(calMonth>11){calMonth=0;calYear++;}if(calMonth<0){calMonth=11;calYear--;}document.getElementById('cal-event-panel').style.display='none';renderCalendar();}
 
-// ── MORNING CHECK ─────────────────────────────────────
-const CRITERIA=[{key:'reg',label:'Registration Completed'},{key:'ontime',label:'Tutor On Time'},{key:'stu',label:'Students On Time'},{key:'ppt',label:'PPT Displayed'},{key:'dev',label:'No Device Use'},{key:'alert',label:'Students Alert'},{key:'uni',label:'Correct Uniform'}];
-const MC_ORDER=['Peter McDaid','Kofi Akordor','Elodie Rui','Linda Hu','Cyan Wang','Fernando Jiang','Tarek Main','Ridel Merino Rivero','Lindy Cui','Chichi Xie'];
-
-function setGreenDot(){
-  const dot=document.getElementById('dot-morning'),info=document.getElementById('mc-gen-info'),now=new Date();
-  if(dot)dot.style.display='block';
-  if(info){info.style.display='block';info.textContent='✓ Last sent '+now.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' at '+now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}
-  const reset=new Date();reset.setDate(reset.getDate()+1);reset.setHours(3,30,0,0);
-  const ms=reset-now;
-  setTimeout(()=>{if(dot)dot.style.display='none';if(info)info.style.display='none';},ms);
-  // Also schedule silent reset of morning check data
-  setTimeout(()=>{Object.keys(mcState).forEach(t=>{delete mcState[t];});saveState();},ms);
-}
-
-function markAllY(){MC_ORDER.forEach(tN=>markTutorY(tN));}
-function markTutorY(tN){
-  if(!mcState[tN])mcState[tN]={};
-  const tid=tN.replace(/\s+/g,'_');
-  CRITERIA.forEach(c=>{mcState[tN][c.key]='y';['by-','bn-','bna-'].forEach(p=>{const b=document.getElementById(p+tid+'-'+c.key);if(b)b.className='yn-btn'+(p==='by-'?' active-y':'');});});
-  const el=document.getElementById('ts-'+tid);if(el){el.className='tutor-status st-done';el.textContent='✓';}
-  saveState();
-}
-function markTutorAbsent(tN){
-  if(!mcState[tN])mcState[tN]={};
-  const tid=tN.replace(/\s+/g,'_');
-  CRITERIA.forEach(c=>{mcState[tN][c.key]='na';['by-','bn-','bna-'].forEach(p=>{const b=document.getElementById(p+tid+'-'+c.key);if(b)b.className='yn-btn'+(p==='bna-'?' active-na':'');});});
-  const el=document.getElementById('ts-'+tid);if(el){el.className='tutor-status st-done';el.textContent='N/A';}
-  saveState();
-}
-function resetAll(){
-  TUTORS.forEach(tut=>{
-    const tN=tut.name;mcState[tN]={};const tid=tN.replace(/\s+/g,'_');
-    CRITERIA.forEach(c=>{['by-','bn-','bna-'].forEach(p=>{const b=document.getElementById(p+tid+'-'+c.key);if(b)b.className='yn-btn';});});
-    const el=document.getElementById('ts-'+tid);if(el){el.className='tutor-status st-empty';el.textContent='—';}
-    const tc=document.getElementById('tc-'+tid);if(tc)tc.value='';
-    const td=document.getElementById('td-'+tid);if(td)td.classList.remove('open');
-  });
-  ['fu1','fu2','fu3','fu4'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=false;});
-  const out=document.getElementById('morning-email-out');if(out){out.style.display='none';out.innerHTML='';}
-  saveState();
-}
-function setMcDate(){
-  const picker=document.getElementById('mc-date-picker');
-  const hidden=document.getElementById('mc-date');
-  const display=document.getElementById('mc-date-display');
-  if(!picker||!picker.value)return;
-  const d=new Date(picker.value+'T00:00:00');
-  const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const fmt=days[d.getDay()]+' '+d.getDate()+' '+months[d.getMonth()]+' '+d.getFullYear();
-  if(hidden)hidden.value=fmt;
-  if(display)display.textContent=fmt;
-  typeof updateMcEmail!=='undefined'&&updateMcEmail();
-}
-function resetMcDate(){
-  const today=_todayStr();
-  const picker=document.getElementById('mc-date-picker');
-  if(picker){picker.value=today;setMcDate();}
-}
-
-function buildMorningChecks(){
-  const tcEl=document.getElementById('tutor-checks');if(tcEl)tcEl.innerHTML=MC_ORDER.map(tN=>{
-    const tData=getTutorByName(tN)||{};
-    const tid=tN.replace(/\s+/g,'_'),room=tData.room||'';
-    const crit=CRITERIA.map(c=>`<div class="crit-item"><span class="crit-label">${c.label}</span><div class="yn-wrap"><button class="yn-btn" id="by-${tid}-${c.key}" type="button" onclick="setYN('${tid}','${tN}','${c.key}','y')">Y</button><button class="yn-btn" id="bn-${tid}-${c.key}" type="button" onclick="setYN('${tid}','${tN}','${c.key}','n')">N</button><button class="yn-btn" id="bna-${tid}-${c.key}" type="button" onclick="setYN('${tid}','${tN}','${c.key}','na')">N/A</button></div></div>`).join('');
-    return`<div class="tutor-block"><div class="tutor-hdr" onclick="toggleTutor('${tid}')"><div class="tutor-hdr-left"><div class="tutor-name">${tN}</div><div class="tutor-room">${room}</div></div><div class="tutor-hdr-right"><button class="quick-btn y-btn" onclick="event.stopPropagation();markTutorY('${tN}')">All Y</button><button class="quick-btn abs-btn" onclick="event.stopPropagation();markTutorAbsent('${tN}')">Absent</button><span class="tutor-status st-empty" id="ts-${tid}">—</span></div></div><div class="tutor-detail" id="td-${tid}">${crit}<textarea class="comments-ta" id="tc-${tid}" rows="2" placeholder="Comments / follow-up..."></textarea><button class="reset-btn" onclick="resetTutor('${tid}','${tN}')">↺ Reset</button></div></div>`;
-  }).join('');
-}
-function setYN(tid,tN,key,val){
-  if(!mcState[tN])mcState[tN]={};const cur=mcState[tN][key];
-  const pfx={y:'by-',n:'bn-',na:'bna-'};
-  if(cur===val){delete mcState[tN][key];Object.keys(pfx).forEach(v=>{const b=document.getElementById(pfx[v]+tid+'-'+key);if(b)b.className='yn-btn';});}
-  else{mcState[tN][key]=val;Object.keys(pfx).forEach(v=>{const b=document.getElementById(pfx[v]+tid+'-'+key);if(b)b.className='yn-btn'+(v===val?' active-'+v:'');});}
-  const ans=Object.keys(mcState[tN]).length,el=document.getElementById('ts-'+tid);
-  if(el){if(ans===0){el.className='tutor-status st-empty';el.textContent='—';}else if(ans<CRITERIA.length){el.className='tutor-status st-partial';el.textContent=ans+'/'+CRITERIA.length;}else{el.className='tutor-status st-done';el.textContent='✓';}}
-  saveState();
-}
-function resetTutor(tid,tN){
-  mcState[tN]={};CRITERIA.forEach(c=>{['by-','bn-','bna-'].forEach(p=>{const b=document.getElementById(p+tid+'-'+c.key);if(b)b.className='yn-btn';});});
-  const el=document.getElementById('ts-'+tid);if(el){el.className='tutor-status st-empty';el.textContent='—';}
-  const tc=document.getElementById('tc-'+tid);if(tc)tc.value='';saveState();
-}
-function toggleTutor(id){document.getElementById('td-'+id).classList.toggle('open');}
-function restoreMCState(){
-  Object.entries(mcState).forEach(([tN,vals])=>{
-    const tid=tN.replace(/\s+/g,'_');
-    Object.entries(vals).forEach(([key,val])=>{
-      ['by-','bn-','bna-'].forEach(p=>{const b=document.getElementById(p+tid+'-'+key);if(b)b.className='yn-btn';});
-      const pfx={y:'by-',n:'bn-',na:'bna-'};const b=document.getElementById(pfx[val]+tid+'-'+key);if(b)b.className='yn-btn active-'+val;
-    });
-    const ans=Object.keys(vals).length,el=document.getElementById('ts-'+tid);
-    if(el){if(ans===0){el.className='tutor-status st-empty';el.textContent='—';}else if(ans<CRITERIA.length){el.className='tutor-status st-partial';el.textContent=ans+'/'+CRITERIA.length;}else{el.className='tutor-status st-done';el.textContent='✓';}}
-  });
-}
-
-// ── EMAIL HELPERS ─────────────────────────────────────
-function emailBox(to,cc,subject,body,id){
-  window['_eb_'+id]={to,cc,subject,body};
-  return`<div class="email-box">
-    <div class="email-row"><div class="email-fw"><span class="email-lbl">To: </span><span class="email-field">${to}</span></div><button class="mini-copy" onclick="mc('to','${id}',this)">Copy</button></div>
-    ${cc?`<div class="email-row"><div class="email-fw"><span class="email-lbl">CC: </span><span class="email-field">${cc}</span></div><button class="mini-copy" onclick="mc('cc','${id}',this)">Copy</button></div>`:''}
-    <div class="email-row"><div class="email-fw"><span class="email-lbl">Subject: </span><span class="email-field">${subject}</span></div><button class="mini-copy" onclick="mc('sub','${id}',this)">Copy</button></div>
-    <div class="email-body-text" id="ebody-${id}">${body}</div>
-    <label class="sig-toggle"><input type="checkbox" id="sig-${id}" onchange="toggleSig('${id}')"> Include Signature</label>
-    <div class="btn-row"><button class="copy-btn" onclick="copyBody('${id}',this)">Copy Body</button></div>
-  </div>`;
-}
-function mc(field,id,btn){
-  const d=window['_eb_'+id]||{},text=field==='to'?d.to:field==='cc'?d.cc:d.subject;
-  navigator.clipboard.writeText(text||'').then(()=>{const o=btn.textContent;btn.textContent='✓';setTimeout(()=>btn.textContent=o,1500);});
-}
-function toggleSig(id){
-  const cb=document.getElementById('sig-'+id),el=document.getElementById('ebody-'+id),d=window['_eb_'+id]||{};
-  if(el)el.textContent=cb.checked?d.body+SIG:d.body;
-}
-function copyBody(id,btn){
-  const el=document.getElementById('ebody-'+id),d=window['_eb_'+id]||{},body=el?el.innerText:d.body;
-  navigator.clipboard.writeText(body).then(()=>{const o=btn.textContent;btn.textContent='✓ Copied';setTimeout(()=>btn.textContent=o,2000);});
-}
-function stepHTML(num,title,content,id){return`<div class="step-item"><div class="step-num" id="sn-${id}">${num}</div><div class="step-body"><div class="step-title">${title}</div>${content}<div class="step-check"><input type="checkbox" id="${id}" onchange="markStep(this)"><label for="${id}">Done</label></div></div></div>`;}
-function markStep(cb){const n=document.getElementById('sn-'+cb.id);if(n)n.classList.toggle('done',cb.checked);}
-
-// ── AUTOCOMPLETE ──────────────────────────────────────
-function acInput(px){
-  const v=document.getElementById(px+'-student').value.toLowerCase().trim(),l=document.getElementById(px+'-ac');
-  if(!v){if(l)l.style.display='none';return;}
-  const all=getAllStudentsWithTutor();
-  const m=all.filter(s=>s.name.toLowerCase().includes(v)).slice(0,6);
-  if(!m.length){if(l)l.style.display='none';return;}
-  if(px==='cfv'){
-    l.innerHTML=m.map(s=>`<div class="ac-item" onmousedown="cfvSelectStudent('${s.name}','${s.tutor}','${s.email}','${s.first}','${s.grade}')"><div>${s.name} <span style="font-size:10px;color:#868e96">${s.grade}</span></div><div class="ac-sub">Tutor: ${s.tutor}</div></div>`).join('');
-  } else {
-    l.innerHTML=m.map(s=>`<div class="ac-item" onmousedown="selectStu('${px}','${s.name}','${s.tutor}','${s.email}','${s.first}','${s.grade}')"><div>${s.name} <span style="font-size:10px;color:#868e96">${s.grade}</span></div><div class="ac-sub">Tutor: ${s.tutor}</div></div>`).join('');
-  }
-  if(l)l.style.display='block';
-}
-function hideAC(px){const l=document.getElementById(px+'-ac');if(l)l.style.display='none';}
-function selectStu(px,name,tutor,email,first,grade){
-  if(px==='cfv'){cfvSelectStudent(name,tutor,email,first,grade);return;}
-  document.getElementById(px+'-student').value=name;
-  const ti=document.getElementById(px+'-tutor');if(ti)ti.value=tutor;
-  const h=document.getElementById(px+'-hint');if(h){h.textContent='Tutor: '+tutor+' · '+grade;h.style.display='block';}
-  hideAC(px);
-  window['_'+px+'_te']=email;window['_'+px+'_tn']=tutor;window['_'+px+'_tf']=first;window['_'+px+'_gr']=grade;
-  if(px==='sd')updateSatDet();if(px==='wd')updateWeekDet();if(px==='pm')updatePM();
-}
-
-// ── DETENTIONS ────────────────────────────────────────
-function selectRP(px,val,el){
-  el.parentElement.querySelectorAll('.pill').forEach(p=>p.classList.remove('selected'));el.classList.add('selected');
-  const h=document.getElementById(px+'-reason'),o=document.getElementById(px+'-reason-other');
-  if(val==='other'){if(h)h.value='';if(o)o.style.display='block';}
-  else{if(h)h.value=val==='device'?'device misuse and having their device confiscated':val==='3neg'?'receiving 3 negatives in one day':val;if(o)o.style.display='none';}
-  if(px==='sd')updateSatDet();if(px==='wd')updateWeekDet();
-}
-function detBodyOnly(sf,tf,date,slot,room,reason,dn){
-  const fn=firstName(sf),div='\n\n────────────────────────\n\n';
-  return`Dear Liaison,\n\nPlease inform ${sf}'s parents that ${fn} has a ${slot} in room ${room} on ${date}.\n\nReason: ${reason}.${dn}${div}Dear ${tf},\n\nPlease remind ${fn} during tutor time that he has a ${slot} in room ${room} on ${date}.\n\nReason: ${reason}.${dn}\n\nThank you,`;
-}
-function fmtDetDate(ds){
-  const d=new Date(ds+'T00:00:00');
-  const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
-  return days[d.getDay()]+' '+d.getDate()+' '+months[d.getMonth()]+' '+d.getFullYear();
-}
-function setWDDate(){
-  const picker=document.getElementById('wd-date-picker');
-  const hidden=document.getElementById('wd-date');
-  const display=document.getElementById('wd-date-display');
-  if(!picker||!picker.value)return;
-  const formatted=fmtDetDate(picker.value);
-  if(hidden)hidden.value=formatted;
-  if(display)display.textContent=formatted;
-  updateWeekDet();
-}
-function setSDDate(){
-  const picker=document.getElementById('sd-date-picker');
-  const hidden=document.getElementById('sd-date');
-  const display=document.getElementById('sd-date-display');
-  if(!picker||!picker.value)return;
-  const formatted=fmtDetDate(picker.value);
-  if(hidden)hidden.value=formatted;
-  if(display)display.textContent=formatted;
-  updateSatDet();
-}
-function initDetDates(){
-  // Default weekday detention to tomorrow
-  const tom=new Date(_todayStr()+'T12:00:00');tom.setDate(tom.getDate()+1);
-  const tomStr=tom.toLocaleDateString('en-CA');
-  const wdp=document.getElementById('wd-date-picker');
-  if(wdp){wdp.value=tomStr;setWDDate();}
-  // Default Saturday detention to next Saturday
-  const nextSat=new Date(_todayStr()+'T12:00:00');
-  const daysToSat=(6-nextSat.getDay()+7)%7||7;
-  nextSat.setDate(nextSat.getDate()+daysToSat);
-  const satStr=nextSat.toLocaleDateString('en-CA');
-  const sdp=document.getElementById('sd-date-picker');
-  if(sdp){sdp.value=satStr;setSDDate();}
-}
-
-function updateSatDet(){
-  const s=gv('sd-student')||'[Student]',gr=window._sd_gr||'',t=gv('sd-tutor')||'[Tutor]',d=gv('sd-date')||'[Date]';
-  const te=window._sd_te||sv('liaison-email'),tf=window._sd_tf||t.split(' ')[0];
-  const r=gv('sd-reason')||gv('sd-reason-other')||'[reason]';
-  const dn=r.toLowerCase().includes('device')||r.toLowerCase().includes('confiscat')?`\n\nPlease also note that ${firstName(s)}'s device will be returned upon completion of the detention.`:'';
-  const gl=gr?' '+gr:'';
-  const sdEl=document.getElementById('sd-steps');if(sdEl)sdEl.innerHTML=
-    stepHTML(1,'Update Reward & Conduct Overview',`<div style="font-size:12px;color:#495057;margin-top:4px">Add 1 to detention counter for <strong>${s}</strong>.</div>${sLink('Reward & Conduct Overview','rc')}`,'sd-s1')+
-    stepHTML(2,'Email Liaison & Tutor',emailBox(`${sv('liaison-email')}; ${te}`,'',`Saturday Detention — ${s}${gl} (${sv('det-sat-start')||'13:30'}–${sv('det-sat-end')||'15:30'}, ${sv('det-sat-room')||'A201'})`,detBodyOnly(s,tf,d,'Saturday detention from '+(sv('det-sat-start')||'13:30')+' to '+(sv('det-sat-end')||'15:30'),(sv('det-sat-room')||'A201'),r,dn),'sd-e'),'sd-s2');
-}
-function updateWeekDet(){
-  const s=gv('wd-student')||'[Student]',gr=window._wd_gr||'',t=gv('wd-tutor')||'[Tutor]',d=gv('wd-date')||'[Date]';
-  const te=window._wd_te||'',tf=window._wd_tf||t.split(' ')[0];
-  const r=gv('wd-reason')||gv('wd-reason-other')||'[reason]';
-  const gl=gr?' '+gr:'';
-  const wdEl=document.getElementById('wd-steps');if(wdEl)wdEl.innerHTML=
-    stepHTML(1,'Email Liaison & Tutor',emailBox(`${sv('liaison-email')}; ${te}`,'',`Morning Detention — ${s}${gl} (${sv('det-wd-time')||'10:35'}, ${sv('det-wd-room')||'A201'})`,detBodyOnly(s,tf,d,'morning detention at '+(sv('det-wd-time')||'10:35'),(sv('det-wd-room')||'A201'),r,''),'wd-e'),'wd-s1');
-}
-
-// ── PARENT MEETING ────────────────────────────────────
-const RISK_LABELS=['','No Risk','Low Risk','Medium Risk','High Risk','Definitely Leaving','Already Left','Temporary Leave'];
-let pmType='arrange';
-let settingsUnlocked=false;
-
-const LEAVER_COMMENT_TEMPLATES=[
-  'Initial concern raised following pastoral conversation on [date]. No formal action taken yet.',
-  'HSM observation: student appears disengaged and has mentioned considering other options.',
-  'Email sent to liaison on [date] to arrange meeting with parents — awaiting response.',
-  'Parent meeting held on [date]. Family [expressed concerns about / confirmed they are considering] alternatives.',
-  'Follow-up email sent to parents on [date] — no response received. Escalated to Deputy Head.',
-  'Student confirmed temporary absence until [date]. Return plan agreed with family.',
-  'Risk level unchanged. Monitoring continues. Next review: [date].',
-  'Risk updated following [meeting / conversation / email]. Situation [has improved / has escalated].',
-];
-
-function setPMType(type,btn){
-  pmType=type;
-  document.querySelectorAll('#pm-type-toggle .type-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
-  document.getElementById('pm-arrange-fields').style.display=type==='arrange'?'block':'none';
-  document.getElementById('pm-retention-fields').style.display=type==='retention'?'block':'none';
-  document.getElementById('pm-message-fields').style.display=type==='message'?'block':'none';
-  updatePM();
-}
-function selectPMRisk(num,el){
-  document.querySelectorAll('#pm-risk-options .risk-opt').forEach(o=>o.classList.remove('selected'));el.classList.add('selected');
-  document.getElementById('pm-risk').value=RISK_LABELS[num];document.getElementById('pm-risk-num').value=num;
-  const cr=document.getElementById('pm-comments-row');if(cr)cr.style.display=num>=2?'flex':'none';
-  updatePM();
-}
-function selectTP(val,el){
-  el.parentElement.querySelectorAll('.pill').forEach(p=>p.classList.remove('selected'));el.classList.add('selected');
-  const o=document.getElementById('pm-timing-other');
-  if(val==='other'){document.getElementById('pm-timing').value='';if(o)o.style.display='block';}
-  else{const l={none:'No Specific Preference',thisweek:'this week',nextweek:'next week'};document.getElementById('pm-timing').value=l[val]||val;if(o)o.style.display='none';}
-  updatePM();
-}
-
-function buildCommentTemplates(){
-  const today=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
-  return`<div style="font-size:11px;font-weight:500;color:#495057;margin-bottom:6px">Quick comment templates (tap to add):</div>`+
-  LEAVER_COMMENT_TEMPLATES.map(t=>`<div onclick="addPMComment('${t.replace(/'/g,"\\'")}','${today}')" style="font-size:11px;color:#1864ab;padding:5px 8px;background:#e7f3ff;border-radius:6px;margin-bottom:4px;cursor:pointer">${t.replace('[date]','<strong>'+today+'</strong>')}</div>`).join('');
-}
-function addPMComment(template,today){
-  const el=document.getElementById('pm-comments');
-  if(!el)return;
-  const filled=template.replace(/\[date\]/g,today);
-  el.value=el.value?(el.value+'\n'+filled):filled;
-  updatePM();
-}
-
-function updatePM(){
-  const s=gv('pm-student')||'[Student]',fn=firstName(s);
-  const t=gv('pm-tutor')||'[Tutor]',te=window._pm_te||'';
-  const gr=window._pm_gr||'',gl=gr?' '+gr:'';
-  const risk=gv('pm-risk'),rNum=parseInt(gv('pm-risk-num'))||0;
-  const comments=gv('pm-comments'),timing=gv('pm-timing')||gv('pm-timing-other')||'No Specific Preference';
-  const purpose=gv('pm-purpose'),message=gv('pm-message');
-  const dateRaw=gv('pm-date'),dateF=dateRaw?new Date(dateRaw).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}):'';
-  const warn=rNum>=2&&!comments?'<div style="font-size:11px;color:#c92a2a;margin-top:4px">⚠️ Comments required</div>':'';
-  const CC_RET=sv('retention-cc');
-  let steps='';
-  if(pmType==='arrange'){
-    const tl=dateF?`I would like to arrange a meeting with ${s}'s parents around ${dateF}.`:`I would like to arrange a meeting with ${s}'s parents at the earliest convenient time.`;
-    const pl=purpose?`\n\nPurpose Of Meeting: ${purpose}`:'';
-    const body=`Dear Liaison,\n\n${tl}${pl}\n\nPlease coordinate a suitable time and confirm with me directly.\n\nKind regards,`;
-    steps=stepHTML(1,'Send Email To Liaison',emailBox(sv('liaison-email'),te,`Parent Meeting Request — ${s}${gl}`,body,'pm-arr'),'pm-s1')+
-      stepHTML(2,'Log In Parent Meeting Log',`<div style="font-size:12px;color:#495057;margin-top:4px">Log <strong>${s}</strong> — date: <strong>${dateF||'TBC'}</strong>.</div>${sLink('Parent Meeting Log','pl')}`,'pm-s2')+
-      stepHTML(3,'Update Reward & Conduct',`<div style="font-size:12px;color:#495057;margin-top:4px">Add 1 to parent meeting counter for <strong>${s}</strong>.</div>${sLink('Reward & Conduct Overview','rc')}`,'pm-s3');
-  }else if(pmType==='retention'){
-    const tl=timing==='No Specific Preference'?'I would be grateful if a meeting could be arranged at the earliest convenient time.':`I would appreciate this meeting being arranged ${timing}.`;
-    let eb='';
-    if(rNum===6)eb=`Dear Liaison,\n\nI am writing to formally notify you that ${s} has left or stopped attending school — Risk Category ${rNum} — ${risk}.\n\nI would like to arrange a meeting with the family to discuss next steps. ${tl}\n\nKind regards,`;
-    else if(rNum===5)eb=`Dear Liaison,\n\nFollowing a pastoral review, ${s} has been assessed at Risk Category ${rNum} — ${risk}.\n\nI would like to arrange a meeting to discuss the circumstances of their departure. ${tl}\n\nKind regards,`;
-    else if(rNum===7)eb=`Dear Liaison,\n\nFollowing a pastoral review, ${s} has been assessed at Risk Category ${rNum} — ${risk}.\n\nI would like to arrange a meeting to discuss arrangements for their return. ${tl}\n\nKind regards,`;
-    else eb=`Dear Liaison,\n\nFollowing a pastoral review, ${s} has been assessed at Risk Category ${rNum} — ${risk} regarding their continued enrolment.\n\n${tl}\n\nKind regards,`;
-    const retCC=CC_RET+(te?'; '+te:'');
-    const ltComment=`<div style="font-size:12px;color:#495057;margin-top:4px">Record <strong>${s}</strong> — Risk Category ${rNum}: <strong>${risk||'[select]'}</strong>${comments?'\n\nComments:\n'+comments:''}.</div>${warn}`;
-    steps=stepHTML(1,'Notify Liaison & SLT',emailBox(sv('liaison-email'),retCC,`Retention Concern — ${s}${gl} — Risk Category ${rNum}: ${risk||'[select]'}`,eb,'pm-ret'),'pm-r1')+
-      stepHTML(2,'Update Leaver Tracker',`${ltComment}${buildCommentTemplates()}${sLink('Leaver Tracker Updated','lt')}`,'pm-r2')+
-      stepHTML(3,'Update Reward & Conduct',`<div style="font-size:12px;color:#495057;margin-top:4px">Record retention risk for <strong>${s}</strong>.</div>${sLink('Reward & Conduct Overview','rc')}`,'pm-r3');
-  }else{
-    const mb=`Dear Liaison,\n\nI would be grateful if you could pass the following message on to ${s}'s parents on my behalf:\n\n——\n${message||'[Your message here]'}\n——\n\nKind regards,`;
-    steps=stepHTML(1,'Send Message Via Liaison',emailBox(sv('liaison-email'),te,`Message For Parents Of ${s}${gl}`,mb,'pm-msg'),'pm-m1');
-  }
-  const pmEl=document.getElementById('pm-steps');if(pmEl)pmEl.innerHTML=steps;
-}
-
-// ── MORNING EMAIL ─────────────────────────────────────
-function generateMorningEmail(){
-  const date=gv('mc-date')||'[date]',time=gv('mc-time')||sv('mc-default-time')||'07:59–08:10';
-  const mcTitle=sv('mc-title')||MC_TITLE_DEFAULT;
-  const fu=['Verbal reminder given to tutor','Follow-up email sent','Logged for monitoring','Escalated to Deputy Head Pastoral'].filter((_,i)=>document.getElementById('fu'+(i+1))&&document.getElementById('fu'+(i+1)).checked);
-  const fuText=fu.length?'\n\nFollow-up actions taken:\n'+fu.map(f=>'• '+f).join('\n'):'';
-  const cL={reg:'Reg.',ontime:'Tutor OT',stu:'Stud. OT',ppt:'PPT',dev:'No Device',alert:'Alert',uni:'Uniform'};
-  const yv=v=>v==='y'?'✓':v==='n'?'✗':v==='na'?'N/A':'—';
-  const ycol=v=>v==='y'?'#2b8a3e':v==='n'?'#c92a2a':v==='na'?'#495057':'#adb5bd';
-  const thS='padding:6px 8px;border:1px solid #dee2e6;background:#1d4ed8;color:#fff;font-size:11px;font-weight:600;text-align:center;white-space:nowrap';
-  const tdS='padding:5px 8px;border:1px solid #dee2e6;font-size:11px;text-align:center;font-weight:700';
-  const tdNS='padding:5px 8px;border:1px solid #dee2e6;font-size:11px;text-align:left;font-weight:500';
-  const tdCS='padding:5px 8px;border:1px solid #dee2e6;font-size:11px;text-align:left';
-  let tbl=`<table style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif"><thead><tr><th style="${thS}">Tutor</th>`;
-  CRITERIA.forEach(c=>{tbl+=`<th style="${thS}">${cL[c.key]}</th>`;});
-  tbl+=`<th style="${thS}">Comments</th></tr></thead><tbody>`;
-  MC_ORDER.forEach((t,i)=>{
-    const d=mcState[t]||{},bg=i%2===0?'#ffffff':'#f0f4ff';
-    tbl+=`<tr style="background:${bg}"><td style="${tdNS}">${t}</td>`;
-    CRITERIA.forEach(c=>{const v=d[c.key]||'';tbl+=`<td style="${tdS};color:${ycol(v)}">${yv(v)}</td>`;});
-    const comment=(document.getElementById('tc-'+t.replace(/\s+/g,'_'))||{}).value||'';
-    tbl+=`<td style="${tdCS}">${comment}</td></tr>`;
-  });
-  tbl+='</tbody></table>';
-  const fuHTML=fu.length?`<p style="font-family:Arial,sans-serif;font-size:12px"><strong>Follow-up actions taken:</strong></p><ul style="font-family:Arial,sans-serif;font-size:12px">${fu.map(f=>`<li>${f}</li>`).join('')}</ul>`:'';
-  const tableHTML=`<div style="font-family:Arial,sans-serif;font-size:12px"><p>Dear Wendy,</p><p>Please find below the ${mcTitle} for Hawking House.</p><p><strong>Date:</strong> ${date} &nbsp;&nbsp; <strong>Time Observed:</strong> ${time} &nbsp;&nbsp; <strong>HSM:</strong> Laith Alattili</p><br>${tbl}${fuHTML}<p>Kind regards,</p></div>`;
-  const plainBody=`Dear Wendy,\n\nPlease find attached the ${mcTitle} for Hawking House.\n\nDate: ${date}\nTime Observed: ${time}\nHSM: Laith Alattili${fuText}\n\nKind regards,`;
-  const subj=`${mcTitle} — Hawking — ${date}`;
-  window._mTHTML=tableHTML;window._mPlain=plainBody;window._mSubj=subj;
-  const wendy=sv('wendy-email'),kris=sv('kris-email');
-  const out=document.getElementById('morning-email-out');
-  out.style.display='block';
-  out.innerHTML=`<div class="email-mode-toggle"><button class="email-mode-btn active" onclick="setMcMode('table',this)">With Table</button><button class="email-mode-btn" onclick="setMcMode('plain',this)">No Table (For Attachment)</button></div>
-  <div class="email-box" style="margin-bottom:.5rem">
-    <div class="email-row"><div class="email-fw"><span class="email-lbl">To: </span><span class="email-field">${wendy}</span></div><button class="mini-copy" onclick="navigator.clipboard.writeText('${wendy}').then(()=>{this.textContent='✓';setTimeout(()=>this.textContent='Copy',1500)})">Copy</button></div>
-    <div class="email-row"><div class="email-fw"><span class="email-lbl">CC: </span><span class="email-field">${kris}</span></div><button class="mini-copy" onclick="navigator.clipboard.writeText('${kris}').then(()=>{this.textContent='✓';setTimeout(()=>this.textContent='Copy',1500)})">Copy</button></div>
-    <div class="email-row"><div class="email-fw"><span class="email-lbl">Subject: </span><span class="email-field" id="mc-subj">${subj}</span></div><button class="mini-copy" onclick="navigator.clipboard.writeText(document.getElementById('mc-subj').textContent).then(()=>{this.textContent='✓';setTimeout(()=>this.textContent='Copy',1500)})">Copy</button></div>
-  </div>
-  <div id="mc-table-mode">
-    <div style="padding:8px;border:1px solid #dee2e6;border-radius:8px;overflow-x:auto;font-size:11px">${tableHTML}</div>
-    <div class="btn-row" style="margin-top:8px"><button class="copy-btn" onclick="copyMcEmail('table',this)">Copy Email (With Table)</button></div>
-    <div class="email-note">Paste into Outlook — table renders automatically</div>
-  </div>
-  <div id="mc-plain-mode" style="display:none">
-    <div class="email-body-text" id="mc-plain-body" style="padding:10px;background:#f8f9fa;border-radius:8px;border:1px solid #dee2e6">${plainBody}</div>
-    <label class="sig-toggle"><input type="checkbox" id="sig-mc-p" onchange="toggleMcSig()"> Include Signature</label>
-    <div class="btn-row" style="margin-top:8px"><button class="copy-btn" onclick="copyMcEmail('plain',this)">Copy Email (No Table)</button></div>
-    <div class="email-note">Attach the PDF from Open Print View before sending</div>
-  </div>
-  <button class="print-btn2" onclick="openPrintView()">🖨 Open Print View</button>`;
-  out.scrollIntoView({behavior:'smooth',block:'nearest'});
-  setGreenDot();
-}
-function setMcMode(mode,btn){document.querySelectorAll('.email-mode-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');document.getElementById('mc-table-mode').style.display=mode==='table'?'block':'none';document.getElementById('mc-plain-mode').style.display=mode==='plain'?'block':'none';}
-function toggleMcSig(){const cb=document.getElementById('sig-mc-p'),el=document.getElementById('mc-plain-body');if(el)el.textContent=cb.checked?(window._mPlain||'')+SIG:(window._mPlain||'');}
-function copyMcEmail(mode,btn){
-  const subj=window._mSubj||'',to=sv('wendy-email'),cc=sv('kris-email');
-  if(mode==='table'){
-    const html=window._mTHTML||'',blob=new Blob([html],{type:'text/html'}),plain=html.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
-    try{navigator.clipboard.write([new ClipboardItem({'text/html':blob,'text/plain':new Blob([plain],{type:'text/plain'})})]).then(()=>{const o=btn.textContent;btn.textContent='✓ Copied';setTimeout(()=>btn.textContent=o,2000);});}
-    catch(e){navigator.clipboard.writeText(plain).then(()=>{const o=btn.textContent;btn.textContent='✓ Copied';setTimeout(()=>btn.textContent=o,2000);});}
-  }else{
-    const el=document.getElementById('mc-plain-body'),body=el?el.innerText:(window._mPlain||'');
-    navigator.clipboard.writeText(body).then(()=>{const o=btn.textContent;btn.textContent='✓ Copied';setTimeout(()=>btn.textContent=o,2000);});
-  }
-}
-
-function openPrintView(){
-  const date=gv('mc-date')||todayFmt(),time=gv('mc-time')||sv('mc-default-time')||'07:59–08:10';
-  const mcTitle=sv('mc-title')||MC_TITLE_DEFAULT;
-  const fileDate=todayFileFmt(),filename=`${mcTitle} — Hawking — ${fileDate}`;
-  const cLfull={reg:'Student Registration Completed',ontime:'Tutor On Time',stu:'Students On Time',ppt:'PPT Displayed for Morning Session',dev:'No Student Device Use',alert:'Students Alert (No Heads on Desk / Sleeping)',uni:'Correct Uniform'};
-  const yv=v=>v==='y'?'✓':v==='n'?'✗':v==='na'?'N/A':'—';
-  const ycol=v=>v==='y'?'#2b8a3e':v==='n'?'#c92a2a':v==='na'?'#555':'#bbb';
-  const thS='padding:5px 4px;border:1px solid #888;background:#1a2e5a;color:#fff;font-weight:600;font-size:9px;text-align:center;vertical-align:middle;line-height:1.3';
-  const tdS='padding:4px 3px;border:1px solid #ccc;text-align:center;vertical-align:middle;font-size:10px;font-weight:700;height:21px';
-  const tdNS='padding:4px 6px;border:1px solid #ccc;text-align:left;vertical-align:middle;font-size:10px;font-weight:500';
-  const tdCS='padding:4px 4px;border:1px solid #ccc;text-align:left;vertical-align:middle;font-size:9px';
-  let rows='';
-  MC_ORDER.forEach((t,i)=>{
-    const d=mcState[t]||{},bg=i%2===0?'#ffffff':'#f3f5fb';
-    rows+=`<tr style="background:${bg}"><td style="${tdNS}">${t}</td>`;
-    Object.keys(cLfull).forEach(k=>{const v=d[k]||'';rows+=`<td style="${tdS};color:${ycol(v)}">${yv(v)}</td>`;});
-    const comment=(document.getElementById('tc-'+t.replace(/\s+/g,'_'))||{}).value||'';
-    rows+=`<td style="${tdCS}">${comment}</td></tr>`;
-  });
-  const fu=['Verbal reminder given to tutor','Follow-up email sent','Logged for monitoring','Escalated to Deputy Head Pastoral'];
-  const fuHTML=fu.map((_,i)=>{const ch=document.getElementById('fu'+(i+1))&&document.getElementById('fu'+(i+1)).checked;return`<div style="display:flex;align-items:center;gap:6px;font-size:9.5px;color:#333;padding:2.5px 0"><span style="width:11px;height:11px;border:1px solid #555;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;font-size:9px;font-weight:700;${ch?'background:#1a2e5a;color:#fff;border-color:#1a2e5a':''}">${ch?'✓':''}</span>${fu[i]}</div>`;}).join('');
-  const genDate=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
-  const LOGO=window._LOGO_URI||'';
-  const w=window.open('','_blank');
-  if(w){w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${filename}</title><style>@media print{.np{display:none!important}body{margin:0;padding:0}}.page{font-family:Arial,sans-serif;max-width:780px;margin:0 auto;padding:14mm 15mm 10mm 15mm}.np{display:flex;align-items:center;gap:12px;margin-bottom:16px;background:#e5e5e5;padding:10px 15mm}.pb{background:#1a2e5a;color:#fff;padding:8px 16px;border-radius:6px;border:none;font-size:13px;cursor:pointer}.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}.htxt{flex:1}.htitle{font-size:14px;font-weight:700;color:#1a2e5a}.hsub{font-size:11px;color:#1a2e5a;margin-top:2px;font-style:italic}.logo{height:54px;margin-left:20px}.divl{border:none;border-top:2px solid #1a2e5a;margin:8px 0 10px}.mr{display:flex;gap:24px;margin-bottom:6px;font-size:11px}.ml{font-weight:700;color:#1a2e5a}.mv{border-bottom:1px solid #888;min-width:160px;padding:0 4px 1px}table{width:100%;border-collapse:collapse;margin-bottom:9px}.bot{display:grid;grid-template-columns:1fr 1fr;gap:10px}.sb{border:1px solid #bbb;border-radius:3px;padding:7px 10px}.st{font-size:10px;font-weight:700;color:#1a2e5a;margin-bottom:5px}.el{list-style:none;padding:0}.el li{font-size:9px;color:#333;padding:1.5px 0;display:flex;align-items:flex-start;gap:5px;line-height:1.3}.el li::before{content:'•';color:#1a2e5a;font-weight:700;flex-shrink:0;margin-top:1px}.ft{display:flex;justify-content:space-between;margin-top:10px;padding-top:6px;border-top:1px solid #ccc;font-size:8px;color:#888}</style></head><body>
-<div class="np"><button class="pb" onclick="window.print()">🖨 Print / Save as PDF</button><span style="font-size:11px;color:#555;font-style:italic">Suggested filename: <strong>${filename}</strong></span></div>
-<div class="page">
-<div class="hdr"><div class="htxt"><div class="htitle">${mcTitle}</div><div class="hsub">Hawking House · For Housemasters / Housemistresses</div></div><img class="logo" id="logo" alt="WAS Changzhou"></div>
-<hr class="divl">
-<div class="mr"><span class="ml">House:</span><span class="mv">Hawking</span><span class="ml" style="margin-left:16px">HSM:</span><span class="mv">Laith Alattili</span></div>
-<div class="mr" style="margin-bottom:10px"><span class="ml">Date:</span><span class="mv">${date}</span><span class="ml" style="margin-left:16px">Time Observed:</span><span class="mv">${time}</span></div>
-<table><thead><tr><th style="${thS};text-align:left;width:108px">Tutor Name</th>${Object.values(cLfull).map(l=>`<th style="${thS}">${l}</th>`).join('')}<th style="${thS};text-align:left;width:135px">Comments / Follow-Up Required</th></tr></thead><tbody>${rows}</tbody></table>
-<div class="bot"><div class="sb"><div class="st">Key Expectations</div><ul class="el"><li>Student registration must be completed accurately and on time.</li><li>Tutors must be present and punctual for the full registration period.</li><li>Students should arrive promptly and be settled.</li><li>Morning PPT must be displayed clearly and used as directed.</li><li>No laptops, tablets, or phones unless explicitly instructed.</li><li>Students should be alert and engaged — no heads on desks or sleeping.</li><li>Correct uniform is expected and checked daily.</li></ul></div>
-<div class="sb"><div class="st">HSM Follow-Up Actions</div>${fuHTML}</div></div>
-<div class="ft"><span>Hawking House · Wycombe Abbey School Changzhou · 常州威雅学校</span><span>Generated: ${genDate}</span></div>
-</div>
-</body>
-</body></html>`);w.document.close();try{w.document.getElementById('logo').src=LOGO;}catch(e){}}
-}
 
 
 // ── CALENDAR CUSTOM EVENTS ────────────────────────────
@@ -26287,7 +25859,11 @@ function renderWeekTasksView(){
     return false;
   }
 
-  const weekTasks=tasks.filter(taskVisibleThisWeek);
+  // Tasks planned into a future period leave the working list (one-place
+  // invariant); they live in the collapsed Planned group until their slot
+  // passes, then return automatically with their trace.
+  const plannedAway=tasks.filter(t=>_tpAnchorFuture(t)&&!t.archived);
+  const weekTasks=tasks.filter(taskVisibleThisWeek).filter(t=>!_tpAnchorFuture(t));
   const todayStr=_todayDateStr();
 
   // Task done key: sticky uses task id, others use id+weekNum
@@ -26323,6 +25899,7 @@ function renderWeekTasksView(){
       metaParts.push(dd.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}));
     }
     if(t.time)metaParts.push('⏱ '+t.time);
+    if(t.anchor&&!_tpAnchorFuture(t)&&!done)metaParts.push(`<span onclick="event.stopPropagation();tpGapPicker('${t.id}')" style="color:#f59f00;font-weight:700;cursor:pointer" title="The planned period passed — tap to replan">📌 planned ${_tpTraceLbl(t)} · replan</span>`);
     return`<div class="plan-task-row">
       <div class="plan-task-cat-dot" style="background:${cat.color}"></div>
       <input type="checkbox" ${done?'checked':''} onchange="planToggleDone('${t.id}')">
@@ -26330,6 +25907,7 @@ function renderWeekTasksView(){
         <div class="plan-task-label${done?' done':''}">${t.text}</div>
         ${metaParts.length?`<div class="plan-task-meta">${metaParts.join(' · ')}</div>`:''}
       </div>
+      <button onclick="tpGapPicker('${t.id}')" title="Plan into a free period" style="background:none;border:none;color:#ced4da;font-size:13px;cursor:pointer;padding:0 2px">🕐</button>
       <button onclick="planEditTask('${t.id}')" style="background:none;border:none;color:#ced4da;font-size:14px;cursor:pointer;padding:0 2px">✎</button>
     </div>`;
   }
@@ -26343,6 +25921,22 @@ function renderWeekTasksView(){
   </div>
   <button class="plan-add-btn" onclick="planAddTask()">＋ Add Task</button></div>`;
 
+  // Planned group — collapsed by default, the full picture on demand
+  if(plannedAway.length){
+    const pOpen=!!window._planPlannedOpen;
+    html+=`<div class="plan-sticky-section" style="margin-top:.5rem">
+      <div class="plan-sticky-hdr" onclick="window._planPlannedOpen=!window._planPlannedOpen;renderWeekTasksView()" style="cursor:pointer;user-select:none">📌 Planned · ${plannedAway.length} ${pOpen?'▾':'▸'}</div>
+      ${pOpen?plannedAway.map(t=>{const c=catMap[t.cat]||{color:'#868e96'};
+        return `<div class="plan-task-row">
+          <div class="plan-task-cat-dot" style="background:${c.color}"></div>
+          <div style="flex:1">
+            <div class="plan-task-label">${t.text}</div>
+            <div class="plan-task-meta">📌 ${_tpTraceLbl(t)}</div>
+          </div>
+          <button onclick="tpUnassign('${t.id}')" title="Return to the open list" style="background:none;border:none;color:#ced4da;font-size:13px;cursor:pointer;padding:0 2px">✕</button>
+        </div>`;}).join(''):''}
+    </div>`;
+  }
   // Sticky tasks always at top
   const sticky=weekTasks.filter(t=>t.scope==='sticky');
   if(sticky.length){
@@ -28690,6 +28284,15 @@ function _amContextItemsHtml(slotCat,linkedCls,label){
     doItems=(S.planData||[]).filter(t=>!t.say&&t.cat===ctx.id&&(t.scope==='sticky'||t.date===todayS));
     if(say.length||doItems.length)groups.push({ctx,say,doItems,key:ctx.id,title:ctx.name});
   });
+  // Tasks planned into THIS slot (the payoff moment: the gap arrives and the
+  // panel shows what you assigned to it, tick right there)
+  try{
+    const _c=amGetCtx();
+    if(_c&&_c.st&&_c.et){
+      const planned=_tpForWindow(todayS,t2m(_c.st),t2m(_c.et));
+      if(planned.length)groups.push({ctx:{id:'__planned',color:'#f59f00',name:'Planned'},say:[],doItems:planned,key:'planned',title:'📌 Planned for this period'});
+    }
+  }catch(e){}
   if(!groups.length)return '';
   return groups.map(g=>{
     const open=_liveGrpOpen[g.key]!==false;
@@ -29793,7 +29396,6 @@ function showTab(name,btn){
   if(name==='sched')renderTimetable();
   if(name==='workflows')showWorkflowList();
   if(name==='lists'){renderHawkingList();renderTeachingTab();}
-  if(name==='8am'){const mct=document.getElementById('mc-time');if(mct)mct.value=sv('mc-default-time')||'07:59–08:10';}
   updateGlobalDefaultBtn();
 }
 function showWorkflowList(){document.getElementById('workflow-list').style.display='block';document.querySelectorAll('.workflow-panel').forEach(p=>p.classList.remove('active'));renderCustomFlowsList();}
@@ -29812,6 +29414,7 @@ function startWorkflow(name){
     updateWeekDet();initDetDates();
   }
   if(name==='parent-mtg'){pmType='arrange';updatePM();}
+  if(name==='tutor-followup')tfInit();
   // Append any extra blocks from builtin flow edits
   const bfData=getBuiltinFlow(name);
   const extraContainer=document.getElementById('workflow-'+name);
@@ -30714,9 +30317,9 @@ function initApp(){
   const sl=document.getElementById('settings-locked');if(sl)sl.style.display='flex';
   const sc=document.getElementById('settings-content');if(sc)sc.style.display='none';
   hydrateDoneState().then(()=>{_subscribeDoneRealtime();drainWorkInbox();_noteFlushQueue();_fireRegFlushQueue();try{if(_curTab==='week'&&typeof renderWeekTasksView==='function')renderWeekTasksView();}catch(e){}});
-  loadSettings();loadPeople();loadState();migrateBaseToDefaults();ensureDefaultContexts();loadSlotNotes();loadHolidays();applyHolidaysToCalendar();loadCalCustomEvents();loadListsData();loadLinks();loadDuties();loadTutorMeetings();dsLoad();loadBoardingSettings();_subscribePenaltiesRealtime();loadNurseMap();loadCommentMap();
+  loadSettings();loadPeople();loadState();migrateBaseToDefaults();ensureDefaultContexts();loadSlotNotes();loadTutorChecks();loadDetLog();loadHolidays();applyHolidaysToCalendar();loadCalCustomEvents();loadListsData();loadLinks();loadDuties();loadTutorMeetings();dsLoad();loadBoardingSettings();try{_hrFlushQueue();}catch(e){}_subscribePenaltiesRealtime();loadNurseMap();loadCommentMap();
   _purgeArchivedFromActive(); // archived list always wins over a synced-back roster
-  buildMorningChecks();restoreMCState();
+  
   initWeekTab();checkTaskReset();renderCustomFlowsList();
   // Apply global default (overrides individual defaults)
   _loadLpPlans();
@@ -30726,8 +30329,6 @@ function initApp(){
   else{renderTimetable();} // always prime timetable
   renderCalendar();
   if(_activeMainTab==='lists'){renderHawkingList();renderTeachingTab();}
-  resetMcDate();
-  const mct=document.getElementById('mc-time');if(mct)mct.value=sv('mc-default-time')||'07:59–08:10'; // always refresh from settings
   const pmt=document.getElementById('pm-timing');if(pmt)pmt.value='No Specific Preference';
   // Clock already started at page load
   updateGlobalDefaultBtn();
@@ -30828,6 +30429,7 @@ function showCustomFlowView(id){
 
 // ═══ FLOWS ENGINE ═══════════════════════════════════════════
 const BUILTIN_FLOW_DEFAULTS = {
+  'tutor-followup':{id:'tutor-followup',title:'Tutor Time Follow-up',subtitle:'Dated reminder from tutor-time checks',icon:'👁', builtin:true, hidden:false, extraEmailBlocks:[], extraLinkBlocks:[], extraNoteBlocks:[]},
   'sat-det':   {id:'sat-det',  title:'Saturday Detention', subtitle:'Device misuse · '+(S['det-sat-start']||'13:30')+'–'+(S['det-sat-end']||'15:30')+' · '+(S['det-sat-room']||'A201'), icon:'📵', builtin:true, hidden:false, extraEmailBlocks:[], extraLinkBlocks:[], extraNoteBlocks:[]},
   'week-det':  {id:'week-det', title:'Weekday Detention',  subtitle:'Morning detention · '+(S['det-wd-time']||'10:35')+' · '+(S['det-wd-room']||'A201'),   icon:'🕐', builtin:true, hidden:false, extraEmailBlocks:[], extraLinkBlocks:[], extraNoteBlocks:[]},
   'parent-mtg':{id:'parent-mtg',title:'Parent Meeting',   subtitle:'General · Retention Concern · Message For Parents', icon:'👥', builtin:true, hidden:false, extraEmailBlocks:[], extraLinkBlocks:[], extraNoteBlocks:[]},
@@ -31413,6 +31015,196 @@ function clearSlotTimeOverride(){}
 function resetSlotTimesOverrides(){dsResetToFactory();}
 
 // ═══ DETENTION TIMES SETTINGS ════════════════════════════════════════════════
+// ── FIRE REGISTER HISTORY ─────────────────────────────────────────────────────
+// Every submitted fire register lives in Supabase fire_registers (plus a local
+// per-day mirror). Until now only TODAY was reachable; this reads any range.
+function toggleFireHistory(){
+  const ed=document.getElementById('fire-hist-editor');if(!ed)return;
+  const open=ed.style.display!=='none';
+  ed.style.display=open?'none':'block';
+  if(!open){
+    const to=_todayStr();
+    const f=new Date();f.setDate(f.getDate()-30);
+    const from=f.toLocaleDateString('en-CA');
+    const fi=document.getElementById('fh-from'),ti=document.getElementById('fh-to');
+    if(fi&&!fi.value)fi.value=from;
+    if(ti&&!ti.value)ti.value=to;
+  }
+}
+function _fhLocalInRange(from,to){
+  const out=[];
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(!k||!k.startsWith('fireSubs_'))continue;
+      const ds=k.slice(9);
+      if(ds<from||ds>to)continue;
+      try{JSON.parse(localStorage.getItem(k)||'[]').forEach(r=>out.push(r));}catch(e){}
+    }
+  }catch(e){}
+  return out;
+}
+function _fhTime(iso){try{return new Date(iso).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}catch(e){return'';}}
+function _fhDateLong(ds){try{return new Date(ds+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});}catch(e){return ds;}}
+function _fhScope(r){return r.scope==='class'?(r.class_name||'Class'):r.scope==='house'?'All House':'Boarders';}
+async function fhLoad(){
+  const from=document.getElementById('fh-from')?.value,to=document.getElementById('fh-to')?.value;
+  const list=document.getElementById('fh-list');if(!list)return;
+  if(!from||!to){list.textContent='Pick both dates.';return;}
+  list.textContent='Loading…';
+  let remote=[];
+  try{
+    const{data,error}=await supa.from('fire_registers').select('*').gte('register_date',from).lte('register_date',to);
+    if(!error&&data)remote=data;
+  }catch(e){}
+  // Merge remote + local mirrors, newest version of each id wins
+  const byId={};
+  [..._fhLocalInRange(from,to),...remote].forEach(r=>{
+    if(!r||!r.id)return;
+    const prev=byId[r.id];
+    if(!prev||String(r.amended_at||r.submitted_at||'')>String(prev.amended_at||prev.submitted_at||''))byId[r.id]=r;
+  });
+  const recs=Object.values(byId).sort((a,b)=>String(b.register_date).localeCompare(String(a.register_date))||String(b.submitted_at).localeCompare(String(a.submitted_at)));
+  window._fhRecords=recs;window._fhRange=[from,to];
+  const acts=document.getElementById('fh-actions');if(acts)acts.style.display=recs.length?'flex':'none';
+  const sub=document.getElementById('fire-hist-sub');if(sub)sub.textContent=recs.length+' register'+(recs.length===1?'':'s')+' · '+from+' → '+to;
+  if(!recs.length){list.innerHTML='<div style="font-size:12px;color:#adb5bd;padding:6px 0">No fire registers in this range.</div>';return;}
+  list.innerHTML=recs.map((r,i)=>{
+    const c=r.counts||{};
+    return `<div onclick="fhView(${i})" style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border3);cursor:pointer">
+      <span style="font-size:15px">🔥</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12.5px;font-weight:600;color:var(--text)">${_fhDateLong(r.register_date)} · ${_fhTime(r.submitted_at)}</div>
+        <div style="font-size:10.5px;color:#868e96">${_esc(_fhScope(r))} · <span style="color:#16a34a">${c.present||0}✓</span> <span style="color:#dc2626">${c.absent||0}✗</span> <span style="color:#d97706">${c.excused||0}~</span> <span>${c.unset||0}·</span>${r.amended_at?' · ✎ amended':''}</div>
+      </div>
+      <span style="color:#adb5bd">›</span>
+    </div>`;
+  }).join('');
+}
+function fhView(i){
+  const r=(window._fhRecords||[])[i];if(!r)return;
+  document.getElementById('fh-view-ov')?.remove();
+  const order={absent:0,excused:1,unset:2,present:3};
+  const entries=(r.entries||[]).slice().sort((a,b)=>(order[a.status]??9)-(order[b.status]??9)||String(a.name).localeCompare(String(b.name)));
+  const stTxt={present:'✓ present',absent:'✗ ABSENT',excused:'~ excused',unset:'— not marked'};
+  const stCol={present:'#16a34a',absent:'#dc2626',excused:'#d97706',unset:'#adb5bd'};
+  const ov=document.createElement('div');ov.id='fh-view-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10002;display:flex;align-items:flex-end;justify-content:center';
+  ov.onclick=e=>{if(e.target===ov)ov.remove();};
+  ov.innerHTML=`<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:520px;max-height:85vh;overflow:auto;padding:14px 16px 24px">
+    <div style="font-size:14px;font-weight:800;color:#212529">🔥 ${_fhDateLong(r.register_date)} · ${_fhTime(r.submitted_at)}</div>
+    <div style="font-size:11px;color:#868e96;margin-bottom:10px">${_esc(_fhScope(r))}${r.amended_at?' · amended '+_fhTime(r.amended_at):''} · by ${_esc(r.submitted_by||'HSM')}</div>
+    ${entries.map((e2,j)=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f3f5">
+      <span style="font-size:10px;color:#adb5bd;min-width:20px;text-align:right">${j+1}.</span>
+      <span style="flex:1;font-size:13px;color:#212529">${_esc(e2.name)}</span>
+      <span style="font-size:11px;font-weight:700;color:${stCol[e2.status]||'#adb5bd'}">${stTxt[e2.status]||e2.status||''}</span>
+    </div>`).join('')}
+    <button onclick="document.getElementById('fh-view-ov').remove()" style="width:100%;margin-top:12px;padding:10px;border:1px solid #dee2e6;border-radius:8px;background:#fff;color:#495057;font-size:13px;font-weight:600;cursor:pointer">Close</button>
+  </div>`;
+  document.body.appendChild(ov);
+}
+function fhExportWord(){
+  const recs=window._fhRecords||[];if(!recs.length)return;
+  if(typeof docx==='undefined'){alert('Document library not loaded.');return;}
+  const{Document,Packer,Paragraph,TextRun,BorderStyle}=docx;
+  const[from,to]=window._fhRange||['',''];
+  const ch=[];
+  ch.push(new Paragraph({children:[new TextRun({text:'Fire Register Report — Hawking House',bold:true,size:32,font:'Arial',color:'B91C1C'})],spacing:{after:60},border:{bottom:{style:BorderStyle.SINGLE,size:4,color:'B91C1C',space:2}}}));
+  ch.push(new Paragraph({children:[new TextRun({text:from+' to '+to+' · '+recs.length+' register'+(recs.length===1?'':'s')+' · generated '+_todayStr(),size:18,font:'Arial',color:'888888'})],spacing:{after:160}}));
+  const group=(entries,st)=>entries.filter(e=>((e.status||'unset')===st)).map(e=>e.name);
+  recs.slice().reverse().forEach(r=>{
+    const c=r.counts||{};
+    ch.push(new Paragraph({children:[new TextRun({text:_fhDateLong(r.register_date)+' · '+_fhTime(r.submitted_at)+' · '+_fhScope(r)+(r.amended_at?' (amended '+_fhTime(r.amended_at)+')':''),bold:true,size:22,font:'Arial',color:'1A2E5A'})],spacing:{before:160,after:40}}));
+    ch.push(new Paragraph({children:[new TextRun({text:'Present '+(c.present||0)+' · Absent '+(c.absent||0)+' · Excused '+(c.excused||0)+' · Not marked '+(c.unset||0),size:18,font:'Arial',color:'666666'})],spacing:{after:60}}));
+    const rows=[['ABSENT',group(r.entries||[],'absent'),'C92A2A'],['Excused',group(r.entries||[],'excused'),'B45309'],['Not marked',group(r.entries||[],'unset'),'888888'],['Present',group(r.entries||[],'present'),'2B8A3E']];
+    rows.forEach(([lbl,names,col])=>{
+      if(!names.length)return;
+      ch.push(new Paragraph({children:[
+        new TextRun({text:lbl+' ('+names.length+'): ',bold:true,size:18,font:'Arial',color:col}),
+        new TextRun({text:names.join(', '),size:18,font:'Arial',color:'222222'})
+      ],spacing:{after:30}}));
+    });
+  });
+  const doc=new Document({sections:[{properties:{},children:ch}]});
+  Packer.toBlob(doc).then(blob=>{
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;
+    a.download='fire_registers_'+from+'_to_'+to+'.docx';
+    a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);
+    showToastMsg('📄 Word report exported','#16a34a');
+  }).catch(err=>alert('Export failed: '+err.message));
+}
+function fhExportCsv(){
+  const recs=window._fhRecords||[];if(!recs.length)return;
+  const[from,to]=window._fhRange||['',''];
+  let csv='Date,Submitted,Amended,Scope,Class,Student,Type,Status\n';
+  recs.slice().reverse().forEach(r=>{
+    (r.entries||[]).forEach(e=>{
+      csv+=`${r.register_date},${_fhTime(r.submitted_at)},${r.amended_at?_fhTime(r.amended_at):''},${r.scope},${r.class_name||''},"${String(e.name).replace(/"/g,"'")}",${e.type||''},${e.status||'unset'}\n`;
+    });
+  });
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='fire_registers_'+from+'_to_'+to+'.csv';
+  a.click();
+  showToastMsg('📊 CSV exported','#16a34a');
+}
+
+// ── FLAGGED SLOTS AUDIT ───────────────────────────────────────────────────────
+const _FLAG_DEFS=[['boarding_register','🛏','Boarding reg'],['house_register','🏠','House reg'],['house_activity','🎯','Activity'],['tutor_check','👁','Tutor check']];
+function _flagListEntries(){
+  const out=[];
+  const scan=(store,srcOf)=>{
+    Object.entries(store).forEach(([key,cell])=>{
+      if(!cell||typeof cell!=='object')return;
+      const flags=_FLAG_DEFS.filter(([f])=>cell[f]);
+      if(!flags.length)return;
+      const p=key.split('_');
+      let slotIdx,day,src;
+      if(store===ttDefaults){if(p.length<2)return;slotIdx=parseInt(p[0],10);day=p[1];src='Weekly';}
+      else{if(p.length<3)return;slotIdx=parseInt(p[1],10);day=p[2];src=(cell.recur&&cell.recur!=='once'?cell.recur:'once')+' · wk '+p[0];}
+      if(isNaN(slotIdx)||slotIdx<0||slotIdx>=SLOTS.length)return;
+      out.push({key,store:srcOf,slotIdx,day,src,label:cell.l||'(no label)',time:cell.customStartTime||getSlotTime(slotIdx),flags});
+    });
+  };
+  scan(ttDefaults,'defaults');scan(ttCustom,'custom');
+  const dOrd={Mon:0,Tue:1,Wed:2,Thu:3,Fri:4,Sat:5,Sun:6};
+  out.sort((a,b)=>(dOrd[a.day]??9)-(dOrd[b.day]??9)||t2m(a.time)-t2m(b.time));
+  return out;
+}
+function renderFlagAudit(){
+  const el=document.getElementById('flag-audit-list');if(!el)return;
+  const rows=_flagListEntries();
+  const sub=document.getElementById('flag-audit-sub');
+  if(sub)sub.textContent=rows.length?rows.length+' flagged slot'+(rows.length===1?'':'s'):'No flags set anywhere';
+  if(!rows.length){el.innerHTML='<div style="font-size:12px;color:#adb5bd;padding:8px 0">No slot carries any flag.</div>';return;}
+  el.innerHTML=rows.map((r,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border3)">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.day} ${r.time} · ${_esc(r.label)}</div>
+      <div style="font-size:10px;color:#868e96">${r.flags.map(([,ic,nm])=>ic+' '+nm).join(' · ')} · ${r.src}</div>
+    </div>
+    <button onclick="flagAuditClear(${i})" style="flex-shrink:0;font-size:11px;font-weight:600;padding:5px 12px;border:1px solid var(--dng-bd);border-radius:var(--rsm);background:var(--dng-bg);color:var(--dng-tx);cursor:pointer">Clear</button>
+  </div>`).join('');
+  window._flagAuditRows=rows;
+}
+function flagAuditClear(i){
+  const r=(window._flagAuditRows||[])[i];if(!r)return;
+  const store=r.store==='defaults'?ttDefaults:ttCustom;
+  const cell=store[r.key];if(!cell)return;
+  _FLAG_DEFS.forEach(([f])=>{delete cell[f];});
+  saveState();
+  renderFlagAudit();
+  try{renderTimetable();}catch(e){}
+  try{renderTodayView();}catch(e){}
+  showToastMsg('Flags cleared from '+r.day+' '+r.time,'#16a34a');
+}
+function toggleFlagAudit(){
+  const ed=document.getElementById('flag-audit-editor');if(!ed)return;
+  const open=ed.style.display!=='none';
+  ed.style.display=open?'none':'block';
+  if(!open)renderFlagAudit();
+}
 function toggleDetTimesEditor(){
   const el=document.getElementById('det-times-editor');
   if(!el)return;
@@ -32004,6 +31796,7 @@ function amOpen(){
 function amClose(){
   _amOpen=false;
   _fireOpen=false;
+  _amPeek=null; // preview is never remembered — every re-entry lands on now
   const ctx=amGetCtx();
   if(ctx){
     _amDismissed={day:ctx.dayName,si:ctx.slotIdx};
@@ -34893,13 +34686,38 @@ function _amBoardingRegisterHtml(type,excusedMap){
   const statBg={'present':'rgba(34,197,94,.13)','absent':'rgba(239,68,68,.13)','excused':'rgba(245,158,11,.13)','':'transparent'};
   const chevron=_brCollapsed?'▶':'▼';
 
-  // Build sections based on type
+  // Build sections based on type, grouped per the remembered mode
+  const mode=_brGroupMode();
+  const _sortAZ=arr=>arr.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  const _grpGrade=(students,prefix)=>{
+    const by={};
+    students.forEach(s=>{const g=_brStudentGrade(s.name);(by[g]=by[g]||[]).push({name:s.name});});
+    return Object.keys(by).sort((a,b)=>(parseInt(a.replace(/\D/g,''),10)||99)-(parseInt(b.replace(/\D/g,''),10)||99))
+      .map(g=>({label:(prefix?prefix+' · ':'')+g,people:_sortAZ(by[g])}));
+  };
+  const _grpRoom=students=>{
+    const secs=[];const placed=new Set();
+    (BOARDER_ROOMS||[]).forEach(r=>{
+      const people=(r.students||[]).filter(n=>students.some(s=>s.name===n)).map(n=>{placed.add(n);return{name:n};});
+      if(people.length)secs.push({label:r.name,people:_sortAZ(people)});
+    });
+    const rest=students.filter(s=>!placed.has(s.name)).map(s=>({name:s.name}));
+    if(rest.length)secs.push({label:'No room',people:_sortAZ(rest)});
+    return secs;
+  };
   const sections=[];
   const allBoarders=STUDENTS.filter(s=>(HAWKING_STATUS[s.name]||{}).boarder);
-  if(allBoarders.length) sections.push({label:'Boarders',people:allBoarders.map(s=>({name:s.name}))});
+  if(allBoarders.length){
+    if(mode==='grade')sections.push(..._grpGrade(allBoarders,type==='house'?'Boarders':''));
+    else if(mode==='room')sections.push(..._grpRoom(allBoarders));
+    else sections.push({label:'Boarders',people:_sortAZ(allBoarders.map(s=>({name:s.name})))});
+  }
   if(type==='house'){
     const dayStudents=STUDENTS.filter(s=>!(HAWKING_STATUS[s.name]||{}).boarder);
-    if(dayStudents.length) sections.push({label:'Day Students',people:dayStudents.map(s=>({name:s.name}))});
+    if(dayStudents.length){
+      if(mode==='grade')sections.push(..._grpGrade(dayStudents,'Day'));
+      else sections.push({label:'Day Students',people:_sortAZ(dayStudents.map(s=>({name:s.name})))});
+    }
     if(TUTORS.length) sections.push({label:'Tutors',people:TUTORS.map(t=>({name:t.name}))});
   }
 
@@ -34907,15 +34725,28 @@ function _amBoardingRegisterHtml(type,excusedMap){
     return '<div style="padding:24px;text-align:center;color:#666;font-size:13px">No students found.</div>';
   }
 
-  // Overall counts
+  // Session comes from the FLAGGED SLOT's midpoint, not the wall clock.
+  // A 07:00–08:00 wake-up register opened at 07:09 sat before the 07:15
+  // morning boundary, so the clock said "hoob" — the register displayed as
+  // Heads on Beds AND wrote taps into last night's session. The slot's
+  // midpoint (07:30) lands in the right window regardless of when in the
+  // slot you open it. Clock time stays the fallback when no slot is active.
+  let _sess;
+  try{
+    const _slotCtx=amGetCtx();
+    if(_slotCtx&&_slotCtx.st&&_slotCtx.et){
+      const _mid=(t2m(_slotCtx.st)+t2m(_slotCtx.et))/2;
+      _sess=getCurrentSession(String(Math.floor(_mid/60)).padStart(2,'0')+':'+String(Math.floor(_mid%60)).padStart(2,'0'));
+    } else _sess=getCurrentSession();
+  }catch(e){_sess=getCurrentSession();}
+  _brCurrentSession=_sess; // sync global session state (stored value stays 3-way for the boarding app)
+  _brState=_brStates[_sess]||{}; // re-point the working map at the slot's session
+
+  // Overall counts (after session selection so they read the right session)
   const allPeople=sections.flatMap(s=>s.people);
   const counts={present:0,absent:0,excused:0,late:0,unset:0};
   allPeople.forEach(p=>{const st=(_brState[p.name]||{}).status||'';if(st)counts[st]=(counts[st]||0)+1;else counts.unset++;});
   const total=allPeople.length;
-
-  // Session header — always use current clock time, not slot start time
-  const _sess=getCurrentSession();
-  _brCurrentSession=_sess; // sync global session state (stored value stays 3-way for the boarding app)
   // Display only: "morning" spans 07:15–19:00 in the stored model, so a register
   // taken mid-afternoon was being labelled "Morning Clearance". Outside the real
   // morning window, show a neutral label instead of a misleading one.
@@ -35020,8 +34851,20 @@ function _amBoardingRegisterHtml(type,excusedMap){
       </div>
       <span id="br-overall-count" style="font-size:11px;color:#aaa">${total-counts.unset}/${total} · <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444">${counts.absent||0}✗</span> <span style="color:#f59e0b">${counts.excused||0}~</span></span>
     </div>
+    ${_brCollapsed?'':`<div style="display:flex;gap:2px;padding:6px 14px;background:rgba(0,0,0,.25);border-bottom:1px solid rgba(255,255,255,.06)" onclick="event.stopPropagation()">
+      ${[['grade','Grade'],['room','Room'],['alpha','A–Z']].map(([m,l])=>`<button onclick="_brSetGroupMode('${m}')" style="font-size:10px;padding:3px 12px;border-radius:5px;border:none;background:${mode===m?'rgba(255,255,255,.15)':'transparent'};color:${mode===m?'#fff':'#888'};font-weight:${mode===m?'700':'400'};cursor:pointer;-webkit-tap-highlight-color:transparent">${l}</button>`).join('')}
+    </div>`}
     ${_brCollapsed?'':('<div>'+sectionsHtml+'</div>')}
   </div>`;
+}
+// Grouping mode for the live register — remembered across sessions
+function _brGroupMode(){try{const m=localStorage.getItem('brGroupMode');return['grade','room','alpha'].includes(m)?m:'grade';}catch(e){return'grade';}}
+function _brSetGroupMode(m){try{localStorage.setItem('brGroupMode',m);}catch(e){}_brRerender();}
+function _brStudentGrade(name){
+  const s=STUDENTS.find(x=>x.name===name);
+  if(s&&s.grade)return s.grade;
+  const t=s&&s.tutor?(TUTORS||[]).find(x=>x.name===s.tutor):null;
+  return(t&&t.grade)||'No grade';
 }
 
 function _brSecToggle(label){
@@ -35171,6 +35014,8 @@ function _brTap(name,status,sessionType){
     if(!_brStates[sType])_brStates[sType]={};
     _brStates[sType][name]=entry;
   }
+  // Snapshot this run — each register occurrence keeps its own record
+  _hrSnapNote(name,sType,(_brState[name]||{}).status||'');
   // Surgical DOM update — find row by data-br-name, update buttons only
   const newSt=(_brState[name]||{}).status||'';
   const statColor={'present':'#22c55e','absent':'#ef4444','excused':'#f59e0b','':'#555'};
@@ -35778,6 +35623,786 @@ function _renderFireRegister(){
 
 // _fireSecToggle replaced by inline onclick in makeSection
 
+// ── HOUSE REGISTER RUN SNAPSHOTS ──────────────────────────────────────────────
+// Every register run (date + session + flagged slot) keeps its own snapshot,
+// so a 10:00 and a 15:30 register in the same session window BOTH survive.
+// boarding_registrations stays latest-state (RT and the week report read it);
+// snapshots are additive. Queued locally until the house_register_runs table
+// exists in Supabase — nothing breaks before the setup SQL is run.
+function _hrRunsKey(ds){return 'hrRuns_'+ds;}
+function _hrRunsFor(ds){try{return JSON.parse(localStorage.getItem(_hrRunsKey(ds))||'{}');}catch(e){return{};}}
+function _hrSaveRuns(ds,runs){try{localStorage.setItem(_hrRunsKey(ds),JSON.stringify(runs));}catch(e){}}
+function _hrSnapNote(name,sType,status){
+  try{
+    const ds=_brToday();
+    let slotSt='manual',regType='house';
+    try{const c=amGetCtx();if(c&&c.st){slotSt=c.st;regType=_brGetType()==='boarding'?'boarding':'house';}}catch(e){}
+    const runId=(ds+'_'+sType+'_'+slotSt).replace(/[^A-Za-z0-9_-]/g,'-');
+    const runs=_hrRunsFor(ds);
+    const now=new Date().toISOString();
+    if(!runs[runId])runs[runId]={id:runId,run_date:ds,session:sType,slot_start:slotSt,register_type:regType,started_at:now,entries:{}};
+    if(status)runs[runId].entries[name]={status,at:now};
+    else delete runs[runId].entries[name];
+    runs[runId].updated_at=now;
+    _hrSaveRuns(ds,runs);
+    _hrQueueAdd(ds,runId);
+    _hrFlushQueue();
+  }catch(e){}
+}
+function _hrQueueAdd(ds,runId){
+  try{
+    const q=JSON.parse(localStorage.getItem('_hrRunQueue')||'[]');
+    if(!q.some(x=>x.runId===runId))q.push({ds,runId});
+    localStorage.setItem('_hrRunQueue',JSON.stringify(q));
+  }catch(e){}
+}
+let _hrFlushBusy=false;
+async function _hrFlushQueue(){
+  if(_hrFlushBusy)return;_hrFlushBusy=true;
+  try{
+    let q=[];try{q=JSON.parse(localStorage.getItem('_hrRunQueue')||'[]');}catch(e){}
+    if(!q.length)return;
+    const left=[];
+    for(const item of q){
+      const run=(_hrRunsFor(item.ds)||{})[item.runId];
+      if(!run)continue;
+      const counts={present:0,absent:0,excused:0};
+      Object.values(run.entries||{}).forEach(e=>{counts[e.status]=(counts[e.status]||0)+1;});
+      const rec={id:run.id,run_date:run.run_date,session:run.session,slot_start:run.slot_start,
+        register_type:run.register_type,started_at:run.started_at,updated_at:run.updated_at,
+        counts,entries:run.entries};
+      try{const{error}=await supa.from('house_register_runs').upsert(rec);if(error)left.push(item);}
+      catch(e){left.push(item);}
+    }
+    try{localStorage.setItem('_hrRunQueue',JSON.stringify(left));}catch(e){}
+  }finally{_hrFlushBusy=false;}
+}
+
+// ── HOUSE REGISTER HISTORY (browser + export) ─────────────────────────────────
+function toggleHouseHistory(){
+  const ed=document.getElementById('hh-editor');if(!ed)return;
+  const open=ed.style.display!=='none';
+  ed.style.display=open?'none':'block';
+  if(!open){
+    const f=new Date();f.setDate(f.getDate()-14);
+    const fi=document.getElementById('hh-from'),ti=document.getElementById('hh-to');
+    if(fi&&!fi.value)fi.value=f.toLocaleDateString('en-CA');
+    if(ti&&!ti.value)ti.value=_todayStr();
+  }
+}
+async function hhLoad(){
+  const from=document.getElementById('hh-from')?.value,to=document.getElementById('hh-to')?.value;
+  const list=document.getElementById('hh-list');if(!list)return;
+  if(!from||!to){list.textContent='Pick both dates.';return;}
+  list.textContent='Loading…';
+  // 1. Run snapshots (remote + local)
+  const byId={};
+  try{
+    const{data}=await supa.from('house_register_runs').select('*').gte('run_date',from).lte('run_date',to);
+    (data||[]).forEach(r=>{byId[r.id]=r;});
+  }catch(e){}
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(!k||!k.startsWith('hrRuns_'))continue;
+      const ds=k.slice(7);if(ds<from||ds>to)continue;
+      Object.values(_hrRunsFor(ds)).forEach(r=>{
+        const prev=byId[r.id];
+        if(!prev||String(r.updated_at||'')>String(prev.updated_at||''))byId[r.id]=r;
+      });
+    }
+  }catch(e){}
+  const runs=Object.values(byId);
+  const runDates=new Set(runs.map(r=>r.run_date+'|'+r.session));
+  // 2. Legacy day records (dates/sessions with no snapshot) from boarding_registrations
+  const legacy=[];
+  try{
+    const{data}=await supa.from('boarding_registrations').select('*').gte('register_date',from).lte('register_date',to);
+    const grp={};
+    (data||[]).forEach(r=>{
+      const key=r.register_date+'|'+(r.session_type||'prep');
+      if(runDates.has(key))return; // snapshot already covers it
+      (grp[key]=grp[key]||[]).push(r);
+    });
+    Object.entries(grp).forEach(([key,rows])=>{
+      const[ds,sess]=key.split('|');
+      const entries={};const counts={present:0,absent:0,excused:0};
+      rows.forEach(r=>{if(r.status){entries[r.student_name]={status:r.status,at:r.updated_at};counts[r.status]=(counts[r.status]||0)+1;}});
+      legacy.push({id:'legacy_'+key.replace(/[^A-Za-z0-9_-]/g,'-'),run_date:ds,session:sess,slot_start:'',register_type:'house',legacy:true,entries,counts,updated_at:rows.map(r=>r.updated_at).sort().pop()});
+    });
+  }catch(e){}
+  const all=[...runs,...legacy].sort((a,b)=>String(b.run_date).localeCompare(String(a.run_date))||String(b.slot_start||'').localeCompare(String(a.slot_start||'')));
+  window._hhRecords=all;window._hhRange=[from,to];
+  const acts=document.getElementById('hh-actions');if(acts)acts.style.display=all.length?'flex':'none';
+  const sub=document.getElementById('hh-sub');if(sub)sub.textContent=all.length+' register'+(all.length===1?'':'s')+' · '+from+' → '+to;
+  if(!all.length){list.innerHTML='<div style="font-size:12px;color:#adb5bd;padding:6px 0">No registers in this range.</div>';return;}
+  list.innerHTML=all.map((r,i)=>{
+    const c=r.counts||{};const n=Object.keys(r.entries||{}).length;
+    return `<div onclick="hhView(${i})" style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border3);cursor:pointer">
+      <span style="font-size:14px">${getSessionEmoji(r.session)}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12.5px;font-weight:600;color:var(--text)">${_fhDateLong(r.run_date)} · ${getSessionLabel(r.session)}${r.slot_start&&r.slot_start!=='manual'?' · '+r.slot_start:''}</div>
+        <div style="font-size:10.5px;color:#868e96">${n} marked · <span style="color:#16a34a">${c.present||0}✓</span> <span style="color:#dc2626">${c.absent||0}✗</span> <span style="color:#d97706">${c.excused||0}~</span>${r.legacy?' · day record':''}</div>
+      </div>
+      <span style="color:#adb5bd">›</span>
+    </div>`;
+  }).join('');
+}
+function hhView(i){
+  const r=(window._hhRecords||[])[i];if(!r)return;
+  document.getElementById('hh-view-ov')?.remove();
+  const order={absent:0,excused:1,present:2};
+  const entries=Object.entries(r.entries||{}).map(([name,e])=>({name,...e}))
+    .sort((a,b)=>(order[a.status]??9)-(order[b.status]??9)||a.name.localeCompare(b.name));
+  const stTxt={present:'✓ present',absent:'✗ ABSENT',excused:'~ excused'};
+  const stCol={present:'#16a34a',absent:'#dc2626',excused:'#d97706'};
+  const tm=iso=>{try{return new Date(iso).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}catch(e){return'';}};
+  const ov=document.createElement('div');ov.id='hh-view-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10002;display:flex;align-items:flex-end;justify-content:center';
+  ov.onclick=e=>{if(e.target===ov)ov.remove();};
+  ov.innerHTML=`<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:520px;max-height:85vh;overflow:auto;padding:14px 16px 24px">
+    <div style="font-size:14px;font-weight:800;color:#212529">${getSessionEmoji(r.session)} ${_fhDateLong(r.run_date)} · ${getSessionLabel(r.session)}${r.slot_start&&r.slot_start!=='manual'?' · '+r.slot_start:''}</div>
+    <div style="font-size:11px;color:#868e96;margin-bottom:10px">${r.legacy?'Reconstructed day record':'Register run'} · ${entries.length} marked</div>
+    ${entries.map((e2,j)=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f3f5">
+      <span style="font-size:10px;color:#adb5bd;min-width:20px;text-align:right">${j+1}.</span>
+      <span style="flex:1;font-size:13px;color:#212529">${_esc(e2.name)}</span>
+      <span style="font-size:10px;color:#adb5bd">${tm(e2.at)}</span>
+      <span style="font-size:11px;font-weight:700;color:${stCol[e2.status]||'#adb5bd'}">${stTxt[e2.status]||e2.status||''}</span>
+    </div>`).join('')}
+    <button onclick="document.getElementById('hh-view-ov').remove()" style="width:100%;margin-top:12px;padding:10px;border:1px solid #dee2e6;border-radius:8px;background:#fff;color:#495057;font-size:13px;font-weight:600;cursor:pointer">Close</button>
+  </div>`;
+  document.body.appendChild(ov);
+}
+function hhExportWord(){
+  const recs=window._hhRecords||[];if(!recs.length)return;
+  if(typeof docx==='undefined'){alert('Document library not loaded.');return;}
+  const{Document,Packer,Paragraph,TextRun,BorderStyle}=docx;
+  const[from,to]=window._hhRange||['',''];
+  const ch=[];
+  ch.push(new Paragraph({children:[new TextRun({text:'House Register Report — Hawking House',bold:true,size:32,font:'Arial',color:'1A2E5A'})],spacing:{after:60},border:{bottom:{style:BorderStyle.SINGLE,size:4,color:'1A2E5A',space:2}}}));
+  ch.push(new Paragraph({children:[new TextRun({text:from+' to '+to+' · '+recs.length+' register'+(recs.length===1?'':'s')+' · generated '+_todayStr(),size:18,font:'Arial',color:'888888'})],spacing:{after:160}}));
+  recs.slice().reverse().forEach(r=>{
+    const c=r.counts||{};
+    const es=Object.entries(r.entries||{}).map(([name,e])=>({name,status:e.status}));
+    ch.push(new Paragraph({children:[new TextRun({text:_fhDateLong(r.run_date)+' · '+getSessionLabel(r.session)+(r.slot_start&&r.slot_start!=='manual'?' · '+r.slot_start:'')+(r.legacy?' (day record)':''),bold:true,size:22,font:'Arial',color:'1A2E5A'})],spacing:{before:160,after:40}}));
+    ch.push(new Paragraph({children:[new TextRun({text:'Present '+(c.present||0)+' · Absent '+(c.absent||0)+' · Excused '+(c.excused||0),size:18,font:'Arial',color:'666666'})],spacing:{after:60}}));
+    [['ABSENT','absent','C92A2A'],['Excused','excused','B45309'],['Present','present','2B8A3E']].forEach(([lbl,st,col])=>{
+      const names=es.filter(e=>e.status===st).map(e=>e.name);
+      if(!names.length)return;
+      ch.push(new Paragraph({children:[
+        new TextRun({text:lbl+' ('+names.length+'): ',bold:true,size:18,font:'Arial',color:col}),
+        new TextRun({text:names.join(', '),size:18,font:'Arial',color:'222222'})
+      ],spacing:{after:30}}));
+    });
+  });
+  const doc=new Document({sections:[{properties:{},children:ch}]});
+  Packer.toBlob(doc).then(blob=>{
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;
+    a.download='house_registers_'+from+'_to_'+to+'.docx';
+    a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);
+    showToastMsg('📄 Word report exported','#16a34a');
+  }).catch(err=>alert('Export failed: '+err.message));
+}
+function hhExportCsv(){
+  const recs=window._hhRecords||[];if(!recs.length)return;
+  const[from,to]=window._hhRange||['',''];
+  let csv='Date,Session,Slot,Student,Status,Marked At\n';
+  recs.slice().reverse().forEach(r=>{
+    Object.entries(r.entries||{}).forEach(([name,e])=>{
+      csv+=`${r.run_date},${r.session},${r.slot_start||''},"${name.replace(/"/g,"'")}",${e.status||''},${e.at||''}\n`;
+    });
+  });
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='house_registers_'+from+'_to_'+to+'.csv';
+  a.click();
+  showToastMsg('📊 CSV exported','#16a34a');
+}
+
+// ── DUTY CHIPS FOR A DATE + WINDOW ────────────────────────────────────────────
+// Who is on duty during [stMin,etMin) on a given date — used by the day view
+// rows and the live-mode peek. Read-only derivation, computed from the same
+// engine the duty strip uses.
+function _dutyChipsFor(ds,stMin,etMin){
+  const chips=[];
+  const ov=(s,e)=>{try{return t2m(s)<etMin&&t2m(e)>stMin;}catch(err){return false;}};
+  try{
+    const prep=dutyPrepFor(ds);
+    if(prep.length){
+      const m=_dutyTutorMeta(prep[0]);
+      if(ov(m.start,m.end))chips.push('🌙 '+prep.map(n=>n.split(' ')[0]).join(', '));
+    }
+  }catch(e){}
+  try{
+    if(ov(DUTY_META.boardStart,DUTY_META.boardEnd)){
+      const team=dutyBoardingTeamFor(ds);
+      if(team.length)chips.push('🏠 '+team.map(n=>String(n).split(' ')[0]).join(', '));
+    }
+  }catch(e){}
+  try{
+    detFor(ds).forEach(d=>{
+      const et=d.end||(()=>{const m=t2m(d.start)+30;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');})();
+      if(ov(d.start,et))chips.push('📵 '+d.student.split(' ')[0]+' '+d.room);
+    });
+  }catch(e){}
+  return chips;
+}
+
+// ── LIVE MODE PEEK ────────────────────────────────────────────────────────────
+// A read-only lens on the rest of today. Dimmed, labelled, nothing writable,
+// held only in memory: any re-entry, the Now pill, or a real slot change lands
+// back on now. Preview must never be able to cost you the present.
+let _amPeek=null;
+function _amPeekEvents(){
+  const now=new Date(),di=now.getDay(),nm=now.getHours()*60+now.getMinutes();
+  const dn=DN[di],ds=_todayStr(),out=[];
+  let prev=null;
+  for(let i=0;i<SLOTS.length;i++){
+    const c=getCustomForWeek(0,i,dn)||getBaseCell(i,dn);
+    const st=(c&&c.customStartTime)||getSlotTime(i);
+    const stM=t2m(st);
+    if(stM<=nm)continue;
+    // merge span continuations (same label+type back-to-back)
+    if(prev&&c&&prev.cellL===c.l&&prev.cellTp===c.tp&&c.l){prev.etM=i+1<SLOTS.length?t2m(getSlotTime(i+1)):24*60;prev.et=(c.customEndTime)||slotEndTime(i);continue;}
+    const etM=i+1<SLOTS.length?t2m(getSlotTime(i+1)):24*60;
+    const et=(c&&c.customEndTime)||slotEndTime(i);
+    const flags=[];
+    if(c){
+      if(c.boarding_register)flags.push('🛏 Boarding register');
+      if(c.house_register)flags.push('🏠 House register');
+      if(c.house_activity)flags.push('🎯 House activity');
+      if(c.tutor_check)flags.push('👁 Tutor check');
+    }
+    const planned=_tpForWindow(ds,stM,etM);
+    const hasContent=(c&&c.l)||flags.length||planned.length;
+    if(!hasContent)continue;
+    if(c&&c.tp==='sleep'&&!flags.length&&!planned.length)continue; // sleep rows are noise in a preview
+    prev={st,et,stM,etM,label:(c&&c.l)||'Free',cat:getCat((c&&(c.cat||c.tp))||'free'),flags,planned,cellL:c&&c.l,cellTp:c&&c.tp};
+    out.push(prev);
+  }
+  return out;
+}
+function _amPeekOpen(){
+  const events=_amPeekEvents();
+  if(!events.length){showToastMsg('Nothing left today to preview','#6b7280');return;}
+  _amPeek={i:0,events,baseSlot:(()=>{try{return (amGetCtx()||{}).slotIdx??-2;}catch(e){return -2;}})()};
+  _amPeekRender();
+}
+function _amPeekNav(d){
+  if(!_amPeek)return;
+  _amPeek.i=Math.max(0,Math.min(_amPeek.events.length-1,_amPeek.i+d));
+  _amPeekRender();
+}
+function _amPeekClose(){
+  _amPeek=null;
+  _amLastCtxKey='';
+  try{amRender();}catch(e){}
+}
+function _amPeekRender(){
+  const body=document.getElementById('am-body');if(!body||!_amPeek)return;
+  const ev=_amPeek.events[_amPeek.i];
+  const duty=_dutyChipsFor(_todayStr(),ev.stM,ev.etM);
+  body.innerHTML=`<div style="filter:saturate(.35) brightness(.9);opacity:.92">
+    <div style="display:flex;align-items:center;gap:8px;margin:8px 12px;padding:7px 12px;background:rgba(148,163,184,.15);border:1px solid rgba(148,163,184,.4);border-radius:10px">
+      <span style="font-size:11px;font-weight:800;letter-spacing:.07em;color:#94a3b8">👁 PREVIEW</span>
+      <span style="flex:1;font-size:11.5px;color:#cbd5e1">${_amPeek.i+1}/${_amPeek.events.length} · not now</span>
+      <button onclick="_amPeekNav(-1)" ${_amPeek.i===0?'disabled':''} style="font-size:13px;padding:3px 11px;border-radius:7px;border:1px solid rgba(255,255,255,.2);background:transparent;color:${_amPeek.i===0?'#475569':'#cbd5e1'};cursor:pointer">‹</button>
+      <button onclick="_amPeekNav(1)" ${_amPeek.i===_amPeek.events.length-1?'disabled':''} style="font-size:13px;padding:3px 11px;border-radius:7px;border:1px solid rgba(255,255,255,.2);background:transparent;color:${_amPeek.i===_amPeek.events.length-1?'#475569':'#cbd5e1'};cursor:pointer">›</button>
+    </div>
+    <div style="margin:0 12px;padding:14px;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:rgba(255,255,255,.03)">
+      <div style="font-size:11px;color:#94a3b8;font-variant-numeric:tabular-nums">${ev.st}–${ev.et}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
+        <span style="font-size:17px;font-weight:800;color:#e2e8f0">${_esc(ev.label)}</span>
+        <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:9px;background:${ev.cat.color};color:${ev.cat.text}">${_esc(ev.cat.label||'')}</span>
+      </div>
+      ${ev.flags.length?`<div style="margin-top:8px;font-size:12px;color:#a78bfa">${ev.flags.join(' · ')}</div>`:''}
+      ${duty.length?`<div style="margin-top:8px;display:flex;flex-direction:column;gap:3px">${duty.map(d=>`<span style="font-size:12.5px;color:#93c5fd">${_esc(d)}</span>`).join('')}</div>`:''}
+      ${ev.planned.length?`<div style="margin-top:10px"><div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:#f59f00">📌 PLANNED</div>${ev.planned.map(t=>`<div style="font-size:12.5px;color:#e2e8f0;padding:2px 0">• ${_esc(t.text)}</div>`).join('')}</div>`:''}
+    </div>
+  </div>
+  <button onclick="_amPeekClose()" style="position:sticky;bottom:12px;display:block;margin:14px auto 4px;font-size:13px;font-weight:800;padding:9px 26px;border-radius:20px;border:none;background:#f59f00;color:#111;cursor:pointer;box-shadow:0 4px 14px rgba(245,159,0,.4)">● Now</button>`;
+}
+
+// ── TASK ↔ PERIOD CONNECTION ──────────────────────────────────────────────────
+// A task can be planned into a specific period. One connection store (a field
+// on the task, t.anchor={date,time}); "removed from the unassigned list" is a
+// view filter, never a data move. Invariant: every open task is visible in
+// exactly one place — the list (unanchored, or anchor passed) or its slot
+// (anchor in the future). A missed slot returns the task with its trace.
+function _tpAnchored(dateStr,time){
+  return (S.planData||[]).filter(t=>!t.say&&!t.archived&&t.anchor&&t.anchor.date===dateStr&&t.anchor.time===time);
+}
+function _tpCount(dateStr,time){return _tpAnchored(dateStr,time).length;}
+// All tasks anchored inside a time window (live mode merges free slots into one
+// span, so the current "period" can cover several grid slots)
+function _tpForWindow(dateStr,stMin,etMin){
+  return (S.planData||[]).filter(t=>!t.say&&!t.archived&&t.anchor&&t.anchor.date===dateStr&&t2m(t.anchor.time||'00:00')>=stMin&&t2m(t.anchor.time||'00:00')<etMin);
+}
+function _tpAnchorFuture(t){
+  if(!t||!t.anchor)return false;
+  const nowD=_todayStr();
+  if(t.anchor.date>nowD)return true;
+  if(t.anchor.date<nowD)return false;
+  const now=new Date();
+  return t2m(t.anchor.time||'00:00')>now.getHours()*60+now.getMinutes();
+}
+function _tpDoneNow(t){try{return localStorage.getItem(_liveDoneKey(t))==='1';}catch(e){return false;}}
+function _tpTraceLbl(t){
+  if(!t.anchor)return'';
+  try{const d=new Date(t.anchor.date+'T00:00:00');
+    return d.toLocaleDateString('en-GB',{weekday:'short'})+' '+t.anchor.time;}catch(e){return t.anchor.date;}
+}
+function tpAssign(taskId,dateStr,time){
+  const t=(S.planData||[]).find(x=>x.id===taskId);if(!t)return;
+  t.anchor={date:dateStr,time};
+  _savePlanNow();
+  document.getElementById('tp-pick-ov')?.remove();
+  showToastMsg('📌 Planned for '+_tpTraceLbl(t),'#f59f00');
+  try{if(ttView==='today')renderTodayView();else renderTimetable();}catch(e){}
+  try{renderWeekTasksView();}catch(e){}
+}
+function tpUnassign(taskId){
+  const t=(S.planData||[]).find(x=>x.id===taskId);if(!t)return;
+  delete t.anchor;
+  _savePlanNow();
+  try{if(ttView==='today')renderTodayView();else renderTimetable();}catch(e){}
+  try{renderWeekTasksView();}catch(e){}
+}
+// Connected-tasks panel content for one slot (day view expansion)
+function _tpPanelHtml(dateStr,time,idx){
+  const rows=_tpAnchored(dateStr,time);
+  const catMap={};(S.planCategories||[]).forEach(c=>{catMap[c.id]=c;});
+  return `<div style="display:flex;flex-direction:column;gap:2px">
+    ${rows.length?rows.map(t=>{const c=catMap[t.cat]||{color:'#868e96'};
+      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(0,0,0,.05)">
+        <span style="width:8px;height:8px;border-radius:50%;background:${c.color};flex-shrink:0"></span>
+        <span style="flex:1;font-size:12.5px;color:#212529;${_tpDoneNow(t)?'text-decoration:line-through;color:#adb5bd;':''}">${_esc(t.text)}</span>
+        <button onclick="tpUnassign('${t.id}')" title="Remove from this period" style="background:none;border:none;color:#adb5bd;font-size:13px;cursor:pointer;padding:2px 6px">✕</button>
+      </div>`;}).join(''):'<div style="font-size:11.5px;color:#adb5bd;padding:3px 0">Nothing planned for this period.</div>'}
+    <button onclick="tpOpenPicker('${dateStr}','${time}',${idx})" style="align-self:flex-start;margin-top:5px;font-size:11.5px;font-weight:700;padding:5px 12px;border:1px solid #dee2e6;border-radius:7px;background:#fff;color:#495057;cursor:pointer">＋ Add task</button>
+  </div>`;
+}
+// Bottom-sheet picker: connect an open task to this period
+function tpOpenPicker(dateStr,time,idx){
+  document.getElementById('tp-pick-ov')?.remove();
+  const catMap={};(S.planCategories||[]).forEach(c=>{catMap[c.id]=c;});
+  const open=(S.planData||[]).filter(t=>!t.say&&!t.archived&&!_tpAnchorFuture(t)&&!_tpDoneNow(t));
+  const forDay=open.filter(t=>t.scope==='day'&&t.date===dateStr);
+  const sticky=open.filter(t=>t.scope==='sticky');
+  const rest=open.filter(t=>!forDay.includes(t)&&!sticky.includes(t));
+  const row=t=>{const c=catMap[t.cat]||{color:'#868e96',name:''};
+    return `<div onclick="tpAssign('${t.id}','${dateStr}','${time}')" style="display:flex;align-items:center;gap:9px;padding:9px 4px;border-bottom:1px solid #f1f3f5;cursor:pointer">
+      <span style="width:9px;height:9px;border-radius:50%;background:${c.color};flex-shrink:0"></span>
+      <span style="flex:1;font-size:13px;color:#212529">${_esc(t.text)}</span>
+      <span style="font-size:10px;color:#adb5bd">${_esc(c.name||'')}</span>
+    </div>`;};
+  const sec=(lbl,arr)=>arr.length?`<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#adb5bd;margin:10px 0 2px">${lbl}</div>`+arr.map(row).join(''):'';
+  const ov=document.createElement('div');ov.id='tp-pick-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10002;display:flex;align-items:flex-end;justify-content:center';
+  ov.onclick=e=>{if(e.target===ov)ov.remove();};
+  ov.innerHTML=`<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:520px;max-height:75vh;overflow:auto;padding:14px 16px 24px">
+    <div style="font-size:14px;font-weight:800;color:#212529">📌 Plan a task here</div>
+    <div style="font-size:11px;color:#868e96;margin-bottom:6px">${_tpTraceLbl({anchor:{date:dateStr,time}})} · picking assigns it to this period and removes it from the open list until then</div>
+    ${open.length?sec('For this day',forDay)+sec('Sticky',sticky)+sec('Other open tasks',rest):'<div style="font-size:12.5px;color:#adb5bd;padding:12px 0">No open tasks to plan.</div>'}
+    <button onclick="document.getElementById('tp-pick-ov').remove()" style="width:100%;margin-top:12px;padding:10px;border:1px solid #dee2e6;border-radius:8px;background:#fff;color:#495057;font-size:13px;font-weight:600;cursor:pointer">Close</button>
+  </div>`;
+  document.body.appendChild(ov);
+}
+// Task-side door: pick a FREE period this week or next for one task
+function tpGapPicker(taskId){
+  document.getElementById('tp-pick-ov')?.remove();
+  const t=(S.planData||[]).find(x=>x.id===taskId);if(!t)return;
+  const now=new Date(),nowD=_todayStr(),nmNow=now.getHours()*60+now.getMinutes();
+  const gaps=[];
+  for(let off=0;off<=1&&gaps.length<40;off++){
+    const mon=getWeekMondayFor(off);
+    ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach((dn,di)=>{
+      const d=new Date(mon);d.setDate(mon.getDate()+di);
+      const ds=d.toLocaleDateString('en-CA');
+      if(ds<nowD)return;
+      for(let i=0;i<SLOTS.length;i++){
+        const cell=getCustomForWeek(off,i,dn)||getBaseCell(i,dn);
+        if(cell&&cell.tp&&cell.tp!=='free')continue; // only genuinely free periods
+        const st=getSlotTime(i);
+        if(ds===nowD&&t2m(st)<=nmNow)continue;
+        gaps.push({ds,dn,st,lbl:(SLOTS[i].label||'')});
+      }
+    });
+  }
+  const ov=document.createElement('div');ov.id='tp-pick-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10002;display:flex;align-items:flex-end;justify-content:center';
+  ov.onclick=e=>{if(e.target===ov)ov.remove();};
+  const fmt=g=>{try{return new Date(g.ds+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});}catch(e){return g.ds;}};
+  ov.innerHTML=`<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:520px;max-height:75vh;overflow:auto;padding:14px 16px 24px">
+    <div style="font-size:14px;font-weight:800;color:#212529">🕐 When will you do it?</div>
+    <div style="font-size:12px;color:#495057;margin-bottom:8px">${_esc(t.text)}</div>
+    ${gaps.length?gaps.slice(0,40).map(g=>`<div onclick="tpAssign('${t.id}','${g.ds}','${g.st}')" style="display:flex;align-items:center;gap:9px;padding:9px 4px;border-bottom:1px solid #f1f3f5;cursor:pointer">
+      <span style="flex:1;font-size:13px;color:#212529">${fmt(g)}</span>
+      <span style="font-size:12px;font-weight:700;color:#16a34a">${g.st}${g.lbl?' · '+_esc(g.lbl):''} free</span>
+    </div>`).join(''):'<div style="font-size:12.5px;color:#adb5bd;padding:12px 0">No free periods found in the next two weeks.</div>'}
+    <button onclick="document.getElementById('tp-pick-ov').remove()" style="width:100%;margin-top:12px;padding:10px;border:1px solid #dee2e6;border-radius:8px;background:#fff;color:#495057;font-size:13px;font-weight:600;cursor:pointer">Close</button>
+  </div>`;
+  document.body.appendChild(ov);
+}
+
+// Standalone planned-tasks block for live mode's free (no-cell) state
+function _tpLiveBlock(planned){
+  return `<div style="margin:10px 12px 0;border:1px solid rgba(255,255,255,.1);border-left:4px solid #f59f00;border-radius:10px;background:rgba(255,255,255,.03);padding:9px 12px">
+    <div style="font-size:12px;font-weight:800;color:#f59f00;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">📌 Planned for this period</div>
+    ${planned.map(t=>{const done=_tpDoneNow(t);
+      return `<label style="display:flex;align-items:flex-start;gap:9px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer">
+        <input type="checkbox" ${done?'checked':''} onchange="liveTogglePoint('${t.id}',false)" style="margin-top:2px;width:17px;height:17px;accent-color:#f59f00">
+        <span style="font-size:14px;color:${done?'#666':'#e5e7eb'};${done?'text-decoration:line-through;':''}line-height:1.35">${_esc(t.text)}</span></label>`;}).join('')}
+  </div>`;
+}
+
+// ── DETENTION RECORDS ─────────────────────────────────────────────────────────
+// Logged from the detention flows at the moment you issue one — no duplicate
+// entry, no timetable event. The live duty strip derives the rest: on a date
+// with detentions, a row appears during the detention window (±5 min) with
+// room and student names, invisible otherwise.
+let DET_LOG=[];
+function loadDetLog(){try{const d=localStorage.getItem('detLog');DET_LOG=d?JSON.parse(d):[];}catch(e){DET_LOG=[];}}
+function saveDetLog(){try{localStorage.setItem('detLog',JSON.stringify(DET_LOG));}catch(e){}}
+function detLogAdd(kind){
+  const sEl=document.getElementById(kind==='sat'?'sd-student':'wd-student');
+  const dEl=document.getElementById(kind==='sat'?'sd-date-picker':'wd-date-picker');
+  const student=(sEl&&sEl.value||'').trim();
+  const date=dEl&&dEl.value;
+  if(!student){showToastMsg('Enter the student first','#dc2626');return;}
+  if(!date){showToastMsg('Pick the detention date first','#dc2626');return;}
+  const room=kind==='sat'?(sv('det-sat-room')||'A201'):(sv('det-wd-room')||'A201');
+  const start=kind==='sat'?(sv('det-sat-start')||'13:30'):(sv('det-wd-time')||'10:35');
+  const end=kind==='sat'?(sv('det-sat-end')||'15:30'):null; // weekday: 30 min window
+  const dup=DET_LOG.find(r=>r.student===student&&r.date===date&&r.kind===kind);
+  if(dup){showToastMsg('Already logged for '+date,'#d97706');return;}
+  DET_LOG.push({id:'det'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+    student,kind,date,room,start,end,logged_at:new Date().toISOString()});
+  // keep the log bounded: drop entries older than ~120 days
+  const cutoff=new Date();cutoff.setDate(cutoff.getDate()-120);
+  const cut=cutoff.toLocaleDateString('en-CA');
+  DET_LOG=DET_LOG.filter(r=>r.date>=cut);
+  saveDetLog();
+  showToastMsg('🗂 Detention logged — it will show in live mode on '+date,'#16a34a');
+}
+function detFor(ds){return DET_LOG.filter(r=>r.date===ds);}
+function detRemove(id){DET_LOG=DET_LOG.filter(r=>r.id!==id);saveDetLog();}
+
+// ── TUTOR TIME FOLLOW-UP FLOW ─────────────────────────────────────────────────
+// Builds a courteous, dated reminder for one tutor from their recorded
+// exceptions. Scope defaults to "since the last reminder you sent them";
+// marking raised advances that marker so the next email never re-litigates.
+const TF_TPL_DEFAULTS={
+  ontime:'tutor time started without you in the room on',
+  device:'students were using devices during tutor time on',
+  uniform:'uniform issues went unaddressed during tutor time on'
+};
+function _tfTpl(k){return S['tf-tpl-'+k]||TF_TPL_DEFAULTS[k];}
+let _tfTutor=null;
+function tfInit(){
+  _tfTutor=null;
+  const chips=document.getElementById('tf-tutor-chips');
+  if(chips)chips.innerHTML=_tcTutors().map(t=>`<button onclick="tfPick('${t.name.replace(/'/g,"\\'")}')" data-tf-chip="${_esc(t.name)}" style="font-size:12px;padding:5px 12px;border-radius:14px;border:1px solid #dee2e6;background:#fff;color:#495057;cursor:pointer">${_esc(t.name.split(' ')[0])} <span style="color:#adb5bd;font-size:10px">${t.grade||''}</span></button>`).join('');
+  ['ontime','device','uniform'].forEach(k=>{const i=document.getElementById('tf-tpl-'+k);if(i){i.value=_tfTpl(k);i.onchange=()=>{S['tf-tpl-'+k]=i.value.trim()||TF_TPL_DEFAULTS[k];saveSettings();if(_tfTutor)tfBuild();};}});
+  const out=document.getElementById('tf-out');if(out)out.innerHTML='Pick a tutor to build the email.';
+  const note=document.getElementById('tf-since-note');if(note)note.textContent='';
+  ['tf-from','tf-to'].forEach(id=>{const e=document.getElementById(id);if(e){e.value='';e.onchange=()=>{if(_tfTutor)tfBuild();};}});
+}
+function tfPick(name){
+  _tfTutor=name;
+  document.querySelectorAll('[data-tf-chip]').forEach(b=>{
+    const on=b.getAttribute('data-tf-chip')===name;
+    b.style.background=on?'#0e7490':'#fff';b.style.color=on?'#fff':'#495057';b.style.borderColor=on?'#0e7490':'#dee2e6';
+  });
+  const rem=(S.tcReminded||{})[name];
+  const fi=document.getElementById('tf-from'),ti=document.getElementById('tf-to');
+  if(fi&&!fi.value){
+    if(rem)fi.value=String(rem).slice(0,10);
+    else{const f=new Date();f.setDate(f.getDate()-30);fi.value=f.toLocaleDateString('en-CA');}
+  }
+  if(ti&&!ti.value)ti.value=_todayStr();
+  const note=document.getElementById('tf-since-note');
+  if(note)note.textContent=rem?('Last reminder sent '+String(rem).slice(0,10)+' — range starts there.'):'No reminder sent before — showing the last 30 days.';
+  tfBuild();
+}
+function tfExceptionsFor(name,from,to){
+  const out=[];
+  Object.keys(TUTOR_CHECKS).sort().forEach(ds=>{
+    if(ds<from||ds>to)return;
+    const r=(TUTOR_CHECKS[ds]||{})[name];if(!r)return;
+    TC_ITEMS.forEach(([k])=>{if(r[k]==='n')out.push({date:ds,item:k,note:r.note||''});});
+  });
+  return out;
+}
+function _tfNiceDate(ds){try{return new Date(ds+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});}catch(e){return ds;}}
+function tfBuild(){
+  const out=document.getElementById('tf-out');if(!out||!_tfTutor)return;
+  const from=document.getElementById('tf-from')?.value||'2000-01-01';
+  const to=document.getElementById('tf-to')?.value||_todayStr();
+  const t=(TUTORS||[]).find(x=>x.name===_tfTutor)||{};
+  const exs=tfExceptionsFor(_tfTutor,from,to);
+  if(!exs.length){
+    out.innerHTML=`<div style="padding:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:12.5px;color:#166534">Nothing to raise — no flagged items for ${_esc(_tfTutor)} in this range.</div>`;
+    return;
+  }
+  const byItem={};exs.forEach(e=>{(byItem[e.item]=byItem[e.item]||[]).push(e);});
+  const first=(_tfTutor||'').split(' ')[0];
+  let lines=[];
+  Object.entries(byItem).forEach(([k,arr])=>{
+    const dates=arr.map(e=>_tfNiceDate(e.date)).join(', ');
+    lines.push('• '+_tfTpl(k)+' '+dates+'.');
+  });
+  const notes=exs.filter(e=>e.note).map(e=>'• '+_tfNiceDate(e.date)+': '+e.note);
+  const body=`Dear ${first},\n\nA quick note from my tutor-time walkrounds — a few things I noticed that I'd like us to tidy up:\n\n${lines.join('\n')}${notes.length?'\n\nMy notes:\n'+notes.join('\n'):''}\n\nNothing formal — just flagging it early so it doesn't become a pattern. Grab me any time if there's context I'm missing or anything I can help with.\n\nThanks,\nLaith`;
+  const subj='Tutor time — a couple of things to tidy up';
+  const mailto='mailto:'+encodeURIComponent(t.email||'')+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(body);
+  window._tfBody=body;window._tfRange=[from,to];
+  out.innerHTML=`<div style="border:1px solid #dee2e6;border-radius:12px;padding:14px;background:#fff">
+    <div style="font-size:11px;color:#868e96;margin-bottom:4px"><strong>To:</strong> ${_esc(t.email||'(no email on record — add it in Settings → Tutors)')}</div>
+    <div style="font-size:11px;color:#868e96;margin-bottom:8px"><strong>Subject:</strong> ${_esc(subj)}</div>
+    <div style="font-size:12px;background:#f8f9fa;border-radius:8px;padding:10px;white-space:pre-wrap;font-family:monospace;max-height:220px;overflow-y:auto">${_esc(body)}</div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:10px">
+      <button onclick="navigator.clipboard.writeText(window._tfBody).then(()=>showToastMsg('Copied','#16a34a'))" style="font-size:12px;padding:7px 14px;background:#212529;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">Copy body</button>
+      ${t.email?`<a href="${mailto}" style="font-size:12px;padding:7px 14px;background:#e7f5ff;border:1px solid #74c0fc;border-radius:8px;color:#1971c2;font-weight:600;text-decoration:none;display:inline-block">Open in Mail</a>`:''}
+      <button onclick="tfMarkRaised()" style="font-size:12px;padding:7px 14px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;color:#166534;cursor:pointer;font-weight:700">✓ Mark raised</button>
+    </div>
+  </div>`;
+}
+function tfMarkRaised(){
+  if(!_tfTutor)return;
+  S.tcReminded=S.tcReminded||{};
+  S.tcReminded[_tfTutor]=new Date().toISOString();
+  // tag the covered entries so the report can show follow-up happened
+  const[from,to]=window._tfRange||['2000-01-01',_todayStr()];
+  Object.keys(TUTOR_CHECKS).forEach(ds=>{
+    if(ds<from||ds>to)return;
+    const r=(TUTOR_CHECKS[ds]||{})[_tfTutor];
+    if(r&&TC_ITEMS.some(([k])=>r[k]==='n'))r.raised=true;
+  });
+  saveTutorChecks();saveSettings();
+  showToastMsg('✓ Marked raised — next email starts from today','#16a34a');
+  const note=document.getElementById('tf-since-note');
+  if(note)note.textContent='Marked raised just now.';
+}
+
+// ── TUTOR CHECK REPORT ────────────────────────────────────────────────────────
+// Reads the per-date tutorChecks store: summary per tutor over a range plus a
+// dated exception log. "No entry" days count as unchecked, never as fine —
+// that is why All fine writes explicit ✓s.
+function toggleTcReport(){
+  const ed=document.getElementById('tcr-editor');if(!ed)return;
+  const open=ed.style.display!=='none';
+  ed.style.display=open?'none':'block';
+  if(!open){
+    const f=new Date();f.setDate(f.getDate()-30);
+    const fi=document.getElementById('tcr-from'),ti=document.getElementById('tcr-to');
+    if(fi&&!fi.value)fi.value=f.toLocaleDateString('en-CA');
+    if(ti&&!ti.value)ti.value=_todayStr();
+  }
+}
+function _tcrCollect(from,to){
+  const perTutor={}; // name → {checked, exc:{ontime,device,uniform}}
+  const log=[];      // {date, tutor, flags:[label...], note}
+  const itemLbl={ontime:'On time',device:'Device use',uniform:'Uniform'};
+  Object.keys(TUTOR_CHECKS).sort().forEach(ds=>{
+    if(ds<from||ds>to)return;
+    Object.entries(TUTOR_CHECKS[ds]||{}).forEach(([tutor,r])=>{
+      const marked=TC_ITEMS.some(([k])=>r[k]);
+      if(!marked)return;
+      const t=(perTutor[tutor]=perTutor[tutor]||{checked:0,exc:{ontime:0,device:0,uniform:0}});
+      t.checked++;
+      const flags=[];
+      TC_ITEMS.forEach(([k])=>{if(r[k]==='n'){t.exc[k]++;flags.push(itemLbl[k]);}});
+      if(flags.length||r.note)log.push({date:ds,tutor,flags,note:r.note||''});
+    });
+  });
+  return{perTutor,log};
+}
+function tcrLoad(){
+  const from=document.getElementById('tcr-from')?.value,to=document.getElementById('tcr-to')?.value;
+  const list=document.getElementById('tcr-list');if(!list)return;
+  if(!from||!to){list.textContent='Pick both dates.';return;}
+  const{perTutor,log}=_tcrCollect(from,to);
+  window._tcrData={perTutor,log,range:[from,to]};
+  const tutors=Object.keys(perTutor);
+  const acts=document.getElementById('tcr-actions');if(acts)acts.style.display=tutors.length?'flex':'none';
+  const sub=document.getElementById('tcr-sub');if(sub)sub.textContent=tutors.length?tutors.length+' tutors · '+log.length+' exception'+(log.length===1?'':'s')+' · '+from+' → '+to:'No checks in range';
+  if(!tutors.length){list.innerHTML='<div style="font-size:12px;color:#adb5bd;padding:6px 0">No tutor checks recorded in this range.</div>';return;}
+  list.innerHTML=_tcTutors().filter(t=>perTutor[t.name]).map(t=>{
+    const d=perTutor[t.name];
+    const ex=d.exc.ontime+d.exc.device+d.exc.uniform;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border3)">
+      <div style="flex:1;min-width:0;font-size:12.5px;font-weight:600;color:var(--text)">${_esc(t.name)} <span style="font-weight:400;color:#adb5bd;font-size:10.5px">${t.grade||''}</span></div>
+      <span style="font-size:11px;color:${ex?'#dc2626':'#16a34a'};font-weight:600">${d.checked} checked · ${ex?ex+' flagged':'clean'}</span>
+    </div>`;
+  }).join('')+(log.length?`<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#adb5bd;margin:10px 0 4px">Exceptions</div>`+log.map(e=>`<div style="padding:5px 0;border-bottom:1px solid var(--border3);font-size:11.5px;color:var(--text2)"><strong>${e.date}</strong> · ${_esc(e.tutor)} · <span style="color:#dc2626">${e.flags.join(', ')||'note'}</span>${e.note?' · '+_esc(e.note):''}</div>`).join(''):'');
+}
+function tcrExportWord(){
+  const d=window._tcrData;if(!d)return;
+  if(typeof docx==='undefined'){alert('Document library not loaded.');return;}
+  const{Document,Packer,Paragraph,TextRun,BorderStyle,Table,TableRow,TableCell,WidthType}=docx;
+  const[from,to]=d.range;
+  const ch=[];
+  ch.push(new Paragraph({children:[new TextRun({text:'Tutor Time Check Report — Hawking House',bold:true,size:32,font:'Arial',color:'0E7490'})],spacing:{after:60},border:{bottom:{style:BorderStyle.SINGLE,size:4,color:'0E7490',space:2}}}));
+  ch.push(new Paragraph({children:[new TextRun({text:from+' to '+to+' · generated '+_todayStr(),size:18,font:'Arial',color:'888888'})],spacing:{after:160}}));
+  const hdr=['Tutor','Days checked','Late','Device','Uniform'];
+  const cell=(txt,bold,color)=>new TableCell({children:[new Paragraph({children:[new TextRun({text:String(txt),bold:!!bold,size:18,font:'Arial',color:color||'222222'})]})]});
+  const rows=[new TableRow({children:hdr.map(h=>cell(h,true,'FFFFFF'))})];
+  _tcTutors().filter(t=>d.perTutor[t.name]).forEach(t=>{
+    const p=d.perTutor[t.name];
+    rows.push(new TableRow({children:[
+      cell(t.name),cell(p.checked),
+      cell(p.exc.ontime||'—',p.exc.ontime>0,p.exc.ontime?'C92A2A':'888888'),
+      cell(p.exc.device||'—',p.exc.device>0,p.exc.device?'C92A2A':'888888'),
+      cell(p.exc.uniform||'—',p.exc.uniform>0,p.exc.uniform?'C92A2A':'888888')
+    ]}));
+  });
+  ch.push(new Table({rows,width:{size:100,type:WidthType.PERCENTAGE}}));
+  if(d.log.length){
+    ch.push(new Paragraph({children:[new TextRun({text:'Exception log',bold:true,size:22,font:'Arial',color:'1A2E5A'})],spacing:{before:240,after:60}}));
+    d.log.forEach(e=>{
+      ch.push(new Paragraph({children:[
+        new TextRun({text:e.date+'  ',bold:true,size:18,font:'Arial',color:'222222'}),
+        new TextRun({text:e.tutor+' — ',size:18,font:'Arial',color:'222222'}),
+        new TextRun({text:e.flags.join(', ')||'note',size:18,font:'Arial',color:'C92A2A'}),
+        e.note?new TextRun({text:'  ·  '+e.note,italics:true,size:18,font:'Arial',color:'666666'}):new TextRun('')
+      ],spacing:{after:40}}));
+    });
+  } else {
+    ch.push(new Paragraph({children:[new TextRun({text:'No exceptions in this range.',size:18,font:'Arial',color:'2B8A3E'})],spacing:{before:160}}));
+  }
+  const doc=new Document({sections:[{properties:{},children:ch}]});
+  Packer.toBlob(doc).then(blob=>{
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;
+    a.download='tutor_checks_'+from+'_to_'+to+'.docx';
+    a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);
+    showToastMsg('📄 Word report exported','#16a34a');
+  }).catch(err=>alert('Export failed: '+err.message));
+}
+function tcrExportCsv(){
+  const d=window._tcrData;if(!d)return;
+  const[from,to]=d.range;
+  let csv='Date,Tutor,On Time,Device,Uniform,Note\n';
+  Object.keys(TUTOR_CHECKS).sort().forEach(ds=>{
+    if(ds<from||ds>to)return;
+    Object.entries(TUTOR_CHECKS[ds]||{}).forEach(([tutor,r])=>{
+      if(!TC_ITEMS.some(([k])=>r[k]))return;
+      const v=k=>r[k]==='y'?'ok':r[k]==='n'?'FLAG':'';
+      csv+=`${ds},"${tutor.replace(/"/g,"'")}",${v('ontime')},${v('device')},${v('uniform')},"${(r.note||'').replace(/"/g,"'")}"\n`;
+    });
+  });
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='tutor_checks_'+from+'_to_'+to+'.csv';
+  a.click();
+  showToastMsg('📊 CSV exported','#16a34a');
+}
+
+// ── TUTOR TIME CHECK ──────────────────────────────────────────────────────────
+// Per-date staff checklist shown in live mode on slots flagged tutor_check.
+// "No entry is never ambiguous": All fine writes an explicit ✓ for every tutor,
+// so a checked day is dense with ticks and an unchecked day is empty — the
+// report can distinguish "all fine" from "didn't check".
+const TC_ITEMS=[['ontime','OT','On time'],['device','📵','No device'],['uniform','👔','Uniform']];
+let TUTOR_CHECKS={};
+function loadTutorChecks(){try{const d=localStorage.getItem('tutorChecks');if(d)TUTOR_CHECKS=JSON.parse(d);}catch(e){TUTOR_CHECKS={};}}
+function saveTutorChecks(){try{localStorage.setItem('tutorChecks',JSON.stringify(TUTOR_CHECKS));}catch(e){}}
+function _tcTutors(){
+  const gnum=g=>parseInt(String(g||'').replace(/\D/g,''),10)||99;
+  return (TUTORS||[]).slice().sort((a,b)=>gnum(a.grade)-gnum(b.grade)||a.name.localeCompare(b.name));
+}
+function _tcRec(name){
+  const ds=_todayStr();
+  if(!TUTOR_CHECKS[ds])TUTOR_CHECKS[ds]={};
+  if(!TUTOR_CHECKS[ds][name])TUTOR_CHECKS[ds][name]={};
+  return TUTOR_CHECKS[ds][name];
+}
+function _tcChipStyle(v){
+  return v==='y'?'background:rgba(34,197,94,.16);border-color:rgba(34,197,94,.5);color:#4ade80'
+    :v==='n'?'background:rgba(239,68,68,.16);border-color:rgba(239,68,68,.55);color:#f87171'
+    :'background:transparent;border-color:rgba(255,255,255,.16);color:#64748b';
+}
+function _tcSummaryTxt(){
+  const day=TUTOR_CHECKS[_todayStr()]||{};
+  const tutors=_tcTutors();
+  let checked=0,exc=0;
+  tutors.forEach(t=>{const r=day[t.name];if(r&&TC_ITEMS.some(([k])=>r[k])){checked++;if(TC_ITEMS.some(([k])=>r[k]==='n'))exc++;}});
+  return checked+'/'+tutors.length+(exc?' · <span style="color:#f87171">'+exc+' flagged</span>':'');
+}
+function _tcRefreshSummary(){const el=document.getElementById('tc-summary');if(el)el.innerHTML=_tcSummaryTxt();}
+function _tcTap(name,key){
+  const r=_tcRec(name);
+  const cur=r[key]||'';
+  const next=cur===''?'n':cur==='n'?'y':'';   // exception-first cycle: — → ✗ → ✓ → —
+  if(next)r[key]=next;else delete r[key];
+  r.at=new Date().toISOString();
+  saveTutorChecks();
+  const tid=name.replace(/\s+/g,'_');
+  const b=document.getElementById('tc-'+tid+'-'+key);
+  if(b){b.style.cssText=b.getAttribute('data-base')+_tcChipStyle(next);b.textContent=(TC_ITEMS.find(([k])=>k===key)||[])[1]+(next==='y'?' ✓':next==='n'?' ✗':'');}
+  _tcRefreshSummary();
+}
+function _tcAllFine(){
+  _tcTutors().forEach(t=>{const r=_tcRec(t.name);TC_ITEMS.forEach(([k])=>{r[k]='y';});r.at=new Date().toISOString();});
+  saveTutorChecks();
+  _tcRepaint();
+}
+function _tcToggleNote(name){
+  const tid=name.replace(/\s+/g,'_');
+  const w=document.getElementById('tc-note-'+tid);
+  if(w){w.style.display=w.style.display==='none'?'block':'none';const i=w.querySelector('input');if(i&&w.style.display!=='none')i.focus();}
+}
+function _tcNoteSave(name,val){
+  const r=_tcRec(name);
+  if(val.trim())r.note=val.trim();else delete r.note;
+  r.at=new Date().toISOString();
+  saveTutorChecks();
+}
+function _tcRepaint(){
+  const w=document.querySelector('[data-tc-section]');
+  if(w)w.innerHTML=_amTutorCheckInnerHtml();
+}
+function _amTutorCheckInnerHtml(){
+  const day=TUTOR_CHECKS[_todayStr()]||{};
+  const chipBase='display:inline-flex;align-items:center;gap:2px;font-size:10px;font-weight:700;padding:3px 7px;border-radius:9px;border:1px solid;cursor:pointer;-webkit-tap-highlight-color:transparent;';
+  const rows=_tcTutors().map(t=>{
+    const r=day[t.name]||{};
+    const tid=t.name.replace(/\s+/g,'_');
+    const nm=t.name.replace(/'/g,"\\'");
+    const chips=TC_ITEMS.map(([k,short])=>{
+      const v=r[k]||'';
+      return `<button id="tc-${tid}-${k}" data-base="${chipBase}" onclick="_tcTap('${nm}','${k}')" style="${chipBase}${_tcChipStyle(v)}">${short}${v==='y'?' ✓':v==='n'?' ✗':''}</button>`;
+    }).join('');
+    return `<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)">
+      <div style="display:flex;align-items:center;gap:7px">
+        <div style="flex:1;min-width:0;font-size:12.5px;font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}${t.room?` <span style="font-weight:500;color:#64748b;font-size:10.5px">${t.room}</span>`:''}</div>
+        ${chips}
+        <button onclick="_tcToggleNote('${nm}')" style="background:none;border:none;color:${r.note?'#fbbf24':'#475569'};font-size:12px;cursor:pointer;padding:2px">📝</button>
+      </div>
+      <div id="tc-note-${tid}" style="display:${r.note?'block':'none'};margin-top:4px">
+        <input value="${(r.note||'').replace(/"/g,'&quot;')}" placeholder="Note…" onchange="_tcNoteSave('${nm}',this.value)"
+          style="width:100%;box-sizing:border-box;font-size:11.5px;padding:5px 8px;border:1px solid rgba(255,255,255,.14);border-radius:7px;background:rgba(0,0,0,.25);color:#e2e8f0;outline:none">
+      </div>
+    </div>`;
+  }).join('');
+  return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <span style="font-size:10px;font-weight:800;letter-spacing:.07em;color:#22d3ee">👁 TUTOR CHECK</span>
+      <span id="tc-summary" style="font-size:10.5px;color:#94a3b8">${_tcSummaryTxt()}</span>
+      <button onclick="_tcAllFine()" style="margin-left:auto;font-size:10.5px;font-weight:700;padding:4px 12px;border-radius:9px;border:1px solid rgba(34,197,94,.5);background:rgba(34,197,94,.12);color:#4ade80;cursor:pointer;-webkit-tap-highlight-color:transparent">✓ All fine</button>
+    </div>${rows}`;
+}
+function _amAppendTutorCheck(body){
+  const w=document.createElement('div');
+  w.setAttribute('data-tc-section','1');
+  w.style.cssText='margin:10px 12px;padding:8px 12px;background:rgba(14,116,144,.10);border:1px solid rgba(34,211,238,.22);border-radius:11px';
+  w.innerHTML=_amTutorCheckInnerHtml();
+  body.appendChild(w);
+}
+
 let _amDayPillOpen=false,_amDayPillHash='';
 function toggleAmDayPill(){
   _amDayPillOpen=!_amDayPillOpen;
@@ -35820,6 +36445,14 @@ function _amDutyTick(){
         parts.push(rowHtml('🌙','Prep duty',rooms.join(', '),m.start+'–'+m.end,'#fbbf24'));
       }
     }
+    // 2b. Detentions logged for today — visible only in their window
+    detFor(ds).forEach(d=>{
+      const _et=d.end?d.end:(()=>{const m=t2m(d.start)+30;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');})();
+      if(!win(d.start,_et))return;
+      parts.push(rowHtml('📵','Detention',
+        _esc(d.student.split(' ')[0])+' <span style="font-weight:500;color:#94a3b8">'+_esc(d.room)+'</span>',
+        d.start+'–'+_et,'#fb923c'));
+    });
     // 3. Boarding team
     if(win(DUTY_META.boardStart,DUTY_META.boardEnd)){
       const team=dutyBoardingTeamFor(ds);
@@ -35876,6 +36509,13 @@ function amRender(){
   const ctx=amGetCtx();_updateLiveBtn();_amAutoCheck();_amDayPillTick();
   const body=document.getElementById('am-body');if(!body)return;
   if(_fireOpen){if(!document.getElementById('am-fire-section'))_renderFireRegister();return;}
+  // Peek holds the panel read-only; a REAL slot change snaps back to now so a
+  // forgotten preview can never hide the present.
+  if(_amPeek){
+    let curSlot=-2;try{curSlot=(amGetCtx()||{}).slotIdx??-2;}catch(e){}
+    if(curSlot!==_amPeek.baseSlot){_amPeekClose();}
+    return;
+  }
   const titleEl=document.getElementById('am-title'),subEl=document.getElementById('am-sub'),chip=document.getElementById('am-cat-chip');
   const now=new Date();
   const nowStr=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
@@ -35886,6 +36526,16 @@ function amRender(){
       _amLastCtxKey=ctxKey;
       if(titleEl)titleEl.textContent='Active Mode';if(subEl)subEl.textContent='';if(chip)chip.style.display='none';
       body.innerHTML=_amFreeHtml(nowStr);
+      // Tasks planned into this free period — the free slot IS the use case
+      try{
+        const nmF=now.getHours()*60+now.getMinutes();
+        let ciF=-1;for(let i=0;i<SLOTS.length;i++)if(nmF>=t2m(getSlotTime(i)))ciF=i;
+        if(ciF>=0){
+          const _etF=ciF+1<SLOTS.length?t2m(getSlotTime(ciF+1)):24*60;
+          const _pl=_tpForWindow(_todayStr(),t2m(getSlotTime(ciF)),_etF);
+          if(_pl.length){const _w=document.createElement('div');_w.innerHTML=_tpLiveBlock(_pl);body.appendChild(_w);}
+        }
+      }catch(e){}
     } else {
       const nv=document.getElementById('am-now-val-el');if(nv)nv.textContent=nowStr;
       const fc=document.getElementById('am-free-cd-el');const next=amGetNext();
@@ -35941,6 +36591,7 @@ function amRender(){
     const _isBoardingSlot=_custForBR&&(_custForBR.boarding_register||_custForBR.house_register);
     if(!cat.commit&&!_isBoardingSlot){
       body.innerHTML=_amFreeHtml(nowStr)+_amSessionNotesHtml(offset,slotIdx,dayName);
+      if(_custForBR&&_custForBR.tutor_check)_amAppendTutorCheck(body);
       try{
         const _cs2=getCustomForWeek(offset,slotIdx,dayName);
         const _scid=(_cs2&&_cs2.cat)||(()=>{const dd=getCatDefs();return Object.keys(dd).find(k=>dd[k]===cat)||tp||'';})();
@@ -35992,6 +36643,8 @@ function amRender(){
         if(changed)_brWrapper.innerHTML=_amBoardingRegisterHtml(_brType,m);
       });
     }
+    // Tutor check inline — flagged slots get the staff checklist
+    if(_custSlot2&&_custSlot2.tutor_check)_amAppendTutorCheck(body);
     // Context items (points + today's tasks) for this slot
     try{
       const _slotCatId=(_custSlot2&&_custSlot2.cat)||(()=>{const d=getCatDefs();return Object.keys(d).find(k=>d[k]===cat)||tp||'';})();
@@ -36106,7 +36759,9 @@ function _amNextHtml(next){
   if(!next)return`<div class="am-next-card"><div class="am-next-lbl">After this</div><div style="font-size:12px;color:#777;text-align:center;padding:.25rem">No more commitments today</div></div>`;
   const tot2=Math.round(next.minUntil*60),ab2=Math.abs(tot2),hh2=Math.floor(ab2/3600),mm2=Math.floor((ab2%3600)/60),ss2=ab2%60;
   const str=String(hh2).padStart(2,'0')+':'+String(mm2).padStart(2,'0')+':'+String(ss2).padStart(2,'0');
-  return`<div class="am-next-card"><div class="am-next-lbl">Up Next · in ${str}</div><div class="am-next-row"><div class="am-next-dot" style="background:${next.cat.color}"></div><span class="am-next-name">${next.label}</span><span class="am-next-time">${next.st}</span></div></div>`;
+  return`<div class="am-next-card" onclick="_amPeekOpen()" style="cursor:pointer" title="Tap to preview the rest of today">
+    <div class="am-next-lbl">Up Next · in ${str} <span style="float:right;font-size:9px;color:#64748b;font-weight:600">👁 preview ›</span></div>
+    <div class="am-next-row"><div class="am-next-dot" style="background:${next.cat.color}"></div><span class="am-next-name">${next.label}</span><span class="am-next-time">${next.st}</span></div></div>`;
 }
 
 function _amCommitHtml(ctx,nowStr,offset,slotIdx,dayName){
@@ -36379,7 +37034,7 @@ function initActiveMode(){
 <script>
 // Visible build number — must match the service worker's CACHE_NAME version.
 // Lets anyone confirm at a glance which build a device is actually running.
-const APP_BUILD='v236';
+const APP_BUILD='v246';
 try{document.getElementById('app-build-tag').textContent='build '+APP_BUILD;console.log('LA Work '+APP_BUILD);}catch(e){}
 </script>
 
