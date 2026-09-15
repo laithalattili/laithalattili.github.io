@@ -32800,7 +32800,7 @@ async function _undoDeparture(id){
     }
     // Re-render live mode register with fresh excused map
     const body=document.getElementById('am-body');
-    if(body&&_amOpen){
+    if(body&&_amOpen&&!_amPeek&&!_fireOpen){
       const ctx=amGetCtx();
       if(ctx){
         const cust=getCustomForWeek(ctx.offset,ctx.slotIdx,ctx.dayName);
@@ -32809,7 +32809,8 @@ async function _undoDeparture(id){
           // Always get fresh excused map for boarding register
           getTodayExcusedMap().then(m=>{
             window._lastExcusedMap=m;
-            if(body&&_amOpen) body.innerHTML=_amBoardingRegisterHtml(_bType,m);
+            // never stomp a preview or an open fire register
+            if(body&&_amOpen&&!_amPeek&&!_fireOpen) body.innerHTML=_amBoardingRegisterHtml(_bType,m);
           });
           // Show loading state immediately
           body.innerHTML=_amBoardingRegisterHtml(_bType,window._lastExcusedMap||{});
@@ -32861,7 +32862,7 @@ async function confirmDeparture(id){
     // Then refresh from Supabase in background
     getTodayExcusedMap().then(m=>{window._lastExcusedMap=m;});
     const body=document.getElementById('am-body');
-    if(body&&_amOpen){
+    if(body&&_amOpen&&!_amPeek&&!_fireOpen){
       const ctx=amGetCtx();
       if(ctx){
         const cust=getCustomForWeek(ctx.offset,ctx.slotIdx,ctx.dayName);
@@ -32870,7 +32871,8 @@ async function confirmDeparture(id){
           // Always get fresh excused map for boarding register
           getTodayExcusedMap().then(m=>{
             window._lastExcusedMap=m;
-            if(body&&_amOpen) body.innerHTML=_amBoardingRegisterHtml(_bType,m);
+            // never stomp a preview or an open fire register
+            if(body&&_amOpen&&!_amPeek&&!_fireOpen) body.innerHTML=_amBoardingRegisterHtml(_bType,m);
           });
           // Show loading state immediately
           body.innerHTML=_amBoardingRegisterHtml(_bType,window._lastExcusedMap||{});
@@ -32927,7 +32929,7 @@ async function confirmReturn(id){
     }
     // Re-render live mode
     const body=document.getElementById('am-body');
-    if(body&&_amOpen){
+    if(body&&_amOpen&&!_amPeek&&!_fireOpen){
       const ctx=amGetCtx();
       if(ctx){
         const cust=getCustomForWeek(ctx.offset,ctx.slotIdx,ctx.dayName);
@@ -32936,7 +32938,8 @@ async function confirmReturn(id){
           // Always get fresh excused map for boarding register
           getTodayExcusedMap().then(m=>{
             window._lastExcusedMap=m;
-            if(body&&_amOpen) body.innerHTML=_amBoardingRegisterHtml(_bType,m);
+            // never stomp a preview or an open fire register
+            if(body&&_amOpen&&!_amPeek&&!_fireOpen) body.innerHTML=_amBoardingRegisterHtml(_bType,m);
           });
           // Show loading state immediately
           body.innerHTML=_amBoardingRegisterHtml(_bType,window._lastExcusedMap||{});
@@ -35953,9 +35956,9 @@ function _amPeekRender(){
   body.innerHTML='<div id="am-peek-banner" style="position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:8px;margin:0 0 6px;padding:9px 12px;background:#1e293b;border-bottom:2px solid #f59f00">'
     +'<span style="font-size:11px;font-weight:800;letter-spacing:.07em;color:#f59f00">\ud83d\udc41 PREVIEW</span>'
     +'<span style="flex:1;font-size:11px;color:#94a3b8">'+(_amPeek.i+1)+'/'+_amPeek.events.length+' \u00b7 swipe \u2039 \u203a</span>'
-    +'<button onclick="_amPeekNav(-1)" '+(_amPeek.i===0?'disabled':'')+' style="font-size:14px;padding:4px 13px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:transparent;color:'+(_amPeek.i===0?'#475569':'#cbd5e1')+';cursor:pointer;-webkit-tap-highlight-color:transparent">\u2039</button>'
-    +'<button onclick="_amPeekNav(1)" '+(_amPeek.i===_amPeek.events.length-1?'disabled':'')+' style="font-size:14px;padding:4px 13px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:transparent;color:'+(_amPeek.i===_amPeek.events.length-1?'#475569':'#cbd5e1')+';cursor:pointer;-webkit-tap-highlight-color:transparent">\u203a</button>'
-    +'<button onclick="_amPeekClose()" style="font-size:12px;font-weight:800;padding:5px 16px;border-radius:14px;border:none;background:#f59f00;color:#111;cursor:pointer;-webkit-tap-highlight-color:transparent">\u25cf Now</button>'
+    +'<button onclick="_amPeekNav(-1)" ontouchend="event.preventDefault();event.stopPropagation();if(!this.disabled)_amPeekNav(-1)" '+(_amPeek.i===0?'disabled':'')+' style="touch-action:manipulation;min-height:36px;font-size:15px;padding:6px 15px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:transparent;color:'+(_amPeek.i===0?'#475569':'#cbd5e1')+';cursor:pointer;-webkit-tap-highlight-color:transparent">\u2039</button>'
+    +'<button onclick="_amPeekNav(1)" ontouchend="event.preventDefault();event.stopPropagation();if(!this.disabled)_amPeekNav(1)" '+(_amPeek.i===_amPeek.events.length-1?'disabled':'')+' style="touch-action:manipulation;min-height:36px;font-size:15px;padding:6px 15px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:transparent;color:'+(_amPeek.i===_amPeek.events.length-1?'#475569':'#cbd5e1')+';cursor:pointer;-webkit-tap-highlight-color:transparent">\u203a</button>'
+    +'<button onclick="_amPeekClose()" ontouchend="event.preventDefault();event.stopPropagation();_amPeekClose()" style="touch-action:manipulation;min-height:36px;font-size:13px;font-weight:800;padding:6px 18px;border-radius:14px;border:none;background:#f59f00;color:#111;cursor:pointer;-webkit-tap-highlight-color:transparent">\u25cf Now</button>'
     +'</div>'
     +'<div id="am-peek-body" style="pointer-events:none;filter:grayscale(.55) brightness(.85);opacity:.9">'+inner+'</div>';
   // Strip ids inside the preview so no live ticker (timers, counters, register
@@ -35963,31 +35966,62 @@ function _amPeekRender(){
   try{body.querySelectorAll('#am-peek-body [id]').forEach(el=>el.removeAttribute('id'));}catch(e){}
 }
 // Swipe on the live panel: left = peek forward, right = back (past the first
-// event, back to now). Read-only navigation only — never fires while the fire
-// register is open, and vertical scrolling is left alone.
+// event, back to now). The panel FOLLOWS the finger once horizontal intent is
+// clear (vertical scrolling is untouched), then slides — so navigation feels
+// like moving cards, not triggering a hidden threshold. Never fires while the
+// fire register is open.
 (function(){
-  let sx=0,sy=0,lx=0,ly=0,stT=0,tracking=false;
+  let sx=0,sy=0,lx=0,ly=0,stT=0,tracking=false,intent=null; // intent: null|'h'|'v'
   function active(){const p=document.getElementById('am-panel');return p&&p.classList.contains('open')&&!_fireOpen;}
-  function inBody(t){const b=document.getElementById('am-body');return b&&t&&b.contains(t);}
-  function onStart(e){if(!active())return;const t=e.touches&&e.touches[0];if(!t||!inBody(e.target))return;sx=lx=t.clientX;sy=ly=t.clientY;stT=Date.now();tracking=true;}
-  function onMove(e){if(!tracking)return;const t=e.touches&&e.touches[0];if(!t)return;lx=t.clientX;ly=t.clientY;}
+  function bodyEl(){return document.getElementById('am-body');}
+  function inBody(t){const b=bodyEl();return b&&t&&b.contains(t);}
+  function canGo(dir){ // is there anywhere to go in this direction?
+    if(dir>0)return _amPeek?_amPeek.i<_amPeek.events.length-1:_amPeekEvents().length>0;
+    return !!_amPeek; // right always at least exits the peek
+  }
+  function setDrag(dx){const b=bodyEl();if(!b)return;b.style.transition='none';b.style.transform=dx?('translateX('+dx+'px)'):'';b.style.opacity=dx?String(Math.max(.55,1-Math.abs(dx)/500)):'';}
+  function settle(){const b=bodyEl();if(!b)return;b.style.transition='transform .18s ease-out,opacity .18s ease-out';b.style.transform='';b.style.opacity='';setTimeout(()=>{if(b){b.style.transition='';}},220);}
+  function slideIn(dir){const b=bodyEl();if(!b)return;b.style.transition='none';b.style.transform='translateX('+(dir>0?46:-46)+'px)';b.style.opacity='.6';requestAnimationFrame(()=>{b.style.transition='transform .16s ease-out,opacity .16s ease-out';b.style.transform='';b.style.opacity='';setTimeout(()=>{if(b)b.style.transition='';},200);});}
+  function onStart(e){
+    if(!active())return;const t=e.touches&&e.touches[0];
+    if(!t||!inBody(e.target))return;
+    sx=lx=t.clientX;sy=ly=t.clientY;stT=Date.now();tracking=true;intent=null;
+  }
+  function onMove(e){
+    if(!tracking)return;const t=e.touches&&e.touches[0];if(!t)return;
+    lx=t.clientX;ly=t.clientY;
+    const dx=lx-sx,dy=ly-sy;
+    if(intent===null){
+      if(Math.abs(dy)>12&&Math.abs(dy)>Math.abs(dx)){intent='v';return;}       // scrolling — leave it alone
+      if(Math.abs(dx)>12&&Math.abs(dx)>Math.abs(dy)*1.2)intent='h';
+      else return;
+    }
+    if(intent!=='h')return;
+    e.preventDefault();                                                        // horizontal lock: stop the scroll fighting the drag
+    const dir=dx<0?1:-1;
+    setDrag(canGo(dir)?dx*0.85:dx*0.25);                                       // resistance when there is nowhere to go
+  }
   function onEnd(e){
     if(!tracking)return;tracking=false;
+    if(intent!=='h'){intent=null;return;}
+    intent=null;
     const t=(e.changedTouches&&e.changedTouches[0])||null;
-    const x=t?t.clientX:lx,y=t?t.clientY:ly;
-    const dx=x-sx,dy=y-sy;
-    if(Date.now()-stT>900)return;
-    if(Math.abs(dx)<60)return;
-    if(Math.abs(dx)<Math.abs(dy)*1.5)return;
-    if(!active())return;
-    if(dx<0){ if(_amPeek)_amPeekNav(1); else _amPeekOpen(); }
+    const x=t?t.clientX:lx;
+    const dx=x-sx,dt=Date.now()-stT;
+    const fast=Math.abs(dx)>=30&&dt<250;                                       // quick flick counts
+    if(!active()){settle();return;}
+    if(Math.abs(dx)<48&&!fast){settle();return;}                               // not far enough — spring back
+    const dir=dx<0?1:-1;
+    if(!canGo(dir)){settle();return;}
+    if(dir>0){ if(_amPeek)_amPeekNav(1); else _amPeekOpen(); }
     else { if(_amPeek){ if(_amPeek.i===0)_amPeekClose(); else _amPeekNav(-1); } }
+    slideIn(dir);
   }
-  function onCancel(){tracking=false;}
+  function onCancel(){tracking=false;intent=null;settle();}
   function bind(){
     if(document._amSwipeBound)return;document._amSwipeBound=true;
     document.addEventListener('touchstart',onStart,{passive:true});
-    document.addEventListener('touchmove',onMove,{passive:true});
+    document.addEventListener('touchmove',onMove,{passive:false});
     document.addEventListener('touchend',onEnd,{passive:true});
     document.addEventListener('touchcancel',onCancel,{passive:true});
   }
@@ -36684,7 +36718,7 @@ function amRender(){
         // late replace reset scroll and read as tap lag.
         const changed=JSON.stringify(excMap)!==JSON.stringify(window._lastExcusedMap||{});
         window._lastExcusedMap=excMap;
-        if(changed){const _sc=body.scrollTop;body.innerHTML=_amBoardingRegisterHtml(_bType,excMap);body.scrollTop=_sc;}
+        if(changed&&!_amPeek&&!_fireOpen){const _sc=body.scrollTop;body.innerHTML=_amBoardingRegisterHtml(_bType,excMap);body.scrollTop=_sc;}
       });
       return;
     }
@@ -37106,7 +37140,7 @@ function initActiveMode(){
 <script>
 // Visible build number — must match the service worker's CACHE_NAME version.
 // Lets anyone confirm at a glance which build a device is actually running.
-const APP_BUILD='v247';
+const APP_BUILD='v248';
 try{document.getElementById('app-build-tag').textContent='build '+APP_BUILD;console.log('LA Work '+APP_BUILD);}catch(e){}
 </script>
 
