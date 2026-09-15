@@ -1579,6 +1579,40 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
         <button onclick="dsResetToFactory()" style="width:100%;margin-top:6px;padding:8px;background:var(--dng-bg);border:1px solid var(--dng-bd);border-radius:var(--rsm);font-size:11px;font-weight:600;color:var(--dng-tx);cursor:pointer">Reset to App Factory Defaults</button>
         <div style="font-size:10px;color:#adb5bd;margin-top:6px">"Save as My Default" stores the current structure so you can always reset back to it. Factory reset returns to the original WAS Changzhou timetable.</div>
       </div>
+      <!-- DETENTION TIMES -->
+      <div class="settings-item" onclick="toggleDetTimesEditor()">
+        <div><div class="settings-item-label">Detention Times &amp; Rooms</div><div class="settings-item-sub" id="det-times-sub">Sat: 13:30–15:30 A201 · WD: 10:35 A201</div></div>
+        <span class="settings-item-arrow">›</span>
+      </div>
+      <div id="det-times-editor" style="display:none;padding:.75rem 1rem;border-top:1px solid var(--border3)">
+        <div style="font-size:11px;color:#868e96;margin-bottom:10px">These times appear in detention email bodies and flow titles.</div>
+        <div style="font-size:10.5px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin:2px 0 6px">Saturday detention</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-bottom:14px">
+          <label style="display:block"><span style="display:block;font-size:11px;color:var(--text3);margin-bottom:3px">Start</span>
+            <input type="time" id="det-sat-start-inp" onchange="saveDetTime()" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm)"></label>
+          <label style="display:block"><span style="display:block;font-size:11px;color:var(--text3);margin-bottom:3px">End</span>
+            <input type="time" id="det-sat-end-inp" onchange="saveDetTime()" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm)"></label>
+          <label style="display:block;grid-column:1/-1"><span style="display:block;font-size:11px;color:var(--text3);margin-bottom:3px">Room</span>
+            <input type="text" id="det-sat-room-inp" placeholder="A201" oninput="saveDetTime()" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm)"></label>
+        </div>
+        <div style="font-size:10.5px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin:2px 0 6px;padding-top:10px;border-top:1px solid var(--border3)">Weekday (morning) detention</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px">
+          <label style="display:block"><span style="display:block;font-size:11px;color:var(--text3);margin-bottom:3px">Time</span>
+            <input type="time" id="det-wd-time-inp" onchange="saveDetTime()" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm)"></label>
+          <label style="display:block"><span style="display:block;font-size:11px;color:var(--text3);margin-bottom:3px">Room</span>
+            <input type="text" id="det-wd-room-inp" placeholder="A201" oninput="saveDetTime()" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm)"></label>
+        </div>
+      </div>
+          </div>
+    </div>
+
+    <!-- Registers & Reports -->
+    <div class="settings-section">
+      <div class="settings-section-title" onclick="toggleSettingsSection('registers___reports',this)">
+        Registers &amp; Reports
+        <span id="ss-chev-registers___reports" style="font-size:12px;transition:transform .2s;display:inline-block">▼</span>
+      </div>
+      <div class="settings-section-body" id="ss-body-registers___reports">
       <!-- FIRE REGISTER HISTORY -->
       <div class="settings-item" onclick="toggleFireHistory()">
         <div><div class="settings-item-label">Fire Register History</div><div class="settings-item-sub" id="fire-hist-sub">View and export submitted fire registers</div></div>
@@ -1642,31 +1676,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
         <div style="font-size:11px;color:#868e96;margin-bottom:8px">Flags make a slot show a register, duty rota or tutor checklist in live mode. If one appears where you don't expect it, the leftover flag is in this list. Clear removes the flag only — the event itself stays.</div>
         <div id="flag-audit-list"></div>
       </div>
-      <!-- DETENTION TIMES -->
-      <div class="settings-item" onclick="toggleDetTimesEditor()">
-        <div><div class="settings-item-label">Detention Times &amp; Rooms</div><div class="settings-item-sub" id="det-times-sub">Sat: 13:30–15:30 A201 · WD: 10:35 A201</div></div>
-        <span class="settings-item-arrow">›</span>
       </div>
-      <div id="det-times-editor" style="display:none;padding:.75rem 1rem;border-top:1px solid var(--border3)">
-        <div style="font-size:11px;color:#868e96;margin-bottom:10px">These times appear in detention email bodies and flow titles.</div>
-        <div style="font-size:10.5px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin:2px 0 6px">Saturday detention</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-bottom:14px">
-          <label style="display:block"><span style="display:block;font-size:11px;color:var(--text3);margin-bottom:3px">Start</span>
-            <input type="time" id="det-sat-start-inp" onchange="saveDetTime()" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm)"></label>
-          <label style="display:block"><span style="display:block;font-size:11px;color:var(--text3);margin-bottom:3px">End</span>
-            <input type="time" id="det-sat-end-inp" onchange="saveDetTime()" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm)"></label>
-          <label style="display:block;grid-column:1/-1"><span style="display:block;font-size:11px;color:var(--text3);margin-bottom:3px">Room</span>
-            <input type="text" id="det-sat-room-inp" placeholder="A201" oninput="saveDetTime()" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm)"></label>
-        </div>
-        <div style="font-size:10.5px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin:2px 0 6px;padding-top:10px;border-top:1px solid var(--border3)">Weekday (morning) detention</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px">
-          <label style="display:block"><span style="display:block;font-size:11px;color:var(--text3);margin-bottom:3px">Time</span>
-            <input type="time" id="det-wd-time-inp" onchange="saveDetTime()" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm)"></label>
-          <label style="display:block"><span style="display:block;font-size:11px;color:var(--text3);margin-bottom:3px">Room</span>
-            <input type="text" id="det-wd-room-inp" placeholder="A201" oninput="saveDetTime()" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--border);border-radius:var(--rsm)"></label>
-        </div>
-      </div>
-          </div>
     </div>
 
     <!-- Categories & Active Mode -->
@@ -34696,10 +34706,11 @@ function _amBoardingRegisterHtml(type,excusedMap){
       .map(g=>({label:(prefix?prefix+' · ':'')+g,people:_sortAZ(by[g])}));
   };
   const _grpRoom=students=>{
+    // Same data the fire register's room view uses: rooms carry r.boarders
     const secs=[];const placed=new Set();
     (BOARDER_ROOMS||[]).forEach(r=>{
-      const people=(r.students||[]).filter(n=>students.some(s=>s.name===n)).map(n=>{placed.add(n);return{name:n};});
-      if(people.length)secs.push({label:r.name,people:_sortAZ(people)});
+      const people=(r.boarders||r.students||[]).filter(n=>students.some(s=>s.name===n)).map(n=>{placed.add(n);return{name:n};});
+      if(people.length)secs.push({label:r.name||r.id||'Room',people:_sortAZ(people)});
     });
     const rest=students.filter(s=>!placed.has(s.name)).map(s=>({name:s.name}));
     if(rest.length)secs.push({label:'No room',people:_sortAZ(rest)});
@@ -34832,8 +34843,8 @@ function _amBoardingRegisterHtml(type,excusedMap){
 
     sectionsHtml+=`
       <div data-br-section="${sec.label}" style="border-bottom:1px solid rgba(255,255,255,.08)">
-        <div onclick="_brSecToggle('${sec.label}')" style="display:flex;align-items:center;justify-content:space-between;padding:7px 14px;background:rgba(255,255,255,.04);cursor:pointer;user-select:none">
-          <span style="font-size:11px;font-weight:600;color:#9ca3af;letter-spacing:.06em;text-transform:uppercase">${sec.label}</span>
+        <div onclick="_brSecToggle('${sec.label}')" style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:rgba(167,139,250,.13);border-left:3px solid #a78bfa;cursor:pointer;user-select:none">
+          <span style="font-size:12.5px;font-weight:800;color:#c4b5fd;letter-spacing:.06em;text-transform:uppercase">${sec.label} <span style="font-weight:500;color:#8b8fa3;font-size:10px;text-transform:none">· ${secTotal}</span></span>
           <div style="display:flex;align-items:center;gap:8px">
             <span data-br-sec-count style="font-size:10px;color:#aaa">${secReg}/${secTotal} · <span style="color:#22c55e">${secCounts.present||0}✓</span> <span style="color:#ef4444">${secCounts.absent||0}✗</span></span>
             <span style="font-size:12px;color:#666">${isOpen?'▾':'▸'}</span>
@@ -34852,7 +34863,7 @@ function _amBoardingRegisterHtml(type,excusedMap){
       <span id="br-overall-count" style="font-size:11px;color:#aaa">${total-counts.unset}/${total} · <span style="color:#22c55e">${counts.present||0}✓</span> <span style="color:#ef4444">${counts.absent||0}✗</span> <span style="color:#f59e0b">${counts.excused||0}~</span></span>
     </div>
     ${_brCollapsed?'':`<div style="display:flex;gap:2px;padding:6px 14px;background:rgba(0,0,0,.25);border-bottom:1px solid rgba(255,255,255,.06)" onclick="event.stopPropagation()">
-      ${[['grade','Grade'],['room','Room'],['alpha','A–Z']].map(([m,l])=>`<button onclick="_brSetGroupMode('${m}')" style="font-size:10px;padding:3px 12px;border-radius:5px;border:none;background:${mode===m?'rgba(255,255,255,.15)':'transparent'};color:${mode===m?'#fff':'#888'};font-weight:${mode===m?'700':'400'};cursor:pointer;-webkit-tap-highlight-color:transparent">${l}</button>`).join('')}
+      ${[['grade','Grade'],['room','Room'],['alpha','A–Z']].map(([m,l])=>`<button onclick="_brSetGroupMode('${m}')" style="font-size:10.5px;padding:4px 14px;border-radius:6px;border:1px solid ${mode===m?'#a78bfa':'transparent'};background:${mode===m?'rgba(167,139,250,.25)':'transparent'};color:${mode===m?'#e9d5ff':'#888'};font-weight:${mode===m?'800':'400'};cursor:pointer;-webkit-tap-highlight-color:transparent">${l}</button>`).join('')}
     </div>`}
     ${_brCollapsed?'':('<div>'+sectionsHtml+'</div>')}
   </div>`;
@@ -35865,7 +35876,7 @@ function _amPeekEvents(){
     const stM=t2m(st);
     if(stM<=nm)continue;
     // merge span continuations (same label+type back-to-back)
-    if(prev&&c&&prev.cellL===c.l&&prev.cellTp===c.tp&&c.l){prev.etM=i+1<SLOTS.length?t2m(getSlotTime(i+1)):24*60;prev.et=(c.customEndTime)||slotEndTime(i);continue;}
+    if(prev&&c&&prev.cellL===c.l&&prev.cellTp===c.tp&&c.l){prev.etM=i+1<SLOTS.length?t2m(getSlotTime(i+1)):24*60;prev.et=(c.customEndTime)||slotEndTime(i);prev.endIdx=i;continue;}
     const etM=i+1<SLOTS.length?t2m(getSlotTime(i+1)):24*60;
     const et=(c&&c.customEndTime)||slotEndTime(i);
     const flags=[];
@@ -35879,7 +35890,7 @@ function _amPeekEvents(){
     const hasContent=(c&&c.l)||flags.length||planned.length;
     if(!hasContent)continue;
     if(c&&c.tp==='sleep'&&!flags.length&&!planned.length)continue; // sleep rows are noise in a preview
-    prev={st,et,stM,etM,label:(c&&c.l)||'Free',cat:getCat((c&&(c.cat||c.tp))||'free'),flags,planned,cellL:c&&c.l,cellTp:c&&c.tp};
+    prev={st,et,stM,etM,label:(c&&c.l)||'Free',cat:getCat((c&&(c.cat||c.tp))||'free'),flags,planned,cellL:c&&c.l,cellTp:c&&c.tp,rootIdx:i,endIdx:i};
     out.push(prev);
   }
   return out;
@@ -35903,27 +35914,85 @@ function _amPeekClose(){
 function _amPeekRender(){
   const body=document.getElementById('am-body');if(!body||!_amPeek)return;
   const ev=_amPeek.events[_amPeek.i];
-  const duty=_dutyChipsFor(_todayStr(),ev.stM,ev.etM);
-  body.innerHTML=`<div style="filter:saturate(.35) brightness(.9);opacity:.92">
-    <div style="display:flex;align-items:center;gap:8px;margin:8px 12px;padding:7px 12px;background:rgba(148,163,184,.15);border:1px solid rgba(148,163,184,.4);border-radius:10px">
-      <span style="font-size:11px;font-weight:800;letter-spacing:.07em;color:#94a3b8">👁 PREVIEW</span>
-      <span style="flex:1;font-size:11.5px;color:#cbd5e1">${_amPeek.i+1}/${_amPeek.events.length} · not now</span>
-      <button onclick="_amPeekNav(-1)" ${_amPeek.i===0?'disabled':''} style="font-size:13px;padding:3px 11px;border-radius:7px;border:1px solid rgba(255,255,255,.2);background:transparent;color:${_amPeek.i===0?'#475569':'#cbd5e1'};cursor:pointer">‹</button>
-      <button onclick="_amPeekNav(1)" ${_amPeek.i===_amPeek.events.length-1?'disabled':''} style="font-size:13px;padding:3px 11px;border-radius:7px;border:1px solid rgba(255,255,255,.2);background:transparent;color:${_amPeek.i===_amPeek.events.length-1?'#475569':'#cbd5e1'};cursor:pointer">›</button>
-    </div>
-    <div style="margin:0 12px;padding:14px;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:rgba(255,255,255,.03)">
-      <div style="font-size:11px;color:#94a3b8;font-variant-numeric:tabular-nums">${ev.st}–${ev.et}</div>
-      <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
-        <span style="font-size:17px;font-weight:800;color:#e2e8f0">${_esc(ev.label)}</span>
-        <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:9px;background:${ev.cat.color};color:${ev.cat.text}">${_esc(ev.cat.label||'')}</span>
-      </div>
-      ${ev.flags.length?`<div style="margin-top:8px;font-size:12px;color:#a78bfa">${ev.flags.join(' · ')}</div>`:''}
-      ${duty.length?`<div style="margin-top:8px;display:flex;flex-direction:column;gap:3px">${duty.map(d=>`<span style="font-size:12.5px;color:#93c5fd">${_esc(d)}</span>`).join('')}</div>`:''}
-      ${ev.planned.length?`<div style="margin-top:10px"><div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:#f59f00">📌 PLANNED</div>${ev.planned.map(t=>`<div style="font-size:12.5px;color:#e2e8f0;padding:2px 0">• ${_esc(t.text)}</div>`).join('')}</div>`:''}
-    </div>
-  </div>
-  <button onclick="_amPeekClose()" style="position:sticky;bottom:12px;display:block;margin:14px auto 4px;font-size:13px;font-weight:800;padding:9px 26px;border-radius:20px;border:none;background:#f59f00;color:#111;cursor:pointer;box-shadow:0 4px 14px rgba(245,159,0,.4)">● Now</button>`;
+  const dayName=DN[new Date().getDay()];
+  const dur=ev.etM-ev.stM;
+  // Synthetic context at the event's START — the exact shape amGetCtx returns,
+  // so the REAL renderers draw the REAL screen you'll see when it arrives.
+  const ctx={dayName,offset:0,slotIdx:ev.rootIdx,endIdx:ev.endIdx??ev.rootIdx,label:ev.label,
+    tp:ev.cellTp||'free',cat:ev.cat,st:ev.st,et:ev.et,rem:dur,dur,el:0,pct:0};
+  const cust=getCustomForWeek(0,ev.rootIdx,dayName);
+  const isBoarding=!!(cust&&(cust.boarding_register||cust.house_register));
+  const savedSess=_brCurrentSession,savedState=_brState;
+  let inner='';
+  try{
+    if(!ctx.cat.commit&&isBoarding){
+      inner=_amBoardingRegisterHtml(cust.boarding_register?'boarding':'house',window._lastExcusedMap||window._cachedExcusedMap||{});
+    } else if(!ctx.cat.commit){
+      inner='<div class="am-free-card" style="margin-top:.5rem"><div class="am-free-lbl">Free period</div></div>';
+    } else {
+      const isLesson=ctx.cat.mode==='lesson'||ctx.tp==='lesson';
+      const isTutorMtg=ctx.cat.mode==='tutormtg'||ctx.tp==='tmtg';
+      inner=isTutorMtg?_amTutorMtgHtml(ctx,'--:--:--'):isLesson?_amLessonHtml(ctx,'--:--:--'):_amCommitHtml(ctx,'--:--:--',0,ev.rootIdx,dayName);
+      if(isBoarding)inner+='<div>'+_amBoardingRegisterHtml(cust.boarding_register?'boarding':'house',window._lastExcusedMap||window._cachedExcusedMap||{})+'</div>';
+    }
+    if(cust&&cust.tutor_check){
+      inner+='<div style="margin:10px 12px;padding:8px 12px;background:rgba(14,116,144,.10);border:1px solid rgba(34,211,238,.22);border-radius:11px">'+_amTutorCheckInnerHtml()+'</div>';
+    }
+    if(ev.planned.length)inner+=_tpLiveBlock(ev.planned);
+    const duty=_dutyChipsFor(_todayStr(),ev.stM,ev.etM);
+    if(duty.length)inner+='<div style="margin:10px 12px 0;padding:8px 12px;border:1px solid rgba(255,255,255,.1);border-radius:10px;background:rgba(255,255,255,.03)">'+duty.map(d=>'<div style="font-size:12.5px;color:#93c5fd;padding:2px 0">'+_esc(d)+'</div>').join('')+'</div>';
+  }catch(e){inner='<div style="padding:20px;color:#888;font-size:12px">Preview unavailable for this slot.</div>';}
+  finally{_brCurrentSession=savedSess;_brState=savedState;}
+  // Header mirrors the real screen, marked as preview
+  try{
+    const titleEl=document.getElementById('am-title'),subEl=document.getElementById('am-sub'),chip=document.getElementById('am-cat-chip');
+    if(titleEl)titleEl.textContent=ev.label;
+    if(subEl)subEl.textContent=ev.st+'\u2013'+ev.et+' \u00b7 preview';
+    if(chip){chip.style.cssText='background:'+ev.cat.color+';color:'+ev.cat.text+';display:inline-flex;filter:saturate(.4)';chip.textContent=ev.cat.label||'';}
+  }catch(e){}
+  body.innerHTML='<div id="am-peek-banner" style="position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:8px;margin:0 0 6px;padding:9px 12px;background:#1e293b;border-bottom:2px solid #f59f00">'
+    +'<span style="font-size:11px;font-weight:800;letter-spacing:.07em;color:#f59f00">\ud83d\udc41 PREVIEW</span>'
+    +'<span style="flex:1;font-size:11px;color:#94a3b8">'+(_amPeek.i+1)+'/'+_amPeek.events.length+' \u00b7 swipe \u2039 \u203a</span>'
+    +'<button onclick="_amPeekNav(-1)" '+(_amPeek.i===0?'disabled':'')+' style="font-size:14px;padding:4px 13px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:transparent;color:'+(_amPeek.i===0?'#475569':'#cbd5e1')+';cursor:pointer;-webkit-tap-highlight-color:transparent">\u2039</button>'
+    +'<button onclick="_amPeekNav(1)" '+(_amPeek.i===_amPeek.events.length-1?'disabled':'')+' style="font-size:14px;padding:4px 13px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:transparent;color:'+(_amPeek.i===_amPeek.events.length-1?'#475569':'#cbd5e1')+';cursor:pointer;-webkit-tap-highlight-color:transparent">\u203a</button>'
+    +'<button onclick="_amPeekClose()" style="font-size:12px;font-weight:800;padding:5px 16px;border-radius:14px;border:none;background:#f59f00;color:#111;cursor:pointer;-webkit-tap-highlight-color:transparent">\u25cf Now</button>'
+    +'</div>'
+    +'<div id="am-peek-body" style="pointer-events:none;filter:grayscale(.55) brightness(.85);opacity:.9">'+inner+'</div>';
+  // Strip ids inside the preview so no live ticker (timers, counters, register
+  // refreshers) can reach into it and animate a moment that hasn\'t happened.
+  try{body.querySelectorAll('#am-peek-body [id]').forEach(el=>el.removeAttribute('id'));}catch(e){}
 }
+// Swipe on the live panel: left = peek forward, right = back (past the first
+// event, back to now). Read-only navigation only — never fires while the fire
+// register is open, and vertical scrolling is left alone.
+(function(){
+  let sx=0,sy=0,lx=0,ly=0,stT=0,tracking=false;
+  function active(){const p=document.getElementById('am-panel');return p&&p.classList.contains('open')&&!_fireOpen;}
+  function inBody(t){const b=document.getElementById('am-body');return b&&t&&b.contains(t);}
+  function onStart(e){if(!active())return;const t=e.touches&&e.touches[0];if(!t||!inBody(e.target))return;sx=lx=t.clientX;sy=ly=t.clientY;stT=Date.now();tracking=true;}
+  function onMove(e){if(!tracking)return;const t=e.touches&&e.touches[0];if(!t)return;lx=t.clientX;ly=t.clientY;}
+  function onEnd(e){
+    if(!tracking)return;tracking=false;
+    const t=(e.changedTouches&&e.changedTouches[0])||null;
+    const x=t?t.clientX:lx,y=t?t.clientY:ly;
+    const dx=x-sx,dy=y-sy;
+    if(Date.now()-stT>900)return;
+    if(Math.abs(dx)<60)return;
+    if(Math.abs(dx)<Math.abs(dy)*1.5)return;
+    if(!active())return;
+    if(dx<0){ if(_amPeek)_amPeekNav(1); else _amPeekOpen(); }
+    else { if(_amPeek){ if(_amPeek.i===0)_amPeekClose(); else _amPeekNav(-1); } }
+  }
+  function onCancel(){tracking=false;}
+  function bind(){
+    if(document._amSwipeBound)return;document._amSwipeBound=true;
+    document.addEventListener('touchstart',onStart,{passive:true});
+    document.addEventListener('touchmove',onMove,{passive:true});
+    document.addEventListener('touchend',onEnd,{passive:true});
+    document.addEventListener('touchcancel',onCancel,{passive:true});
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
+})();
 
 // ── TASK ↔ PERIOD CONNECTION ──────────────────────────────────────────────────
 // A task can be planned into a specific period. One connection store (a field
@@ -35992,20 +36061,23 @@ function tpOpenPicker(dateStr,time,idx){
   const forDay=open.filter(t=>t.scope==='day'&&t.date===dateStr);
   const sticky=open.filter(t=>t.scope==='sticky');
   const rest=open.filter(t=>!forDay.includes(t)&&!sticky.includes(t));
-  const row=t=>{const c=catMap[t.cat]||{color:'#868e96',name:''};
-    return `<div onclick="tpAssign('${t.id}','${dateStr}','${time}')" style="display:flex;align-items:center;gap:9px;padding:9px 4px;border-bottom:1px solid #f1f3f5;cursor:pointer">
+  // Already planned elsewhere: shown grayed with their location — you must be
+  // able to SEE a task is placed, and to override the earlier decision.
+  const elsewhere=(S.planData||[]).filter(t=>!t.say&&!t.archived&&_tpAnchorFuture(t)&&!(t.anchor.date===dateStr&&t.anchor.time===time));
+  const row=(t,planned)=>{const c=catMap[t.cat]||{color:'#868e96',name:''};
+    return `<div onclick="tpAssign('${t.id}','${dateStr}','${time}')" style="display:flex;align-items:center;gap:9px;padding:9px 4px;border-bottom:1px solid #f1f3f5;cursor:pointer;${planned?'opacity:.5':''}">
       <span style="width:9px;height:9px;border-radius:50%;background:${c.color};flex-shrink:0"></span>
       <span style="flex:1;font-size:13px;color:#212529">${_esc(t.text)}</span>
-      <span style="font-size:10px;color:#adb5bd">${_esc(c.name||'')}</span>
+      ${planned?`<span style="font-size:10px;font-weight:700;color:#f59f00;white-space:nowrap">📌 ${_tpTraceLbl(t)}</span>`:`<span style="font-size:10px;color:#adb5bd">${_esc(c.name||'')}</span>`}
     </div>`;};
-  const sec=(lbl,arr)=>arr.length?`<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#adb5bd;margin:10px 0 2px">${lbl}</div>`+arr.map(row).join(''):'';
+  const sec=(lbl,arr,planned)=>arr.length?`<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#adb5bd;margin:10px 0 2px">${lbl}</div>`+arr.map(t=>row(t,planned)).join(''):'';
   const ov=document.createElement('div');ov.id='tp-pick-ov';
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10002;display:flex;align-items:flex-end;justify-content:center';
   ov.onclick=e=>{if(e.target===ov)ov.remove();};
   ov.innerHTML=`<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:520px;max-height:75vh;overflow:auto;padding:14px 16px 24px">
     <div style="font-size:14px;font-weight:800;color:#212529">📌 Plan a task here</div>
     <div style="font-size:11px;color:#868e96;margin-bottom:6px">${_tpTraceLbl({anchor:{date:dateStr,time}})} · picking assigns it to this period and removes it from the open list until then</div>
-    ${open.length?sec('For this day',forDay)+sec('Sticky',sticky)+sec('Other open tasks',rest):'<div style="font-size:12.5px;color:#adb5bd;padding:12px 0">No open tasks to plan.</div>'}
+    ${open.length||elsewhere.length?sec('For this day',forDay)+sec('Sticky',sticky)+sec('Other open tasks',rest)+sec('Already planned — tap to move here',elsewhere,true):'<div style="font-size:12.5px;color:#adb5bd;padding:12px 0">No open tasks to plan.</div>'}
     <button onclick="document.getElementById('tp-pick-ov').remove()" style="width:100%;margin-top:12px;padding:10px;border:1px solid #dee2e6;border-radius:8px;background:#fff;color:#495057;font-size:13px;font-weight:600;cursor:pointer">Close</button>
   </div>`;
   document.body.appendChild(ov);
@@ -37034,7 +37106,7 @@ function initActiveMode(){
 <script>
 // Visible build number — must match the service worker's CACHE_NAME version.
 // Lets anyone confirm at a glance which build a device is actually running.
-const APP_BUILD='v246';
+const APP_BUILD='v247';
 try{document.getElementById('app-build-tag').textContent='build '+APP_BUILD;console.log('LA Work '+APP_BUILD);}catch(e){}
 </script>
 
@@ -37417,7 +37489,7 @@ function qcSendPersonal(){
     return !!(t&&t.classList.contains('active'));
   }
   function overlayOpen(){
-    return !!document.querySelector('#day-menu-overlay,#hs-overlay,#sc-overlay,#tp-overlay,#duty-date-overlay,#duty-meta-overlay,#say-hist,.modal-overlay.open');
+    return !!document.querySelector('#day-menu-overlay,#hs-overlay,#sc-overlay,#tp-overlay,#duty-date-overlay,#duty-meta-overlay,#say-hist,.modal-overlay.open,#am-panel.open');
   }
   function onStart(e){
     tracking=false;
