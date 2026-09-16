@@ -23914,9 +23914,17 @@ function getLive(){
   // Hide on weekends if weekend view is off (but still allow overnight on Sat if shown)
   if((di===0||di===6)&&!ttShowWeekend)return null;
 
-  // Find current slot
+  // Find current slot (grid times)
   let ci=-1;
   for(let i=0;i<SLOTS.length;i++)if(nm>=t2m(getSlotTime(i)))ci=i;
+  // A real event with a CUSTOM time is current by its own clock, not the
+  // grid's — ask the same authority live mode uses, so the week highlight can
+  // never disagree with "you are in this event". Free stretches keep the plain
+  // grid slot (their merged span root would look wrong as a highlight).
+  try{
+    const c=amGetCtx();
+    if(c&&typeof c.slotIdx==='number'&&String(c.label||'').trim())ci=c.slotIdx;
+  }catch(e){}
 
   return{dayName,currentIdx:ci,todayDc:DAYS.indexOf(dayName),isPastMidnight:false};
 }
@@ -24822,6 +24830,16 @@ function renderTodayView(){
     for(let i=0;i<dayEvents.length;i++){
       if(nm>=t2m(dayEvents[i].tStart)&&nm<t2m(dayEvents[i].tEnd))curEventIdx=i;
     }
+    // Custom-timed events can slip through the window test (their grid-derived
+    // end doesn't match their real one). Live mode's context is authoritative:
+    // if it says an event is running NOW, highlight that event here too.
+    try{
+      const _c=amGetCtx();
+      if(_c&&String(_c.label||'').trim()&&typeof _c.slotIdx==='number'){
+        const _hit=dayEvents.findIndex(e=>e.idx>=_c.slotIdx&&e.idx<=(_c.endIdx??_c.slotIdx)&&(e.cell&&e.cell.l)===_c.label);
+        if(_hit>=0)curEventIdx=_hit;
+      }
+    }catch(e){}
     if(curEventIdx>=0){
       for(let i=curEventIdx+1;i<dayEvents.length;i++){
         if(dayEvents[i].cell.tp!=='free'&&dayEvents[i].cell.tp!=='sleep'){nextEventIdx=i;break;}
@@ -31862,15 +31880,20 @@ function setLessonDone(week,idx,day,id,val){
   S.lessonDone[k][id]=val;saveSettings();
 }
 function lessonPacingState(plan,elapsedMins){
+  // pastPlan: elapsed has consumed EVERY planned minute. The last section is no
+  // longer "running over" — the lesson has simply moved into unplanned time.
+  // (Callers decide what to show: when the plan is shorter than the lesson,
+  // a red overrun on the last section was a false statement about the situation.)
+  const total=plan.reduce((a,s)=>a+(s.dur||0),0);
   let cursor=0;
   for(let i=0;i<plan.length;i++){
     const secEnd=cursor+plan[i].dur;
     if(elapsedMins<secEnd||i===plan.length-1){
-      return{sectionIdx:i,secRem:plan[i].dur-(elapsedMins-cursor),cursor};
+      return{sectionIdx:i,secRem:plan[i].dur-(elapsedMins-cursor),cursor,pastPlan:elapsedMins>=total,total};
     }
     cursor=secEnd;
   }
-  return{sectionIdx:plan.length-1,secRem:0,cursor:0};
+  return{sectionIdx:plan.length-1,secRem:0,cursor:0,pastPlan:elapsedMins>=total,total};
 }
 function amLessonToggleDone(label,week,idx,day,id,val){
   setLessonDone(week,idx,day,id,val);_amLastCtxKey='';amRender();
@@ -32231,15 +32254,20 @@ function amOpenNeg(classId,studentName,e){
 
 // Given elapsed minutes, return current section index and remaining seconds in that section
 function lessonPacingState(plan,elapsedMins){
+  // pastPlan: elapsed has consumed EVERY planned minute. The last section is no
+  // longer "running over" — the lesson has simply moved into unplanned time.
+  // (Callers decide what to show: when the plan is shorter than the lesson,
+  // a red overrun on the last section was a false statement about the situation.)
+  const total=plan.reduce((a,s)=>a+(s.dur||0),0);
   let cursor=0;
   for(let i=0;i<plan.length;i++){
     const secEnd=cursor+plan[i].dur;
     if(elapsedMins<secEnd||i===plan.length-1){
-      return{sectionIdx:i,secRem:plan[i].dur-(elapsedMins-cursor),cursor};
+      return{sectionIdx:i,secRem:plan[i].dur-(elapsedMins-cursor),cursor,pastPlan:elapsedMins>=total,total};
     }
     cursor=secEnd;
   }
-  return{sectionIdx:plan.length-1,secRem:0,cursor:0};
+  return{sectionIdx:plan.length-1,secRem:0,cursor:0,pastPlan:elapsedMins>=total,total};
 }
 function amToggleRoster(classId){
   try{const c=localStorage.getItem('am_roster_collapsed_'+classId);localStorage.setItem('am_roster_collapsed_'+classId,c==='1'?'0':'1');}catch(e){}
@@ -32290,13 +32318,17 @@ function _amLessonHtml(ctx,nowStr){
     html+=`<div class="am-cl-section"><div class="am-cl-hdr"><span class="am-cl-title">Lesson Plan</span></div><div style="text-align:center;padding:.5rem;color:#555;font-size:12px">No plan yet for <strong style="color:#888">${_esc(label)}</strong>.<br><span style="font-size:11px">Add sections below.</span></div>${_amAddSectionHtml(label)}</div>`;
   } else {
     const totalPlanned=plan.reduce((a,s)=>a+(s.dur||0),0);
-    const{sectionIdx,secRem}=lessonPacingState(plan,elapsedMins);
+    const{sectionIdx,secRem,pastPlan}=lessonPacingState(plan,elapsedMins);
+    // Past the plan's end with lesson time left = UNPLANNED TIME, not a section
+    // overrun. No section is active; an honest amber row counts it instead.
+    const _lessonDur=Math.round(ctx.dur||0);
+    const unplannedMode=!!pastPlan&&totalPlanned<_lessonDur-0.5&&ctx.rem>0;
     let cursor=0;
     const rows=plan.map((sec,i)=>{
       const secDur=sec.dur||0;
       const secStart=cursor;cursor+=secDur;
-      const isCurSec=i===sectionIdx;
-      const isPast=i<sectionIdx;
+      const isCurSec=!unplannedMode&&i===sectionIdx;
+      const isPast=i<sectionIdx||(unplannedMode&&i<=sectionIdx);
       const isDone=!!done[sec.id];
       const isLate=isCurSec&&secRem<0&&!isDone;
       const totalSec=Math.round(Math.abs(secRem)*60);
@@ -32325,7 +32357,17 @@ function _amLessonHtml(ctx,nowStr){
       if(d>=2)_cov=`<div style="font-size:10.5px;color:#6b7280;padding:2px 0 6px">${d} min of the ${_spanMins} min lesson unplanned</div>`;
       else if(d<=-2)_cov=`<div style="font-size:10.5px;color:#a16207;padding:2px 0 6px">plan runs ${Math.abs(d)} min over the ${_spanMins} min lesson</div>`;
     }
-    html+=`<div class="am-cl-section"><div class="am-cl-hdr"><span class="am-cl-title">Lesson Plan · ${totalPlanned}min</span><span style="font-size:10px;color:#555">${Math.round(elapsedMins)}min in</span></div>${_cov}${rows}${_amAddSectionHtml(label)}</div>`;
+    const _unplRow=unplannedMode?(()=>{
+      const inUnpl=Math.max(0,elapsedMins-totalPlanned);
+      const t=Math.round(inUnpl*60),mm=Math.floor(t/60),ss=t%60;
+      const r=Math.max(0,ctx.rem),rt=Math.round(r*60),rm=Math.floor(rt/60),rs=rt%60;
+      return `<div style="display:flex;align-items:center;gap:9px;margin-top:6px;padding:9px 12px;border:1px solid rgba(245,159,0,.35);border-radius:9px;background:rgba(245,159,0,.07)">
+        <span style="font-size:13px">⏳</span>
+        <span style="flex:1;font-size:11px;font-weight:800;letter-spacing:.05em;color:#f59f00">UNPLANNED TIME</span>
+        <span id="lpx-unpl-t" style="font-size:14px;font-weight:700;color:#f59f00;font-variant-numeric:tabular-nums">${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}</span>
+        <span id="lpx-unpl-rem" style="font-size:10.5px;color:#8b8fa3;font-variant-numeric:tabular-nums">${String(rm).padStart(2,'0')}:${String(rs).padStart(2,'0')} left</span>
+      </div>`;})():'';
+    html+=`<div class="am-cl-section"><div class="am-cl-hdr"><span class="am-cl-title">Lesson Plan · ${totalPlanned}min</span><span style="font-size:10px;color:#555">${Math.round(elapsedMins)}min in</span></div>${_cov}${rows}${_unplRow}${_amAddSectionHtml(label)}</div>`;
   }
   const live=snGetLive(offset,slotIdx,dayName);
   const liveItems=live.filter(b=>b.text.trim());
@@ -36785,15 +36827,30 @@ function amRender(){
         let plan0=[];try{const d=localStorage.getItem('lp_'+label);plan0=d?JSON.parse(d):[];}catch(e){}
         if(!plan0.length&&typeof getLessonPlan==='function')plan0=getLessonPlan(label)||[];
         if(plan0.length&&typeof lessonPacingState==='function'){
-          const{sectionIdx,secRem}=lessonPacingState(plan0,elapsed0);
+          const{sectionIdx,secRem,pastPlan,total:planTotal0}=lessonPacingState(plan0,elapsed0);
+          const lessonDur0=Math.round(ctx.dur||0);
+          const remLesson0=t2m(ctx.et)-_nm0;
+          const unplMode0=!!pastPlan&&planTotal0<lessonDur0-0.5&&remLesson0>0;
           // Move the highlight on exactly once when the active section changes
           if(window._amPrevSec!==undefined&&window._amPrevSec!==sectionIdx&&!_amFocused)_amLastCtxKey='';
           window._amPrevSec=sectionIdx;
+          // Entering/leaving unplanned time rebuilds once so the row (dis)appears
+          if(window._amPrevUnpl!==undefined&&window._amPrevUnpl!==unplMode0&&!_amFocused)_amLastCtxKey='';
+          window._amPrevUnpl=unplMode0;
+          if(unplMode0){
+            const uEl=document.getElementById('lpx-unpl-t');
+            if(uEl){
+              const t=Math.round(Math.max(0,elapsed0-planTotal0)*60);
+              uEl.textContent=String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0');
+              const rEl=document.getElementById('lpx-unpl-rem');
+              if(rEl){const rt=Math.round(Math.max(0,remLesson0)*60);rEl.textContent=String(Math.floor(rt/60)).padStart(2,'0')+':'+String(rt%60).padStart(2,'0')+' left';}
+            }
+          }
           const done0=getLessonDone(offset,slotIdx,dayName)||{};
           plan0.forEach((sec,i)=>{
             const tEl=document.getElementById('lpx-timer-'+i);if(!tEl)return;
             const secDur=sec.dur||0;
-            const isCur=i===sectionIdx;
+            const isCur=!unplMode0&&i===sectionIdx;
             if(isCur){
               const isLate=secRem<0&&!done0[sec.id];
               const tot=Math.round(Math.abs(secRem)*60),mm=Math.floor(tot/60),ss=tot%60;
@@ -36806,7 +36863,7 @@ function amRender(){
               }
             }else{
               tEl.textContent=secDur?secDur+'m':'-';
-              tEl.style.color=(i<sectionIdx)?'#333':'#444';
+              tEl.style.color=(i<sectionIdx||unplMode0)?'#333':'#444';
             }
           });
         }
@@ -37140,7 +37197,7 @@ function initActiveMode(){
 <script>
 // Visible build number — must match the service worker's CACHE_NAME version.
 // Lets anyone confirm at a glance which build a device is actually running.
-const APP_BUILD='v248';
+const APP_BUILD='v250';
 try{document.getElementById('app-build-tag').textContent='build '+APP_BUILD;console.log('LA Work '+APP_BUILD);}catch(e){}
 </script>
 
