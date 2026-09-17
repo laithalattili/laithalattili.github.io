@@ -25871,7 +25871,10 @@ function renderWeekTasksView(){
   // Helper: is a task visible this week?
   function taskVisibleThisWeek(t){
     if(t.scope==='sticky')return true;
-    if(t.scope==='week'||t.scope==='week-day')return t.weekNum===wNum;
+    if(t.scope==='week'||t.scope==='week-day'){
+      if(t.weekStart)return t.weekStart===mon.toLocaleDateString('en-CA');
+      return t.weekNum===wNum;
+    }
     if(t.scope==='day'){
       if(!t.date)return t.weekNum===wNum;
       // Check if the date falls in the currently displayed week
@@ -25893,6 +25896,20 @@ function renderWeekTasksView(){
   const plannedAway=tasks.filter(t=>_tpAnchorFuture(t)&&!t.archived);
   const weekTasks=tasks.filter(taskVisibleThisWeek).filter(t=>!_tpAnchorFuture(t));
   const todayStr=_todayDateStr();
+  // Unfinished tasks from PAST weeks roll forward instead of silently
+  // vanishing — a to-do list must never lose items to the calendar.
+  const _monStr=mon.toLocaleDateString('en-CA');
+  const _doneAnywhere=t=>{try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.indexOf('plan_done_'+t.id)===0&&localStorage.getItem(k)==='1')return true;}}catch(e){}return false;};
+  const carried=tasks.filter(t=>{
+    if(t.archived||t.scope==='sticky'||t.scope==='recurring')return false;
+    if(_tpAnchorFuture(t)||_doneAnywhere(t))return false;
+    if(t.scope==='day'&&t.date)return t.date<_monStr;
+    if(t.scope==='week'||t.scope==='week-day'){
+      if(t.weekStart)return t.weekStart<_monStr;
+      return t.weekNum!=null&&t.weekNum<wNum;
+    }
+    return false;
+  });
 
   // Task done key: sticky uses task id, others use id+weekNum
   function doneKey(t){return t.scope==='sticky'?('plan_done_'+t.id):('plan_done_'+t.id+'_w'+wNum);}
@@ -25949,6 +25966,24 @@ function renderWeekTasksView(){
   </div>
   <button class="plan-add-btn" onclick="planAddTask()">＋ Add Task</button></div>`;
 
+  // Carried-over group — always visible, these are live obligations
+  if(carried.length){
+    html+=`<div class="plan-sticky-section" style="margin-top:.5rem">
+      <div class="plan-sticky-hdr" style="color:#d9480f">↩ Carried over · ${carried.length}</div>
+      ${carried.map(t=>{const c=catMap[t.cat]||{color:'#868e96'};
+        const origin=t.scope==='day'&&t.date?t.date:(t.weekStart?('week of '+t.weekStart):('W'+t.weekNum));
+        return `<div class="plan-task-row">
+          <div class="plan-task-cat-dot" style="background:${c.color}"></div>
+          <input type="checkbox" onchange="planToggleDone('${t.id}')">
+          <div style="flex:1">
+            <div class="plan-task-label">${t.text}</div>
+            <div class="plan-task-meta" style="color:#d9480f">↩ from ${origin}</div>
+          </div>
+          <button onclick="tpGapPicker('${t.id}')" title="Plan into a free period" style="background:none;border:none;color:#ced4da;font-size:13px;cursor:pointer;padding:0 2px">🕐</button>
+          <button onclick="planEditTask('${t.id}')" style="background:none;border:none;color:#ced4da;font-size:14px;cursor:pointer;padding:0 2px">✎</button>
+        </div>`;}).join('')}
+    </div>`;
+  }
   // Planned group — collapsed by default, the full picture on demand
   if(plannedAway.length){
     const pOpen=!!window._planPlannedOpen;
@@ -26302,7 +26337,10 @@ function planSaveTask(id){
       if(sel.length&&sel.length!==all)task.grades=sel; else delete task.grades;
     }
   } else {
-    task={...prev,id,text,scope,recur,recurDay,weekNum:wNum,date,day,time,cat};
+    // weekStart anchors week tasks to a DATE — week NUMBERS shift when the
+    // Week-1 reference changes (that renumbering stranded the AOR batch).
+    const _pwkStart=(scope==='week'||scope==='week-day')?getWeekMondayFor(ttWeekOffset).toLocaleDateString('en-CA'):null;
+    task={...prev,id,text,scope,recur,recurDay,weekNum:wNum,weekStart:_pwkStart,date,day,time,cat};
     delete task.say;delete task.archived;delete task.delivered_at;delete task.via;delete task.grades;
     if(!(getContext(cat)||{}).kind)delete task.sub;
   }
@@ -29427,6 +29465,209 @@ function showTab(name,btn){
   updateGlobalDefaultBtn();
 }
 function showWorkflowList(){document.getElementById('workflow-list').style.display='block';document.querySelectorAll('.workflow-panel').forEach(p=>p.classList.remove('active'));renderCustomFlowsList();}
+
+
+// ── FLOW GENERATORS (restored v252) ─────────────────────────────
+// The v246 morning-tab removal took these with it, breaking the Saturday
+// Detention, Weekday Detention and Parent Meeting flows (startWorkflow threw
+// on updateWeekDet/updateSatDet/updatePM). Restored verbatim from v245 —
+// only the flow machinery, none of the morning check sheet.
+function acInput(px){
+const RISK_LABELS=['','No Risk','Low Risk','Medium Risk','High Risk','Definitely Leaving','Already Left','Temporary Leave'];
+let pmType='arrange';
+const LEAVER_COMMENT_TEMPLATES=[
+  'Initial concern raised following pastoral conversation on [date]. No formal action taken yet.',
+  'HSM observation: student appears disengaged and has mentioned considering other options.',
+  'Email sent to liaison on [date] to arrange meeting with parents — awaiting response.',
+  'Parent meeting held on [date]. Family [expressed concerns about / confirmed they are considering] alternatives.',
+  'Follow-up email sent to parents on [date] — no response received. Escalated to Deputy Head.',
+  'Student confirmed temporary absence until [date]. Return plan agreed with family.',
+  'Risk level unchanged. Monitoring continues. Next review: [date].',
+  'Risk updated following [meeting / conversation / email]. Situation [has improved / has escalated].',
+];
+
+  const v=document.getElementById(px+'-student').value.toLowerCase().trim(),l=document.getElementById(px+'-ac');
+  if(!v){if(l)l.style.display='none';return;}
+  const all=getAllStudentsWithTutor();
+  const m=all.filter(s=>s.name.toLowerCase().includes(v)).slice(0,6);
+  if(!m.length){if(l)l.style.display='none';return;}
+  if(px==='cfv'){
+    l.innerHTML=m.map(s=>`<div class="ac-item" onmousedown="cfvSelectStudent('${s.name}','${s.tutor}','${s.email}','${s.first}','${s.grade}')"><div>${s.name} <span style="font-size:10px;color:#868e96">${s.grade}</span></div><div class="ac-sub">Tutor: ${s.tutor}</div></div>`).join('');
+  } else {
+    l.innerHTML=m.map(s=>`<div class="ac-item" onmousedown="selectStu('${px}','${s.name}','${s.tutor}','${s.email}','${s.first}','${s.grade}')"><div>${s.name} <span style="font-size:10px;color:#868e96">${s.grade}</span></div><div class="ac-sub">Tutor: ${s.tutor}</div></div>`).join('');
+  }
+  if(l)l.style.display='block';
+}
+function addPMComment(template,today){
+  const el=document.getElementById('pm-comments');
+  if(!el)return;
+  const filled=template.replace(/\[date\]/g,today);
+  el.value=el.value?(el.value+'\n'+filled):filled;
+  updatePM();
+}
+function buildCommentTemplates(){
+  const today=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+  return`<div style="font-size:11px;font-weight:500;color:#495057;margin-bottom:6px">Quick comment templates (tap to add):</div>`+
+  LEAVER_COMMENT_TEMPLATES.map(t=>`<div onclick="addPMComment('${t.replace(/'/g,"\\'")}','${today}')" style="font-size:11px;color:#1864ab;padding:5px 8px;background:#e7f3ff;border-radius:6px;margin-bottom:4px;cursor:pointer">${t.replace('[date]','<strong>'+today+'</strong>')}</div>`).join('');
+}
+function copyBody(id,btn){
+  const el=document.getElementById('ebody-'+id),d=window['_eb_'+id]||{},body=el?el.innerText:d.body;
+  navigator.clipboard.writeText(body).then(()=>{const o=btn.textContent;btn.textContent='✓ Copied';setTimeout(()=>btn.textContent=o,2000);});
+}
+function detBodyOnly(sf,tf,date,slot,room,reason,dn){
+  const fn=firstName(sf),div='\n\n────────────────────────\n\n';
+  return`Dear Liaison,\n\nPlease inform ${sf}'s parents that ${fn} has a ${slot} in room ${room} on ${date}.\n\nReason: ${reason}.${dn}${div}Dear ${tf},\n\nPlease remind ${fn} during tutor time that he has a ${slot} in room ${room} on ${date}.\n\nReason: ${reason}.${dn}\n\nThank you,`;
+}
+function emailBox(to,cc,subject,body,id){
+  window['_eb_'+id]={to,cc,subject,body};
+  return`<div class="email-box">
+    <div class="email-row"><div class="email-fw"><span class="email-lbl">To: </span><span class="email-field">${to}</span></div><button class="mini-copy" onclick="mc('to','${id}',this)">Copy</button></div>
+    ${cc?`<div class="email-row"><div class="email-fw"><span class="email-lbl">CC: </span><span class="email-field">${cc}</span></div><button class="mini-copy" onclick="mc('cc','${id}',this)">Copy</button></div>`:''}
+    <div class="email-row"><div class="email-fw"><span class="email-lbl">Subject: </span><span class="email-field">${subject}</span></div><button class="mini-copy" onclick="mc('sub','${id}',this)">Copy</button></div>
+    <div class="email-body-text" id="ebody-${id}">${body}</div>
+    <label class="sig-toggle"><input type="checkbox" id="sig-${id}" onchange="toggleSig('${id}')"> Include Signature</label>
+    <div class="btn-row"><button class="copy-btn" onclick="copyBody('${id}',this)">Copy Body</button></div>
+  </div>`;
+}
+function fmtDetDate(ds){
+  const d=new Date(ds+'T00:00:00');
+  const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  return days[d.getDay()]+' '+d.getDate()+' '+months[d.getMonth()]+' '+d.getFullYear();
+}
+function hideAC(px){const l=document.getElementById(px+'-ac');if(l)l.style.display='none';}
+function initDetDates(){
+  // Default weekday detention to tomorrow
+  const tom=new Date(_todayStr()+'T12:00:00');tom.setDate(tom.getDate()+1);
+  const tomStr=tom.toLocaleDateString('en-CA');
+  const wdp=document.getElementById('wd-date-picker');
+  if(wdp){wdp.value=tomStr;setWDDate();}
+  // Default Saturday detention to next Saturday
+  const nextSat=new Date(_todayStr()+'T12:00:00');
+  const daysToSat=(6-nextSat.getDay()+7)%7||7;
+  nextSat.setDate(nextSat.getDate()+daysToSat);
+  const satStr=nextSat.toLocaleDateString('en-CA');
+  const sdp=document.getElementById('sd-date-picker');
+  if(sdp){sdp.value=satStr;setSDDate();}
+}
+function markStep(cb){const n=document.getElementById('sn-'+cb.id);if(n)n.classList.toggle('done',cb.checked);}
+function selectPMRisk(num,el){
+  document.querySelectorAll('#pm-risk-options .risk-opt').forEach(o=>o.classList.remove('selected'));el.classList.add('selected');
+  document.getElementById('pm-risk').value=RISK_LABELS[num];document.getElementById('pm-risk-num').value=num;
+  const cr=document.getElementById('pm-comments-row');if(cr)cr.style.display=num>=2?'flex':'none';
+  updatePM();
+}
+function selectRP(px,val,el){
+  el.parentElement.querySelectorAll('.pill').forEach(p=>p.classList.remove('selected'));el.classList.add('selected');
+  const h=document.getElementById(px+'-reason'),o=document.getElementById(px+'-reason-other');
+  if(val==='other'){if(h)h.value='';if(o)o.style.display='block';}
+  else{if(h)h.value=val==='device'?'device misuse and having their device confiscated':val==='3neg'?'receiving 3 negatives in one day':val;if(o)o.style.display='none';}
+  if(px==='sd')updateSatDet();if(px==='wd')updateWeekDet();
+}
+function selectStu(px,name,tutor,email,first,grade){
+  if(px==='cfv'){cfvSelectStudent(name,tutor,email,first,grade);return;}
+  document.getElementById(px+'-student').value=name;
+  const ti=document.getElementById(px+'-tutor');if(ti)ti.value=tutor;
+  const h=document.getElementById(px+'-hint');if(h){h.textContent='Tutor: '+tutor+' · '+grade;h.style.display='block';}
+  hideAC(px);
+  window['_'+px+'_te']=email;window['_'+px+'_tn']=tutor;window['_'+px+'_tf']=first;window['_'+px+'_gr']=grade;
+  if(px==='sd')updateSatDet();if(px==='wd')updateWeekDet();if(px==='pm')updatePM();
+}
+function selectTP(val,el){
+  el.parentElement.querySelectorAll('.pill').forEach(p=>p.classList.remove('selected'));el.classList.add('selected');
+  const o=document.getElementById('pm-timing-other');
+  if(val==='other'){document.getElementById('pm-timing').value='';if(o)o.style.display='block';}
+  else{const l={none:'No Specific Preference',thisweek:'this week',nextweek:'next week'};document.getElementById('pm-timing').value=l[val]||val;if(o)o.style.display='none';}
+  updatePM();
+}
+function setPMType(type,btn){
+  pmType=type;
+  document.querySelectorAll('#pm-type-toggle .type-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+  document.getElementById('pm-arrange-fields').style.display=type==='arrange'?'block':'none';
+  document.getElementById('pm-retention-fields').style.display=type==='retention'?'block':'none';
+  document.getElementById('pm-message-fields').style.display=type==='message'?'block':'none';
+  updatePM();
+}
+function setSDDate(){
+  const picker=document.getElementById('sd-date-picker');
+  const hidden=document.getElementById('sd-date');
+  const display=document.getElementById('sd-date-display');
+  if(!picker||!picker.value)return;
+  const formatted=fmtDetDate(picker.value);
+  if(hidden)hidden.value=formatted;
+  if(display)display.textContent=formatted;
+  updateSatDet();
+}
+function setWDDate(){
+  const picker=document.getElementById('wd-date-picker');
+  const hidden=document.getElementById('wd-date');
+  const display=document.getElementById('wd-date-display');
+  if(!picker||!picker.value)return;
+  const formatted=fmtDetDate(picker.value);
+  if(hidden)hidden.value=formatted;
+  if(display)display.textContent=formatted;
+  updateWeekDet();
+}
+function stepHTML(num,title,content,id){return`<div class="step-item"><div class="step-num" id="sn-${id}">${num}</div><div class="step-body"><div class="step-title">${title}</div>${content}<div class="step-check"><input type="checkbox" id="${id}" onchange="markStep(this)"><label for="${id}">Done</label></div></div></div>`;}
+function toggleSig(id){
+  const cb=document.getElementById('sig-'+id),el=document.getElementById('ebody-'+id),d=window['_eb_'+id]||{};
+  if(el)el.textContent=cb.checked?d.body+SIG:d.body;
+}
+function updatePM(){
+  const s=gv('pm-student')||'[Student]',fn=firstName(s);
+  const t=gv('pm-tutor')||'[Tutor]',te=window._pm_te||'';
+  const gr=window._pm_gr||'',gl=gr?' '+gr:'';
+  const risk=gv('pm-risk'),rNum=parseInt(gv('pm-risk-num'))||0;
+  const comments=gv('pm-comments'),timing=gv('pm-timing')||gv('pm-timing-other')||'No Specific Preference';
+  const purpose=gv('pm-purpose'),message=gv('pm-message');
+  const dateRaw=gv('pm-date'),dateF=dateRaw?new Date(dateRaw).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}):'';
+  const warn=rNum>=2&&!comments?'<div style="font-size:11px;color:#c92a2a;margin-top:4px">⚠️ Comments required</div>':'';
+  const CC_RET=sv('retention-cc');
+  let steps='';
+  if(pmType==='arrange'){
+    const tl=dateF?`I would like to arrange a meeting with ${s}'s parents around ${dateF}.`:`I would like to arrange a meeting with ${s}'s parents at the earliest convenient time.`;
+    const pl=purpose?`\n\nPurpose Of Meeting: ${purpose}`:'';
+    const body=`Dear Liaison,\n\n${tl}${pl}\n\nPlease coordinate a suitable time and confirm with me directly.\n\nKind regards,`;
+    steps=stepHTML(1,'Send Email To Liaison',emailBox(sv('liaison-email'),te,`Parent Meeting Request — ${s}${gl}`,body,'pm-arr'),'pm-s1')+
+      stepHTML(2,'Log In Parent Meeting Log',`<div style="font-size:12px;color:#495057;margin-top:4px">Log <strong>${s}</strong> — date: <strong>${dateF||'TBC'}</strong>.</div>${sLink('Parent Meeting Log','pl')}`,'pm-s2')+
+      stepHTML(3,'Update Reward & Conduct',`<div style="font-size:12px;color:#495057;margin-top:4px">Add 1 to parent meeting counter for <strong>${s}</strong>.</div>${sLink('Reward & Conduct Overview','rc')}`,'pm-s3');
+  }else if(pmType==='retention'){
+    const tl=timing==='No Specific Preference'?'I would be grateful if a meeting could be arranged at the earliest convenient time.':`I would appreciate this meeting being arranged ${timing}.`;
+    let eb='';
+    if(rNum===6)eb=`Dear Liaison,\n\nI am writing to formally notify you that ${s} has left or stopped attending school — Risk Category ${rNum} — ${risk}.\n\nI would like to arrange a meeting with the family to discuss next steps. ${tl}\n\nKind regards,`;
+    else if(rNum===5)eb=`Dear Liaison,\n\nFollowing a pastoral review, ${s} has been assessed at Risk Category ${rNum} — ${risk}.\n\nI would like to arrange a meeting to discuss the circumstances of their departure. ${tl}\n\nKind regards,`;
+    else if(rNum===7)eb=`Dear Liaison,\n\nFollowing a pastoral review, ${s} has been assessed at Risk Category ${rNum} — ${risk}.\n\nI would like to arrange a meeting to discuss arrangements for their return. ${tl}\n\nKind regards,`;
+    else eb=`Dear Liaison,\n\nFollowing a pastoral review, ${s} has been assessed at Risk Category ${rNum} — ${risk} regarding their continued enrolment.\n\n${tl}\n\nKind regards,`;
+    const retCC=CC_RET+(te?'; '+te:'');
+    const ltComment=`<div style="font-size:12px;color:#495057;margin-top:4px">Record <strong>${s}</strong> — Risk Category ${rNum}: <strong>${risk||'[select]'}</strong>${comments?'\n\nComments:\n'+comments:''}.</div>${warn}`;
+    steps=stepHTML(1,'Notify Liaison & SLT',emailBox(sv('liaison-email'),retCC,`Retention Concern — ${s}${gl} — Risk Category ${rNum}: ${risk||'[select]'}`,eb,'pm-ret'),'pm-r1')+
+      stepHTML(2,'Update Leaver Tracker',`${ltComment}${buildCommentTemplates()}${sLink('Leaver Tracker Updated','lt')}`,'pm-r2')+
+      stepHTML(3,'Update Reward & Conduct',`<div style="font-size:12px;color:#495057;margin-top:4px">Record retention risk for <strong>${s}</strong>.</div>${sLink('Reward & Conduct Overview','rc')}`,'pm-r3');
+  }else{
+    const mb=`Dear Liaison,\n\nI would be grateful if you could pass the following message on to ${s}'s parents on my behalf:\n\n——\n${message||'[Your message here]'}\n——\n\nKind regards,`;
+    steps=stepHTML(1,'Send Message Via Liaison',emailBox(sv('liaison-email'),te,`Message For Parents Of ${s}${gl}`,mb,'pm-msg'),'pm-m1');
+  }
+  const pmEl=document.getElementById('pm-steps');if(pmEl)pmEl.innerHTML=steps;
+}
+function updateSatDet(){
+  const s=gv('sd-student')||'[Student]',gr=window._sd_gr||'',t=gv('sd-tutor')||'[Tutor]',d=gv('sd-date')||'[Date]';
+  const te=window._sd_te||sv('liaison-email'),tf=window._sd_tf||t.split(' ')[0];
+  const r=gv('sd-reason')||gv('sd-reason-other')||'[reason]';
+  const dn=r.toLowerCase().includes('device')||r.toLowerCase().includes('confiscat')?`\n\nPlease also note that ${firstName(s)}'s device will be returned upon completion of the detention.`:'';
+  const gl=gr?' '+gr:'';
+  const sdEl=document.getElementById('sd-steps');if(sdEl)sdEl.innerHTML=
+    stepHTML(1,'Update Reward & Conduct Overview',`<div style="font-size:12px;color:#495057;margin-top:4px">Add 1 to detention counter for <strong>${s}</strong>.</div>${sLink('Reward & Conduct Overview','rc')}`,'sd-s1')+
+    stepHTML(2,'Email Liaison & Tutor',emailBox(`${sv('liaison-email')}; ${te}`,'',`Saturday Detention — ${s}${gl} (${sv('det-sat-start')||'13:30'}–${sv('det-sat-end')||'15:30'}, ${sv('det-sat-room')||'A201'})`,detBodyOnly(s,tf,d,'Saturday detention from '+(sv('det-sat-start')||'13:30')+' to '+(sv('det-sat-end')||'15:30'),(sv('det-sat-room')||'A201'),r,dn),'sd-e'),'sd-s2');
+}
+function updateWeekDet(){
+  const s=gv('wd-student')||'[Student]',gr=window._wd_gr||'',t=gv('wd-tutor')||'[Tutor]',d=gv('wd-date')||'[Date]';
+  const te=window._wd_te||'',tf=window._wd_tf||t.split(' ')[0];
+  const r=gv('wd-reason')||gv('wd-reason-other')||'[reason]';
+  const gl=gr?' '+gr:'';
+  const wdEl=document.getElementById('wd-steps');if(wdEl)wdEl.innerHTML=
+    stepHTML(1,'Email Liaison & Tutor',emailBox(`${sv('liaison-email')}; ${te}`,'',`Morning Detention — ${s}${gl} (${sv('det-wd-time')||'10:35'}, ${sv('det-wd-room')||'A201'})`,detBodyOnly(s,tf,d,'morning detention at '+(sv('det-wd-time')||'10:35'),(sv('det-wd-room')||'A201'),r,''),'wd-e'),'wd-s1');
+}
+
 function startWorkflow(name){
   document.getElementById('workflow-list').style.display='none';
   document.querySelectorAll('.workflow-panel').forEach(p=>p.classList.remove('active'));
@@ -30345,7 +30586,7 @@ function initApp(){
   const sl=document.getElementById('settings-locked');if(sl)sl.style.display='flex';
   const sc=document.getElementById('settings-content');if(sc)sc.style.display='none';
   hydrateDoneState().then(()=>{_subscribeDoneRealtime();drainWorkInbox();_noteFlushQueue();_fireRegFlushQueue();try{if(_curTab==='week'&&typeof renderWeekTasksView==='function')renderWeekTasksView();}catch(e){}});
-  loadSettings();loadPeople();loadState();migrateBaseToDefaults();ensureDefaultContexts();loadSlotNotes();loadTutorChecks();loadDetLog();loadHolidays();applyHolidaysToCalendar();loadCalCustomEvents();loadListsData();loadLinks();loadDuties();loadTutorMeetings();dsLoad();loadBoardingSettings();try{_hrFlushQueue();}catch(e){}_subscribePenaltiesRealtime();loadNurseMap();loadCommentMap();
+  loadSettings();loadPeople();loadState();migrateBaseToDefaults();ensureDefaultContexts();loadSlotNotes();loadTutorChecks();loadDetLog();try{_repairLegacyAorTasks();}catch(e){}loadHolidays();applyHolidaysToCalendar();loadCalCustomEvents();loadListsData();loadLinks();loadDuties();loadTutorMeetings();dsLoad();loadBoardingSettings();try{_hrFlushQueue();}catch(e){}_subscribePenaltiesRealtime();loadNurseMap();loadCommentMap();
   _purgeArchivedFromActive(); // archived list always wins over a synced-back roster
   
   initWeekTab();checkTaskReset();renderCustomFlowsList();
@@ -31753,6 +31994,11 @@ function amGetCtx(){
   const etDisplay=_custEt||et;
   const stDisplay=_custSt||getSlotTime(ci);
   const rem=em-nm,dur=em-smEff,el=nm-smEff,pct=dur>0?Math.min(100,Math.max(0,el/dur*100)):0;
+  // v252: a commitment ENDS at its effective end. No whole-event overtime state
+  // — once the end passes, live mode releases to the free/next screen. The only
+  // overtime display anywhere is the per-section overrun INSIDE a lesson plan
+  // (an unticked section running over while the lesson itself is still on).
+  if(rem<=0)return null;
   return{dayName,offset,slotIdx:ci,endIdx,label:cell.l,tp:cell.tp,cat:getCat(cell.cat||cell.tp),st:stDisplay,et:etDisplay,rem,dur,el,pct};
 }
 function amGetNext(){
@@ -36070,6 +36316,35 @@ function _amPeekRender(){
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
 })();
 
+// ── LEGACY AOR TASK REPAIR ────────────────────────────────────────────────────
+// The early migration created the AOR QTS tasks as week-NUMBER-scoped and
+// duplicated each across its two-week window. Changing the Week-1 reference
+// re-mapped those numbers months into the future, stranding all of them.
+// One-time repair: dedupe by text, archive anything already completed, and
+// re-home the rest into the CURRENT week (date-anchored), where the
+// carried-over group keeps them alive until done.
+function _repairLegacyAorTasks(){
+  try{
+    if(S._aorRehomed)return;
+    const legacy=(S.planData||[]).filter(t=>String(t.id||'').indexOf('lt')===0&&t.cat==='aor'&&t.scope==='week'&&!t.weekStart);
+    if(!legacy.length){S._aorRehomed=true;saveSettings();return;}
+    const doneAny=t=>{try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.indexOf('plan_done_'+t.id)===0&&localStorage.getItem(k)==='1')return true;}}catch(e){}return false;};
+    const monStr=getWeekMondayFor(0).toLocaleDateString('en-CA');
+    const wNow=getWeekNumber(0);
+    const seen={};
+    let rehomed=0,archived=0;
+    legacy.forEach(t=>{
+      if(doneAny(t)||seen[t.text]){t.archived=true;archived++;return;}
+      seen[t.text]=1;
+      t.weekNum=wNow;t.weekStart=monStr;
+      rehomed++;
+    });
+    S._aorRehomed=true;
+    _savePlanNow();
+    if(rehomed)console.log('AOR repair: rehomed '+rehomed+', archived '+archived+' (dupes/done)');
+  }catch(e){console.warn('AOR repair:',e);}
+}
+
 // ── TASK ↔ PERIOD CONNECTION ──────────────────────────────────────────────────
 // A task can be planned into a specific period. One connection store (a field
 // on the task, t.anchor={date,time}); "removed from the unassigned list" is a
@@ -37197,7 +37472,7 @@ function initActiveMode(){
 <script>
 // Visible build number — must match the service worker's CACHE_NAME version.
 // Lets anyone confirm at a glance which build a device is actually running.
-const APP_BUILD='v250';
+const APP_BUILD='v252';
 try{document.getElementById('app-build-tag').textContent='build '+APP_BUILD;console.log('LA Work '+APP_BUILD);}catch(e){}
 </script>
 
