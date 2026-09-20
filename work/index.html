@@ -23923,7 +23923,13 @@ function getLive(){
   // grid slot (their merged span root would look wrong as a highlight).
   try{
     const c=amGetCtx();
-    if(c&&typeof c.slotIdx==='number'&&String(c.label||'').trim())ci=c.slotIdx;
+    if(c&&typeof c.slotIdx==='number'&&String(c.label||'').trim()){
+      // v253: if the grid already puts us INSIDE the live span, keep that finer
+      // row (second half of a double highlights the second row); only snap to
+      // the span root when custom times displaced the event off its grid slot.
+      const _within=ci>=c.slotIdx&&ci<=(c.endIdx??c.slotIdx);
+      if(!_within)ci=c.slotIdx;
+    }
   }catch(e){}
 
   return{dayName,currentIdx:ci,todayDc:DAYS.indexOf(dayName),isPastMidnight:false};
@@ -24836,8 +24842,15 @@ function renderTodayView(){
     try{
       const _c=amGetCtx();
       if(_c&&String(_c.label||'').trim()&&typeof _c.slotIdx==='number'){
-        const _hit=dayEvents.findIndex(e=>e.idx>=_c.slotIdx&&e.idx<=(_c.endIdx??_c.slotIdx)&&(e.cell&&e.cell.l)===_c.label);
-        if(_hit>=0)curEventIdx=_hit;
+        // v253: a merged span can render as several rows here — highlight the
+        // row whose own window contains NOW, not blindly the first match
+        // (which pinned the marker on an already-ended half of a double).
+        const _hits=[];
+        dayEvents.forEach((e,i)=>{if(e.idx>=_c.slotIdx&&e.idx<=(_c.endIdx??_c.slotIdx)&&(e.cell&&e.cell.l)===_c.label)_hits.push(i);});
+        if(_hits.length){
+          const _in=_hits.find(i=>nm>=t2m(dayEvents[i].tStart)&&nm<t2m(dayEvents[i].tEnd));
+          curEventIdx=(_in!==undefined)?_in:_hits[0];
+        }
       }
     }catch(e){}
     if(curEventIdx>=0){
@@ -31977,17 +31990,35 @@ function amGetCtx(){
   // lesson). Scan BOTH ways: forward for the true end, backward for the true start.
   // Without the backward scan, the second half restarted the elapsed clock, the
   // tick state and the session notes, because everything keys off slotIdx.
-  let endIdx=ci;
-  for(let i=ci+1;i<SLOTS.length;i++){const c=getCustomForWeek(offset,i,dayName)||getBaseCell(i,dayName);if(c&&c.l===cell.l&&c.tp===cell.tp)endIdx=i;else break;}
-  let rootIdx=ci;
-  for(let i=ci-1;i>=0;i--){const c=getCustomForWeek(offset,i,dayName)||getBaseCell(i,dayName);if(c&&c.l===cell.l&&c.tp===cell.tp)rootIdx=i;else break;}
+  // v253: a CUSTOM time is a wall. Two same-label slots the user split with an
+  // explicit end/start boundary (13:30→14:15 | 14:15–15:00) are TWO commitments
+  // — merging them rooted the highlight on the ended half and, worse, took the
+  // first slot's custom end as the whole span's end. Only plain back-to-back
+  // slots (the true double-lesson shape) still merge.
+  let endIdx=ci,_fwPrev=cell;
+  for(let i=ci+1;i<SLOTS.length;i++){
+    const c=getCustomForWeek(offset,i,dayName)||getBaseCell(i,dayName);
+    if(_fwPrev&&_fwPrev.customEndTime)break;      // previous half declares its own end
+    if(c&&c.customStartTime)break;                 // next half declares its own start
+    if(c&&c.l===cell.l&&c.tp===cell.tp){endIdx=i;_fwPrev=c;}else break;
+  }
+  let rootIdx=ci,_bwNext=cell;
+  for(let i=ci-1;i>=0;i--){
+    const c=getCustomForWeek(offset,i,dayName)||getBaseCell(i,dayName);
+    if(_bwNext&&_bwNext.customStartTime)break;     // this half declares its own start
+    if(c&&c.customEndTime)break;                   // earlier half declares its own end
+    if(c&&c.l===cell.l&&c.tp===cell.tp){rootIdx=i;_bwNext=c;}else break;
+  }
   ci=rootIdx; // every downstream key (notes, ticks, elapsed) uses the span root
   const et=slotEndTime(endIdx),sm=t2m(getSlotTime(ci));
   // Use custom start/end time if set on this slot
   const _cust=getCustomForWeek(offset,ci,dayName)||getBaseCell(ci,dayName);
   // Start comes from the span's first slot, end from its last
   const _custEnd=(endIdx!==ci)?(getCustomForWeek(offset,endIdx,dayName)||getBaseCell(endIdx,dayName)):_cust;
-  const _custEt=(_custEnd&&_custEnd.customEndTime)?_custEnd.customEndTime:(_cust&&_cust.customEndTime?_cust.customEndTime:null);
+  // End comes from the span's LAST slot only — inheriting the root's custom end
+  // shrank a multi-slot span to its first half (v253; defensive now that custom
+  // boundaries stop the merge, but the trap stays closed).
+  const _custEt=(_custEnd&&_custEnd.customEndTime)?_custEnd.customEndTime:(endIdx===ci&&_cust&&_cust.customEndTime?_cust.customEndTime:null);
   const _custSt=_cust&&_cust.customStartTime?_cust.customStartTime:null;
   const em=_custEt?t2m(_custEt):t2m(et);
   const smEff=_custSt?t2m(_custSt):sm;
@@ -36166,8 +36197,9 @@ function _amPeekEvents(){
     const st=(c&&c.customStartTime)||getSlotTime(i);
     const stM=t2m(st);
     if(stM<=nm)continue;
-    // merge span continuations (same label+type back-to-back)
-    if(prev&&c&&prev.cellL===c.l&&prev.cellTp===c.tp&&c.l){prev.etM=i+1<SLOTS.length?t2m(getSlotTime(i+1)):24*60;prev.et=(c.customEndTime)||slotEndTime(i);prev.endIdx=i;continue;}
+    // merge span continuations (same label+type back-to-back) — but a custom
+    // time boundary splits, exactly as amGetCtx treats it (v253)
+    if(prev&&c&&prev.cellL===c.l&&prev.cellTp===c.tp&&c.l&&!c.customStartTime&&!prev._custEt){prev.etM=i+1<SLOTS.length?t2m(getSlotTime(i+1)):24*60;prev.et=(c.customEndTime)||slotEndTime(i);prev._custEt=!!c.customEndTime;prev.endIdx=i;continue;}
     const etM=i+1<SLOTS.length?t2m(getSlotTime(i+1)):24*60;
     const et=(c&&c.customEndTime)||slotEndTime(i);
     const flags=[];
@@ -36181,7 +36213,7 @@ function _amPeekEvents(){
     const hasContent=(c&&c.l)||flags.length||planned.length;
     if(!hasContent)continue;
     if(c&&c.tp==='sleep'&&!flags.length&&!planned.length)continue; // sleep rows are noise in a preview
-    prev={st,et,stM,etM,label:(c&&c.l)||'Free',cat:getCat((c&&(c.cat||c.tp))||'free'),flags,planned,cellL:c&&c.l,cellTp:c&&c.tp,rootIdx:i,endIdx:i};
+    prev={st,et,stM,etM,label:(c&&c.l)||'Free',cat:getCat((c&&(c.cat||c.tp))||'free'),flags,planned,cellL:c&&c.l,cellTp:c&&c.tp,rootIdx:i,endIdx:i,_custEt:!!(c&&c.customEndTime)};
     out.push(prev);
   }
   return out;
@@ -37472,7 +37504,7 @@ function initActiveMode(){
 <script>
 // Visible build number — must match the service worker's CACHE_NAME version.
 // Lets anyone confirm at a glance which build a device is actually running.
-const APP_BUILD='v252';
+const APP_BUILD='v253';
 try{document.getElementById('app-build-tag').textContent='build '+APP_BUILD;console.log('LA Work '+APP_BUILD);}catch(e){}
 </script>
 
