@@ -2514,20 +2514,64 @@ const SYNC_KEYS=['settings','tutors','students','archived','ttCustom','ttDefault
 
 let _supaReady=false;
 
+// ── v254: durable sync outbox ─────────────────────────────────────
+// A push that cannot reach Supabase is QUEUED on this device (raw setter —
+// the queue itself never syncs), retried automatically, and protected: a
+// cloud pull never overwrites a key with queued local edits, so the user's
+// version wins until it has been safely pushed. Before this, a failed or
+// still-pending initial load silently dropped EVERY save of the session,
+// and the next refresh pulled the old server copy over the local edits.
+function _syncQ(){try{return JSON.parse(localStorage.getItem('_syncQueue')||'{}');}catch(e){return{};}}
+function _syncQSet(q){try{_lsSet('_syncQueue',JSON.stringify(q));}catch(e){}}
+function _syncEnqueue(key,value){
+  const q=_syncQ();const was=Object.keys(q).length;
+  q[key]=value;_syncQSet(q);
+  if(!was){try{showToastMsg('Saved on this device — cloud sync pending, will retry','#f59f0b');}catch(e){}}
+}
+function _syncDequeue(key,value){
+  const q=_syncQ();
+  if(key in q&&(value===undefined||q[key]===value)){delete q[key];_syncQSet(q);}
+}
+let _syncFlushing=false;
+async function _syncFlush(){
+  if(_syncFlushing)return;
+  const keys=Object.keys(_syncQ());if(!keys.length)return;
+  _syncFlushing=true;
+  try{
+    let flushed=0;
+    for(const k of keys){
+      const v=_syncQ()[k];if(v===undefined)continue;
+      try{
+        const res=await supa.from(SUPA_TABLE).upsert({key:k,value:v,updated_at:new Date().toISOString()},{onConflict:'key'});
+        if(res&&res.error)throw res.error;
+        _syncDequeue(k,v);flushed++;
+        _supaReady=true; // the cloud is reachable — direct saves may resume
+      }catch(e){}
+    }
+    if(flushed&&!Object.keys(_syncQ()).length){try{showToastMsg('All changes synced ✓','#16a34a');}catch(e){}}
+  }finally{_syncFlushing=false;}
+}
+setInterval(_syncFlush,30000);
+window.addEventListener('online',()=>setTimeout(_syncFlush,1000));
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(_syncFlush,1500);});
+
 async function supaLoad(){
   try{
     const{data,error}=await supa.from(SUPA_TABLE).select('key,value');
     if(error)throw error;
     if(data&&data.length){
       console.log('supaLoad: got keys=',data.map(r=>r.key));
+      const _q=_syncQ(); // keys with queued local edits are NEWER than the server
       data.forEach(row=>{
         try{
+          if(Object.prototype.hasOwnProperty.call(_q,row.key))return;
           var val=typeof row.value==='string'?row.value:JSON.stringify(row.value);
           _lsSet(row.key,val); // use raw setter to avoid re-syncing
         }catch(e){}
       });
     }
     _supaReady=true;
+    setTimeout(_syncFlush,500); // push anything left over from an offline session
   }catch(e){
     console.warn('Supabase load failed, using localStorage:',e.message);
     _supaReady=false;
@@ -2535,12 +2579,17 @@ async function supaLoad(){
 }
 
 async function supaSave(key,value){
-  if(!_supaReady)return;
   // Don't sync security-sensitive local-only keys
   if(!SYNC_KEYS.includes(key)&&!(key&&key.startsWith('lp_')))return;
+  if(!_supaReady){_syncEnqueue(key,value);return;} // load failed or still pending — queue, never drop
   try{
-    await supa.from(SUPA_TABLE).upsert({key,value,updated_at:new Date().toISOString()},{onConflict:'key'});
-  }catch(e){console.warn('Supabase save failed for',key,e.message);}
+    const res=await supa.from(SUPA_TABLE).upsert({key,value,updated_at:new Date().toISOString()},{onConflict:'key'});
+    if(res&&res.error)throw res.error; // supabase-js reports errors in the result, it does not throw
+    _syncDequeue(key,value);
+  }catch(e){
+    _syncEnqueue(key,value);
+    console.warn('Supabase save failed for',key,e&&e.message);
+  }
 }
 
 // Patch localStorage to also sync to Supabase on write
@@ -37504,7 +37553,7 @@ function initActiveMode(){
 <script>
 // Visible build number — must match the service worker's CACHE_NAME version.
 // Lets anyone confirm at a glance which build a device is actually running.
-const APP_BUILD='v253';
+const APP_BUILD='v254';
 try{document.getElementById('app-build-tag').textContent='build '+APP_BUILD;console.log('LA Work '+APP_BUILD);}catch(e){}
 </script>
 
