@@ -2521,16 +2521,29 @@ let _supaReady=false;
 // version wins until it has been safely pushed. Before this, a failed or
 // still-pending initial load silently dropped EVERY save of the session,
 // and the next refresh pulled the old server copy over the local edits.
+// v258: BOOT WRITES NEVER SYNC. Everything the app writes while starting up
+// (migrations, loaders initialising defaults, normalisers re-saving what they
+// loaded) is mechanical, not a user edit — pushing or queueing it let a device
+// that booted with wiped or stale storage overwrite the real timetable and
+// duties on the server for every device. The gate opens at the end of initApp;
+// only writes made after that (real user actions) can reach the cloud.
+let _bootSyncGate=true;
+setTimeout(()=>{_bootSyncGate=false;},15000); // failsafe if initApp ever throws mid-way
+
 function _syncQ(){try{return JSON.parse(localStorage.getItem('_syncQueue')||'{}');}catch(e){return{};}}
 function _syncQSet(q){try{_lsSet('_syncQueue',JSON.stringify(q));}catch(e){}}
+// Entries are {v:value, ts:when-queued}. Legacy plain-string entries (v254–257)
+// normalise to ts:0, which makes the server win any timestamp comparison —
+// after the timetable incident, unknown age must never beat known-newer data.
+function _syncQEntry(q,k){const e=q[k];if(e===undefined)return undefined;if(e&&typeof e==='object'&&'v'in e)return e;return{v:e,ts:0};}
 function _syncEnqueue(key,value){
   const q=_syncQ();const was=Object.keys(q).length;
-  q[key]=value;_syncQSet(q);
+  q[key]={v:value,ts:Date.now()};_syncQSet(q);
   if(!was){try{showToastMsg('Saved on this device — cloud sync pending, will retry','#f59f0b');}catch(e){}}
 }
 function _syncDequeue(key,value){
-  const q=_syncQ();
-  if(key in q&&(value===undefined||q[key]===value)){delete q[key];_syncQSet(q);}
+  const q=_syncQ();const e=_syncQEntry(q,key);
+  if(e&&(value===undefined||e.v===value)){delete q[key];_syncQSet(q);}
 }
 let _syncFlushing=false;
 async function _syncFlush(){
@@ -2538,15 +2551,31 @@ async function _syncFlush(){
   const keys=Object.keys(_syncQ());if(!keys.length)return;
   _syncFlushing=true;
   try{
+    // SERVER-NEWER-WINS: before pushing anything, read the server's timestamps
+    // for the queued keys. A row the server changed AFTER an entry was queued
+    // wins — the entry is dropped and the server value applied locally. If the
+    // timestamps cannot be read, nothing is pushed blind.
+    let srv={};
+    try{
+      const res=await supa.from(SUPA_TABLE).select('key,value,updated_at').in('key',keys);
+      if(res&&res.error)throw res.error;
+      (res&&res.data||[]).forEach(r=>{srv[r.key]=r;});
+    }catch(e){return;}
     let flushed=0;
     for(const k of keys){
-      const v=_syncQ()[k];if(v===undefined)continue;
+      const e=_syncQEntry(_syncQ(),k);if(!e)continue;
+      const row=srv[k];const srvTs=row&&row.updated_at?new Date(row.updated_at).getTime():0;
+      if(srvTs>e.ts){
+        try{if(row&&row.value!=null)_lsSet(k,typeof row.value==='string'?row.value:JSON.stringify(row.value));}catch(_e){}
+        const q=_syncQ();delete q[k];_syncQSet(q);
+        continue;
+      }
       try{
-        const res=await supa.from(SUPA_TABLE).upsert({key:k,value:v,updated_at:new Date().toISOString()},{onConflict:'key'});
+        const res=await supa.from(SUPA_TABLE).upsert({key:k,value:e.v,updated_at:new Date().toISOString()},{onConflict:'key'});
         if(res&&res.error)throw res.error;
-        _syncDequeue(k,v);flushed++;
+        _syncDequeue(k,e.v);flushed++;
         _supaReady=true; // the cloud is reachable — direct saves may resume
-      }catch(e){}
+      }catch(e2){}
     }
     if(flushed&&!Object.keys(_syncQ()).length){try{showToastMsg('All changes synced ✓','#16a34a');}catch(e){}}
   }finally{_syncFlushing=false;}
@@ -2557,18 +2586,24 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout
 
 async function supaLoad(){
   try{
-    const{data,error}=await supa.from(SUPA_TABLE).select('key,value');
+    const{data,error}=await supa.from(SUPA_TABLE).select('key,value,updated_at');
     if(error)throw error;
     if(data&&data.length){
       console.log('supaLoad: got keys=',data.map(r=>r.key));
-      const _q=_syncQ(); // keys with queued local edits are NEWER than the server
+      const _q=_syncQ();let _qChanged=false; // queued local edits vs server: newer timestamp wins
       data.forEach(row=>{
         try{
-          if(Object.prototype.hasOwnProperty.call(_q,row.key))return;
+          if(Object.prototype.hasOwnProperty.call(_q,row.key)){
+            const e=_syncQEntry(_q,row.key);
+            const srvTs=row.updated_at?new Date(row.updated_at).getTime():0;
+            if(srvTs>(e?e.ts:0)){delete _q[row.key];_qChanged=true;} // server is newer — drop the stale entry, apply the row
+            else return;                                            // local queued edit is newer — keep it, flush pushes it
+          }
           var val=typeof row.value==='string'?row.value:JSON.stringify(row.value);
           _lsSet(row.key,val); // use raw setter to avoid re-syncing
         }catch(e){}
       });
+      if(_qChanged)_syncQSet(_q);
     }
     _supaReady=true;
     setTimeout(_syncFlush,500); // push anything left over from an offline session
@@ -2581,7 +2616,8 @@ async function supaLoad(){
 async function supaSave(key,value){
   // Don't sync security-sensitive local-only keys
   if(!SYNC_KEYS.includes(key)&&!(key&&key.startsWith('lp_')))return;
-  if(!_supaReady){_syncEnqueue(key,value);return;} // load failed or still pending — queue, never drop
+  if(_bootSyncGate)return; // startup writes are mechanical — local only, never queued, never pushed
+  if(!_supaReady){_syncEnqueue(key,value);return;} // load failed — queue the USER edit, never drop
   try{
     const res=await supa.from(SUPA_TABLE).upsert({key,value,updated_at:new Date().toISOString()},{onConflict:'key'});
     if(res&&res.error)throw res.error; // supabase-js reports errors in the result, it does not throw
@@ -23881,24 +23917,14 @@ function getBaseCell(idx,day){
 // re-ran the migration, saw a slot the user had deleted as merely "absent", and
 // helpfully recreated it — then synced the ghost back everywhere.
 function migrateBaseToDefaults(){
-  if(ttDefaults&&ttDefaults.__baseMigrated)return;              // synced guard
-  const legacyDone=(()=>{try{return localStorage.getItem('ttBaseMigrated')==='1';}catch(e){return false;}})();
-  if(legacyDone){                                               // already done on this device pre-fix
-    ttDefaults.__baseMigrated={done:true,at:new Date().toISOString(),legacy:true};
-    saveState();
-    return;
-  }
-  const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  let n=0;const created=[];
-  SLOTS.forEach((row,idx)=>{DAYS.forEach(day=>{
-    const b=row[day];if(!b||!b.tp||b.tp==='sleep'||b.tp==='free')return;
-    const dk=idx+'_'+day;
-    if(!ttDefaults[dk]){ttDefaults[dk]={...b,_fromBase:true};created.push(dk);n++;}
-  });});
-  ttDefaults.__baseMigrated={done:true,at:new Date().toISOString(),created};
-  try{localStorage.setItem('ttBaseMigrated','1');}catch(e){}
-  saveState();
-  if(n)console.log('Migrated',n,'base timetable cells into editable defaults');
+  // v258: RETIRED. This used to copy the old hardcoded 2025 grid into
+  // ttDefaults on any boot that found an empty store. A device that booted
+  // with wiped storage while the cloud load failed therefore "restored" the
+  // old timetable and duties, and the sync outbox then pushed that garbage
+  // over the real data on the server. The timetable now has exactly one
+  // source of truth: the synced ttDefaults/ttCustom. A truly fresh install
+  // starts EMPTY and fills from the cloud. The old SLOTS grid stays in the
+  // file only so purgeLegacyBaseSlots can still identify leftovers.
 }
 // Remove every remaining entry that came from the old built-in timetable
 function purgeLegacyBaseSlots(){
@@ -30680,8 +30706,13 @@ function initApp(){
         fetchPersonalSlots().then(function(){renderTimetable();});
       }).subscribe();
   }catch(e){console.warn('omni RT:',e);}
-  // Expose slot structure + custom slots to Supabase for Omni
+  // Expose slot structure + custom slots to Supabase for Omni.
+  // v258: ONLY when the cloud load succeeded — this used to push whatever this
+  // device happened to hold, every boot, unconditionally. A device that booted
+  // stale or empty pushed its old/blank ttCustom over the real one for
+  // everyone. With a successful load, what it pushes is the just-pulled truth.
   setTimeout(function(){
+    if(!_supaReady)return;
     supaSave('slotTimes',JSON.stringify(SLOTS.filter(function(s){return s.t>='07:00';}).map(function(s){return{t:s.t};})));
     supaSave('ttCustom',JSON.stringify(ttCustom));
     const _w1=getW1Ref();
@@ -30691,6 +30722,8 @@ function initApp(){
   function schedNext(){const n=new Date(),nx=new Date(n);nx.setDate(nx.getDate()+1);nx.setHours(0,0,5,0);setTimeout(()=>{const el=document.getElementById('mc-date');if(el)el.value=todayFmt();schedNext();},(nx-n));}
   schedNext();
   setInterval(()=>{const ts=document.getElementById('tab-sched');if(ts&&ts.classList.contains('active'))renderTimetable();},60000);
+  // v258: startup is over — from here on, writes are user actions and may sync.
+  _bootSyncGate=false;
 }
 
 // ── STARTUP ───────────────────────────────────────────
@@ -36339,6 +36372,20 @@ function _amPeekRender(){
   // Strip ids inside the preview so no live ticker (timers, counters, register
   // refreshers) can reach into it and animate a moment that hasn\'t happened.
   try{body.querySelectorAll('#am-peek-body [id]').forEach(el=>el.removeAttribute('id'));}catch(e){}
+  // v257: a future slot has no "now" and nothing is remaining — the time row
+  // shows the event's FROM → TO prominently, with the duration underneath,
+  // instead of a fake countdown and a dashed NOW pill.
+  try{
+    const _tr=body.querySelector('#am-peek-body .am-time-row');
+    if(_tr){
+      const _dm=Math.max(0,Math.round(t2m(ev.et)-t2m(ev.st)));
+      const _dh=Math.floor(_dm/60),_dr=_dm%60;
+      const _dStr=_dh?(_dh+'h'+(_dr?' '+_dr+'m':'')):(_dr+'m');
+      _tr.innerHTML='<div class="am-cd-block" style="flex:1;text-align:center">'
+        +'<div class="am-cd-val" style="letter-spacing:.02em">'+_esc(ev.st)+' <span style="color:#f59f00;font-weight:400">→</span> '+_esc(ev.et)+'</div>'
+        +'<div class="am-cd-lbl">Duration · '+_dStr+'</div></div>';
+    }
+  }catch(e){}
 }
 // Swipe on the live panel: left = peek forward, right = back (past the first
 // event, back to now). The panel FOLLOWS the finger once horizontal intent is
@@ -37559,7 +37606,7 @@ function initActiveMode(){
 <script>
 // Visible build number — must match the service worker's CACHE_NAME version.
 // Lets anyone confirm at a glance which build a device is actually running.
-const APP_BUILD='v256';
+const APP_BUILD='v258';
 try{document.getElementById('app-build-tag').textContent='build '+APP_BUILD;console.log('LA Work '+APP_BUILD);}catch(e){}
 </script>
 
