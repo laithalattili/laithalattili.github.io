@@ -705,9 +705,9 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
       </div>
       <div id="cv-rhythms"></div>
       <div id="cv-tasks" style="display:none"></div>
-      <div id="cv-packing" style="display:none;position:relative;overflow:hidden">
+      <div id="cv-packing" style="display:none">
         <!-- Sub-tabs -->
-        <div style="display:flex;gap:0;border-bottom:1px solid var(--bd);background:var(--sur)">
+        <div id="pk-subtabs" style="display:flex;gap:0;border-bottom:1px solid var(--bd);background:var(--sur)">
           <button class="pk-tab active" data-pkt="items" onclick="switchPKTab('items')">Items</button>
           <button class="pk-tab" data-pkt="lists" onclick="switchPKTab('lists')">Lists</button>
           <button class="pk-tab" data-pkt="active" onclick="switchPKTab('active')">Active</button>
@@ -740,10 +740,11 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
         </div>
 
         <!-- LIST DETAIL (overlaid) -->
-        <div id="pk-list-detail" style="display:none;position:absolute;inset:0;background:var(--bg);z-index:10;overflow-y:auto;min-height:100%">
+        <div id="pk-list-detail" style="display:none">
           <div style="display:flex;align-items:center;gap:8px;padding:.5rem .6rem .3rem;border-bottom:1px solid var(--bd);background:var(--sur)">
             <button onclick="closePKDetail()" style="font-size:12px;color:var(--tx4);background:none;border:none">← Back</button>
             <div id="pk-detail-name" style="flex:1;font-size:14px;font-weight:700;color:var(--tx)"></div>
+            <div id="pk-detail-count" style="font-family:var(--mono);font-size:11px;color:var(--tx4)"></div>
             <button onclick="openEditPackList(_pkDetailListId)" style="font-size:11px;color:var(--tx4);background:none;border:none">✎</button>
           </div>
           <!-- Periods -->
@@ -3415,7 +3416,12 @@ async function switchCV(v){
   ['rhythms','tasks','packing','templates'].forEach(x=>{const e=el('cv-'+x);if(e)e.style.display=x===v?'':'none';});
   if(!_cLoaded)await loadChecklists();
   if(v==='rhythms')renderCVRhythms();if(v==='tasks')renderCVTasks();
-  if(v==='packing'){if(!_pkLoaded){loadPacking().then(()=>switchPKTab('items'));}else switchPKTab('items');}
+  if(v==='packing'){
+    // Always refresh from Supabase so ticks from other devices appear
+    const wasLoaded=_pkLoaded;
+    loadPacking().then(()=>{switchPKTab(_pkActiveLists().length?'active':(_pkTab||'items'));});
+    if(wasLoaded)switchPKTab(_pkActiveLists().length?'active':(_pkTab||'items')); // instant paint from cache
+  }
   if(v==='templates')el('cv-templates').innerHTML='<div style="padding:.75rem;font-size:13px;color:var(--tx3)">Templates — coming in next build.</div>';
 }
 
@@ -3717,21 +3723,26 @@ async function renderDash(){
 
   // ── PACKING progress ───────────────────────────────────────────────────────
   const pkCard=el('dc-pack-card');const pkMain=el('dc-pack-main');
-  if(pkCard&&pkMain&&_pkLoaded){
-    const active=_pkActiveList();
-    if(active){
+  if(pkCard&&pkMain){
+    if(!_pkLoaded)await loadPacking();
+    const actives=typeof _pkActiveLists==='function'?_pkActiveLists():[];
+    if(actives.length){
       pkCard.style.display='';
-      const period=_pkActivePeriod(active.id);
-      const listItems=PK_LIST_ITEMS.filter(x=>x.list_id===active.id);
-      const tickable=listItems.length;
-      const ticked=period?PK_TICKS.filter(t=>t.period_id===period.id&&listItems.some(li=>li.id===t.list_item_id)).length:0;
-      const pct=tickable>0?Math.round(ticked/tickable*100):0;
-      const barColor=pct===100?'var(--ok)':pct>50?'var(--acc)':'var(--bd2)';
-      pkMain.innerHTML=`<div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:4px">${active.name}</div>
-        <div style="height:8px;background:var(--bd);border-radius:4px;overflow:hidden;margin-bottom:3px"><div style="height:100%;width:${pct}%;background:${barColor};border-radius:4px;transition:width .5s"></div></div>
-        <div style="font-family:var(--mono);font-size:11px;color:var(--tx4)">${ticked} / ${tickable} packed · ${pct}%</div>`;
+      pkMain.innerHTML=actives.map(active=>{
+        const period=_pkActivePeriod(active.id);
+        const listItems=PK_LIST_ITEMS.filter(x=>x.list_id===active.id);
+        const tickable=listItems.length;
+        const ticked=period?PK_TICKS.filter(t=>t.period_id===period.id&&listItems.some(li=>li.id===t.list_item_id)).length:0;
+        const pct=tickable>0?Math.round(ticked/tickable*100):0;
+        const barColor=pct===100?'var(--ok)':pct>50?'var(--acc)':'var(--bd2)';
+        return `<div style="margin-bottom:.5rem">
+          <div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:4px">${active.name}</div>
+          <div style="height:8px;background:var(--bd);border-radius:4px;overflow:hidden;margin-bottom:3px"><div style="height:100%;width:${pct}%;background:${barColor};border-radius:4px;transition:width .5s"></div></div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--tx4)">${ticked} / ${tickable} packed · ${pct}%</div>
+        </div>`;
+      }).join('');
     }else pkCard.style.display='none';
-  }else if(pkCard)pkCard.style.display='none';
+  }
 
   // ── OUTFIT ─────────────────────────────────────────────────────────────────
   renderDashOutfit();
@@ -5258,12 +5269,22 @@ function _pkActiveList(){
 
 function switchPKTab(t){
   _pkTab=t;
+  const det=el('pk-list-detail');if(det)det.style.display='none';
+  const st=el('pk-subtabs');if(st)st.style.display='flex';
   document.querySelectorAll('.pk-tab').forEach(b=>b.classList.toggle('active',b.dataset.pkt===t));
   ['items','lists','active'].forEach(x=>{ const el2=el('pkt-'+x);if(el2)el2.style.display=x===t?'':'none'; });
   if(t==='items')renderPKItems();
   if(t==='lists')renderPKLists();
   if(t==='active')renderPKActive();
 }
+// Effective category for a list item: explicit assignment, else the item's first library tag
+function _pkEffCat(li){
+  if(li.category_id)return li.category_id;
+  const tag=PK_ITEM_TAGS.find(t=>t.item_id===li.item_id);
+  return tag?tag.category_id:'__none';
+}
+// All currently active lists (today inside any of their periods)
+function _pkActiveLists(){return PK_LISTS.filter(l=>_pkActivePeriod(l.id));}
 
 // ── RENDER: ITEMS TAB ─────────────────────────────────────────────────────────
 function renderPKItems(){
@@ -5322,13 +5343,20 @@ function renderPKLists(){
 // ── RENDER: ACTIVE TAB ────────────────────────────────────────────────────────
 function renderPKActive(){
   const wrap=el('pk-active-wrap');if(!wrap)return;
-  const active=_pkActiveList();
-  if(!active){wrap.innerHTML='<div style="font-size:13px;color:var(--tx4);text-align:center;padding:1.5rem">No active packing list right now.</div>';return;}
-  const period=_pkActivePeriod(active.id);
-  _pkDetailListId=active.id;_pkDetailPeriodId=period?.id||null;
-  wrap.innerHTML=`<div style="font-size:14px;font-weight:700;color:var(--tx);margin-bottom:.1rem">${active.name}</div>
-    <div style="font-size:11px;color:var(--tx4);margin-bottom:.65rem">${period?period.start_date+' – '+period.end_date:''}</div>`+
-    _renderPackChecklist(active.id,period?.id,true);
+  const actives=_pkActiveLists();
+  if(!actives.length){wrap.innerHTML='<div style="font-size:13px;color:var(--tx4);text-align:center;padding:1.5rem">No active packing list right now.</div>';return;}
+  wrap.innerHTML=actives.map(active=>{
+    const period=_pkActivePeriod(active.id);
+    const listItems=PK_LIST_ITEMS.filter(x=>x.list_id===active.id);
+    const ticked=period?PK_TICKS.filter(t=>t.period_id===period.id&&listItems.some(li=>li.id===t.list_item_id)).length:0;
+    return `<div style="margin-bottom:1.1rem">
+      <div style="display:flex;align-items:baseline;justify-content:space-between">
+        <div style="font-size:14px;font-weight:700;color:var(--tx)">${active.name}</div>
+        <div style="font-family:var(--mono);font-size:11px;color:${ticked===listItems.length&&listItems.length?'var(--ok)':'var(--tx4)'}">${ticked}/${listItems.length} packed</div>
+      </div>
+      <div style="font-size:11px;color:var(--tx4);margin-bottom:.5rem">${period?period.start_date+' – '+period.end_date:''}</div>`+
+      _renderPackChecklist(active.id,period?.id,false)+`</div>`;
+  }).join('');
 }
 
 // ── RENDER: CHECKLIST (shared between active tab + live mode) ─────────────────
@@ -5338,7 +5366,7 @@ function _renderPackChecklist(listId,periodId,withRequired){
   // Group by category
   const catMap={};
   listItems.forEach(li=>{
-    const cid=li.category_id||'__none';
+    const cid=_pkEffCat(li);
     if(!catMap[cid])catMap[cid]=[];
     catMap[cid].push(li);
   });
@@ -5355,7 +5383,7 @@ function _renderPackChecklist(listId,periodId,withRequired){
       const isReq=li.required!=null?li.required:item.required;
       if(withRequired&&!isReq)return; // in active/live, show required only unless showing all
       const ticked=periodId&&PK_TICKS.some(t=>t.list_item_id===li.id&&t.period_id===periodId);
-      html+=`<div onclick="togglePKTick('${li.id}','${periodId}')" style="display:flex;align-items:center;gap:10px;padding:.45rem .75rem;border-bottom:.5px solid var(--bd);cursor:pointer">
+      html+=`<div onclick="togglePKTick('${li.id}','${periodId||''}')" style="display:flex;align-items:center;gap:10px;padding:.45rem .75rem;border-bottom:.5px solid var(--bd);cursor:pointer">
         <div style="width:20px;height:20px;border-radius:50%;border:2px solid ${ticked?'var(--ok)':'var(--bd2)'};background:${ticked?'var(--ok)':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700">${ticked?'✓':''}</div>
         <div style="flex:1">
           <div style="font-size:13px;color:${ticked?'var(--tx4)':'var(--tx)'};text-decoration:${ticked?'line-through':'none'}">${item.name}${isReq?'<span style="font-size:9px;color:var(--acc);margin-left:4px">★</span>':''}</div>
@@ -5377,23 +5405,30 @@ function openPKDetail(listId){
   _pkDetailPeriodId=period?.id||null;
   renderPKPeriods();
   renderPKDetailItems();
+  // Show detail in normal flow; hide sub-tabs and tab bodies so page scroll owns it
+  const st=el('pk-subtabs');if(st)st.style.display='none';
+  ['items','lists','active'].forEach(x=>{const e2=el('pkt-'+x);if(e2)e2.style.display='none';});
   const det=el('pk-list-detail');
-  if(det){det.style.display='block';det.scrollTop=0;}
+  if(det)det.style.display='block';
+  const scr=el('scr');if(scr)scr.scrollTop=0;
 }
 function closePKDetail(){
-  const det=el('pk-list-detail');if(det)det.style.display='none';
   _pkDetailListId=null;_pkDetailPeriodId=null;
-  renderPKLists();
+  switchPKTab('lists');
 }
 function renderPKPeriods(){
   const wrap=el('pk-periods-wrap');if(!wrap||!_pkDetailListId)return;
   const periods=PK_PERIODS.filter(p=>p.list_id===_pkDetailListId).sort((a,b)=>a.start_date.localeCompare(b.start_date));
   const today=todayStr();
   if(!periods.length){wrap.innerHTML='<div style="font-size:11px;color:var(--tx4)">No periods yet.</div>';return;}
+  const listItems=PK_LIST_ITEMS.filter(x=>x.list_id===_pkDetailListId);
   wrap.innerHTML=periods.map(p=>{
     const isNow=today>=p.start_date&&today<=p.end_date;
+    const isPast=p.end_date<today;
+    const ticked=PK_TICKS.filter(t=>t.period_id===p.id&&listItems.some(li=>li.id===t.list_item_id)).length;
+    const suffix=isNow?' ✓ now':isPast?` · ${ticked}/${listItems.length} packed`:'';
     return`<div style="display:flex;align-items:center;gap:8px;padding:.25rem 0">
-      <div style="flex:1;font-size:12px;font-family:var(--mono);color:${isNow?'var(--ok)':'var(--tx3)'}">${p.start_date} – ${p.end_date}${isNow?' ✓ now':''}</div>
+      <div style="flex:1;font-size:12px;font-family:var(--mono);color:${isNow?'var(--ok)':'var(--tx3)'}">${p.start_date} – ${p.end_date}${suffix}</div>
       <button onclick="openEditPackPeriod('${p.id}')" style="font-size:10px;color:var(--tx4);background:none;border:none">✎</button>
     </div>`;
   }).join('');
@@ -5401,9 +5436,10 @@ function renderPKPeriods(){
 function renderPKDetailItems(){
   const wrap=el('pk-detail-items');if(!wrap||!_pkDetailListId)return;
   const listItems=PK_LIST_ITEMS.filter(x=>x.list_id===_pkDetailListId).sort((a,b)=>(a.position||0)-(b.position||0));
+  _pkUpdateDetailCount();
   if(!listItems.length){wrap.innerHTML='<div style="padding:1rem;font-size:13px;color:var(--tx4);text-align:center">No items. Tap + Item or + Category to add.</div>';return;}
   const catMap={};
-  listItems.forEach(li=>{const cid=li.category_id||'__none';if(!catMap[cid])catMap[cid]=[];catMap[cid].push(li);});
+  listItems.forEach(li=>{const cid=_pkEffCat(li);if(!catMap[cid])catMap[cid]=[];catMap[cid].push(li);});
   let html='';
   const period=_pkDetailPeriodId;
   const allCats=[...PK_CATS.filter(c=>catMap[c.id]),{id:'__none',name:'Other'}];
@@ -5420,16 +5456,48 @@ function renderPKDetailItems(){
           <div style="font-size:13px;color:${ticked?'var(--tx4)':'var(--tx)'};text-decoration:${ticked?'line-through':'none'}">${item.name}${isReq?'<span style="font-size:9px;color:var(--acc);margin-left:4px">★</span>':''}</div>
           ${li.note?`<div style="font-size:10px;color:var(--tx4)">${li.note}</div>`:''}
         </div>
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <button onclick="movePKListItem('${li.id}',-1)" style="font-size:9px;line-height:1;color:var(--tx4);background:none;border:none;padding:1px 4px">▲</button>
+          <button onclick="movePKListItem('${li.id}',1)" style="font-size:9px;line-height:1;color:var(--tx4);background:none;border:none;padding:1px 4px">▼</button>
+        </div>
         <button onclick="openEditPKListItem('${li.id}')" style="font-size:10px;color:var(--tx4);background:none;border:none">✎</button>
       </div>`;
     });
   });
   wrap.innerHTML=html;
 }
+function _pkUpdateDetailCount(){
+  const cEl=el('pk-detail-count');if(!cEl)return;
+  if(!_pkDetailListId){cEl.textContent='';return;}
+  const listItems=PK_LIST_ITEMS.filter(x=>x.list_id===_pkDetailListId);
+  const p=_pkDetailPeriodId;
+  const ticked=p?PK_TICKS.filter(t=>t.period_id===p&&listItems.some(li=>li.id===t.list_item_id)).length:0;
+  cEl.textContent=p?(ticked+'/'+listItems.length+' packed'):(listItems.length+' items');
+}
+async function movePKListItem(id,dir){
+  if(!_pkDetailListId)return;
+  const listItems=PK_LIST_ITEMS.filter(x=>x.list_id===_pkDetailListId).sort((a,b)=>(a.position||0)-(b.position||0));
+  const idx=listItems.findIndex(x=>x.id===id);if(idx<0)return;
+  const j=idx+dir;if(j<0||j>=listItems.length)return;
+  // Normalise positions if any collide (legacy rows can share position 0)
+  const seen=new Set();let collide=false;
+  listItems.forEach(x=>{const p=x.position||0;if(seen.has(p))collide=true;seen.add(p);});
+  if(collide)listItems.forEach((x,i)=>x.position=i+1);
+  const a=listItems[idx],b=listItems[j];
+  const tmp=a.position;a.position=b.position;b.position=tmp;
+  renderPKDetailItems();
+  try{
+    const toSave=collide?listItems:[a,b];
+    await Promise.all(toSave.map(x=>supaFrom('omni_pack_list_items').update({position:x.position}).eq('id',x.id)));
+  }catch(e){console.warn('Reorder:',e.message);}
+}
 
 // ── TICK ──────────────────────────────────────────────────────────────────────
 async function togglePKTick(listItemId,periodId){
-  if(!periodId)return;
+  if(!periodId||periodId==='undefined'||periodId==='null'){
+    showToast('Add an active period to this list to start ticking');
+    return;
+  }
   const existing=PK_TICKS.find(t=>t.list_item_id===listItemId&&t.period_id===periodId);
   try{
     if(existing){
@@ -5439,34 +5507,38 @@ async function togglePKTick(listItemId,periodId){
       const{data}=await supaFrom('omni_pack_ticks').insert({list_item_id:listItemId,period_id:periodId}).select().single();
       if(data)PK_TICKS.push(data);
     }
-    renderPKDetailItems();renderPKActive();_renderLivePackCard();
+    renderPKDetailItems();
+    if(_pkTab==='active'&&el('pk-list-detail')?.style.display==='none')renderPKActive();
+    _renderLivePackCard();
   }catch(e){console.warn('Tick:',e.message);}
 }
 
 // ── LIVE MODE PACKING CARD ────────────────────────────────────────────────────
 function _renderLivePackCard(){
   const card=el('live-pack-card');if(!card)return;
-  const active=_pkActiveList();
-  if(!active){card.style.display='none';return;}
-  const period=_pkActivePeriod(active.id);
+  const actives=_pkActiveLists();
+  if(!actives.length){card.style.display='none';return;}
   card.style.display='';
-  const listItems=PK_LIST_ITEMS.filter(x=>x.list_id===active.id).sort((a,b)=>(a.position||0)-(b.position||0));
-  const tickable=listItems.length;
-  const ticked=period?PK_TICKS.filter(t=>t.period_id===period.id&&listItems.some(li=>li.id===t.list_item_id)).length:0;
-  // Only required items in live mode
-  const reqItems=listItems.filter(li=>{const it=PK_ITEMS.find(x=>x.id===li.item_id);return li.required!=null?li.required:(it?.required||false);});
-  card.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem">
-    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#8a7a68">${active.name}</div>
-    <div style="font-family:var(--mono);font-size:10px;color:${ticked===tickable?'#4a7a5a':'#8a7a68'}">${ticked}/${tickable} packed</div>
-  </div>`+
-  (reqItems.length?reqItems.map(li=>{
-    const item=PK_ITEMS.find(x=>x.id===li.item_id);if(!item)return'';
-    const done=period&&PK_TICKS.some(t=>t.list_item_id===li.id&&t.period_id===period.id);
-    return`<div onclick="togglePKTick('${li.id}','${period?.id||''}')" style="display:flex;align-items:center;gap:8px;padding:.2rem 0;cursor:pointer">
-      <div style="width:15px;height:15px;border-radius:50%;border:1.5px solid ${done?'#4a7a5a':'#333'};background:${done?'#4a7a5a':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff">${done?'✓':''}</div>
-      <span style="font-size:12px;color:${done?'#444':'#ccc'};text-decoration:${done?'line-through':'none'}">${item.name}</span>
-    </div>`;
-  }).join(''):`<div style="font-size:11px;color:#555">No required items — open Packing tab to see all.</div>`);
+  card.innerHTML=actives.map(active=>{
+    const period=_pkActivePeriod(active.id);
+    const listItems=PK_LIST_ITEMS.filter(x=>x.list_id===active.id).sort((a,b)=>(a.position||0)-(b.position||0));
+    const tickable=listItems.length;
+    const ticked=period?PK_TICKS.filter(t=>t.period_id===period.id&&listItems.some(li=>li.id===t.list_item_id)).length:0;
+    // Only required items in live mode
+    const reqItems=listItems.filter(li=>{const it=PK_ITEMS.find(x=>x.id===li.item_id);return li.required!=null?li.required:(it?.required||false);});
+    return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#8a7a68">${active.name}</div>
+      <div style="font-family:var(--mono);font-size:10px;color:${ticked===tickable&&tickable?'#4a7a5a':'#8a7a68'}">${ticked}/${tickable} packed</div>
+    </div>`+
+    (reqItems.length?reqItems.map(li=>{
+      const item=PK_ITEMS.find(x=>x.id===li.item_id);if(!item)return'';
+      const done=period&&PK_TICKS.some(t=>t.list_item_id===li.id&&t.period_id===period.id);
+      return`<div onclick="togglePKTick('${li.id}','${period?.id||''}')" style="display:flex;align-items:center;gap:8px;padding:.2rem 0;cursor:pointer">
+        <div style="width:15px;height:15px;border-radius:50%;border:1.5px solid ${done?'#4a7a5a':'#333'};background:${done?'#4a7a5a':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff">${done?'✓':''}</div>
+        <span style="font-size:12px;color:${done?'#444':'#ccc'};text-decoration:${done?'line-through':'none'}">${item.name}</span>
+      </div>`;
+    }).join(''):`<div style="font-size:11px;color:#555;margin-bottom:.3rem">No required items — open Packing tab to see all.</div>`);
+  }).join('<div style="height:.55rem"></div>');
 }
 
 // ── CRUD: CATEGORIES ──────────────────────────────────────────────────────────
@@ -5535,10 +5607,11 @@ async function savePKItem(){
       closePKItemModal();renderPKItems();showToast('Saved ✓');
       return;
     }
-    // Adding: split on comma for multiple items at once
+    // Adding: split on comma for multiple items at once; skip names already in library
     const names=raw.split(',').map(s=>s.trim()).filter(Boolean);
-    let added=0;
+    let added=0,skipped=0;
     for(const nm of names){
+      if(PK_ITEMS.some(x=>x.name.toLowerCase()===nm.toLowerCase())){skipped++;continue;}
       const{data}=await supaFrom('omni_pack_items').insert({name:nm,required:req}).select().single();
       if(data){
         PK_ITEMS.push(data);added++;
@@ -5549,7 +5622,8 @@ async function savePKItem(){
         }
       }
     }
-    closePKItemModal();renderPKItems();showToast(added>1?added+' items added ✓':'Saved ✓');
+    closePKItemModal();renderPKItems();
+    showToast((added>1?added+' items added ✓':added===1?'Saved ✓':'Nothing added')+(skipped?' · '+skipped+' already existed':''));
   }catch(e){showToast('Error');console.error(e);}
 }
 async function deletePKItem(){
@@ -5657,21 +5731,27 @@ async function savePKListItem(){
   const newRaw=el('pklitem-new').value.trim();
   try{
     const itemIds=[..._pkSelItems];
-    // Create new item(s) if typed (comma-separated allowed here too)
+    // Create new item(s) if typed (comma-separated allowed here too).
+    // A name matching an existing library item reuses it instead of duplicating.
     if(newRaw){
       const names=newRaw.split(',').map(s=>s.trim()).filter(Boolean);
       for(const nm of names){
+        const existing=PK_ITEMS.find(x=>x.name.toLowerCase()===nm.toLowerCase());
+        if(existing){if(!itemIds.includes(existing.id))itemIds.push(existing.id);continue;}
         const{data}=await supaFrom('omni_pack_items').insert({name:nm,required:req}).select().single();
         if(data){PK_ITEMS.push(data);itemIds.push(data.id);}
       }
     }
     if(!itemIds.length){showToast('Select or create an item');return;}
     let pos=Math.max(0,...PK_LIST_ITEMS.filter(x=>x.list_id===_pkDetailListId).map(x=>x.position||0));
-    const rows=itemIds.map(id=>({
+    // Skip anything already in this list; note applies to every row added
+    const inList=new Set(PK_LIST_ITEMS.filter(x=>x.list_id===_pkDetailListId).map(x=>x.item_id));
+    const rows=itemIds.filter(id=>!inList.has(id)).map(id=>({
       list_id:_pkDetailListId,item_id:id,
-      note:(itemIds.length===1?note:'')||null,
+      note:note||null,
       required:req?true:null,position:++pos
     }));
+    if(!rows.length){showToast('Already in this list');return;}
     const{data}=await supaFrom('omni_pack_list_items').insert(rows).select();
     if(data)PK_LIST_ITEMS.push(...data);
     _pkSelItems=new Set();closePKLItemModal();renderPKDetailItems();
