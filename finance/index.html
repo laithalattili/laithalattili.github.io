@@ -309,6 +309,7 @@ input:focus,select:focus{border-color:var(--ink)}
 .cat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:9px}
 .cat-btn{display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 4px;border-radius:var(--r);border:.5px solid var(--brd);cursor:pointer;background:var(--surf);transition:all .12s;font-size:10px;font-weight:600;color:var(--ink3);text-align:center}
 .cat-btn:hover{background:var(--bg)}.cat-btn.sel{border-color:var(--ink);color:var(--ink)}
+.cat-btn-hol{background:var(--amb-bg);border-color:var(--amb);color:#f2a65a;font-weight:700}.cat-btn-hol:hover{background:var(--amb-bg)}.cat-btn-hol.sel{border-color:#f2a65a;color:#f2a65a;box-shadow:0 0 0 2px rgba(242,166,90,.25)}
 .cat-dot{width:14px;height:14px;border-radius:50%}
 .log-big-btn{width:100%;padding:14px;border-radius:var(--rlg);border:none;background:var(--ink);color:var(--bg);font-size:16px;font-weight:700;cursor:pointer;font-family:var(--f);display:flex;align-items:center;justify-content:center;gap:7px}
 .log-big-btn:hover{opacity:.87}.log-big-btn:active{transform:scale(.98)}
@@ -545,6 +546,7 @@ input:focus,select:focus{border-color:var(--ink)}
   </div>
   <div id="log-hol-bar" style="margin-bottom:9px"></div>
   <div id="log-month-summary" style="margin-bottom:11px"></div>
+  <button id="log-jump-btn" class="btn btn-p" style="display:none;position:fixed;right:14px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:55;border-radius:999px;padding:10px 16px;font-size:13px;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.25)" onclick="var f=document.querySelector('.log-amt-wrap');if(f){f.scrollIntoView({behavior:'smooth',block:'start'});setTimeout(function(){var a=document.getElementById('log-amt');if(a)a.focus();},380);}">+ Add expense</button>
   <div class="log-amt-wrap">
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin-bottom:9px" id="log-mode-lbl">New Expense</div>
     <input class="log-amt-big" type="number" id="log-amt" placeholder="0" min="0" step="0.01"/>
@@ -965,7 +967,7 @@ function updateClock(){
 var MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 var MNAMES=['January','February','March','April','May','June','July','August','September','October','November','December'];
 var OZ_TO_G=31.1035;
-var CAT_COLORS_DEFAULTS={'Food & dining':'#e07b54','Transport':'#5d9fd4','Taobao / shopping':'#9b6fd4','Entertainment':'#e8b84b','Personal care':'#4db89e','Protein & supplements':'#6bcb77','Phone & mobile':'#8fa0c0','AI services':'#c78acd','Holiday':'#f2a65a','Gifts':'#e98f9f','Health':'#5bbfb5','Cat':'#f4a261','Other':'#aaa'};
+var CAT_COLORS_DEFAULTS={'Food & dining':'#e07b54','Transport':'#5d9fd4','Taobao / shopping':'#9b6fd4','Entertainment':'#e8b84b','Personal care':'#4db89e','Protein & supplements':'#6bcb77','Phone & mobile':'#8fa0c0','AI services':'#c78acd','Gifts':'#e98f9f','Health':'#5bbfb5','Cat':'#f4a261','Other':'#aaa'};
 // CAT_COLORS is a live proxy into S.catColors so it persists and syncs across devices.
 // Always access via this variable — never read S.catColors directly.
 var CAT_COLORS=CAT_COLORS_DEFAULTS;
@@ -2150,7 +2152,7 @@ function renderDashboard(){
     var holActive=getActiveHolidays();
     // Holiday budget in its native currency
     var holBudObj=null;
-    holActive.forEach(function(h){var bd=holDailyBudgetTotal(h);if(bd.total>0&&!holBudObj)holBudObj={total:bd.total,currency:bd.currency,spent:holDailyBudgetSpent(h)};});
+    holActive.forEach(function(h){var bd=holDailyBudgetTotal(h);if(bd.total>0&&!holBudObj)holBudObj={total:bd.total,currency:bd.currency,spent:holDailyBudgetSpent(h),hol:h};});
     var showingHol=totalBudget<1&&holBudObj;
     var dispBudget=showingHol?holBudObj.total:totalBudget;
     var dispSpent=showingHol?holBudObj.spent:totalSpent;
@@ -2161,10 +2163,18 @@ function renderDashboard(){
     var budTitle=showingHol?'This month \u00b7 holiday budget':'This month \u00b7 budget';
     budBar.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'+
       '<div style="font-size:12px;font-weight:700;color:'+(showingHol?'#f2a65a':'var(--ink2)')+'">'+budTitle+'</div>'+
-      '<div class="mono" style="font-size:13px;font-weight:700;color:'+(dispSpent>dispBudget?'var(--red)':'var(--ink2)')+'">'+dispFmt(dispSpent)+' <span style="font-weight:400;color:var(--ink4)">/ '+dispFmt(dispBudget)+' '+dispCur+'</span></div>'+
+      '<div class="mono" style="font-size:14px;font-weight:800;color:'+budRemColor(dispBudget-dispSpent,dispBudget)+'">'+(dispSpent>dispBudget?'Over by '+dispFmt(dispSpent-dispBudget):dispFmt(dispBudget-dispSpent)+' left')+' '+dispCur+'</div>'+
       '</div>'+
       '<div class="prog-track"><div class="prog-fill" style="width:'+dispPct+'%;background:'+dispCol+'"></div></div>'+
-      '<div style="font-size:11px;color:var(--ink3);margin-top:3px">'+(dispSpent>dispBudget?'Over by '+dispFmt(dispSpent-dispBudget):dispFmt(dispBudget-dispSpent)+' remaining')+' '+dispCur+'</div>';
+      '<div style="font-size:11px;color:var(--ink3);margin-top:3px" class="mono">Spent '+dispFmt(dispSpent)+' of '+dispFmt(dispBudget)+' '+dispCur+(function(){
+        if(!showingHol||!holBudObj||!holBudObj.hol)return '';
+        var hD=holBudObj.hol;var hsD=parseLocalDate(hD.start),heD=parseLocalDate(hD.end);var nowDD=today();
+        if(!hsD||!heD||nowDD<hsD||nowDD>heD)return '';
+        var totD=Math.round((heD-hsD)/86400000)+1;var dayD=Math.floor((nowDD-hsD)/86400000)+1;
+        var remD=Math.max(1,totD-dayD);
+        var fwdD=n2(Math.max(0,dispBudget-dispSpent)/remD);
+        return ' \u00b7 '+fwdD+'/day for '+remD+' days left';
+      })()+'</div>';
     // Compact surplus strip inside the same card
     var surplusByCur=calcSurplusByCur();
     var surParts=[];
@@ -2221,7 +2231,7 @@ function renderDashboard(){
 
 // ═══ LOG ═══
 function catDisplayName(cat){if(cat==='__surplus__')return 'Surplus';if(cat&&cat.indexOf('__hol-')===0){var b=S.budgets&&S.budgets[cat];return b&&b.holLabel?('✈ '+b.holLabel):'✈ Holiday';}return cat;}
-function renderCatGrid(){var cg=document.getElementById('cat-grid');if(!cg)return;cg.innerHTML='';Object.keys(CAT_COLORS).forEach(function(cat){var btn=document.createElement('div');btn.className='cat-btn'+(S.selectedCat===cat?' sel':'');var dot=document.createElement('div');dot.className='cat-dot';dot.style.background=CAT_COLORS[cat];btn.appendChild(dot);var lbl=document.createElement('span');lbl.textContent=catDisplayName(cat);btn.appendChild(lbl);btn.onclick=function(){S.selectedCat=cat;renderCatGrid();updateHolCatField();};cg.appendChild(btn);});updateHolCatField();}
+function renderCatGrid(){var cg=document.getElementById('cat-grid');if(!cg)return;cg.innerHTML='';var catKeys=Object.keys(CAT_COLORS);catKeys.sort(function(a,b){return (a.indexOf('__hol-')===0?0:1)-(b.indexOf('__hol-')===0?0:1);});catKeys.forEach(function(cat){var isHolBtn=cat.indexOf('__hol-')===0;var btn=document.createElement('div');btn.className='cat-btn'+(isHolBtn?' cat-btn-hol':'')+(S.selectedCat===cat?' sel':'');var dot=document.createElement('div');dot.className='cat-dot';dot.style.background=CAT_COLORS[cat];btn.appendChild(dot);var lbl=document.createElement('span');lbl.textContent=catDisplayName(cat);btn.appendChild(lbl);btn.onclick=function(){S.selectedCat=cat;renderCatGrid();updateHolCatField();};cg.appendChild(btn);});updateHolCatField();}
 function updateHolCatField(){
   var wrap=document.getElementById('log-holcat-wrap');if(!wrap)return;
   var isHol=(S.selectedCat||'').indexOf('__hol-')===0;
@@ -2404,6 +2414,11 @@ function renderLogFavourites(){
   });
   el.appendChild(wrap);
 }
+function budRemColor(rem,budget){
+  if(rem<0)return 'var(--red)';
+  var f=budget>0?rem/budget:0;
+  return f>0.3?'var(--grn)':f>0.1?'var(--amb)':'var(--red)';
+}
 function renderLogMonthlySummary(){
   var el=document.getElementById('log-month-summary');if(!el)return;
   var now=logViewDate();
@@ -2422,16 +2437,32 @@ function renderLogMonthlySummary(){
   el.innerHTML='<div style="background:var(--surf);border:.5px solid var(--brd);border-radius:var(--rlg);padding:11px 14px">'
     +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">'
     +'<span style="font-size:12px;font-weight:700;color:var(--ink2)">'+mn+' spending</span>'
-    +'<span style="font-family:var(--mono);font-size:13px;font-weight:700;color:'+(over?'var(--red)':'var(--ink)')+'">'+fRMB(totalSpent)+'</span>'
+    +'<span style="font-family:var(--mono);font-size:14px;font-weight:800;color:'+budRemColor(totalBudget-totalSpent,totalBudget)+'">'+(over?'Over by '+fRMB(totalSpent-totalBudget):fRMB(totalBudget-totalSpent)+' left')+'</span>'
     +'</div>'
     +'<div style="height:5px;background:var(--bg);border-radius:3px;overflow:hidden;margin-bottom:5px">'
     +'<div style="height:100%;width:'+pct+'%;background:'+col+';border-radius:3px;transition:width .3s"></div>'
     +'</div>'
     +'<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ink3)">'
-    +'<span>'+(over?'Over budget by '+fRMB(totalSpent-totalBudget):pct+'% of budget used')+'</span>'
-    +'<span>Budget: '+fRMB(totalBudget)+'</span>'
+    +'<span>Spent '+fRMB(totalSpent)+' of '+fRMB(totalBudget)+'</span>'
+    +'<span>'+pct+'% used</span>'
     +'</div>'
     +'</div>';
+  // Carried surplus from past months — measurement context, kept OUT of the bar
+  // so the bar stays this-month discipline. Current month view only.
+  if(logIsCurrentMonth()){
+    try{
+      var lsbc=calcSurplusByCur();var lsParts=[];
+      Object.keys(lsbc).forEach(function(c){
+        var a=lsbc[c];if(Math.abs(a)<1)return;
+        var f=c==='JOD'?fJOD:c==='GBP'?fGBP:fRMB;
+        lsParts.push('<span class="mono" style="font-weight:700;color:'+(a>=0?'var(--grn)':'var(--red)')+'">'+(a>=0?'+':'')+f(a)+'</span>');
+      });
+      if(lsParts.length){
+        el.innerHTML+='<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--ink3);padding:5px 14px 0">'
+          +'<span>Carried surplus from past months</span><span style="display:flex;gap:8px">'+lsParts.join('')+'</span></div>';
+      }
+    }catch(e){}
+  }
 }
 function renderLogHolBar(){
   var el=document.getElementById('log-hol-bar');if(!el)return;
@@ -2454,9 +2485,33 @@ function renderLogHolBar(){
     var over=spent>bd.total;
     var bar=document.createElement('div');
     bar.style.cssText='background:var(--surf2);border:.5px solid #f2a65a;border-radius:var(--r);padding:9px;margin-bottom:6px';
-    bar.innerHTML='<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#f2a65a;margin-bottom:4px"><span>✈ '+h.label+'</span><span style="color:'+(over?'var(--red)':'var(--ink3)')+'">'+n2(spent)+' / '+bd.total+' '+bd.currency+'</span></div>'+
+    var holRem=n2(bd.total-spent);
+    bar.innerHTML='<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:12px;font-weight:700;color:#f2a65a;margin-bottom:4px"><span>\u2708 '+h.label+'</span><span class="mono" style="font-weight:800;font-size:13px;color:'+budRemColor(holRem,bd.total)+'">'+(over?'Over by '+n2(-holRem):n2(holRem)+' left')+' '+bd.currency+'</span></div>'+
       '<div style="background:var(--brd);border-radius:3px;height:6px;overflow:hidden"><div style="height:100%;border-radius:3px;width:'+pct+'%;background:'+(over?'var(--red)':'#f2a65a')+'"></div></div>'+
-      '<div style="font-size:10px;margin-top:2px;color:'+(over?'var(--red)':'var(--ink3)')+'">'+( over?'⚠ Over by '+n2(spent-bd.total):(n2(bd.total-spent)+' remaining'))+' '+bd.currency+'</div>';
+      '<div style="font-size:10px;margin-top:2px;color:var(--ink4)" class="mono">'+n2(spent)+' of '+bd.total+' '+bd.currency+' spent</div>';
+    // Pace tracker — only while the trip is actively running and viewing the current month
+    var nowP=today();
+    var hs3=parseLocalDate(h.start),he3=parseLocalDate(h.end);
+    if(logIsCurrentMonth()&&hs3&&he3&&nowP>=hs3&&nowP<=he3&&bd.total>0){
+      var nightsP=safeArr(h.items).filter(function(t){return t.type==='daily';}).reduce(function(a,t){return a+(t.nights||1);},0);
+      var dailyRate=nightsP>0?n2(bd.total/nightsP):0;
+      var dayNum=Math.floor((nowP-hs3)/86400000)+1;
+      var totalDaysP=Math.round((he3-hs3)/86400000)+1;
+      var remDays=Math.max(1,totalDaysP-dayNum);
+      var catKeyP='__hol-'+h.id+'__';
+      var todayStr=nowP.toISOString().split('T')[0];
+      var todaySpent=n2(safeArr(expenses).filter(function(e){return e.category===catKeyP&&e.date===todayStr;}).reduce(function(a,e){return a+toTarget(e.amount,e.currency,bd.currency);},0));
+      // Budget side capped by nights; time side uses calendar days
+      var paceAllowed=n2(dailyRate*Math.min(dayNum,nightsP));
+      var paceDiff=n2(paceAllowed-spent); // positive = under pace
+      var fwdAllow=remDays>0?n2(Math.max(0,bd.total-spent)/remDays):0;
+      var todayOver=dailyRate>0&&todaySpent>dailyRate;
+      var paceHTML='<div style="margin-top:5px;padding-top:5px;border-top:.5px dashed var(--brd)" class="mono">'
+        +'<div style="display:flex;justify-content:space-between;font-size:10px"><span style="color:'+(todayOver?'var(--red)':'var(--ink3)')+'">Today: '+n2(todaySpent)+(dailyRate>0?' (rate '+dailyRate+')':'')+'</span><span style="color:var(--ink4)">Day '+dayNum+'/'+totalDaysP+'</span></div>'
+        +'<div style="display:flex;justify-content:space-between;font-size:10px;margin-top:1px"><span style="font-weight:700;color:'+(paceDiff>=0?'var(--grn)':'var(--red)')+'">'+(paceDiff>=0?'Under pace by '+n2(paceDiff):'Over pace by '+n2(-paceDiff))+'</span><span style="color:var(--ink3)">'+fwdAllow+'/day for '+remDays+' days left</span></div>'
+        +'</div>';
+      bar.insertAdjacentHTML('beforeend',paceHTML);
+    }
     el.appendChild(bar);
   });
 }
@@ -2478,9 +2533,11 @@ function renderLogBudgetBars(){
     var col2=pct2>90?'var(--red)':pct2>70?'var(--amb)':'var(--grn)';
     var fmtFn2=cur2==='JOD'?fJOD:cur2==='GBP'?fGBP:fRMB;
     var row2=document.createElement('div');row2.style.marginBottom='6px';
-    row2.innerHTML='<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">'+
+    var rem2=n2(budget2-spent2);
+    row2.innerHTML='<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:12px;margin-bottom:2px">'+
       '<span style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:'+(CAT_COLORS[cat]||'#aaa')+';display:inline-block"></span>'+catDisplayName(cat)+'</span>'+
-      '<span class="mono">'+fmtFn2(spent2)+' / '+fmtFn2(budget2)+' '+cur2+'</span></div>'+
+      '<span style="text-align:right"><span class="mono" style="font-weight:800;font-size:13px;color:'+budRemColor(rem2,budget2)+'">'+(rem2<0?'Over by '+fmtFn2(-rem2):fmtFn2(rem2)+' left')+'</span>'+
+      '<span class="mono" style="display:block;font-size:10px;color:var(--ink4)">'+fmtFn2(spent2)+' of '+fmtFn2(budget2)+' '+cur2+'</span></span></div>'+
       '<div class="prog-track"><div class="prog-fill" style="width:'+pct2+'%;background:'+col2+'"></div></div>';
     el.appendChild(row2);
   });
@@ -2611,6 +2668,19 @@ function toggleTick(id){
       }
     }
   }
+  // Surplus take: ticking zeroes the pool by advancing the reset date (the
+  // confirmation above already recorded the amount, so the item stays visible).
+  // Unticking restores the previous reset date so the pool reappears.
+  if(id.indexOf('surplus-')===0&&!isFuture){
+    if(!wasOn){
+      S.surplusPrevReset=S.surplusResetDate||null;
+      S.surplusResetDate=today().toISOString().split('T')[0];
+    } else {
+      S.surplusResetDate=S.surplusPrevReset||null;
+      delete S.surplusPrevReset;
+      if(confirmedDebits[cKey]&&confirmedDebits[cKey][id])delete confirmedDebits[cKey][id];
+    }
+  }
   autosave();renderCommitments();if(currentPage==='dashboard')renderDashboard();
   // Sync wishlist bought state when a wl- tick changes
   if(id.indexOf('wl-')===0){
@@ -2625,8 +2695,8 @@ function toggleTick(id){
     }
   }
 }
-function tickAll(){getCommitItems().forEach(function(c){if(!tickState[tickKey(c.id)])toggleTick(c.id);});renderCommitments();}
-function untickAll(){getCommitItems().forEach(function(c){tickState[tickKey(c.id)]=false;});autosave();renderCommitments();}
+function tickAll(){getCommitItems().forEach(function(c){if(c.method==='surplus')return;if(!tickState[tickKey(c.id)])toggleTick(c.id);});renderCommitments();}
+function untickAll(){getCommitItems().forEach(function(c){if(c.method==='surplus')return;tickState[tickKey(c.id)]=false;});autosave();renderCommitments();}
 function getCommitItemsForMonth(pyr,pmo){return getCommitItems(pyr,pmo);}
 function getCommitItems(pyr,pmo){
   var yr=pyr!=null?pyr:commitMon.year,mo=pmo!=null?pmo:commitMon.month,items=[];
@@ -2711,6 +2781,30 @@ function getCommitItems(pyr,pmo){
   });
   }catch(e){console.error('[COMMIT] holiday grouping error:',e);}
   safeArr(wishlistItems).filter(function(w){return w.scheduledYr===yr&&w.scheduledMo===mo;}).forEach(function(w){items.push({id:'wl-'+w.id,name:'\uD83D\uDED2 '+w.name,amount:w.amount,currency:w.currency,type:'out',method:'wishlist',note:w.note||'Wishlist item'});});
+  // Budget surplus — tickable withdrawal of the accumulated pool (current real month only).
+  // Tick = "I took this money" (accounting layer). It resets the pool; NO expense is logged.
+  try{
+    var nowS=today();
+    if(yr===nowS.getFullYear()&&mo===nowS.getMonth()+1){
+      var poolS=calcSurplusByCur();
+      var cdS=confirmedDebits[yr+'-'+mo]||{};
+      var seen={};
+      // Already-ticked take items: render from the recorded amount (pool is 0 now)
+      Object.keys(cdS).forEach(function(k){
+        if(k.indexOf('surplus-')!==0)return;
+        if(!tickState[yr+'-'+mo+'-'+k])return;
+        seen[k]=true;
+        items.push({id:k,name:'\uD83D\uDCB0 Take budget surplus',amount:cdS[k].amount,currency:cdS[k].currency,type:'out',method:'surplus',note:'Withdrawn — pool reset; it re-accumulates from today'});
+      });
+      // Live pool per currency
+      Object.keys(poolS).forEach(function(c){
+        var a=poolS[c];if(a<1)return;
+        var idS='surplus-'+c;
+        if(seen[idS])return;
+        items.push({id:idS,name:'\uD83D\uDCB0 Take budget surplus',amount:n2(a),currency:c,type:'out',method:'surplus',note:'Accumulated budget underspend \u2014 tick if you withdraw it; Reset on Dashboard saves it instead'});
+      });
+    }
+  }catch(e){console.warn('[COMMIT] surplus item:',e);}
   return items;
 }
 
@@ -2756,7 +2850,7 @@ function renderCommitments(){
   var items=getCommitItems();
   var carryItems=getCarryOverItems(yr,mo);
 
-  var methodBadge={transfer:'<span class="ctb ctb-t">Transfer</span>',app:'<span class="ctb ctb-a">Bank app</span>',auto:'<span class="ctb ctb-au">Auto</span>',settlement:'<span class="ctb ctb-s">Settlement</span>',income:'',wishlist:'<span class="ctb" style="background:var(--pur-bg);color:var(--pur)">Wishlist</span>',holiday:'<span class="ctb" style="background:var(--blu-bg);color:var(--blu)">Holiday</span>'};
+  var methodBadge={transfer:'<span class="ctb ctb-t">Transfer</span>',app:'<span class="ctb ctb-a">Bank app</span>',auto:'<span class="ctb ctb-au">Auto</span>',settlement:'<span class="ctb ctb-s">Settlement</span>',income:'',wishlist:'<span class="ctb" style="background:var(--pur-bg);color:var(--pur)">Wishlist</span>',holiday:'<span class="ctb" style="background:var(--blu-bg);color:var(--blu)">Holiday</span>',surplus:'<span class="ctb" style="background:var(--grn-bg);color:var(--grn)">Surplus</span>'};
 
   // Sub-group definitions — which top-level category they belong to
   var subGroups=[
@@ -2765,6 +2859,7 @@ function renderCommitments(){
     {key:'settlement',title:'Settlement payments',   cat:'out', icon:'📋'},
     {key:'auto',     title:'Automated debits',       cat:'out', icon:'⚡'},
     {key:'holiday',  title:'Holiday budgets',        cat:'out', icon:'✈️'},
+    {key:'surplus',  title:'Budget surplus',          cat:'out', icon:'💰'},
     {key:'wishlist', title:'Wishlist purchases',     cat:'out', icon:'🛒'},
     {key:'income',   title:'Income to confirm',      cat:'in',  icon:'💰'},
   ];
@@ -5557,6 +5652,32 @@ document.addEventListener('DOMContentLoaded',function(){
   migrateBudgets();
   initCatColors();
   setTimeout(function(){if(typeof seedUndo==='function')seedUndo();if(typeof updateFinanceBanner==='function')updateFinanceBanner();},1200);
+  try{
+    var _lw=document.querySelector('.log-amt-wrap'),_lj=document.getElementById('log-jump-btn');
+    if(_lw&&_lj&&'IntersectionObserver' in window){
+      new IntersectionObserver(function(en){_lj.style.display=en[0].isIntersecting?'none':'inline-flex';},{threshold:0}).observe(_lw);
+    }
+  }catch(e){}
+  // Heal legacy 'Holiday' category: it never matched any trip's internal key, so
+  // expenses logged on it were invisible to every holiday bar. Remap each such
+  // expense to the trip whose date range contains it, and remove the trap button.
+  try{
+    safeArr(expenses).forEach(function(e){
+      if(e.category!=='Holiday')return;
+      var ed=parseLocalDate(e.date);if(!ed)return;
+      var match=safeArr(holidays).find(function(h){
+        if(h.archived||!h.start||!h.end)return false;
+        var hs=parseLocalDate(h.start),he=parseLocalDate(h.end);
+        return hs&&he&&ed>=hs&&ed<=he;
+      });
+      if(match)e.category='__hol-'+match.id+'__';
+    });
+    if(S.catColors&&S.catColors['Holiday'])delete S.catColors['Holiday'];
+    if(typeof CAT_COLORS!=='undefined'&&CAT_COLORS['Holiday'])delete CAT_COLORS['Holiday'];
+    if(S.budgets&&S.budgets['Holiday'])delete S.budgets['Holiday'];
+    if(Array.isArray(S.budgetOrder))S.budgetOrder=S.budgetOrder.filter(function(x){return x!=='Holiday';});
+    if(S.selectedCat==='Holiday')S.selectedCat='Other';
+  }catch(e){console.warn('holiday-cat heal:',e);}
   // Heal one-off phases whose hidden end month drifted from start (caused double-counting)
   try{safeArr(settlements).forEach(function(s){safeArr(s.phases).forEach(function(ph){if(ph.oneOff&&(ph.endMon!==ph.startMon||ph.endYr!==ph.startYr)){ph.endMon=ph.startMon;ph.endYr=ph.startYr;}});});}catch(e){}
   if(typeof syncHolidayBudgets==='function')syncHolidayBudgets();
