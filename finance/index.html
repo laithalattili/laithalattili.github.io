@@ -1016,6 +1016,9 @@ var S={
   financeNotified:{},
   targetMonth:{yr:null,mo:null},
   surplusResetDate:null,
+  surplusResetDates:{},
+  surplusAdjustments:[],
+  surplusEvents:[],
   mlFlowOpen:{jod:true,rmb:true},
   salaryPhases:[],
   salaryRMBFull:0,
@@ -2185,13 +2188,11 @@ function renderDashboard(){
       surParts.push('<span class="mono" style="font-weight:700;color:'+(sa>=0?'var(--grn)':'var(--red)')+'">'+(sa>=0?'+':'')+fmtFn2(sa)+'</span>');
     });
     if(surParts.length){
-      var resetDate2=S.surplusResetDate?new Date(S.surplusResetDate):null;
-      var sinceStr=resetDate2?resetDate2.toLocaleDateString('en-GB',{month:'short',year:'numeric'}):'all time';
       var surStrip=document.createElement('div');
       surStrip.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:.5px solid var(--brd)';
-      surStrip.innerHTML='<span style="font-size:11px;color:var(--ink3)">Surplus <span style="color:var(--ink4);font-size:10px">since '+sinceStr+'</span></span>'+
-        '<span style="display:flex;gap:8px;align-items:center;font-size:12px">'+surParts.join(' ')+
-        '<button class="btn btn-xs btn-d" onclick="resetSurplus()" style="padding:1px 6px;font-size:10px">Reset</button></span>';
+      surStrip.innerHTML='<span style="font-size:11px;color:var(--ink3)">Variance <span style="color:var(--ink4);font-size:10px">manage in Commitments</span></span>'+
+        '<span style="display:flex;gap:8px;align-items:center;font-size:12px">'+surParts.join(' ')+'</span>';
+      surStrip.style.cursor='pointer';surStrip.onclick=function(){showView('commitments');};
       budBar.appendChild(surStrip);
     }
     budgetSecEl.appendChild(budBar);
@@ -2310,26 +2311,31 @@ function updateSurplus(){
   var budget=Object.keys(S.budgets).filter(function(c){return c!=='__surplus__'&&c.indexOf('__hol-')<0;}).reduce(function(a,cat){return a+toRMB(getBudgetAmount(cat),getBudgetCurrency(cat));},0);
   S.rmbSurplus=n2(Math.max(0,budget-spent));
 }
+function surplusResetDateFor(cur){return (S.surplusResetDates&&S.surplusResetDates[cur])||S.surplusResetDate||null;}
+function surplusResetStart(cur){
+  var d=surplusResetDateFor(cur);var now=today();
+  if(d){var dd=new Date(d);return new Date(dd.getFullYear(),dd.getMonth(),1);}
+  return new Date(now.getFullYear()-1,now.getMonth(),1);
+}
 function calcSurplusByCur(){
   var now=today();
-  var resetDate=S.surplusResetDate?new Date(S.surplusResetDate):null;
   var currencies={};
   Object.keys(S.budgets||{}).forEach(function(cat){
     if(cat==='__surplus__'||cat.indexOf('__hol-')===0)return;
-    var cur=getBudgetCurrency(cat);
-    if(!currencies[cur])currencies[cur]=true;
+    currencies[getBudgetCurrency(cat)]=true;
   });
+  safeArr(S.surplusAdjustments).forEach(function(a){if(a&&a.currency)currencies[a.currency]=true;});
   if(!Object.keys(currencies).length)return {};
-  var result={};Object.keys(currencies).forEach(function(c){result[c]=0;});
-  var startDate=resetDate?new Date(resetDate.getFullYear(),resetDate.getMonth(),1):new Date(now.getFullYear()-1,now.getMonth(),1);
-  var d=new Date(startDate);
+  var result={};Object.keys(currencies).forEach(function(x){result[x]=0;});
   var lastMonth=new Date(now.getFullYear(),now.getMonth()-1,1);
-  while(d<=lastMonth){
-    var yr=d.getFullYear(),mo=d.getMonth()+1;
-    Object.keys(currencies).forEach(function(cur){
+  var sLinked={};
+  safeArr(streams).forEach(function(st){if(st.type==='expense')safeArr(st.linkedBudgetCats).forEach(function(x){sLinked[x]=true;});});
+  Object.keys(currencies).forEach(function(cur){
+    // Auto part: monthly budget minus logged spend, per completed month, from this currency's reset start
+    var d=new Date(surplusResetStart(cur));
+    while(d<=lastMonth){
+      var yr=d.getFullYear(),mo=d.getMonth()+1;
       var sFrac=nonHolidayFraction(yr,mo);
-      var sLinked={};
-      safeArr(streams).forEach(function(st){if(st.type==='expense')safeArr(st.linkedBudgetCats).forEach(function(c){sLinked[c]=true;});});
       var monthBudget=Object.keys(S.budgets||{}).filter(function(cat){
         return cat!=='__surplus__'&&cat.indexOf('__hol-')<0&&getBudgetCurrency(cat)===cur;
       }).reduce(function(a,cat){var b=getBudgetAmount(cat);if(sLinked[cat])b=n2(b*sFrac);return a+b;},0);
@@ -2339,10 +2345,37 @@ function calcSurplusByCur(){
           S.budgets&&S.budgets[e.category]&&e.category!=='__surplus__'&&e.category.indexOf('__hol-')<0;
       }).reduce(function(a,e){return a+e.amount;},0);
       result[cur]=n2(result[cur]+(monthBudget-monthSpent));
+      d.setMonth(d.getMonth()+1);
+    }
+    // Manual part: signed adjustments dated on/after this currency's reset date
+    var rst=surplusResetDateFor(cur);
+    safeArr(S.surplusAdjustments).forEach(function(a){
+      if(!a||a.currency!==cur)return;
+      if(rst&&(a.date||'')<rst)return;
+      result[cur]=n2(result[cur]+(a.amount||0));
     });
-    d.setMonth(d.getMonth()+1);
-  }
+  });
   return result;
+}
+function addSurplusAdj(cur,amount,note){
+  amount=parseFloat(amount);if(!amount||isNaN(amount))return;
+  S.surplusAdjustments=safeArr(S.surplusAdjustments);
+  S.surplusAdjustments.push({id:Date.now(),date:today().toISOString().split('T')[0],currency:cur,amount:n2(amount),note:(note||'').trim()});
+  autosave();sbPushNow();renderCommitments();if(currentPage==='dashboard')renderDashboard();
+}
+function deleteSurplusAdj(id){
+  S.surplusAdjustments=safeArr(S.surplusAdjustments).filter(function(a){return a.id!==id;});
+  autosave();sbPushNow();renderCommitments();if(currentPage==='dashboard')renderDashboard();
+}
+function settleSurplusCur(cur,kind){
+  var cur_total=(calcSurplusByCur()[cur])||0;
+  var verb=kind==='take'?'withdraw':'save';
+  if(!confirm('This will '+verb+' the entire '+cur+' variance ('+n2(cur_total)+') and start it fresh from today. Manual entries stay in history but stop counting. Continue?'))return;
+  S.surplusResetDates=S.surplusResetDates||{};
+  S.surplusResetDates[cur]=today().toISOString().split('T')[0];
+  S.surplusEvents=safeArr(S.surplusEvents);
+  S.surplusEvents.push({id:Date.now(),date:today().toISOString().split('T')[0],currency:cur,amount:n2(cur_total),kind:kind});
+  autosave();sbPushNow();renderCommitments();if(currentPage==='dashboard')renderDashboard();
 }
 function resetSurplus(){
   if(!confirm('Reset surplus to zero? This marks accumulated surplus as saved.'))return;
@@ -2459,7 +2492,7 @@ function renderLogMonthlySummary(){
       });
       if(lsParts.length){
         el.innerHTML+='<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--ink3);padding:5px 14px 0">'
-          +'<span>Carried surplus from past months</span><span style="display:flex;gap:8px">'+lsParts.join('')+'</span></div>';
+          +'<span>Carried variance from past months</span><span style="display:flex;gap:8px">'+lsParts.join('')+'</span></div>';
       }
     }catch(e){}
   }
@@ -2668,19 +2701,6 @@ function toggleTick(id){
       }
     }
   }
-  // Surplus take: ticking zeroes the pool by advancing the reset date (the
-  // confirmation above already recorded the amount, so the item stays visible).
-  // Unticking restores the previous reset date so the pool reappears.
-  if(id.indexOf('surplus-')===0&&!isFuture){
-    if(!wasOn){
-      S.surplusPrevReset=S.surplusResetDate||null;
-      S.surplusResetDate=today().toISOString().split('T')[0];
-    } else {
-      S.surplusResetDate=S.surplusPrevReset||null;
-      delete S.surplusPrevReset;
-      if(confirmedDebits[cKey]&&confirmedDebits[cKey][id])delete confirmedDebits[cKey][id];
-    }
-  }
   autosave();renderCommitments();if(currentPage==='dashboard')renderDashboard();
   // Sync wishlist bought state when a wl- tick changes
   if(id.indexOf('wl-')===0){
@@ -2781,30 +2801,6 @@ function getCommitItems(pyr,pmo){
   });
   }catch(e){console.error('[COMMIT] holiday grouping error:',e);}
   safeArr(wishlistItems).filter(function(w){return w.scheduledYr===yr&&w.scheduledMo===mo;}).forEach(function(w){items.push({id:'wl-'+w.id,name:'\uD83D\uDED2 '+w.name,amount:w.amount,currency:w.currency,type:'out',method:'wishlist',note:w.note||'Wishlist item'});});
-  // Budget surplus — tickable withdrawal of the accumulated pool (current real month only).
-  // Tick = "I took this money" (accounting layer). It resets the pool; NO expense is logged.
-  try{
-    var nowS=today();
-    if(yr===nowS.getFullYear()&&mo===nowS.getMonth()+1){
-      var poolS=calcSurplusByCur();
-      var cdS=confirmedDebits[yr+'-'+mo]||{};
-      var seen={};
-      // Already-ticked take items: render from the recorded amount (pool is 0 now)
-      Object.keys(cdS).forEach(function(k){
-        if(k.indexOf('surplus-')!==0)return;
-        if(!tickState[yr+'-'+mo+'-'+k])return;
-        seen[k]=true;
-        items.push({id:k,name:'\uD83D\uDCB0 Take budget surplus',amount:cdS[k].amount,currency:cdS[k].currency,type:'out',method:'surplus',note:'Withdrawn — pool reset; it re-accumulates from today'});
-      });
-      // Live pool per currency
-      Object.keys(poolS).forEach(function(c){
-        var a=poolS[c];if(a<1)return;
-        var idS='surplus-'+c;
-        if(seen[idS])return;
-        items.push({id:idS,name:'\uD83D\uDCB0 Take budget surplus',amount:n2(a),currency:c,type:'out',method:'surplus',note:'Accumulated budget underspend \u2014 tick if you withdraw it; Reset on Dashboard saves it instead'});
-      });
-    }
-  }catch(e){console.warn('[COMMIT] surplus item:',e);}
   return items;
 }
 
@@ -2842,6 +2838,76 @@ function getCarryOverItems(yr,mo){
     });
   }
   return carry;
+}
+function renderVariancePanel(cb){
+  var pool=calcSurplusByCur();
+  var curs=Object.keys(pool);
+  // Always show currencies that have budgets or any adjustment/event, even at zero
+  safeArr(S.surplusAdjustments).forEach(function(a){if(a&&a.currency&&curs.indexOf(a.currency)<0)curs.push(a.currency);});
+  if(!curs.length)return;
+  var wrap=document.createElement('div');wrap.className='card';wrap.style.cssText='margin-top:10px;border:.5px solid var(--brd)';
+  var open=cgOpen('variance-panel',true);
+  var hd=document.createElement('div');hd.style.cssText='display:flex;align-items:center;justify-content:space-between;cursor:pointer';
+  hd.innerHTML='<span style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--ink)"><span style="font-size:13px;color:var(--ink4)">'+(open?'\u2304':'\u203A')+'</span>\uD83D\uDCB0 Variance <span style="font-size:11px;font-weight:400;color:var(--ink3)">over / under account</span></span>';
+  var body=document.createElement('div');body.style.cssText='margin-top:'+(open?'8px':'0')+';display:'+(open?'block':'none');
+  hd.onclick=function(){cgToggle('variance-panel');var no=cgOpen('variance-panel',true);body.style.display=no?'block':'none';body.style.marginTop=no?'8px':'0';hd.querySelector('span span').textContent=no?'\u2304':'\u203A';};
+  wrap.appendChild(hd);wrap.appendChild(body);
+
+  curs.forEach(function(cur){
+    var bal=pool[cur]||0;
+    var col=bal>0?'var(--grn)':bal<0?'var(--red)':'var(--ink3)';
+    var row=document.createElement('div');row.style.cssText='padding:9px 0;border-top:.5px solid var(--brd)';
+    // Header line: currency + big signed balance + actions
+    var top=document.createElement('div');top.style.cssText='display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px';
+    top.innerHTML='<span style="font-size:12px;font-weight:700;color:var(--ink2)">'+cur+'</span>'+
+      '<span class="mono" style="font-size:16px;font-weight:800;color:'+col+'">'+(bal>0?'+':'')+n2(bal)+'</span>';
+    var acts=document.createElement('div');acts.style.cssText='display:flex;gap:5px;flex-wrap:wrap';
+    var addBtn=document.createElement('button');addBtn.className='btn btn-xs';addBtn.textContent='+ Adjust';
+    var saveBtn=document.createElement('button');saveBtn.className='btn btn-xs';saveBtn.textContent='Save';saveBtn.title='Bank this balance and start fresh';
+    var takeBtn=document.createElement('button');takeBtn.className='btn btn-xs';takeBtn.textContent='Take';takeBtn.title='Mark as withdrawn and start fresh';
+    saveBtn.onclick=(function(cc){return function(){settleSurplusCur(cc,'save');};})(cur);
+    takeBtn.onclick=(function(cc){return function(){settleSurplusCur(cc,'take');};})(cur);
+    acts.appendChild(addBtn);acts.appendChild(saveBtn);acts.appendChild(takeBtn);
+    top.appendChild(acts);
+    row.appendChild(top);
+    // Inline add form (hidden until +Adjust)
+    var form=document.createElement('div');form.style.cssText='display:none;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px;padding:7px;background:var(--bg);border-radius:var(--r)';
+    var sign=document.createElement('select');sign.style.cssText='font-size:12px;padding:4px';['+ add','- deduct'].forEach(function(o,i){var op=document.createElement('option');op.value=i===0?'1':'-1';op.textContent=o;sign.appendChild(op);});
+    var amt=document.createElement('input');amt.type='number';amt.placeholder='amount';amt.style.cssText='width:90px;font-size:12px;padding:4px;font-family:var(--mono)';
+    var note=document.createElement('input');note.type='text';note.placeholder='note (e.g. CH flight 300 under)';note.style.cssText='flex:1;min-width:120px;font-size:12px;padding:4px';
+    var go=document.createElement('button');go.className='btn btn-xs btn-p';go.textContent='Add';
+    go.onclick=(function(cc){return function(){var v=(parseFloat(amt.value)||0)*parseInt(sign.value,10);if(!v)return;addSurplusAdj(cc,v,note.value);};})(cur);
+    form.appendChild(sign);form.appendChild(amt);form.appendChild(note);form.appendChild(go);
+    addBtn.onclick=function(){form.style.display=form.style.display==='none'?'flex':'none';if(form.style.display==='flex')amt.focus();};
+    row.appendChild(form);
+    // History: adjustments (deletable) + events, greyed if before reset
+    var rst=surplusResetDateFor(cur);
+    var adjs=safeArr(S.surplusAdjustments).filter(function(a){return a.currency===cur;}).sort(function(a,b){return (b.date||'').localeCompare(a.date||'')|| (b.id-a.id);});
+    var evs=safeArr(S.surplusEvents).filter(function(e){return e.currency===cur;});
+    if(adjs.length||evs.length){
+      var hist=document.createElement('div');hist.style.cssText='margin-top:6px';
+      adjs.forEach(function(a){
+        var stale=rst&&(a.date||'')<rst;
+        var r=document.createElement('div');r.style.cssText='display:flex;align-items:center;gap:6px;font-size:11px;padding:2px 0;'+(stale?'opacity:.4':'');
+        r.innerHTML='<span style="color:var(--ink4);width:74px">'+(a.date||'')+'</span>'+
+          '<span class="mono" style="width:70px;font-weight:700;color:'+(a.amount>=0?'var(--grn)':'var(--red)')+'">'+(a.amount>=0?'+':'')+n2(a.amount)+'</span>'+
+          '<span style="flex:1;color:var(--ink3)">'+(a.note||'')+(stale?' (before reset)':'')+'</span>';
+        var del=document.createElement('button');del.className='btn btn-xs btn-d';del.textContent='Del';
+        del.onclick=(function(id){return function(){deleteSurplusAdj(id);};})(a.id);
+        r.appendChild(del);hist.appendChild(r);
+      });
+      evs.sort(function(a,b){return (b.date||'').localeCompare(a.date||'');}).forEach(function(e){
+        var r=document.createElement('div');r.style.cssText='display:flex;align-items:center;gap:6px;font-size:11px;padding:2px 0;opacity:.55';
+        r.innerHTML='<span style="color:var(--ink4);width:74px">'+(e.date||'')+'</span>'+
+          '<span class="mono" style="width:70px;color:var(--ink3)">'+n2(e.amount)+'</span>'+
+          '<span style="flex:1;color:var(--ink3)">'+(e.kind==='take'?'Withdrawn (reset)':'Saved (reset)')+'</span>';
+        hist.appendChild(r);
+      });
+      row.appendChild(hist);
+    }
+    body.appendChild(row);
+  });
+  cb.appendChild(wrap);
 }
 function renderCommitments(){
   var clEl=document.getElementById('commit-label');if(clEl)clEl.textContent=MNAMES[commitMon.month-1]+' '+commitMon.year;
@@ -2997,6 +3063,8 @@ function renderCommitments(){
 
     catDiv.appendChild(catBody);cb.appendChild(catDiv);
   });
+
+  try{renderVariancePanel(cb);}catch(e){console.warn('variance panel:',e);}
 
   // Update expand/collapse button label
   var expandBtn=document.getElementById('cc-expand-btn');
@@ -5678,6 +5746,13 @@ document.addEventListener('DOMContentLoaded',function(){
     if(Array.isArray(S.budgetOrder))S.budgetOrder=S.budgetOrder.filter(function(x){return x!=='Holiday';});
     if(S.selectedCat==='Holiday')S.selectedCat='Other';
   }catch(e){console.warn('holiday-cat heal:',e);}
+  // Migrate legacy single surplus reset date into per-currency map
+  try{
+    if(!S.surplusResetDates)S.surplusResetDates={};
+    if(S.surplusResetDate){Object.keys(calcSurplusByCur()).forEach(function(cc){if(!S.surplusResetDates[cc])S.surplusResetDates[cc]=S.surplusResetDate;});}
+    if(!Array.isArray(S.surplusAdjustments))S.surplusAdjustments=[];
+    if(!Array.isArray(S.surplusEvents))S.surplusEvents=[];
+  }catch(e){}
   // Heal one-off phases whose hidden end month drifted from start (caused double-counting)
   try{safeArr(settlements).forEach(function(s){safeArr(s.phases).forEach(function(ph){if(ph.oneOff&&(ph.endMon!==ph.startMon||ph.endYr!==ph.startYr)){ph.endMon=ph.startMon;ph.endYr=ph.startYr;}});});}catch(e){}
   if(typeof syncHolidayBudgets==='function')syncHolidayBudgets();
