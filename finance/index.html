@@ -870,10 +870,10 @@ input:focus,select:focus{border-color:var(--ink)}
         </div>
         <div style="margin:10px 0;padding:10px;background:var(--bg);border-radius:var(--r);border:.5px solid var(--brd)">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:4px">
-            <span style="font-size:12px;font-weight:700;color:var(--ink2)">&#128190; Server backups &amp; sync log</span>
-            <button class="btn btn-sm" onclick="loadServerBackups()">Load log</button>
+            <span style="font-size:12px;font-weight:700;color:var(--ink2)">&#128190; Change history &amp; restore</span>
+            <button class="btn btn-sm" onclick="loadServerBackups()">Load history</button>
           </div>
-          <div style="font-size:11px;color:var(--ink3);margin-bottom:6px">Every sync overwrite is archived server-side (last 30 kept). Each row shows the record count and how it changed — a red number flags a sync that lost data, so you don't have to discover it by accident. Restore rewinds ALL data to that moment and pushes it to every device.</div>
+          <div style="font-size:11px;color:var(--ink3);margin-bottom:6px">Every change to every record is archived server-side before it happens (last 50 versions per record). Restore rewinds just that one record and syncs it to all devices. Pre-migration whole-state backups remain available below the list.</div>
           <div id="backup-list" style="font-size:12px"></div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -4985,8 +4985,87 @@ function sbRecordCount(inner){
   if(!inner)return null;
   return safeArr(inner.expenses).length+safeArr(inner.settlements).length+safeArr(inner.holidays).length;
 }
+var FR_KIND_LABELS={exp:'Expense',ev:'Event',set:'Settlement',hol:'Holiday',gold:'Gold',prop:'Property',str:'Stream',sov:'Override',wl:'Wishlist',snap:'Snapshot',tl:'Transfer',adj:'Adjustment',sev:'Surplus',sing:'Settings'};
+function frEntryLabel(rec){
+  var d=rec.data||{};
+  var name=d.note||d.name||d.label||'';
+  if(!name&&rec.kind==='sing')name=rec.rid;
+  var amt=(d.amount!==undefined&&d.amount!==null)?(' '+d.amount+(d.currency?' '+d.currency:'')):'';
+  var s=(FR_KIND_LABELS[rec.kind]||rec.kind)+(name?': '+String(name).slice(0,26):amt?'':' '+String(rec.rid).slice(-6))+amt;
+  return s;
+}
+async function frRestoreHistory(hid){
+  try{
+    var res=await fetch(SB_URL+'/rest/v1/finance_records_history?hid=eq.'+hid+'&select=kind,rid,data,ver,deleted,updated_at',{headers:frHdr()});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    var rows=await res.json();
+    if(!rows.length)return alert('History entry not found.');
+    var rec=rows[0];
+    var d=new Date(rec.updated_at);
+    if(!confirm('Restore this record to its state from '+d.toLocaleString()+'?\n\n'+frEntryLabel(rec)+(rec.deleted?' (was deleted at that point)':'')+'\n\nOnly this one record changes. The current version is archived first, so this is reversible.'))return;
+    S.deletedIds=safeArr(S.deletedIds).filter(function(k){return k!==rec.kind+':'+rec.rid;});
+    if(rec.kind==='sing'){
+      var sdef=FR_SINGLETONS.find(function(x){return x[0]===rec.rid;});
+      if(sdef&&!rec.deleted)sdef[2](rec.data);
+    }else{
+      var def=FR_KINDS.find(function(x){return x[0]===rec.kind;});
+      if(!def)return alert('Unknown record type.');
+      var arr=safeArr(def[1]()).filter(function(x){return !(x&&String(x.id)===rec.rid);});
+      if(!rec.deleted&&rec.data)arr.push(rec.data);
+      def[2](frSortCollection(rec.kind,arr));
+    }
+    autosave();
+    try{safeShowView(currentPage);}catch(e){}
+    alert('Restored. Syncing to all devices.');
+  }catch(e){alert('Restore failed: '+e.message);}
+}
 async function loadServerBackups(){
+  if(_frActive)return frLoadChangeLog();
+  return loadLegacyBackups();
+}
+async function frLoadChangeLog(){
   var el=document.getElementById('backup-list');if(!el)return;
+  el.innerHTML='<span style="color:var(--ink3)">Loading…</span>';
+  try{
+    var res=await fetch(SB_URL+'/rest/v1/finance_records_history?select=hid,kind,rid,data,ver,deleted,device,updated_at,archived_at&order=hid.desc&limit=40',{headers:frHdr()});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    var rows=(await res.json()).filter(function(r){return !(r.kind==='sing'&&r.rid==='_meta');});
+    el.innerHTML='';
+    if(!rows.length){
+      var none=document.createElement('div');
+      none.style.cssText='color:var(--ink3);padding:3px 0';
+      none.textContent='No changes recorded yet. Every edit to every record is archived here from now on.';
+      el.appendChild(none);
+    }
+    var myDev=sbDeviceId();
+    rows.forEach(function(r){
+      var d=new Date(r.archived_at);
+      var row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:.5px solid var(--brd)';
+      row.innerHTML=
+        '<span class="mono" style="font-size:10px;color:var(--ink3);white-space:nowrap">'+d.toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})+'</span>'+
+        '<span style="flex:1;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+frEntryLabel(r)+(r.deleted?' <span style="color:var(--red)">(deleted)</span>':'')+'</span>'+
+        '<span style="font-size:10px;color:var(--ink3)">'+(r.device===myDev?'this device':(r.device||'').slice(-6))+'</span>';
+      var btn=document.createElement('button');btn.className='btn btn-xs';btn.textContent='Restore';
+      btn.onclick=(function(hid){return function(){frRestoreHistory(hid);};})(r.hid);
+      row.appendChild(btn);el.appendChild(row);
+    });
+    // Pre-migration whole-state backups, collapsed
+    var hd=document.createElement('div');
+    hd.style.cssText='font-size:11px;font-weight:700;color:var(--ink3);margin-top:8px;cursor:pointer';
+    hd.textContent='\u{1F4E6} Pre-migration whole-state backups ›';
+    var body=document.createElement('div');body.style.display='none';body.id='legacy-backup-list';
+    hd.onclick=function(){
+      var open=body.style.display!=='none';
+      body.style.display=open?'none':'block';
+      hd.textContent='\u{1F4E6} Pre-migration whole-state backups '+(open?'›':'⌄');
+      if(!open&&!body.dataset.loaded){body.dataset.loaded='1';loadLegacyBackups(body);}
+    };
+    el.appendChild(hd);el.appendChild(body);
+  }catch(e){el.innerHTML='<span style="color:var(--red)">Failed: '+e.message+'</span>';}
+}
+async function loadLegacyBackups(targetEl){
+  var el=targetEl||document.getElementById('backup-list');if(!el)return;
   el.innerHTML='<span style="color:var(--ink3)">Loading\u2026</span>';
   try{
     var res=await fetch(SB_URL+'/rest/v1/finance_history?id=eq.'+SB_ROW_ID+'&select=hid,archived_at,data&order=hid.desc&limit=30',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
@@ -6006,31 +6085,29 @@ function sbApplyRemote(remote){
   return true;
 }
 
-async function sbPush(preStampedVer){
+async function sbLegacyPush(preStampedVer){
   if(_sbSyncing)return false;
   _sbSyncing=true;
   sbSetStatus('Pushing...','busy');
   try{
-    // ── Never push over a remote this device has not seen (compare-and-swap) ──
-    try{
-      var chk=await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=ver:data-%3E%3Eversion',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
-      if(chk.ok){
-        var crows=await chk.json();
-        var rVer=crows&&crows.length?parseInt(crows[0].ver||'0',10):0;
-        if(rVer&&rVer!==_sbLastSeenRemoteVer&&rVer!==_sbLastPushedVer){
-          // Remote changed since we last looked: fetch it and merge its money records first
-          var full=await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=data',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
-          if(full.ok){
-            var frows=await full.json();
-            if(frows&&frows.length&&frows[0].data){
-              sbMergeRemoteIntoLocal(frows[0].data);
-              _sbLastSeenRemoteVer=rVer;
-              preStampedVer=null; // stamp a fresh, newest version for the merged state
-            }
-          }
-        }
+    // ── Never push over a remote this device has not seen. If the check
+    // cannot complete for ANY reason, the push is ABORTED — there is no
+    // "push anyway" path. A failed precondition stops and retries later. ──
+    var chk=await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=ver:data-%3E%3Eversion',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+    if(!chk.ok)throw new Error('preflight HTTP '+chk.status+' — push aborted, will retry');
+    var crows=await chk.json();
+    var rVer=crows&&crows.length?parseInt(crows[0].ver||'0',10):0;
+    if(rVer&&rVer!==_sbLastSeenRemoteVer&&rVer!==_sbLastPushedVer){
+      // Remote changed since we last looked: fetch it and merge its records first
+      var full=await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=data',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+      if(!full.ok)throw new Error('preflight fetch HTTP '+full.status+' — push aborted, will retry');
+      var frows=await full.json();
+      if(frows&&frows.length&&frows[0].data){
+        sbMergeRemoteIntoLocal(frows[0].data);
+        _sbLastSeenRemoteVer=rVer;
+        preStampedVer=null; // stamp a fresh, newest version for the merged state
       }
-    }catch(pf){console.warn('[SYNC] preflight check failed, pushing anyway:',pf.message);}
+    }
     var payload=sbBuildPayload();
     if(preStampedVer)payload.version=preStampedVer;
     _sbLastPushedVer=payload.version;
@@ -6055,7 +6132,7 @@ async function sbPush(preStampedVer){
   return true;
 }
 
-async function sbPull(){
+async function sbLegacyPull(){
   if(_sbSyncing)return false;
   if(_sbLastLocalChange&&Date.now()-_sbLastLocalChange<5000)return false;
   _sbSyncing=true;
@@ -6085,22 +6162,36 @@ async function sbPull(){
   }
 }
 
+// ── Public sync API: dispatches to the record engine after migration, ──
+// ── or to the legacy whole-blob engine before it. ──
 function sbSchedulePush(preStampedVer){
+  if(_frActive){frSchedulePush();return;}
   _sbDirty=true;
   _sbLastLocalChange=Date.now();
   clearTimeout(_sbPushTimer);
   _sbPushTimer=setTimeout(async function(){
-    var ok=await sbPush(preStampedVer);
+    var ok=await sbLegacyPush(preStampedVer);
     if(ok){_sbDirty=false;}
     else{setTimeout(function(){sbSchedulePush(preStampedVer);},3000);}
   },500);
 }
-
-function sbPushNow(){clearTimeout(_sbPushTimer);_sbDirty=false;_sbSyncing=false;_sbLastLocalChange=Date.now();sbPush();}
+async function sbPush(preStampedVer){
+  if(_frActive)return frPushNow();
+  return sbLegacyPush(preStampedVer);
+}
+async function sbPull(){
+  if(_frActive)return frReconcile();
+  return sbLegacyPull();
+}
+function sbPushNow(){
+  if(_frActive){frPushNow();return;}
+  clearTimeout(_sbPushTimer);_sbDirty=false;_sbSyncing=false;_sbLastLocalChange=Date.now();sbLegacyPush();
+}
 function sbPullNow(){sbPull().then(function(changed){if(changed)showView(currentPage);});}
 
-// ─── Supabase Realtime via WebSocket ───────────────────────────────────────
-function sbStartRealtime(){
+// ─── Legacy Supabase Realtime via WebSocket (pre-migration only) ───────────
+function sbLegacyRealtime(){
+  if(_frActive)return;
   try{
     var wsUrl=SB_URL.replace('https://','wss://')+'/realtime/v1/websocket?apikey='+SB_KEY+'&vsn=1.0.0';
     var ws=new WebSocket(wsUrl);
@@ -6146,23 +6237,524 @@ function sbStartRealtime(){
     ws.onerror=function(e){console.warn('[RT] error',e);sbSetStatus('Realtime error','err');};
 
     ws.onclose=function(){
+      if(_frActive)return; // engine switched mid-session; new realtime owns the socket now
       console.log('[RT] Disconnected — reconnecting in 5s');
       sbSetStatus('Reconnecting...','busy');
-      setTimeout(sbStartRealtime,5000);
+      setTimeout(sbLegacyRealtime,5000);
     };
   }catch(e){
     console.warn('[RT] Failed to start realtime:',e);
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// PER-RECORD SYNC ENGINE (v120)
+// One row per record in finance_records. Every write is conditional
+// (UPDATE ... WHERE ver = expected), enforced by the database itself.
+// There is NO code path that writes the whole dataset, and NO code path
+// that writes unconditionally. A failed precondition refetches that one
+// row, reapplies the local edit on top, and retries.
+// ═══════════════════════════════════════════════════════════════════════
+var _frActive=false;try{_frActive=localStorage.getItem('lf_fr_active')==='1';}catch(e){}
+var _frShadow={};        // 'kind:rid' -> {json: canonical data, ver, deleted}
+var _frPending={};       // 'kind:rid' -> 1  (local changes not yet confirmed by server)
+var _frPushing=false,_frQueued=false,_frPushTimer=null,_frMeta=null,_frRT=null;
+var FR_ORDERED={set:1,hol:1,gold:1,prop:1,str:1,sov:1,wl:1};
+var FR_KINDS=[
+  ['exp',function(){return expenses;},function(a){expenses=a;}],
+  ['ev',function(){return oneoffEvents;},function(a){oneoffEvents=a;}],
+  ['set',function(){return settlements;},function(a){settlements=a;}],
+  ['hol',function(){return holidays;},function(a){holidays=a;}],
+  ['gold',function(){return goldPieces;},function(a){goldPieces=a;}],
+  ['prop',function(){return properties;},function(a){properties=a;}],
+  ['str',function(){return streams;},function(a){streams=a;}],
+  ['sov',function(){return streamOverrides;},function(a){streamOverrides=a;}],
+  ['wl',function(){return wishlistItems;},function(a){wishlistItems=a;}],
+  ['snap',function(){return safeArr(S.snapshots);},function(a){S.snapshots=a;}],
+  ['tl',function(){return safeArr(S.transferLog);},function(a){S.transferLog=a;}],
+  ['adj',function(){return safeArr(S.surplusAdjustments);},function(a){S.surplusAdjustments=a;}],
+  ['sev',function(){return safeArr(S.surplusEvents);},function(a){S.surplusEvents=a;}]
+];
+function frGetSCore(){
+  var out={},skip={snapshots:1,transferLog:1,surplusAdjustments:1,surplusEvents:1};
+  Object.keys(S).forEach(function(k){if(!skip[k])out[k]=S[k];});
+  return out;
+}
+function frApplySCore(o){
+  if(!o||typeof o!=='object')return;
+  var keep={snapshots:S.snapshots,transferLog:S.transferLog,surplusAdjustments:S.surplusAdjustments,surplusEvents:S.surplusEvents};
+  S=Object.assign({},o);
+  S.snapshots=keep.snapshots;S.transferLog=keep.transferLog;
+  S.surplusAdjustments=keep.surplusAdjustments;S.surplusEvents=keep.surplusEvents;
+  if(S.catColors)CAT_COLORS=S.catColors;
+  if(typeof syncHolidayBudgets==='function')try{syncHolidayBudgets();}catch(e){}
+}
+var FR_SINGLETONS=[
+  ['S',frGetSCore,frApplySCore],
+  ['tickState',function(){return tickState;},function(o){tickState=o||{};}],
+  ['parentSkips',function(){return parentSkips;},function(o){parentSkips=Array.isArray(o)?o:[];}],
+  ['confirmedDebits',function(){return confirmedDebits;},function(o){confirmedDebits=o||{};}],
+  ['openMonths',function(){return openMonths;},function(o){openMonths=o||{};}],
+  ['commitGroupState',function(){return commitGroupState;},function(o){commitGroupState=o||{};}]
+];
+function frSortObj(v){
+  if(Array.isArray(v))return v.map(frSortObj);
+  if(v&&typeof v==='object'){var o={};Object.keys(v).sort().forEach(function(k){if(v[k]!==undefined)o[k]=frSortObj(v[k]);});return o;}
+  return v===undefined?null:v;
+}
+function frCanon(v){return JSON.stringify(frSortObj(v));}
+function frClean(v){try{return JSON.parse(JSON.stringify(v));}catch(e){return null;}}
+function frHdr(extra){
+  var h={'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'};
+  if(extra)Object.keys(extra).forEach(function(k){h[k]=extra[k];});
+  return h;
+}
+function frLocalSave(){try{localStorage.setItem('lf_data',snapshotState());localStorage.setItem('lf_ver',String(Date.now()));}catch(e){}}
+function frSavePending(){try{localStorage.setItem('lf_fr_pending',JSON.stringify(_frPending));}catch(e){}}
+function frLoadPending(){try{_frPending=JSON.parse(localStorage.getItem('lf_fr_pending')||'{}')||{};}catch(e){_frPending={};}}
+function frCollectRecords(){
+  var out={};
+  FR_KINDS.forEach(function(def){
+    var kind=def[0];
+    safeArr(def[1]()).forEach(function(rec,idx){
+      if(!rec||rec.id===undefined||rec.id===null||rec.id==='')return;
+      var data=frClean(rec);if(!data)return;
+      if(FR_ORDERED[kind])data._ord=idx;
+      out[kind+':'+rec.id]={kind:kind,rid:String(rec.id),data:data};
+    });
+  });
+  FR_SINGLETONS.forEach(function(def){
+    var data=frClean(def[1]());
+    out['sing:'+def[0]]={kind:'sing',rid:def[0],data:(data===null||data===undefined)?{}:data};
+  });
+  return out;
+}
+function frCmpOrd(a,b){
+  var ao=(a&&a._ord!==undefined)?a._ord:Infinity,bo=(b&&b._ord!==undefined)?b._ord:Infinity;
+  if(ao!==bo)return ao-bo;
+  return String(a.id).localeCompare(String(b.id));
+}
+function frSortCollection(kind,arr){
+  if(kind==='exp')arr.sort(function(a,b){return (b.date||'').localeCompare(a.date||'')||(b.id-a.id);});
+  else if(kind==='snap')arr.sort(function(a,b){return (b.id||0)-(a.id||0);});
+  else if(FR_ORDERED[kind])arr.sort(frCmpOrd);
+  else arr.sort(function(a,b){return String(a.id).localeCompare(String(b.id),undefined,{numeric:true});});
+  return arr;
+}
+async function frGetRow(kind,rid){
+  var res=await fetch(SB_URL+'/rest/v1/finance_records?kind=eq.'+encodeURIComponent(kind)+'&rid=eq.'+encodeURIComponent(rid)+'&select=kind,rid,data,ver,deleted,device,updated_at',{headers:frHdr()});
+  if(!res.ok)throw new Error('HTTP '+res.status);
+  var rows=await res.json();return rows.length?rows[0]:null;
+}
+async function frFetchAllRows(){
+  var out=[],from=0,page=1000;
+  for(;;){
+    var res=await fetch(SB_URL+'/rest/v1/finance_records?select=kind,rid,data,ver,deleted,device,updated_at&order=kind.asc,rid.asc',{headers:frHdr({'Range-Unit':'items','Range':from+'-'+(from+page-1)})});
+    if(res.status===416)break;
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    var rows=await res.json();out=out.concat(rows);
+    if(rows.length<page)break;
+    from+=page;
+  }
+  return out;
+}
+function frUnionById(mine,theirs,prefix){
+  var dead={};safeArr(S.deletedIds).forEach(function(k){dead[k]=true;});
+  var out=safeArr(mine).filter(function(x){return x&&x.id!==undefined&&!dead[prefix+x.id];});
+  var have={};out.forEach(function(x){have[x.id]=true;});
+  safeArr(theirs).forEach(function(x){if(x&&x.id!==undefined&&!have[x.id]&&!dead[prefix+x.id]){out.push(x);have[x.id]=true;}});
+  return out;
+}
+function frMergeConflict(kind,base,mine,theirs){
+  // theirs = current server state. Overlay only the fields THIS device
+  // actually changed (vs base), so nothing unrelated is dragged along.
+  var m=frClean(mine),t=frClean(theirs);
+  if(Array.isArray(m)||Array.isArray(t)||!t||typeof t!=='object'||!m||typeof m!=='object')return m;
+  var out=t,b=base&&typeof base==='object'?base:{};
+  Object.keys(m).forEach(function(k){
+    if(frCanon(m[k])!==frCanon(b[k]))out[k]=m[k];
+  });
+  Object.keys(b).forEach(function(k){
+    if(!(k in m)&&frCanon(b[k])===frCanon(out[k]))delete out[k];
+  });
+  if(kind==='set')out.payments=frUnionById(m.payments,t.payments,'pay:');
+  return out;
+}
+async function frGuardedWrite(kind,rid,data,isDelete){
+  var key=kind+':'+rid,sh=_frShadow[key];
+  for(var attempt=0;attempt<4;attempt++){
+    if(!sh){ // create
+      var body={kind:kind,rid:String(rid),data:data||{},ver:1,deleted:!!isDelete,device:sbDeviceId(),updated_at:new Date().toISOString()};
+      var res=await fetch(SB_URL+'/rest/v1/finance_records',{method:'POST',headers:frHdr({'Prefer':'return=representation'}),body:JSON.stringify(body)});
+      if(res.ok){var rw=(await res.json())[0];_frShadow[key]={json:frCanon(rw.data),ver:rw.ver,deleted:rw.deleted};return true;}
+      if(res.status===409){
+        var cur=await frGetRow(kind,rid);
+        if(cur){
+          if(!isDelete)data=frMergeConflict(kind,null,data,cur.data);
+          sh={json:frCanon(cur.data),ver:cur.ver,deleted:cur.deleted};
+          continue;
+        }
+        continue;
+      }
+      throw new Error('HTTP '+res.status);
+    }
+    // guarded update: the DB itself rejects this if the row moved
+    var body2={data:isDelete?(sh.json?JSON.parse(sh.json):{}):data,ver:sh.ver+1,deleted:!!isDelete,device:sbDeviceId(),updated_at:new Date().toISOString()};
+    var r2=await fetch(SB_URL+'/rest/v1/finance_records?kind=eq.'+encodeURIComponent(kind)+'&rid=eq.'+encodeURIComponent(rid)+'&ver=eq.'+sh.ver,{method:'PATCH',headers:frHdr({'Prefer':'return=representation'}),body:JSON.stringify(body2)});
+    if(!r2.ok)throw new Error('HTTP '+r2.status);
+    var rows2=await r2.json();
+    if(rows2.length){_frShadow[key]={json:frCanon(rows2[0].data),ver:rows2[0].ver,deleted:rows2[0].deleted};return true;}
+    // Stale: refetch that one row, reapply local edit on top, retry.
+    var cur2=await frGetRow(kind,rid);
+    if(!cur2){sh=null;delete _frShadow[key];continue;}
+    if(!isDelete){
+      var baseObj=null;try{baseObj=sh.json?JSON.parse(sh.json):null;}catch(e){}
+      data=frMergeConflict(kind,baseObj,data,cur2.data);
+    }
+    sh={json:frCanon(cur2.data),ver:cur2.ver,deleted:cur2.deleted};
+    _frShadow[key]=sh;
+  }
+  return false;
+}
+function frIsManagedKey(key){
+  if(key==='sing:_meta')return false;
+  var ci=key.indexOf(':');if(ci<1)return false;
+  var kind=key.slice(0,ci);
+  if(kind==='sing')return FR_SINGLETONS.some(function(d){return d[0]===key.slice(ci+1);});
+  return FR_KINDS.some(function(d){return d[0]===kind;});
+}
+function frMarkPending(){
+  var wanted=frCollectRecords(),marked=false;
+  Object.keys(wanted).forEach(function(key){
+    var sh=_frShadow[key];
+    if(!sh||sh.deleted||sh.json!==frCanon(wanted[key].data)){if(!_frPending[key]){_frPending[key]=1;marked=true;}}
+  });
+  Object.keys(_frShadow).forEach(function(key){
+    if(!frIsManagedKey(key))return;
+    if(!_frShadow[key].deleted&&!wanted[key]){if(!_frPending[key]){_frPending[key]=1;marked=true;}}
+  });
+  if(marked)frSavePending();
+}
+function frSchedulePush(){
+  frMarkPending();
+  clearTimeout(_frPushTimer);
+  _frPushTimer=setTimeout(function(){frPush();},500);
+}
+async function frPushNow(){clearTimeout(_frPushTimer);frMarkPending();return frPush();}
+async function frPush(){
+  if(!_frActive)return false;
+  if(_frPushing){_frQueued=true;return true;}
+  _frPushing=true;
+  sbSetStatus('Syncing...','busy');
+  var okAll=true;
+  try{
+    var wanted=frCollectRecords();
+    var ops=[];
+    Object.keys(wanted).forEach(function(key){
+      var sh=_frShadow[key];
+      if(!sh||sh.deleted||sh.json!==frCanon(wanted[key].data))ops.push({key:key,kind:wanted[key].kind,rid:wanted[key].rid,data:wanted[key].data,del:false});
+    });
+    Object.keys(_frShadow).forEach(function(key){
+      if(!frIsManagedKey(key))return; // never touch _meta or unknown rows
+      if(!_frShadow[key].deleted&&!wanted[key]){
+        var ci=key.indexOf(':');
+        ops.push({key:key,kind:key.slice(0,ci),rid:key.slice(ci+1),data:null,del:true});
+      }
+    });
+    for(var i=0;i<ops.length;i++){
+      var op=ops[i];_frPending[op.key]=1;
+      var ok=false;
+      try{ok=await frGuardedWrite(op.kind,op.rid,op.data,op.del);}catch(e){console.warn('[FR] write',op.key,e.message);ok=false;}
+      if(ok)delete _frPending[op.key];else okAll=false;
+    }
+    frSavePending();
+    if(okAll)sbSetStatus('Synced at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
+    else sbSetStatus('Some changes not synced yet (will retry)','err');
+    if(typeof pushFinanceSummary==='function')try{pushFinanceSummary();}catch(e){}
+  }catch(e){
+    console.warn('[FR] push',e.message);
+    sbSetStatus('Sync failed: '+e.message,'err');
+    okAll=false;
+  }
+  _frPushing=false;
+  if(_frQueued){_frQueued=false;frSchedulePush();}
+  else if(!okAll){clearTimeout(_frPushTimer);_frPushTimer=setTimeout(function(){frPush();},5000);}
+  return okAll;
+}
+function frApplyRows(rows){
+  // Rebuild state from server rows; local pending records keep their local
+  // version (they'll be pushed with guarded writes right after).
+  var byKind={};
+  rows.forEach(function(r){
+    var key=r.kind+':'+r.rid;
+    _frShadow[key]={json:frCanon(r.data),ver:r.ver,deleted:r.deleted};
+    if(!byKind[r.kind])byKind[r.kind]=[];
+    byKind[r.kind].push(r);
+  });
+  var before=snapshotState();
+  FR_KINDS.forEach(function(def){
+    var kind=def[0],cur=safeArr(def[1]());
+    var localById={};cur.forEach(function(x){if(x&&x.id!==undefined)localById[String(x.id)]=x;});
+    var arr=[],seen={};
+    safeArr(byKind[kind]).forEach(function(r){
+      seen[r.rid]=true;
+      var key=kind+':'+r.rid;
+      if(_frPending[key]){var loc=localById[r.rid];if(loc)arr.push(loc);return;}
+      if(!r.deleted)arr.push(r.data);
+    });
+    cur.forEach(function(x){
+      if(!x||x.id===undefined)return;
+      if(seen[String(x.id)])return;
+      // Local record with no server row at all: never destroy silently — keep and push.
+      arr.push(x);
+      _frPending[kind+':'+x.id]=1;
+    });
+    def[2](frSortCollection(kind,arr));
+  });
+  FR_SINGLETONS.forEach(function(def){
+    var key='sing:'+def[0];
+    if(_frPending[key])return;
+    var r=safeArr(byKind['sing']).find(function(x){return x.rid===def[0];});
+    if(r&&!r.deleted)def[2](r.data);
+  });
+  frSavePending();
+  var after=snapshotState();
+  if(after!==before){frLocalSave();return true;}
+  return false;
+}
+async function frReconcile(){
+  var rows=await frFetchAllRows();
+  var changed=frApplyRows(rows.filter(function(r){return !(r.kind==='sing'&&r.rid==='_meta');}));
+  var metaRow=rows.find(function(r){return r.kind==='sing'&&r.rid==='_meta';});
+  if(metaRow)_frMeta=metaRow.data||{};
+  if(Object.keys(_frPending).length)frSchedulePush();
+  return changed;
+}
+function frApplyRow(rec){
+  var key=rec.kind+':'+rec.rid;
+  _frShadow[key]={json:frCanon(rec.data),ver:rec.ver,deleted:rec.deleted};
+  if(_frPending[key])return false; // our local edit wins; guarded push reconciles
+  if(rec.kind==='sing'){
+    if(rec.rid==='_meta'){_frMeta=rec.data||{};return false;}
+    var sdef=FR_SINGLETONS.find(function(d){return d[0]===rec.rid;});
+    if(sdef&&!rec.deleted){sdef[2](rec.data);frLocalSave();return true;}
+    return false;
+  }
+  var def=FR_KINDS.find(function(d){return d[0]===rec.kind;});
+  if(!def)return false;
+  var arr=safeArr(def[1]()).filter(function(x){return !(x&&String(x.id)===rec.rid);});
+  if(!rec.deleted)arr.push(rec.data);
+  def[2](frSortCollection(rec.kind,arr));
+  frLocalSave();
+  return true;
+}
+function frStartRealtime(){
+  try{
+    var wsUrl=SB_URL.replace('https://','wss://')+'/realtime/v1/websocket?apikey='+SB_KEY+'&vsn=1.0.0';
+    var ws=new WebSocket(wsUrl);
+    _frRT=ws;
+    ws.onopen=function(){
+      console.log('[FR-RT] Connected');
+      ws.send(JSON.stringify({topic:'realtime:public:finance_records',event:'phx_join',payload:{},ref:String(_sbRealtimeRef++)}));
+      sbSetStatus('Live','ok');
+      // Reconcile on every (re)connect: catches anything missed while offline
+      frReconcile().then(function(changed){if(changed)frRefreshView();}).catch(function(e){console.warn('[FR] reconnect reconcile:',e.message);});
+    };
+    ws.onmessage=function(evt){
+      try{
+        var msg=JSON.parse(evt.data);
+        if(msg.event==='heartbeat'||msg.topic==='phoenix'){
+          ws.send(JSON.stringify({topic:'phoenix',event:'heartbeat',payload:{},ref:String(_sbRealtimeRef++)}));
+          return;
+        }
+        if((msg.event==='INSERT'||msg.event==='UPDATE')&&msg.payload&&msg.payload.record){
+          var rec=msg.payload.record;
+          if(!rec||!rec.kind)return;
+          if(rec.device===sbDeviceId()){_frShadow[rec.kind+':'+rec.rid]={json:frCanon(rec.data),ver:rec.ver,deleted:rec.deleted};return;}
+          var changed=frApplyRow(rec);
+          if(changed){
+            sbSetStatus('Live update at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
+            safeShowView(currentPage);
+          }
+        }
+      }catch(e){console.warn('[FR-RT] message error',e);}
+    };
+    ws.onerror=function(e){console.warn('[FR-RT] error',e);};
+    ws.onclose=function(){
+      console.log('[FR-RT] Disconnected — reconnecting in 5s');
+      sbSetStatus('Reconnecting...','busy');
+      setTimeout(function(){if(_frActive)frStartRealtime();},5000);
+    };
+  }catch(e){console.warn('[FR-RT] failed to start:',e);}
+}
+// ── One-time migration: old single blob → per-record rows. ──────────────
+// Cuts over ONLY after verifying every record survived, byte for byte.
+// The old finance_data row is never written again; it stays as a frozen backup.
+function frEnsureIds(){
+  var n=0;
+  FR_KINDS.forEach(function(def){
+    safeArr(def[1]()).forEach(function(rec){
+      if(rec&&(rec.id===undefined||rec.id===null||rec.id==='')){rec.id='m'+Date.now()+'_'+(n++);}
+    });
+  });
+  if(n)frLocalSave();
+}
+var FR_TOMB_KINDS={exp:1,ev:1,tl:1,adj:1,sev:1};
+async function frMigrate(){
+  try{
+    sbSetStatus('Migrating to per-record storage...','busy');
+    frEnsureIds();
+    var wanted=frCollectRecords();
+    // Port legacy deletion tombstones as deleted rows so deletes never resurrect
+    safeArr(S.deletedIds).forEach(function(k){
+      var ci=k.indexOf(':');if(ci<1)return;
+      var kind=k.slice(0,ci),rid=k.slice(ci+1);
+      if(!FR_TOMB_KINDS[kind])return;
+      var key=kind+':'+rid;
+      if(!wanted[key])wanted[key]={kind:kind,rid:rid,data:{},deleted:true};
+    });
+    var keys=Object.keys(wanted);
+    for(var i=0;i<keys.length;i+=40){
+      var batch=keys.slice(i,i+40).map(function(key){
+        var w=wanted[key];
+        return {kind:w.kind,rid:w.rid,data:w.data,ver:1,deleted:!!w.deleted,device:sbDeviceId(),updated_at:new Date().toISOString()};
+      });
+      var res=await fetch(SB_URL+'/rest/v1/finance_records',{method:'POST',headers:frHdr({'Prefer':'resolution=merge-duplicates'}),body:JSON.stringify(batch)});
+      if(res.status===404){sbSetStatus('New tables not set up yet — run supabase-records-setup.sql once','err');return false;}
+      if(!res.ok)throw new Error('upsert HTTP '+res.status);
+    }
+    // ── Verification gate: no cutover unless EVERYTHING matches ──
+    var problems=frVerifyMigration(wanted,await frFetchAllRows());
+    if(problems.length){
+      console.warn('[FR] migration verify round 1:',problems);
+      // one retry for transient issues
+      var res2=await fetch(SB_URL+'/rest/v1/finance_records',{method:'POST',headers:frHdr({'Prefer':'resolution=merge-duplicates'}),body:JSON.stringify(keys.map(function(key){var w=wanted[key];return {kind:w.kind,rid:w.rid,data:w.data,ver:1,deleted:!!w.deleted,device:sbDeviceId(),updated_at:new Date().toISOString()};}))});
+      if(!res2.ok)throw new Error('retry upsert HTTP '+res2.status);
+      problems=frVerifyMigration(wanted,await frFetchAllRows());
+    }
+    if(problems.length){
+      sbSetStatus('Migration NOT applied: verification failed','err');
+      alert('Migration verification failed — the app is still running safely on the old storage. Nothing was changed or lost.\n\nDetails:\n'+problems.slice(0,10).join('\n'));
+      return false;
+    }
+    // Verified: write the cutover marker
+    var counts={};Object.keys(wanted).forEach(function(k){var kd=wanted[k].kind;counts[kd]=(counts[kd]||0)+1;});
+    _frMeta={migratedAt:new Date().toISOString(),device:sbDeviceId(),counts:counts};
+    var mres=await fetch(SB_URL+'/rest/v1/finance_records',{method:'POST',headers:frHdr({'Prefer':'resolution=merge-duplicates'}),body:JSON.stringify({kind:'sing',rid:'_meta',data:_frMeta,ver:1,deleted:false,device:sbDeviceId(),updated_at:new Date().toISOString()})});
+    if(!mres.ok)throw new Error('meta HTTP '+mres.status);
+    Object.keys(wanted).forEach(function(key){
+      var w=wanted[key];
+      _frShadow[key]={json:frCanon(w.data),ver:_frShadow[key]?_frShadow[key].ver:1,deleted:!!w.deleted};
+    });
+    _frActive=true;
+    try{localStorage.setItem('lf_fr_active','1');}catch(e){}
+    try{if(_sbRealtimeSocket)_sbRealtimeSocket.close();}catch(e){}
+    // shadow versions must reflect server truth
+    (await frFetchAllRows()).forEach(function(r){_frShadow[r.kind+':'+r.rid]={json:frCanon(r.data),ver:r.ver,deleted:r.deleted};});
+    frStartRealtime();
+    var total=Object.keys(wanted).length;
+    sbSetStatus('Migrated ✓ per-record sync live','ok');
+    console.log('[FR] migration complete:',counts);
+    alert('Storage upgraded ✓\n\n'+total+' records verified and moved to per-record storage. Every record was checked individually: counts match, no ids missing, contents identical.\n\nYour old data was NOT deleted — it stays frozen on the server as a permanent extra backup.\n\nOpen the app once on your other devices so they pick up the new version.');
+    return true;
+  }catch(e){
+    console.warn('[FR] migration failed:',e);
+    sbSetStatus('Migration failed: '+e.message+' (still on old storage)','err');
+    return false;
+  }
+}
+function frVerifyMigration(wanted,serverRows){
+  var problems=[];
+  var srv={};serverRows.forEach(function(r){srv[r.kind+':'+r.rid]=r;});
+  Object.keys(wanted).forEach(function(key){
+    var w=wanted[key],r=srv[key];
+    if(!r){problems.push('missing on server: '+key);return;}
+    if(!!w.deleted!==!!r.deleted){problems.push('deleted flag mismatch: '+key);return;}
+    if(!w.deleted&&frCanon(w.data)!==frCanon(r.data))problems.push('content mismatch: '+key);
+  });
+  Object.keys(srv).forEach(function(key){
+    if(key==='sing:_meta')return;
+    if(!wanted[key])problems.push('unexpected on server: '+key);
+  });
+  return problems;
+}
+// ── Watchdog: a device still on the old cached app version writes the old
+// row; detect that and offer a one-tap import of its records. ──
+function frShowOldBanner(dev,ts){
+  if(document.getElementById('fr-old-banner'))return;
+  var b=document.createElement('div');
+  b.id='fr-old-banner';
+  b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--amb-bg,#8a6d3b);color:var(--ink,#fff);border-bottom:2px solid var(--amb,#f0ad4e);padding:10px 14px;font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap';
+  var t=new Date(ts);
+  b.innerHTML='<span style="flex:1">⚠ A device still on the OLD app version ('+(dev||'unknown')+') saved data at '+t.toLocaleString()+'. Its changes are not in the new storage yet.</span>';
+  var imp=document.createElement('button');imp.className='btn btn-sm btn-p';imp.textContent='Import its records';
+  imp.onclick=function(){frImportOldRow(ts);};
+  var dis=document.createElement('button');dis.className='btn btn-sm';dis.textContent='Dismiss';
+  dis.onclick=function(){try{localStorage.setItem('lf_fr_oldseen',String(new Date(ts).getTime()));}catch(e){}b.remove();};
+  b.appendChild(imp);b.appendChild(dis);
+  document.body.appendChild(b);
+}
+async function frImportOldRow(ts){
+  try{
+    var res=await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=data',{headers:frHdr()});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    var rows=await res.json();
+    if(!rows.length)return alert('Old data row not found.');
+    var added=sbMergeRemoteIntoLocal(rows[0].data)||0;
+    try{localStorage.setItem('lf_fr_oldseen',String(new Date(ts).getTime()));}catch(e){}
+    var b=document.getElementById('fr-old-banner');if(b)b.remove();
+    autosave();
+    safeShowView(currentPage);
+    alert(added?('Imported '+added+' record(s) from the old-version device. Now update that device: open the app on it and refresh.'):'No new records found to import (settings-only changes are not auto-imported). Update that device: open the app on it and refresh.');
+  }catch(e){alert('Import failed: '+e.message);}
+}
+async function frWatchOldRow(){
+  if(!_frActive)return;
+  try{
+    var res=await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=updated_at,dev:data-%3E%3EdeviceId',{headers:frHdr()});
+    if(!res.ok)return;
+    var rows=await res.json();
+    if(!rows.length)return;
+    var t=new Date(rows[0].updated_at).getTime();
+    var migrated=_frMeta&&_frMeta.migratedAt?new Date(_frMeta.migratedAt).getTime():0;
+    var seen=0;try{seen=parseFloat(localStorage.getItem('lf_fr_oldseen')||'0');}catch(e){}
+    if(migrated&&t>migrated+10000&&t>seen)frShowOldBanner(rows[0].dev,rows[0].updated_at);
+  }catch(e){}
+}
+function frRefreshView(){
+  var active=document.activeElement;
+  var isTyping=active&&(active.tagName==='INPUT'||active.tagName==='TEXTAREA'||active.tagName==='SELECT');
+  if(isTyping)active.addEventListener('blur',function(){showView(currentPage);},{once:true});
+  else showView(currentPage);
+}
 function sbInitSync(){
   sbSetStatus('Connecting...','busy');
-  // Pull once on startup to get latest data
-  sbPull().then(function(changed){if(changed){var active=document.activeElement;var isTyping=active&&(active.tagName==='INPUT'||active.tagName==='TEXTAREA'||active.tagName==='SELECT');if(isTyping){active.addEventListener('blur',function(){showView(currentPage);},{once:true});}else{showView(currentPage);}}});
-  // Then start realtime for instant cross-device updates
-  sbStartRealtime();
-  // Push finance summary on startup so Omni always has fresh data
-  setTimeout(pushFinanceSummary, 2000);
+  frLoadPending();
+  (async function(){
+    var meta=null,metaErr=false;
+    try{meta=await frGetRow('sing','_meta');}catch(e){metaErr=true;console.warn('[FR] meta check:',e.message);}
+    if((meta&&!meta.deleted)||(metaErr&&_frActive)){
+      // Migrated (or previously migrated and currently offline): record engine.
+      // Never fall back to the legacy whole-blob engine once migrated.
+      _frActive=true;if(meta)_frMeta=meta.data||{};
+      try{localStorage.setItem('lf_fr_active','1');}catch(e){}
+      try{
+        var changed=await frReconcile();
+        if(changed)frRefreshView();
+      }catch(e){console.warn('[FR] reconcile:',e);sbSetStatus('Offline — will sync when back','err');}
+      frStartRealtime();
+      frWatchOldRow();setInterval(frWatchOldRow,5*60*1000);
+    }else{
+      _frActive=false;
+      try{localStorage.removeItem('lf_fr_active');}catch(e){}
+      var changed2=await sbLegacyPull();
+      if(changed2)frRefreshView();
+      var ok=await frMigrate();
+      if(!ok)sbLegacyRealtime();
+      else{frWatchOldRow();setInterval(frWatchOldRow,5*60*1000);}
+    }
+    setTimeout(pushFinanceSummary,2000);
+  })();
 }
 
 </script>
