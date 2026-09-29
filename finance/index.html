@@ -868,6 +868,14 @@ input:focus,select:focus{border-color:var(--ink)}
           <button class="btn" onclick="exportToPDF()">&#8659; Print / PDF</button>
           <button class="btn" onclick="takeSnapshot()">&#128247; Save snapshot</button>
         </div>
+        <div style="margin:10px 0;padding:10px;background:var(--bg);border-radius:var(--r);border:.5px solid var(--brd)">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:4px">
+            <span style="font-size:12px;font-weight:700;color:var(--ink2)">&#128190; Server backups</span>
+            <button class="btn btn-sm" onclick="loadServerBackups()">Load backups</button>
+          </div>
+          <div style="font-size:11px;color:var(--ink3);margin-bottom:6px">Every sync overwrite is archived server-side (last 30 kept). Restore rewinds ALL data to that moment and pushes it to every device.</div>
+          <div id="backup-list" style="font-size:12px"></div>
+        </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-d" onclick="clearOldData()">&#128465; Clear old data</button>
           <button class="btn btn-d" onclick="resetData()">&#9888; Reset ALL</button>
@@ -2364,6 +2372,7 @@ function addSurplusAdj(cur,amount,note){
   autosave();sbPushNow();renderCommitments();if(currentPage==='dashboard')renderDashboard();
 }
 function deleteSurplusAdj(id){
+  tomb('adj:'+id);
   S.surplusAdjustments=safeArr(S.surplusAdjustments).filter(function(a){return a.id!==id;});
   autosave();sbPushNow();renderCommitments();if(currentPage==='dashboard')renderDashboard();
 }
@@ -2383,6 +2392,7 @@ function resetSurplus(){
   autosave();sbPushNow();renderDashboard();
 }
 function deleteExp(id){
+  tomb('exp:'+id);
   expenses=expenses.filter(function(e){return e.id!==id;});
   updateSurplus();autosave();sbPushNow();renderLog();
 }
@@ -2697,6 +2707,7 @@ function toggleTick(id){
       var st=settlements.find(function(x){return x.id===settleId;});
       if(st){
         var monLabel=MNAMES[commitMon.month-1]+' '+commitMon.year+' (auto)';
+        safeArr(st.payments).forEach(function(p){if(p.autoRecorded&&p.note===monLabel)tomb('pay:'+p.id);});
         st.payments=safeArr(st.payments).filter(function(p){return !(p.autoRecorded&&p.note===monLabel);});
       }
     }
@@ -3370,7 +3381,7 @@ function renderProjection(){
         var eff=(t.rmbSent/t.jodReceived).toFixed(3);
         r.innerHTML='<span style="color:var(--ink3)">'+(t.date||'?')+'</span><span class="mono" style="flex:1">'+fRMB(t.rmbSent)+' \u2192 '+fJOD(t.jodReceived)+'</span><span class="mono" style="color:var(--ink3)">'+eff+' Y/JOD</span>';
         var del=document.createElement('button');del.className='btn btn-xs btn-d';del.textContent='Del';
-        del.onclick=(function(tid){return function(){if(!confirm('Remove this transfer record?'))return;S.transferLog=safeArr(S.transferLog).filter(function(x){return x.id!==tid;});autosave();sbPushNow();renderProjection();};})(t.id);
+        del.onclick=(function(tid){return function(){if(!confirm('Remove this transfer record?'))return;tomb('tl:'+tid);S.transferLog=safeArr(S.transferLog).filter(function(x){return x.id!==tid;});autosave();sbPushNow();renderProjection();};})(t.id);
         r.appendChild(del);tlList.appendChild(r);
       });
       cw.appendChild(tlList);
@@ -3576,7 +3587,7 @@ function renderProjection(){
           if(it.isHoliday){r.title='Click to open Holidays';r.onclick=function(e){e.stopPropagation();showView('holidays');};}
           if(it.isSurplus){r.style.cssText='background:linear-gradient(90deg,rgba(93,159,212,.08),transparent);border-left:2px solid var(--blu);border-radius:4px;padding:2px 4px;font-style:italic';}
           if(it.streamId&&!it.evId&&!it.isHoliday&&!it.isWishlist&&!it.prePaid){var eb=document.createElement('button');eb.className='btn btn-xs';eb.style.cssText='padding:1px 5px;font-size:10px;margin-left:3px';eb.textContent='Edit';eb.onclick=(function(sid,yr2,mo2){return function(e){e.stopPropagation();showMonthStreamEdit(sid,yr2,mo2,idx);};})(it.streamId,row.yr,row.mo);r.appendChild(eb);}
-          if(it.evId){var db=document.createElement('button');db.className='btn btn-xs btn-d';db.style.cssText='padding:1px 5px;font-size:10px;margin-left:3px';db.textContent='Del';db.onclick=(function(eid){return function(e){e.stopPropagation();oneoffEvents=oneoffEvents.filter(function(x){return x.id!==eid;});autosave();renderProjection();};})(it.evId);r.appendChild(db);}
+          if(it.evId){var db=document.createElement('button');db.className='btn btn-xs btn-d';db.style.cssText='padding:1px 5px;font-size:10px;margin-left:3px';db.textContent='Del';db.onclick=(function(eid){return function(e){e.stopPropagation();tomb('ev:'+eid);oneoffEvents=oneoffEvents.filter(function(x){return x.id!==eid;});autosave();renderProjection();};})(it.evId);r.appendChild(db);}
           flowsDiv.appendChild(r);
         });
       }
@@ -4194,7 +4205,7 @@ function deletePhase(sid,phid){var s=settlements.find(function(x){return x.id===
 function updatePhase(sid,phid,key,val){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;var ph=safeArr(s.phases).find(function(p){return String(p.id)===String(phid);});if(!ph)return;ph[key]=typeof val==='boolean'?val:(isNaN(val)||key==='currency'||key==='account'?val:parseFloat(val)||parseInt(val,10));autosave();}
 function addPayment(sid){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;var amt=parseFloat(document.getElementById('pay-amt-'+sid).value);if(!amt||amt<=0)return alert('Enter a valid amount.');var cur=document.getElementById('pay-cur-'+sid).value;var amtJOD=toJOD(amt,cur);s.payments=safeArr(s.payments);s.payments.push({id:Date.now(),amtJOD:n2(amtJOD),amtRaw:amt,currency:cur,date:document.getElementById('pay-date-'+sid).value||today().toISOString().split('T')[0],note:document.getElementById('pay-note-'+sid).value,type:document.getElementById('pay-type-'+sid).value});document.getElementById('pay-amt-'+sid).value='';document.getElementById('pay-note-'+sid).value='';autosave();renderSettlement();}
 function editPayment(sid,pid){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;var p=safeArr(s.payments).find(function(x){return String(x.id)===String(pid);});if(!p)return;var ex=document.getElementById('edit-pay-'+pid);if(ex){ex.remove();return;}var row=document.getElementById('prow-'+sid+'-'+pid);if(!row)return;var div=document.createElement('div');div.id='edit-pay-'+pid;div.className='form-box';div.style.marginTop='4px';var aI=document.createElement('input');aI.type='number';aI.value=n2(p.amtJOD);aI.style.marginBottom='7px';var nI=document.createElement('input');nI.type='text';nI.value=p.note||'';nI.style.marginBottom='7px';var sb=document.createElement('button');sb.className='btn btn-sm btn-p';sb.textContent='Save';sb.onclick=function(){p.amtJOD=parseFloat(aI.value)||p.amtJOD;p.note=nI.value;div.remove();autosave();renderSettlement();};var cb=document.createElement('button');cb.className='btn btn-sm';cb.textContent='Cancel';cb.style.marginLeft='6px';cb.onclick=function(){div.remove();};var l1=document.createElement('label');l1.textContent='Amount (JOD)';l1.style.cssText='display:block;font-size:11px;color:var(--ink3);font-weight:700;margin-bottom:3px';var l2=document.createElement('label');l2.textContent='Note';l2.style.cssText='display:block;font-size:11px;color:var(--ink3);font-weight:700;margin-bottom:3px;margin-top:4px';div.appendChild(l1);div.appendChild(aI);div.appendChild(l2);div.appendChild(nI);div.appendChild(sb);div.appendChild(cb);row.insertAdjacentElement('afterend',div);}
-function deletePayment(sid,pid){if(!confirm('Remove?'))return;var s=settlements.find(function(x){return x.id===sid;});if(!s)return;s.payments=safeArr(s.payments).filter(function(p){return String(p.id)!==String(pid);});autosave();renderSettlement();}
+function deletePayment(sid,pid){if(!confirm('Remove?'))return;var s=settlements.find(function(x){return x.id===sid;});if(!s)return;tomb('pay:'+pid);s.payments=safeArr(s.payments).filter(function(p){return String(p.id)!==String(pid);});autosave();renderSettlement();}
 function addMotelEntry(sid){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;var amt=parseFloat(document.getElementById('motel-amt').value)||0;s.payments=safeArr(s.payments);s.payments.unshift({id:Date.now(),amtJOD:amt,label:document.getElementById('motel-label').value||'Entry',date:document.getElementById('motel-date').value||today().toISOString().split('T')[0],status:document.getElementById('motel-status').value,note:document.getElementById('motel-note').value});document.getElementById('motel-amt').value='';document.getElementById('motel-label').value='';document.getElementById('motel-note').value='';autosave();renderSettlement();}
 function deleteMotelEntry(sid,pid){if(!confirm('Remove?'))return;var s=settlements.find(function(x){return x.id===sid;});if(!s)return;s.payments=safeArr(s.payments).filter(function(p){return String(p.id)!==String(pid);});autosave();renderSettlement();}
 
@@ -4970,6 +4981,43 @@ function renderBudgetSettings(){
   });
 }
 function renderSnapshotList(){var sl=document.getElementById('snapshots-list');if(!sl)return;renderHistory&&renderHistory();}
+async function loadServerBackups(){
+  var el=document.getElementById('backup-list');if(!el)return;
+  el.innerHTML='<span style="color:var(--ink3)">Loading\u2026</span>';
+  try{
+    var res=await fetch(SB_URL+'/rest/v1/finance_history?id=eq.'+SB_ROW_ID+'&select=hid,archived_at&order=hid.desc&limit=30',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+    if(res.status===404||res.status===400){el.innerHTML='<span style="color:var(--amb)">History table not set up yet \u2014 run the SQL snippet in Supabase once.</span>';return;}
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    var rows=await res.json();
+    if(!rows.length){el.innerHTML='<span style="color:var(--ink3)">No backups yet. One is archived automatically on every sync overwrite.</span>';return;}
+    el.innerHTML='';
+    rows.forEach(function(r){
+      var d=new Date(r.archived_at);
+      var row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:.5px solid var(--brd)';
+      row.innerHTML='<span class="mono" style="flex:1;font-size:11px">'+d.toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'})+'</span>';
+      var btn=document.createElement('button');btn.className='btn btn-xs';btn.textContent='Restore';
+      btn.onclick=(function(hid){return function(){restoreServerBackup(hid);};})(r.hid);
+      row.appendChild(btn);el.appendChild(row);
+    });
+  }catch(e){el.innerHTML='<span style="color:var(--red)">Failed: '+e.message+'</span>';}
+}
+async function restoreServerBackup(hid){
+  try{
+    var res=await fetch(SB_URL+'/rest/v1/finance_history?hid=eq.'+hid+'&select=data,archived_at',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    var rows=await res.json();
+    if(!rows.length){alert('Backup not found.');return;}
+    var blob=rows[0].data;var inner=blob&&blob.data;
+    if(!inner){alert('Backup is malformed.');return;}
+    var nExp=safeArr(inner.expenses).length;
+    var d=new Date(rows[0].archived_at);
+    if(!confirm('Restore backup from '+d.toLocaleString()+'?\n\nIt holds '+nExp+' logged expenses.\nThis replaces ALL current data on every device (the current state is itself archived first, so this is reversible).'))return;
+    applyStateStr(JSON.stringify(inner));
+    autosave();sbPushNow();
+    try{showView(currentPage);}catch(e){}
+    alert('Restored. Data pushed to all devices.');
+  }catch(e){alert('Restore failed: '+e.message);}
+}
 function renderSettingsPage(){
   initSettingsSections();renderMinimums();
   var fields={jod2rmb:S.jod2rmb,gbp2jod:S.gbp2jod,'proj-add-months':S.projAddMonths||12};
@@ -5795,6 +5843,52 @@ var _sbDirty=false;
 var _sbDeviceId=null;
 var _sbLastLocalChange=0;
 var _sbLastPushedVer=0;
+var _sbLastSeenRemoteVer=0; // last remote version this device has fetched or produced
+function tomb(key){
+  // Record a typed deletion tombstone so merges never resurrect deleted records
+  S.deletedIds=safeArr(S.deletedIds);
+  if(S.deletedIds.indexOf(key)<0)S.deletedIds.push(key);
+  if(S.deletedIds.length>800)S.deletedIds=S.deletedIds.slice(-800);
+}
+function sbMergeRemoteIntoLocal(remote){
+  // Union append-mostly money records from an unseen remote state into local,
+  // so a two-sided divergence merges losslessly instead of one side winning.
+  // Local wins on same-id conflicts (this device is the active writer).
+  try{
+    var rd=remote&&remote.data;if(!rd)return;
+    // Tombstones: union both sides first
+    var rDel=safeArr(rd.S&&rd.S.deletedIds);
+    S.deletedIds=safeArr(S.deletedIds);
+    rDel.forEach(function(k){if(S.deletedIds.indexOf(k)<0)S.deletedIds.push(k);});
+    if(S.deletedIds.length>800)S.deletedIds=S.deletedIds.slice(-800);
+    var dead={};S.deletedIds.forEach(function(k){dead[k]=true;});
+    function unionById(localArr,remoteArr,prefix){
+      var out=safeArr(localArr).filter(function(x){return x&&!dead[prefix+x.id];});
+      var have={};out.forEach(function(x){have[x.id]=true;});
+      var added=0;
+      safeArr(remoteArr).forEach(function(x){
+        if(!x||have[x.id]||dead[prefix+x.id])return;
+        out.push(x);have[x.id]=true;added++;
+      });
+      return {arr:out,added:added};
+    }
+    var totalAdded=0;
+    var m=unionById(expenses,rd.expenses,'exp:');
+    m.arr.sort(function(a,b){return (b.date||'').localeCompare(a.date||'')||(b.id-a.id);});
+    expenses=m.arr;totalAdded+=m.added;
+    m=unionById(oneoffEvents,rd.oneoffEvents,'ev:');oneoffEvents=m.arr;totalAdded+=m.added;
+    m=unionById(S.transferLog,rd.S&&rd.S.transferLog,'tl:');S.transferLog=m.arr;totalAdded+=m.added;
+    m=unionById(S.surplusAdjustments,rd.S&&rd.S.surplusAdjustments,'adj:');S.surplusAdjustments=m.arr;totalAdded+=m.added;
+    m=unionById(S.surplusEvents,rd.S&&rd.S.surplusEvents,'sev:');S.surplusEvents=m.arr;totalAdded+=m.added;
+    safeArr(rd.settlements).forEach(function(rs){
+      var ls=safeArr(settlements).find(function(x){return x.id===rs.id;});
+      if(!ls)return;
+      var pm=unionById(ls.payments,rs.payments,'pay:');ls.payments=pm.arr;totalAdded+=pm.added;
+    });
+    if(totalAdded>0)console.warn('[SYNC] merged '+totalAdded+' record(s) from remote instead of overwriting');
+    return totalAdded;
+  }catch(e){console.warn('[SYNC] merge failed:',e);return 0;}
+}
 var _sbRealtimeSocket=null;
 var _sbRealtimeRef=1;
 
@@ -5837,8 +5931,9 @@ function sbBuildPayload(){
 
 function sbApplyRemote(remote){
   // Apply remote data to in-memory state. Called from pull and realtime.
-  if(_sbDirty)return false;
   var remoteVer=remote.version||0;
+  if(remoteVer>_sbLastSeenRemoteVer)_sbLastSeenRemoteVer=remoteVer;
+  if(_sbDirty)return false;
   if(remoteVer&&remoteVer<=_sbLastPushedVer)return false;
   if(_sbLastLocalChange&&Date.now()-_sbLastLocalChange<5000)return false;
   // Never let an OLDER remote overwrite newer local data (e.g. pre-refresh push failed).
@@ -5881,6 +5976,26 @@ async function sbPush(preStampedVer){
   _sbSyncing=true;
   sbSetStatus('Pushing...','busy');
   try{
+    // ── Never push over a remote this device has not seen (compare-and-swap) ──
+    try{
+      var chk=await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=ver:data-%3E%3Eversion',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+      if(chk.ok){
+        var crows=await chk.json();
+        var rVer=crows&&crows.length?parseInt(crows[0].ver||'0',10):0;
+        if(rVer&&rVer!==_sbLastSeenRemoteVer&&rVer!==_sbLastPushedVer){
+          // Remote changed since we last looked: fetch it and merge its money records first
+          var full=await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=data',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+          if(full.ok){
+            var frows=await full.json();
+            if(frows&&frows.length&&frows[0].data){
+              sbMergeRemoteIntoLocal(frows[0].data);
+              _sbLastSeenRemoteVer=rVer;
+              preStampedVer=null; // stamp a fresh, newest version for the merged state
+            }
+          }
+        }
+      }
+    }catch(pf){console.warn('[SYNC] preflight check failed, pushing anyway:',pf.message);}
     var payload=sbBuildPayload();
     if(preStampedVer)payload.version=preStampedVer;
     _sbLastPushedVer=payload.version;
@@ -5891,6 +6006,8 @@ async function sbPush(preStampedVer){
       body:JSON.stringify({id:SB_ROW_ID,data:payload,updated_at:new Date().toISOString()})
     });
     if(!res.ok){var e=await res.text();throw new Error('HTTP '+res.status+': '+e.slice(0,120));}
+    _sbLastSeenRemoteVer=payload.version; // remote now equals what we produced
+    try{localStorage.setItem('lf_data',JSON.stringify(payload.data));localStorage.setItem('lf_ver',String(payload.version));}catch(ls){}
     sbSetStatus('Synced at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
     if(typeof pushFinanceSummary==='function')pushFinanceSummary();
   }catch(e){
@@ -5916,6 +6033,7 @@ async function sbPull(){
     var rows=await res.json();
     if(!rows||!rows.length){sbSetStatus('No data yet','ok');_sbSyncing=false;return false;}
     var remote=rows[0].data;
+    if(remote&&remote.version)_sbLastSeenRemoteVer=remote.version;
     var changed=false;
     if(!_sbDirty){
       changed=sbApplyRemote(remote);
