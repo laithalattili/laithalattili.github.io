@@ -309,7 +309,7 @@ input:focus,select:focus{border-color:var(--ink)}
 .cat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:9px}
 .cat-btn{display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 4px;border-radius:var(--r);border:.5px solid var(--brd);cursor:pointer;background:var(--surf);transition:all .12s;font-size:10px;font-weight:600;color:var(--ink3);text-align:center}
 .cat-btn:hover{background:var(--bg)}.cat-btn.sel{border-color:var(--ink);color:var(--ink)}
-.cat-btn-hol{background:var(--amb-bg);border-color:var(--amb);color:#f2a65a;font-weight:700}.cat-btn-hol:hover{background:var(--amb-bg)}.cat-btn-hol.sel{border-color:#f2a65a;color:#f2a65a;box-shadow:0 0 0 2px rgba(242,166,90,.25)}
+.cat-btn-hol{background:var(--surf);border-color:var(--brd);color:#f2a65a;font-weight:700}.cat-btn-hol:hover{background:var(--bg)}.cat-btn-hol.sel{background:var(--amb-bg);border-color:#f2a65a;color:#f2a65a;box-shadow:0 0 0 2px rgba(242,166,90,.25)}
 .cat-dot{width:14px;height:14px;border-radius:50%}
 .log-big-btn{width:100%;padding:14px;border-radius:var(--rlg);border:none;background:var(--ink);color:var(--bg);font-size:16px;font-weight:700;cursor:pointer;font-family:var(--f);display:flex;align-items:center;justify-content:center;gap:7px}
 .log-big-btn:hover{opacity:.87}.log-big-btn:active{transform:scale(.98)}
@@ -6744,7 +6744,7 @@ function frShowOldBanner(dev,ts){
   if(document.getElementById('fr-old-banner'))return;
   var b=document.createElement('div');
   b.id='fr-old-banner';
-  b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#3a2f14;color:#f5e9c9;border-bottom:2px solid #d9a53f;padding:10px 14px;font-size:13px;line-height:1.4;display:flex;gap:10px;align-items:center;flex-wrap:wrap;box-shadow:0 4px 14px rgba(0,0,0,.5)';
+  b.style.cssText='position:fixed;bottom:84px;left:12px;right:12px;max-width:720px;margin:0 auto;z-index:9999;background:#3a2f14;color:#f5e9c9;border:1.5px solid #d9a53f;border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.4;display:flex;gap:10px;align-items:center;flex-wrap:wrap;box-shadow:0 6px 20px rgba(0,0,0,.55)';
   var t=new Date(ts);
   b.innerHTML='<span style="flex:1">⚠ A device still on the OLD app version ('+(dev||'unknown')+') saved data at '+t.toLocaleString()+'. Its changes are not in the new storage yet.</span>';
   var imp=document.createElement('button');imp.className='btn btn-sm btn-p';imp.textContent='Import its records';
