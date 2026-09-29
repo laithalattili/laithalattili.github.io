@@ -6600,6 +6600,63 @@ function frEnsureIds(){
   if(n)frLocalSave();
 }
 var FR_TOMB_KINDS={exp:1,ev:1,tl:1,adj:1,sev:1};
+async function frEnsureRow(w){
+  // Make the server row match w exactly: plain insert if absent, otherwise a
+  // guarded conditional update. Never relies on upsert semantics.
+  var cur=await frGetRow(w.kind,w.rid);
+  for(var a=0;a<4;a++){
+    if(!cur){
+      var res=await fetch(SB_URL+'/rest/v1/finance_records',{method:'POST',headers:frHdr({'Prefer':'return=representation'}),body:JSON.stringify({kind:w.kind,rid:String(w.rid),data:w.data||{},ver:1,deleted:!!w.deleted,device:sbDeviceId(),updated_at:new Date().toISOString()})});
+      if(res.ok)return true;
+      if(res.status===409){cur=await frGetRow(w.kind,w.rid);continue;}
+      throw new Error('insert HTTP '+res.status);
+    }
+    if(!!cur.deleted===!!w.deleted&&frCanon(cur.data)===frCanon(w.data))return true;
+    var r2=await fetch(SB_URL+'/rest/v1/finance_records?kind=eq.'+encodeURIComponent(w.kind)+'&rid=eq.'+encodeURIComponent(w.rid)+'&ver=eq.'+cur.ver,{method:'PATCH',headers:frHdr({'Prefer':'return=representation'}),body:JSON.stringify({data:w.data||{},ver:cur.ver+1,deleted:!!w.deleted,device:sbDeviceId(),updated_at:new Date().toISOString()})});
+    if(!r2.ok)throw new Error('update HTTP '+r2.status);
+    var rows2=await r2.json();
+    if(rows2.length)return true;
+    cur=await frGetRow(w.kind,w.rid); // someone moved it: reload and retry
+  }
+  return false;
+}
+async function frSyncWanted(wanted,existing){
+  // Bring the server to exactly `wanted`: batch-insert what's missing,
+  // guarded-update what differs. Returns true if a batch insert hit the
+  // table-missing case.
+  var toInsert=[],toFix=[];
+  Object.keys(wanted).forEach(function(key){
+    var w=wanted[key],e=existing[key];
+    if(!e)toInsert.push(key);
+    else if(!!e.deleted!==!!w.deleted||frCanon(e.data)!==frCanon(w.data))toFix.push(key);
+  });
+  for(var i=0;i<toInsert.length;i+=40){
+    var slice=toInsert.slice(i,i+40);
+    var batch=slice.map(function(key){var w=wanted[key];return {kind:w.kind,rid:String(w.rid),data:w.data||{},ver:1,deleted:!!w.deleted,device:sbDeviceId(),updated_at:new Date().toISOString()};});
+    var res=await fetch(SB_URL+'/rest/v1/finance_records',{method:'POST',headers:frHdr({'Prefer':'return=minimal'}),body:JSON.stringify(batch)});
+    if(res.status===404)return 'no-table';
+    if(res.status===409){
+      // concurrent writer created some of these: settle each row individually
+      for(var j=0;j<slice.length;j++)await frEnsureRow(wanted[slice[j]]);
+      continue;
+    }
+    if(!res.ok)throw new Error('insert HTTP '+res.status);
+  }
+  for(var k=0;k<toFix.length;k++)await frEnsureRow(wanted[toFix[k]]);
+  return 'ok';
+}
+async function frJoinMigrated(metaData){
+  // Another device already migrated (or the marker reappeared): never
+  // migrate over live data — adopt it and reconcile.
+  _frMeta=metaData||{};
+  _frActive=true;
+  try{localStorage.setItem('lf_fr_active','1');}catch(e){}
+  try{if(_sbRealtimeSocket)_sbRealtimeSocket.close();}catch(e){}
+  try{var ch=await frReconcile();if(ch)frRefreshView();}catch(e){console.warn('[FR] join reconcile:',e.message);}
+  frStartRealtime();
+  sbSetStatus('Per-record sync live','ok');
+  return true;
+}
 async function frMigrate(){
   try{
     sbSetStatus('Migrating to per-record storage...','busy');
@@ -6613,23 +6670,23 @@ async function frMigrate(){
       var key=kind+':'+rid;
       if(!wanted[key])wanted[key]={kind:kind,rid:rid,data:{},deleted:true};
     });
-    var keys=Object.keys(wanted);
-    for(var i=0;i<keys.length;i+=40){
-      var batch=keys.slice(i,i+40).map(function(key){
-        var w=wanted[key];
-        return {kind:w.kind,rid:w.rid,data:w.data,ver:1,deleted:!!w.deleted,device:sbDeviceId(),updated_at:new Date().toISOString()};
-      });
-      var res=await fetch(SB_URL+'/rest/v1/finance_records',{method:'POST',headers:frHdr({'Prefer':'resolution=merge-duplicates'}),body:JSON.stringify(batch)});
-      if(res.status===404){sbSetStatus('New tables not set up yet — run supabase-records-setup.sql once','err');return false;}
-      if(!res.ok)throw new Error('upsert HTTP '+res.status);
-    }
+    // Look at what's on the server first. If a cutover marker exists, another
+    // device (or an earlier run) already migrated: JOIN it, never overwrite it.
+    var existingRows;
+    try{existingRows=await frFetchAllRows();}
+    catch(fe){sbSetStatus('New tables not reachable — run supabase-records-setup.sql once','err');return false;}
+    var existing={};existingRows.forEach(function(r){existing[r.kind+':'+r.rid]=r;});
+    if(existing['sing:_meta']&&!existing['sing:_meta'].deleted)return frJoinMigrated(existing['sing:_meta'].data);
+    var st=await frSyncWanted(wanted,existing);
+    if(st==='no-table'){sbSetStatus('New tables not set up yet — run supabase-records-setup.sql once','err');return false;}
     // ── Verification gate: no cutover unless EVERYTHING matches ──
     var problems=frVerifyMigration(wanted,await frFetchAllRows());
     if(problems.length){
       console.warn('[FR] migration verify round 1:',problems);
-      // one retry for transient issues
-      var res2=await fetch(SB_URL+'/rest/v1/finance_records',{method:'POST',headers:frHdr({'Prefer':'resolution=merge-duplicates'}),body:JSON.stringify(keys.map(function(key){var w=wanted[key];return {kind:w.kind,rid:w.rid,data:w.data,ver:1,deleted:!!w.deleted,device:sbDeviceId(),updated_at:new Date().toISOString()};}))});
-      if(!res2.ok)throw new Error('retry upsert HTTP '+res2.status);
+      // settle every row individually, then verify again
+      var existing2={};(await frFetchAllRows()).forEach(function(r){existing2[r.kind+':'+r.rid]=r;});
+      if(existing2['sing:_meta']&&!existing2['sing:_meta'].deleted)return frJoinMigrated(existing2['sing:_meta'].data);
+      await frSyncWanted(wanted,existing2);
       problems=frVerifyMigration(wanted,await frFetchAllRows());
     }
     if(problems.length){
@@ -6640,8 +6697,8 @@ async function frMigrate(){
     // Verified: write the cutover marker
     var counts={};Object.keys(wanted).forEach(function(k){var kd=wanted[k].kind;counts[kd]=(counts[kd]||0)+1;});
     _frMeta={migratedAt:new Date().toISOString(),device:sbDeviceId(),counts:counts};
-    var mres=await fetch(SB_URL+'/rest/v1/finance_records',{method:'POST',headers:frHdr({'Prefer':'resolution=merge-duplicates'}),body:JSON.stringify({kind:'sing',rid:'_meta',data:_frMeta,ver:1,deleted:false,device:sbDeviceId(),updated_at:new Date().toISOString()})});
-    if(!mres.ok)throw new Error('meta HTTP '+mres.status);
+    var mok=await frEnsureRow({kind:'sing',rid:'_meta',data:_frMeta,deleted:false});
+    if(!mok)throw new Error('could not write cutover marker');
     Object.keys(wanted).forEach(function(key){
       var w=wanted[key];
       _frShadow[key]={json:frCanon(w.data),ver:_frShadow[key]?_frShadow[key].ver:1,deleted:!!w.deleted};
@@ -6670,7 +6727,10 @@ function frVerifyMigration(wanted,serverRows){
     var w=wanted[key],r=srv[key];
     if(!r){problems.push('missing on server: '+key);return;}
     if(!!w.deleted!==!!r.deleted){problems.push('deleted flag mismatch: '+key);return;}
-    if(!w.deleted&&frCanon(w.data)!==frCanon(r.data))problems.push('content mismatch: '+key);
+    if(!w.deleted&&frCanon(w.data)!==frCanon(r.data)){
+      problems.push('content mismatch: '+key);
+      console.warn('[FR] mismatch '+key+'\n local: '+frCanon(w.data).slice(0,400)+'\n server: '+frCanon(r.data).slice(0,400));
+    }
   });
   Object.keys(srv).forEach(function(key){
     if(key==='sing:_meta')return;
@@ -6684,7 +6744,7 @@ function frShowOldBanner(dev,ts){
   if(document.getElementById('fr-old-banner'))return;
   var b=document.createElement('div');
   b.id='fr-old-banner';
-  b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--amb-bg,#8a6d3b);color:var(--ink,#fff);border-bottom:2px solid var(--amb,#f0ad4e);padding:10px 14px;font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap';
+  b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#3a2f14;color:#f5e9c9;border-bottom:2px solid #d9a53f;padding:10px 14px;font-size:13px;line-height:1.4;display:flex;gap:10px;align-items:center;flex-wrap:wrap;box-shadow:0 4px 14px rgba(0,0,0,.5)';
   var t=new Date(ts);
   b.innerHTML='<span style="flex:1">⚠ A device still on the OLD app version ('+(dev||'unknown')+') saved data at '+t.toLocaleString()+'. Its changes are not in the new storage yet.</span>';
   var imp=document.createElement('button');imp.className='btn btn-sm btn-p';imp.textContent='Import its records';
@@ -6744,9 +6804,16 @@ function sbInitSync(){
       }catch(e){console.warn('[FR] reconcile:',e);sbSetStatus('Offline — will sync when back','err');}
       frStartRealtime();
       frWatchOldRow();setInterval(frWatchOldRow,5*60*1000);
+    }else if(_frActive){
+      // This device migrated before, but the marker read came back empty.
+      // NEVER re-migrate a migrated device: re-create the marker and rejoin.
+      console.warn('[FR] cutover marker missing on a migrated device — self-healing');
+      _frMeta=(_frMeta&&_frMeta.migratedAt)?_frMeta:{migratedAt:new Date().toISOString(),device:sbDeviceId(),selfHealed:true};
+      try{await frEnsureRow({kind:'sing',rid:'_meta',data:_frMeta,deleted:false});}catch(e){console.warn('[FR] marker heal:',e.message);}
+      try{var ch=await frReconcile();if(ch)frRefreshView();}catch(e){console.warn('[FR] heal reconcile:',e.message);}
+      frStartRealtime();
+      frWatchOldRow();setInterval(frWatchOldRow,5*60*1000);
     }else{
-      _frActive=false;
-      try{localStorage.removeItem('lf_fr_active');}catch(e){}
       var changed2=await sbLegacyPull();
       if(changed2)frRefreshView();
       var ok=await frMigrate();
