@@ -4269,9 +4269,15 @@ function holItemPayMonth(h,item){
   var db=item.daysBefore!=null?item.daysBefore:30;
   var payDate=new Date(start.getTime()-db*86400000);
   var pyYr=payDate.getFullYear(),pyMo=payDate.getMonth()+1;
-  // If pay month is in the past, roll forward to current month (still needs paying)
+  // If pay month is in the past, roll forward to current month (still needs
+  // paying) — but ONLY if it wasn't ticked as paid in its original month.
+  // A paid item stays in the month it was paid.
   var now=today();var nowYr=now.getFullYear(),nowMo=now.getMonth()+1;
-  if(pyYr*12+pyMo < nowYr*12+nowMo){pyYr=nowYr;pyMo=nowMo;}
+  if(pyYr*12+pyMo < nowYr*12+nowMo){
+    var typ=(item.type==='flight'||item.type==='hotel')?item.type:'other';
+    var paidKey=pyYr+'-'+pyMo+'-holgrp-'+h.id+'-'+typ+'-'+pyYr+'-'+pyMo;
+    if(!tickState[paidKey]){pyYr=nowYr;pyMo=nowMo;}
+  }
   return {yr:pyYr,mo:pyMo};
 }
 function holIsActive(h){
