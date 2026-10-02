@@ -2240,7 +2240,13 @@ function renderDashboard(){
 
 // ═══ LOG ═══
 function catDisplayName(cat){if(cat==='__surplus__')return 'Surplus';if(cat&&cat.indexOf('__hol-')===0){var b=S.budgets&&S.budgets[cat];return b&&b.holLabel?('✈ '+b.holLabel):'✈ Holiday';}return cat;}
-function renderCatGrid(){var cg=document.getElementById('cat-grid');if(!cg)return;cg.innerHTML='';var catKeys=Object.keys(CAT_COLORS);catKeys.sort(function(a,b){return (a.indexOf('__hol-')===0?0:1)-(b.indexOf('__hol-')===0?0:1);});catKeys.forEach(function(cat){var isHolBtn=cat.indexOf('__hol-')===0;var btn=document.createElement('div');btn.className='cat-btn'+(isHolBtn?' cat-btn-hol':'')+(S.selectedCat===cat?' sel':'');var dot=document.createElement('div');dot.className='cat-dot';dot.style.background=CAT_COLORS[cat];btn.appendChild(dot);var lbl=document.createElement('span');lbl.textContent=catDisplayName(cat);btn.appendChild(lbl);btn.onclick=function(){S.selectedCat=cat;renderCatGrid();updateHolCatField();};cg.appendChild(btn);});updateHolCatField();}
+function renderCatGrid(){var cg=document.getElementById('cat-grid');if(!cg)return;cg.innerHTML='';
+  // Only categories that actually have a budget are selectable — plus active
+  // holiday budgets. Spending can no longer land outside every budget bar.
+  var catKeys=Object.keys(S.budgets||{}).filter(function(c){return c!=='__surplus__';});
+  catKeys.sort(function(a,b){return (a.indexOf('__hol-')===0?0:1)-(b.indexOf('__hol-')===0?0:1);});
+  if(catKeys.length&&catKeys.indexOf(S.selectedCat)<0){S.selectedCat=catKeys.filter(function(c){return c.indexOf('__hol-')<0;})[0]||catKeys[0];}
+  catKeys.forEach(function(cat){var isHolBtn=cat.indexOf('__hol-')===0;var btn=document.createElement('div');btn.className='cat-btn'+(isHolBtn?' cat-btn-hol':'')+(S.selectedCat===cat?' sel':'');var dot=document.createElement('div');dot.className='cat-dot';dot.style.background=CAT_COLORS[cat];btn.appendChild(dot);var lbl=document.createElement('span');lbl.textContent=catDisplayName(cat);btn.appendChild(lbl);btn.onclick=function(){S.selectedCat=cat;renderCatGrid();updateHolCatField();};cg.appendChild(btn);});updateHolCatField();}
 function updateHolCatField(){
   var wrap=document.getElementById('log-holcat-wrap');if(!wrap)return;
   var isHol=(S.selectedCat||'').indexOf('__hol-')===0;
@@ -4801,6 +4807,68 @@ function renderBudgetSettingsLS(){
     } else {
       row.appendChild(budInp);row.appendChild(curSel);row.appendChild(acctSel);
     }
+    bs.appendChild(row);
+  });
+  try{renderUnbudgetedCats(bs);}catch(e){console.warn('unbudgeted cats:',e);}
+}
+function renderUnbudgetedCats(bs){
+  // Categories that exist in history or the color list but have NO budget.
+  // These can no longer be picked when logging; this block is how old ones
+  // get merged into a real budget category or promoted to one.
+  var orphans={};
+  Object.keys(CAT_COLORS||{}).forEach(function(c){
+    if(c==='__surplus__'||c.indexOf('__hol-')===0)return;
+    if(!(S.budgets&&S.budgets[c]))orphans[c]={count:0,sums:{}};
+  });
+  safeArr(expenses).forEach(function(e){
+    var c=e.category;
+    if(!c||c==='__surplus__'||(c||'').indexOf('__hol-')===0)return;
+    if(S.budgets&&S.budgets[c])return;
+    if(!orphans[c])orphans[c]={count:0,sums:{}};
+    orphans[c].count++;orphans[c].sums[e.currency]=n2((orphans[c].sums[e.currency]||0)+e.amount);
+  });
+  var names=Object.keys(orphans);
+  if(!names.length)return;
+  var hd=document.createElement('div');
+  hd.style.cssText='margin-top:14px;font-size:12px;font-weight:700;color:var(--amb)';
+  hd.textContent='⚠ Categories without a budget ('+names.length+')';
+  var note=document.createElement('div');
+  note.style.cssText='font-size:11px;color:var(--ink3);margin:3px 0 6px';
+  note.textContent='Not selectable when logging. Merge each one into a real category (moves its logged expenses) or give it a budget.';
+  bs.appendChild(hd);bs.appendChild(note);
+  var budgetCats=getBudgetOrder().filter(function(c){return c!=='__surplus__'&&c.indexOf('__hol-')<0;});
+  names.sort().forEach(function(c){
+    var o=orphans[c];
+    var sumsTxt=Object.keys(o.sums).map(function(cu){return n2(o.sums[cu])+' '+cu;}).join(', ');
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:.5px solid var(--brd);flex-wrap:wrap';
+    row.innerHTML='<span style="width:9px;height:9px;border-radius:50%;background:'+(CAT_COLORS[c]||'#aaa')+';flex-shrink:0"></span>'
+      +'<span style="flex:1;font-size:13px;min-width:90px">'+c+'</span>'
+      +'<span style="font-size:11px;color:var(--ink3)">'+(o.count?o.count+' expense'+(o.count>1?'s':'')+' · '+sumsTxt:'no expenses')+'</span>';
+    var sel=document.createElement('select');sel.style.cssText='font-size:12px;max-width:150px';
+    var o0=document.createElement('option');o0.value='';o0.textContent='Merge into…';sel.appendChild(o0);
+    budgetCats.forEach(function(bc){var op=document.createElement('option');op.value=bc;op.textContent=bc;sel.appendChild(op);});
+    var go=document.createElement('button');go.className='btn btn-xs';go.textContent='Merge';
+    go.onclick=(function(src,selEl){return function(){
+      var dst=selEl.value;if(!dst)return alert('Pick the category to merge into.');
+      if(!confirm('Move '+(orphans[src].count||0)+' expense(s) from "'+src+'" into "'+dst+'" and remove "'+src+'"? Amounts and dates stay unchanged.'))return;
+      var moved=0;
+      safeArr(expenses).forEach(function(e){if(e.category===src){e.category=dst;moved++;}});
+      delete CAT_COLORS[src];if(S.catColors)delete S.catColors[src];
+      if(S.selectedCat===src)S.selectedCat=dst;
+      autosave();renderBudgetSettingsLS();renderCatGrid();
+      alert('Moved '+moved+' expense(s) into "'+dst+'".');
+    };})(c,sel);
+    var mk=document.createElement('button');mk.className='btn btn-xs';mk.textContent='Make budget';
+    mk.onclick=(function(src){return function(){
+      var amt=parseFloat(prompt('Monthly budget amount for "'+src+'":','0'));
+      if(isNaN(amt))return;
+      var cur=(prompt('Currency (RMB / JOD / GBP):','RMB')||'RMB').toUpperCase();
+      S.budgets[src]={amount:n2(amt),currency:cur,account:cur==='JOD'?'arab':'boc'};
+      initBudgetOrder();if(S.budgetOrder.indexOf(src)<0)S.budgetOrder.push(src);
+      autosave();renderBudgetSettingsLS();renderCatGrid();
+    };})(c);
+    row.appendChild(sel);row.appendChild(go);row.appendChild(mk);
     bs.appendChild(row);
   });
 }
