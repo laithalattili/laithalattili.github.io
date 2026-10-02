@@ -2240,14 +2240,25 @@ function renderDashboard(){
 }
 
 // ═══ LOG ═══
-function catDisplayName(cat){if(cat==='__surplus__')return 'Surplus';if(cat&&cat.indexOf('__hol-')===0){var b=S.budgets&&S.budgets[cat];return b&&b.holLabel?('✈ '+b.holLabel):'✈ Holiday';}return cat;}
+function catDisplayName(cat){if(cat==='__surplus__')return 'Surplus';if(cat&&cat.indexOf('__hol-')===0){var b=S.budgets&&S.budgets[cat];if(b&&b.holLabel)return '✈ '+b.holLabel;var hid=cat.slice(6,-2);var hh=safeArr(holidays).find(function(x){return x&&x.id===hid;});return '✈ '+((hh&&hh.label)||'Holiday');}return cat;}
 function renderCatGrid(){var cg=document.getElementById('cat-grid');if(!cg)return;cg.innerHTML='';
-  // Only categories that actually have a budget are selectable — plus active
-  // holiday budgets. Spending can no longer land outside every budget bar.
-  var catKeys=Object.keys(S.budgets||{}).filter(function(c){return c!=='__surplus__';});
+  // Only categories that actually have a budget are selectable. Holiday
+  // categories are month-aware: viewing a past month in the Log offers the
+  // holiday(s) that overlapped THAT month, so old holiday expenses can
+  // still be logged where they belong.
+  var catKeys=Object.keys(S.budgets||{}).filter(function(c){return c!=='__surplus__'&&c.indexOf('__hol-')!==0;});
+  var lv=(typeof logViewDate==='function')?logViewDate():today();
+  var mStart=new Date(lv.getFullYear(),lv.getMonth(),1),mEnd=new Date(lv.getFullYear(),lv.getMonth()+1,0,23,59,59);
+  safeArr(holidays).forEach(function(h){
+    if(!h||!h.start||!h.end)return;
+    var hs=new Date(h.start),he=new Date(h.end);
+    var key='__hol-'+h.id+'__';
+    if(he>=mStart&&hs<=mEnd&&catKeys.indexOf(key)<0)catKeys.unshift(key);
+  });
+  Object.keys(S.budgets||{}).forEach(function(c){if(c.indexOf('__hol-')===0&&catKeys.indexOf(c)<0)catKeys.push(c);});
   catKeys.sort(function(a,b){return (a.indexOf('__hol-')===0?0:1)-(b.indexOf('__hol-')===0?0:1);});
   if(catKeys.length&&catKeys.indexOf(S.selectedCat)<0){S.selectedCat=catKeys.filter(function(c){return c.indexOf('__hol-')<0;})[0]||catKeys[0];}
-  catKeys.forEach(function(cat){var isHolBtn=cat.indexOf('__hol-')===0;var btn=document.createElement('div');btn.className='cat-btn'+(isHolBtn?' cat-btn-hol':'')+(S.selectedCat===cat?' sel':'');var dot=document.createElement('div');dot.className='cat-dot';dot.style.background=CAT_COLORS[cat];btn.appendChild(dot);var lbl=document.createElement('span');lbl.textContent=catDisplayName(cat);btn.appendChild(lbl);btn.onclick=function(){S.selectedCat=cat;renderCatGrid();updateHolCatField();};cg.appendChild(btn);});updateHolCatField();}
+  catKeys.forEach(function(cat){var isHolBtn=cat.indexOf('__hol-')===0;var btn=document.createElement('div');btn.className='cat-btn'+(isHolBtn?' cat-btn-hol':'')+(S.selectedCat===cat?' sel':'');var dot=document.createElement('div');dot.className='cat-dot';dot.style.background=CAT_COLORS[cat]||(cat.indexOf('__hol-')===0?'#f2a65a':'#aaa');btn.appendChild(dot);var lbl=document.createElement('span');lbl.textContent=catDisplayName(cat);btn.appendChild(lbl);btn.onclick=function(){S.selectedCat=cat;renderCatGrid();updateHolCatField();};cg.appendChild(btn);});updateHolCatField();}
 function updateHolCatField(){
   var wrap=document.getElementById('log-holcat-wrap');if(!wrap)return;
   var isHol=(S.selectedCat||'').indexOf('__hol-')===0;
