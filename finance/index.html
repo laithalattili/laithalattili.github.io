@@ -4382,6 +4382,36 @@ function holIsActive(h){
   var now=today();var start=new Date(h.start);var end=new Date(h.end);
   return now>=start&&now<=end;
 }
+function settleEndedHolidays(){
+  // When a holiday has ended (or is archived), post its net daily-budget
+  // result into variance as a labeled adjustment, so holiday over/underspend
+  // settles into the same ledger as everything else instead of evaporating.
+  // Idempotent across devices: the adjustment id is derived from the holiday,
+  // so concurrent settles merge into one entry, and a user-deleted entry is
+  // never resurrected (tombstone respected).
+  var changed=false;
+  safeArr(holidays).forEach(function(h){
+    if(!h||h.varSettled)return;
+    if(!h.start||!h.end)return;
+    if(!holIsPast(h)&&!h.archived)return;
+    var daily=safeArr(h.items).filter(function(i){return i&&i.type==='daily';});
+    var total=0,cur='RMB';
+    daily.forEach(function(it){total+=holItemTotal(it);cur=it.currency||cur;});
+    var spent=0;try{spent=holDailyBudgetSpent(h)||0;}catch(e){}
+    if(!daily.length&&!spent){h.varSettled=true;changed=true;return;}
+    var net=n2(total-spent);
+    var adjId='hset-'+h.id;
+    var exists=safeArr(S.surplusAdjustments).some(function(a){return a&&a.id===adjId;});
+    var dead=safeArr(S.deletedIds).indexOf('adj:'+adjId)>=0;
+    if(!exists&&!dead&&Math.abs(net)>=0.01){
+      S.surplusAdjustments=safeArr(S.surplusAdjustments);
+      S.surplusAdjustments.push({id:adjId,date:today().toISOString().split('T')[0],currency:cur,amount:net,note:'✈ '+(h.label||'Holiday')+' settled: '+n2(total)+' budget − '+n2(spent)+' spent'});
+    }
+    h.varSettled=true;changed=true;
+  });
+  if(changed)autosave();
+  return changed;
+}
 function holDailyBudgetTotal(h){
   var total=0;var cur='RMB';
   safeArr(h.items).forEach(function(item){
@@ -4520,7 +4550,7 @@ function renderHolidays(){
     var holSaveBar=document.createElement('div');holSaveBar.style.cssText='padding:10px 0 4px;display:flex;justify-content:flex-end;gap:8px;align-items:center';
     var archBtn=document.createElement('button');archBtn.className='btn btn-sm';archBtn.textContent='\uD83D\uDCE6 Archive';
     archBtn.title='Hide from all views and calculations';
-    archBtn.onclick=(function(hobj){return function(){if(!confirm('Archive "'+hobj.label+'"? It will be hidden from projection, commitments, and budgets.'))return;hobj.archived=true;autosave();sbPushNow();renderHolidays();};})(h);
+    archBtn.onclick=(function(hobj){return function(){if(!confirm('Archive "'+hobj.label+'"? It will be hidden from projection, commitments, and budgets. Its budget result (over/under) is posted to Variance.'))return;hobj.archived=true;try{settleEndedHolidays();}catch(e){}autosave();sbPushNow();renderHolidays();};})(h);
     holSaveBar.appendChild(archBtn);
     holSaveBar.appendChild(makeSaveBtn('Save holiday'));
     body.appendChild(holSaveBar);
@@ -6104,6 +6134,8 @@ document.addEventListener('DOMContentLoaded',function(){
   if(sbLogo){sbLogo.addEventListener('click',function(){if(window.innerWidth<=720)closeMob();});}
   // Supabase sync: pull on startup
   setTimeout(function(){if(typeof sbInitSync==='function')sbInitSync();},500);
+  // Settle ended holidays into variance (runs after state + sync have settled)
+  setTimeout(function(){try{settleEndedHolidays();}catch(e){console.warn('hol settle:',e);}},4000);
   // Poll and visibilitychange pull disabled — Realtime handles cross-device sync
   // These caused data-revert races with the push/echo cycle
 });
