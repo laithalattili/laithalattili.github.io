@@ -4996,7 +4996,7 @@ function frEntryLabel(rec){
 }
 async function frRestoreHistory(hid){
   try{
-    var res=await fetch(SB_URL+'/rest/v1/finance_records_history?hid=eq.'+hid+'&select=kind,rid,data,ver,deleted,updated_at',{headers:frHdr()});
+    var res=await frFetch(SB_URL+'/rest/v1/finance_records_history?hid=eq.'+hid+'&select=kind,rid,data,ver,deleted,updated_at',{headers:frHdr()});
     if(!res.ok)throw new Error('HTTP '+res.status);
     var rows=await res.json();
     if(!rows.length)return alert('History entry not found.');
@@ -5027,7 +5027,7 @@ async function frLoadChangeLog(){
   var el=document.getElementById('backup-list');if(!el)return;
   el.innerHTML='<span style="color:var(--ink3)">Loading…</span>';
   try{
-    var res=await fetch(SB_URL+'/rest/v1/finance_records_history?select=hid,kind,rid,data,ver,deleted,device,updated_at,archived_at&order=hid.desc&limit=40',{headers:frHdr()});
+    var res=await frFetch(SB_URL+'/rest/v1/finance_records_history?select=hid,kind,rid,data,ver,deleted,device,updated_at,archived_at&order=hid.desc&limit=40',{headers:frHdr()});
     if(!res.ok)throw new Error('HTTP '+res.status);
     var rows=(await res.json()).filter(function(r){return !(r.kind==='sing'&&r.rid==='_meta');});
     el.innerHTML='';
@@ -6309,6 +6309,15 @@ function frHdr(extra){
   if(extra)Object.keys(extra).forEach(function(k){h[k]=extra[k];});
   return h;
 }
+function frFetch(url,opts,timeoutMs){
+  // fetch with a hard timeout: a hung connection (VPN, flaky network) fails
+  // fast and the op stays pending for retry, instead of freezing "Syncing...".
+  opts=opts||{};
+  var ctl=(typeof AbortController!=='undefined')?new AbortController():null;
+  if(ctl)opts.signal=ctl.signal;
+  var t=ctl?setTimeout(function(){try{ctl.abort();}catch(e){}},timeoutMs||15000):null;
+  return fetch(url,opts).finally(function(){if(t)clearTimeout(t);});
+}
 function frLocalSave(){try{localStorage.setItem('lf_data',snapshotState());localStorage.setItem('lf_ver',String(Date.now()));}catch(e){}}
 function frSavePending(){try{localStorage.setItem('lf_fr_pending',JSON.stringify(_frPending));}catch(e){}}
 function frLoadPending(){try{_frPending=JSON.parse(localStorage.getItem('lf_fr_pending')||'{}')||{};}catch(e){_frPending={};}}
@@ -6342,14 +6351,14 @@ function frSortCollection(kind,arr){
   return arr;
 }
 async function frGetRow(kind,rid){
-  var res=await fetch(SB_URL+'/rest/v1/finance_records?kind=eq.'+encodeURIComponent(kind)+'&rid=eq.'+encodeURIComponent(rid)+'&select=kind,rid,data,ver,deleted,device,updated_at',{headers:frHdr()});
+  var res=await frFetch(SB_URL+'/rest/v1/finance_records?kind=eq.'+encodeURIComponent(kind)+'&rid=eq.'+encodeURIComponent(rid)+'&select=kind,rid,data,ver,deleted,device,updated_at',{headers:frHdr()});
   if(!res.ok)throw new Error('HTTP '+res.status);
   var rows=await res.json();return rows.length?rows[0]:null;
 }
 async function frFetchAllRows(){
   var out=[],from=0,page=1000;
   for(;;){
-    var res=await fetch(SB_URL+'/rest/v1/finance_records?select=kind,rid,data,ver,deleted,device,updated_at&order=kind.asc,rid.asc',{headers:frHdr({'Range-Unit':'items','Range':from+'-'+(from+page-1)})});
+    var res=await frFetch(SB_URL+'/rest/v1/finance_records?select=kind,rid,data,ver,deleted,device,updated_at&order=kind.asc,rid.asc',{headers:frHdr({'Range-Unit':'items','Range':from+'-'+(from+page-1)})});
     if(res.status===416)break;
     if(!res.ok)throw new Error('HTTP '+res.status);
     var rows=await res.json();out=out.concat(rows);
@@ -6385,7 +6394,7 @@ async function frGuardedWrite(kind,rid,data,isDelete){
   for(var attempt=0;attempt<4;attempt++){
     if(!sh){ // create
       var body={kind:kind,rid:String(rid),data:data||{},ver:1,deleted:!!isDelete,device:sbDeviceId(),updated_at:new Date().toISOString()};
-      var res=await fetch(SB_URL+'/rest/v1/finance_records',{method:'POST',headers:frHdr({'Prefer':'return=representation'}),body:JSON.stringify(body)});
+      var res=await frFetch(SB_URL+'/rest/v1/finance_records',{method:'POST',headers:frHdr({'Prefer':'return=representation'}),body:JSON.stringify(body)});
       if(res.ok){var rw=(await res.json())[0];_frShadow[key]={json:frCanon(rw.data),ver:rw.ver,deleted:rw.deleted};return true;}
       if(res.status===409){
         var cur=await frGetRow(kind,rid);
@@ -6400,7 +6409,7 @@ async function frGuardedWrite(kind,rid,data,isDelete){
     }
     // guarded update: the DB itself rejects this if the row moved
     var body2={data:isDelete?(sh.json?JSON.parse(sh.json):{}):data,ver:sh.ver+1,deleted:!!isDelete,device:sbDeviceId(),updated_at:new Date().toISOString()};
-    var r2=await fetch(SB_URL+'/rest/v1/finance_records?kind=eq.'+encodeURIComponent(kind)+'&rid=eq.'+encodeURIComponent(rid)+'&ver=eq.'+sh.ver,{method:'PATCH',headers:frHdr({'Prefer':'return=representation'}),body:JSON.stringify(body2)});
+    var r2=await frFetch(SB_URL+'/rest/v1/finance_records?kind=eq.'+encodeURIComponent(kind)+'&rid=eq.'+encodeURIComponent(rid)+'&ver=eq.'+sh.ver,{method:'PATCH',headers:frHdr({'Prefer':'return=representation'}),body:JSON.stringify(body2)});
     if(!r2.ok)throw new Error('HTTP '+r2.status);
     var rows2=await r2.json();
     if(rows2.length){_frShadow[key]={json:frCanon(rows2[0].data),ver:rows2[0].ver,deleted:rows2[0].deleted};return true;}
@@ -6441,11 +6450,14 @@ function frSchedulePush(){
   _frPushTimer=setTimeout(function(){frPush();},500);
 }
 async function frPushNow(){clearTimeout(_frPushTimer);frMarkPending();return frPush();}
+var _frFailStreak=0;
 async function frPush(){
   if(!_frActive)return false;
   if(_frPushing){_frQueued=true;return true;}
   _frPushing=true;
-  sbSetStatus('Syncing...','busy');
+  // Only show "Syncing..." if the push actually takes a while — routine
+  // sub-second pushes shouldn't flicker the dot orange.
+  var busyTimer=setTimeout(function(){sbSetStatus('Syncing...','busy');},1200);
   var okAll=true;
   try{
     var wanted=frCollectRecords();
@@ -6468,17 +6480,29 @@ async function frPush(){
       if(ok)delete _frPending[op.key];else okAll=false;
     }
     frSavePending();
-    if(okAll)sbSetStatus('Synced at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
-    else sbSetStatus('Some changes not synced yet (will retry)','err');
+    if(okAll){
+      _frFailStreak=0;
+      sbSetStatus('Synced at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
+    }
     if(typeof pushFinanceSummary==='function')try{pushFinanceSummary();}catch(e){}
   }catch(e){
     console.warn('[FR] push',e.message);
-    sbSetStatus('Sync failed: '+e.message,'err');
     okAll=false;
   }
+  clearTimeout(busyTimer);
   _frPushing=false;
+  if(!okAll){
+    _frFailStreak++;
+    // Transient network trouble is normal (VPN, mobile): stay calm for the
+    // first few rounds, go red only when it persists. Data is queued locally
+    // either way and retries with growing spacing.
+    if(_frFailStreak>=4)sbSetStatus('Sync failing — changes are saved locally and will keep retrying','err');
+    else sbSetStatus('Connection hiccup — retrying shortly','busy');
+    var delay=Math.min(60000,5000*Math.pow(2,Math.min(_frFailStreak-1,4)));
+    clearTimeout(_frPushTimer);
+    _frPushTimer=setTimeout(function(){frPush();},delay);
+  }
   if(_frQueued){_frQueued=false;frSchedulePush();}
-  else if(!okAll){clearTimeout(_frPushTimer);_frPushTimer=setTimeout(function(){frPush();},5000);}
   return okAll;
 }
 function frApplyRows(rows){
@@ -6548,6 +6572,15 @@ function frApplyRow(rec){
   frLocalSave();
   return true;
 }
+var _frRTUp=false,_frRTBackoff=5000,_frPollTimer=null;
+function frPollWhileDown(){
+  // Realtime socket down: keep devices in sync with a quiet periodic pull.
+  clearInterval(_frPollTimer);
+  _frPollTimer=setInterval(function(){
+    if(_frRTUp||!_frActive){clearInterval(_frPollTimer);_frPollTimer=null;return;}
+    frReconcile().then(function(changed){if(changed){frRefreshView();sbSetStatus('Updated at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');}}).catch(function(e){console.warn('[FR] poll:',e.message);});
+  },90000);
+}
 function frStartRealtime(){
   try{
     var wsUrl=SB_URL.replace('https://','wss://')+'/realtime/v1/websocket?apikey='+SB_KEY+'&vsn=1.0.0';
@@ -6555,6 +6588,8 @@ function frStartRealtime(){
     _frRT=ws;
     ws.onopen=function(){
       console.log('[FR-RT] Connected');
+      _frRTUp=true;_frRTBackoff=5000;
+      clearInterval(_frPollTimer);_frPollTimer=null;
       ws.send(JSON.stringify({topic:'realtime:public:finance_records',event:'phx_join',payload:{},ref:String(_sbRealtimeRef++)}));
       sbSetStatus('Live','ok');
       // Reconcile on every (re)connect: catches anything missed while offline
@@ -6581,9 +6616,13 @@ function frStartRealtime(){
     };
     ws.onerror=function(e){console.warn('[FR-RT] error',e);};
     ws.onclose=function(){
-      console.log('[FR-RT] Disconnected — reconnecting in 5s');
-      sbSetStatus('Reconnecting...','busy');
-      setTimeout(function(){if(_frActive)frStartRealtime();},5000);
+      _frRTUp=false;
+      // A down socket is not an alarm: writes still work and polling covers
+      // pulls. Reconnect quietly with growing spacing; don't touch the dot.
+      console.log('[FR-RT] Disconnected — reconnecting in '+Math.round(_frRTBackoff/1000)+'s');
+      frPollWhileDown();
+      setTimeout(function(){if(_frActive&&!_frRTUp)frStartRealtime();},_frRTBackoff);
+      _frRTBackoff=Math.min(90000,_frRTBackoff*2);
     };
   }catch(e){console.warn('[FR-RT] failed to start:',e);}
 }
@@ -6606,13 +6645,13 @@ async function frEnsureRow(w){
   var cur=await frGetRow(w.kind,w.rid);
   for(var a=0;a<4;a++){
     if(!cur){
-      var res=await fetch(SB_URL+'/rest/v1/finance_records',{method:'POST',headers:frHdr({'Prefer':'return=representation'}),body:JSON.stringify({kind:w.kind,rid:String(w.rid),data:w.data||{},ver:1,deleted:!!w.deleted,device:sbDeviceId(),updated_at:new Date().toISOString()})});
+      var res=await frFetch(SB_URL+'/rest/v1/finance_records',{method:'POST',headers:frHdr({'Prefer':'return=representation'}),body:JSON.stringify({kind:w.kind,rid:String(w.rid),data:w.data||{},ver:1,deleted:!!w.deleted,device:sbDeviceId(),updated_at:new Date().toISOString()})});
       if(res.ok)return true;
       if(res.status===409){cur=await frGetRow(w.kind,w.rid);continue;}
       throw new Error('insert HTTP '+res.status);
     }
     if(!!cur.deleted===!!w.deleted&&frCanon(cur.data)===frCanon(w.data))return true;
-    var r2=await fetch(SB_URL+'/rest/v1/finance_records?kind=eq.'+encodeURIComponent(w.kind)+'&rid=eq.'+encodeURIComponent(w.rid)+'&ver=eq.'+cur.ver,{method:'PATCH',headers:frHdr({'Prefer':'return=representation'}),body:JSON.stringify({data:w.data||{},ver:cur.ver+1,deleted:!!w.deleted,device:sbDeviceId(),updated_at:new Date().toISOString()})});
+    var r2=await frFetch(SB_URL+'/rest/v1/finance_records?kind=eq.'+encodeURIComponent(w.kind)+'&rid=eq.'+encodeURIComponent(w.rid)+'&ver=eq.'+cur.ver,{method:'PATCH',headers:frHdr({'Prefer':'return=representation'}),body:JSON.stringify({data:w.data||{},ver:cur.ver+1,deleted:!!w.deleted,device:sbDeviceId(),updated_at:new Date().toISOString()})});
     if(!r2.ok)throw new Error('update HTTP '+r2.status);
     var rows2=await r2.json();
     if(rows2.length)return true;
@@ -6633,7 +6672,7 @@ async function frSyncWanted(wanted,existing){
   for(var i=0;i<toInsert.length;i+=40){
     var slice=toInsert.slice(i,i+40);
     var batch=slice.map(function(key){var w=wanted[key];return {kind:w.kind,rid:String(w.rid),data:w.data||{},ver:1,deleted:!!w.deleted,device:sbDeviceId(),updated_at:new Date().toISOString()};});
-    var res=await fetch(SB_URL+'/rest/v1/finance_records',{method:'POST',headers:frHdr({'Prefer':'return=minimal'}),body:JSON.stringify(batch)});
+    var res=await frFetch(SB_URL+'/rest/v1/finance_records',{method:'POST',headers:frHdr({'Prefer':'return=minimal'}),body:JSON.stringify(batch)});
     if(res.status===404)return 'no-table';
     if(res.status===409){
       // concurrent writer created some of these: settle each row individually
@@ -6756,7 +6795,7 @@ function frShowOldBanner(dev,ts){
 }
 async function frImportOldRow(ts){
   try{
-    var res=await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=data',{headers:frHdr()});
+    var res=await frFetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=data',{headers:frHdr()});
     if(!res.ok)throw new Error('HTTP '+res.status);
     var rows=await res.json();
     if(!rows.length)return alert('Old data row not found.');
@@ -6771,7 +6810,7 @@ async function frImportOldRow(ts){
 async function frWatchOldRow(){
   if(!_frActive)return;
   try{
-    var res=await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=updated_at,dev:data-%3E%3EdeviceId',{headers:frHdr()});
+    var res=await frFetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=updated_at,dev:data-%3E%3EdeviceId',{headers:frHdr()});
     if(!res.ok)return;
     var rows=await res.json();
     if(!rows.length)return;
