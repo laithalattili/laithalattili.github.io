@@ -6555,6 +6555,10 @@ function frMergeConflict(kind,base,mine,theirs){
   // theirs = current server state. Overlay only the fields THIS device
   // actually changed (vs base), so nothing unrelated is dragged along.
   var m=frClean(mine),t=frClean(theirs);
+  // No known base for a settings record: the server version wins. Without a
+  // base we cannot tell which fields are local edits and which are just
+  // stale memory, and stale memory must never beat live data.
+  if(kind==='sing'&&!base)return (t&&typeof t==='object')?t:m;
   if(Array.isArray(m)||Array.isArray(t)||!t||typeof t!=='object'||!m||typeof m!=='object')return m;
   var out=t,b=base&&typeof base==='object'?base:{};
   Object.keys(m).forEach(function(k){
@@ -6609,15 +6613,24 @@ function frIsManagedKey(key){
   if(kind==='sing')return FR_SINGLETONS.some(function(d){return d[0]===key.slice(ci+1);});
   return FR_KINDS.some(function(d){return d[0]===kind;});
 }
+function frMarkDirty(key){
+  // A pending entry remembers the BASE (what this device last saw synced)
+  // so a later push can apply only the real local differences on top of
+  // whatever the server holds by then — never a wholesale stale copy.
+  if(_frPending[key])return false;
+  var sh=_frShadow[key];
+  _frPending[key]={b:sh?sh.json:null,v:sh?sh.ver:0};
+  return true;
+}
 function frMarkPending(){
   var wanted=frCollectRecords(),marked=false;
   Object.keys(wanted).forEach(function(key){
     var sh=_frShadow[key];
-    if(!sh||sh.deleted||sh.json!==frCanon(wanted[key].data)){if(!_frPending[key]){_frPending[key]=1;marked=true;}}
+    if(!sh||sh.deleted||sh.json!==frCanon(wanted[key].data)){if(frMarkDirty(key))marked=true;}
   });
   Object.keys(_frShadow).forEach(function(key){
     if(!frIsManagedKey(key))return;
-    if(!_frShadow[key].deleted&&!wanted[key]){if(!_frPending[key]){_frPending[key]=1;marked=true;}}
+    if(!_frShadow[key].deleted&&!wanted[key]){if(frMarkDirty(key))marked=true;}
   });
   if(marked)frSavePending();
 }
@@ -6650,8 +6663,15 @@ async function frPush(){
         ops.push({key:key,kind:key.slice(0,ci),rid:key.slice(ci+1),data:null,del:true});
       }
     });
+    // Pending entries that produced NO op hold no real local change (stale
+    // carry-over from an earlier session): drop them instead of letting them
+    // guard — and eventually push — stale data forever.
+    var opKeys={};ops.forEach(function(o){opKeys[o.key]=1;});
+    var dropped=false;
+    Object.keys(_frPending).forEach(function(k){if(!opKeys[k]){delete _frPending[k];dropped=true;}});
+    if(dropped)frSavePending();
     for(var i=0;i<ops.length;i++){
-      var op=ops[i];_frPending[op.key]=1;
+      var op=ops[i];frMarkDirty(op.key);
       var ok=false;
       try{ok=await frGuardedWrite(op.kind,op.rid,op.data,op.del);}catch(e){console.warn('[FR] write',op.key,e.message);ok=false;}
       if(ok)delete _frPending[op.key];else okAll=false;
@@ -6688,7 +6708,9 @@ function frApplyRows(rows){
   var byKind={};
   rows.forEach(function(r){
     var key=r.kind+':'+r.rid;
-    _frShadow[key]={json:frCanon(r.data),ver:r.ver,deleted:r.deleted};
+    // Keys with unsent local changes keep their frozen base as the shadow;
+    // the guarded write resolves against the live server version itself.
+    if(!_frPending[key])_frShadow[key]={json:frCanon(r.data),ver:r.ver,deleted:r.deleted};
     if(!byKind[r.kind])byKind[r.kind]=[];
     byKind[r.kind].push(r);
   });
@@ -6733,8 +6755,8 @@ async function frReconcile(){
 }
 function frApplyRow(rec){
   var key=rec.kind+':'+rec.rid;
+  if(_frPending[key])return false; // local edit in flight: keep base shadow; guarded push reconciles
   _frShadow[key]={json:frCanon(rec.data),ver:rec.ver,deleted:rec.deleted};
-  if(_frPending[key])return false; // our local edit wins; guarded push reconciles
   if(rec.kind==='sing'){
     if(rec.rid==='_meta'){_frMeta=rec.data||{};return false;}
     var sdef=FR_SINGLETONS.find(function(d){return d[0]===rec.rid;});
@@ -6782,7 +6804,7 @@ function frStartRealtime(){
         if((msg.event==='INSERT'||msg.event==='UPDATE')&&msg.payload&&msg.payload.record){
           var rec=msg.payload.record;
           if(!rec||!rec.kind)return;
-          if(rec.device===sbDeviceId()){_frShadow[rec.kind+':'+rec.rid]={json:frCanon(rec.data),ver:rec.ver,deleted:rec.deleted};return;}
+          if(rec.device===sbDeviceId()){var ek=rec.kind+':'+rec.rid;if(!_frPending[ek])_frShadow[ek]={json:frCanon(rec.data),ver:rec.ver,deleted:rec.deleted};return;}
           var changed=frApplyRow(rec);
           if(changed){
             sbSetStatus('Live update at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
@@ -7006,6 +7028,12 @@ function frRefreshView(){
 function sbInitSync(){
   sbSetStatus('Connecting...','busy');
   frLoadPending();
+  // Restore the frozen base for changes that were pending when the app closed,
+  // so their eventual push merges onto the live server state correctly.
+  Object.keys(_frPending).forEach(function(k){
+    var p=_frPending[k];
+    if(p&&typeof p==='object'&&p.b&&!_frShadow[k])_frShadow[k]={json:p.b,ver:p.v||0,deleted:false};
+  });
   (async function(){
     var meta=null,metaErr=false;
     try{meta=await frGetRow('sing','_meta');}catch(e){metaErr=true;console.warn('[FR] meta check:',e.message);}
