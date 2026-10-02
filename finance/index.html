@@ -890,6 +890,7 @@ input:focus,select:focus{border-color:var(--ink)}
     <div class="settings-sec-body" id="ssec-body-gist">
       <div class="card" style="margin-top:0;border-top:none;border-radius:0 0 var(--rlg) var(--rlg)">
         <div id="gist-status-bar" style="font-size:12px;padding:7px 10px;border-radius:var(--r);margin-bottom:10px;background:var(--bg);color:var(--ink3);border:.5px solid var(--brd)">Status: <span id="gist-status-text">Not configured</span></div>
+        <div id="sync-doctor"></div>
         <div style="font-size:11px;color:var(--ink3);margin-bottom:10px">Sync is automatic — data pushes on every change and pulls on startup and tab focus.</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
           <button class="btn btn-p" onclick="sbPushNow()">&#8593; Push now</button>
@@ -6640,7 +6641,43 @@ function frSchedulePush(){
   _frPushTimer=setTimeout(function(){frPush();},500);
 }
 async function frPushNow(){clearTimeout(_frPushTimer);frMarkPending();return frPush();}
-var _frFailStreak=0;
+var _frFailStreak=0,_frSyncErrors={};
+function frKeyLabel(key){
+  var ci=key.indexOf(':'),kind=key.slice(0,ci),rid=key.slice(ci+1);
+  if(kind==='sing')return 'Settings ('+rid+')';
+  var lbl=FR_KIND_LABELS[kind]||kind;
+  var def=FR_KINDS.find(function(d){return d[0]===kind;});
+  if(def){var rec=safeArr(def[1]()).find(function(x){return x&&String(x.id)===rid;});
+    if(rec)return lbl+': '+(rec.name||rec.note||rec.label||rid);}
+  return lbl+' '+String(rid).slice(-6);
+}
+function frRenderDoctor(){
+  var el=document.getElementById('sync-doctor');if(!el)return;
+  var keys=Object.keys(_frPending);
+  if(!keys.length){el.innerHTML='';return;}
+  var h='<div style="margin-top:8px;padding:8px 10px;background:var(--bg);border:.5px solid var(--brd);border-radius:var(--r)">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--amb);margin-bottom:4px">\u2695 Sync doctor — '+keys.length+' unsent change(s)</div>';
+  keys.forEach(function(k){
+    h+='<div style="display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 0;flex-wrap:wrap">'
+      +'<span style="flex:1;min-width:110px">'+frKeyLabel(k)+'</span>'
+      +'<span style="color:var(--red);font-size:10px;flex:2;min-width:120px">'+(_frSyncErrors[k]||'waiting to send')+'</span>'
+      +'<button class="btn btn-xs" onclick="frDiscardPending(\''+k.replace(/'/g,"\\'")+'\')">Discard my change</button></div>';
+  });
+  h+='<div style="margin-top:5px"><button class="btn btn-xs btn-p" onclick="frPushNow().then(function(){frRenderDoctor();})">Retry all now</button></div></div>';
+  el.innerHTML=h;
+}
+async function frDiscardPending(key){
+  if(!confirm('Discard this device\'s unsent change for "'+frKeyLabel(key)+'" and adopt the server version? Other devices\' data is not affected.'))return;
+  try{
+    delete _frPending[key];delete _frSyncErrors[key];frSavePending();
+    var ci=key.indexOf(':'),kind=key.slice(0,ci),rid=key.slice(ci+1);
+    var cur=await frGetRow(kind,rid);
+    if(cur)frApplyRow(cur);
+    try{safeShowView(currentPage);}catch(e){}
+    frRenderDoctor();
+    sbSetStatus('Local change discarded — server version adopted','ok');
+  }catch(e){alert('Could not fetch server version: '+e.message);}
+}
 async function frPush(){
   if(!_frActive)return false;
   if(_frPushing){_frQueued=true;return true;}
@@ -6673,8 +6710,12 @@ async function frPush(){
     for(var i=0;i<ops.length;i++){
       var op=ops[i];frMarkDirty(op.key);
       var ok=false;
-      try{ok=await frGuardedWrite(op.kind,op.rid,op.data,op.del);}catch(e){console.warn('[FR] write',op.key,e.message);ok=false;}
-      if(ok)delete _frPending[op.key];else okAll=false;
+      try{
+        ok=await frGuardedWrite(op.kind,op.rid,op.data,op.del);
+        if(!ok)_frSyncErrors[op.key]='write kept failing version checks (retried 4x)';
+      }catch(e){console.warn('[FR] write',op.key,e.message);_frSyncErrors[op.key]=e.message;ok=false;}
+      if(ok){delete _frPending[op.key];delete _frSyncErrors[op.key];}
+      else okAll=false;
     }
     frSavePending();
     if(okAll){
@@ -6693,8 +6734,10 @@ async function frPush(){
     // Transient network trouble is normal (VPN, mobile): stay calm for the
     // first few rounds, go red only when it persists. Data is queued locally
     // either way and retries with growing spacing.
-    if(_frFailStreak>=4)sbSetStatus('Sync failing — changes are saved locally and will keep retrying','err');
+    var ek=Object.keys(_frSyncErrors)[0];
+    if(_frFailStreak>=4)sbSetStatus('Sync failing on "'+(ek?frKeyLabel(ek):'?')+'"'+(ek&&_frSyncErrors[ek]?': '+_frSyncErrors[ek]:'')+' — changes saved locally, retrying','err');
     else sbSetStatus('Connection hiccup — retrying shortly','busy');
+    frRenderDoctor();
     var delay=Math.min(60000,5000*Math.pow(2,Math.min(_frFailStreak-1,4)));
     clearTimeout(_frPushTimer);
     _frPushTimer=setTimeout(function(){frPush();},delay);
