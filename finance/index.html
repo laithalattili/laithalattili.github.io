@@ -1975,14 +1975,13 @@ function buildProjection(){
       Object.entries(sbc).forEach(function(entry){
         var sc=entry[0],sa=entry[1];
         if(Math.abs(sa)<0.01)return;
+        // Conservative model: leftover budget (positive) carries as money to
+        // be spent; a deficit is sunk — the balance already paid for it, and
+        // the forecast never assumes future claw-back discipline.
         var slabel='Budget surplus (carried over)';
-        if(sc==='RMB'){
-          if(sa>0){rmbOut+=sa;rmbItems.push({l:slabel,v:'-'+fRMB(sa),c:'neg',isSurplus:true});}
-          else{rmbIn+=Math.abs(sa);rmbItems.push({l:slabel+' (deficit)',v:'+'+fRMB(Math.abs(sa)),c:'pos',isSurplus:true});}
-        } else if(sc==='JOD'){
-          if(sa>0){jodOut+=sa;jodItems.push({l:slabel,v:'-'+fJOD(sa),c:'neg',isSurplus:true});}
-          else{jodIn+=Math.abs(sa);jodItems.push({l:slabel+' (deficit)',v:'+'+fJOD(Math.abs(sa)),c:'pos',isSurplus:true});}
-        }
+        if(sa<=0)return; // deficit: sunk, never projected as future income
+        if(sc==='RMB'){rmbOut+=sa;rmbItems.push({l:slabel,v:'-'+fRMB(sa),c:'neg',isSurplus:true});}
+        else if(sc==='JOD'){jodOut+=sa;jodItems.push({l:slabel,v:'-'+fJOD(sa),c:'neg',isSurplus:true});}
       });
     }
     // Compute carry-over unpaid totals — ONLY for the current month (i===0).
