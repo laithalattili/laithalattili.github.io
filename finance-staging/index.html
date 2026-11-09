@@ -1365,7 +1365,6 @@ function makeSaveBtn(label){
   btn.style.cssText='margin-top:8px';
   btn.onclick=function(){
     autosave();
-    _sbSyncing=false;
     sbPush().then(function(){
       btn.textContent='✓ Saved';btn.style.background='var(--grn)';
       setTimeout(function(){btn.textContent=label||'Save';btn.style.background='';},2000);
@@ -6252,61 +6251,14 @@ async function lfBootAuth(){
 }
 
 var SB_ROW_ID='laith';
-var _sbPushTimer=null;
-var _sbSyncing=false;
-var _sbDirty=false;
-var _sbDeviceId=null;
-var _sbLastLocalChange=0;
-var _sbLastPushedVer=0;
-var _sbLastSeenRemoteVer=0; // last remote version this device has fetched or produced
+var _sbPushTimer=null; // unused by the engine; harmless
+var _sbDeviceId=null;    // cached per-tab device id (see sbDeviceId)
 function tomb(key){
   // Record a typed deletion tombstone so merges never resurrect deleted records
   S.deletedIds=safeArr(S.deletedIds);
   if(S.deletedIds.indexOf(key)<0)S.deletedIds.push(key);
   if(S.deletedIds.length>800)S.deletedIds=S.deletedIds.slice(-800);
 }
-function sbMergeRemoteIntoLocal(remote){
-  // Union append-mostly money records from an unseen remote state into local,
-  // so a two-sided divergence merges losslessly instead of one side winning.
-  // Local wins on same-id conflicts (this device is the active writer).
-  try{
-    var rd=remote&&remote.data;if(!rd)return;
-    // Tombstones: union both sides first
-    var rDel=safeArr(rd.S&&rd.S.deletedIds);
-    S.deletedIds=safeArr(S.deletedIds);
-    rDel.forEach(function(k){if(S.deletedIds.indexOf(k)<0)S.deletedIds.push(k);});
-    if(S.deletedIds.length>800)S.deletedIds=S.deletedIds.slice(-800);
-    var dead={};S.deletedIds.forEach(function(k){dead[k]=true;});
-    function unionById(localArr,remoteArr,prefix){
-      var out=safeArr(localArr).filter(function(x){return x&&!dead[prefix+x.id];});
-      var have={};out.forEach(function(x){have[x.id]=true;});
-      var added=0;
-      safeArr(remoteArr).forEach(function(x){
-        if(!x||have[x.id]||dead[prefix+x.id])return;
-        out.push(x);have[x.id]=true;added++;
-      });
-      return {arr:out,added:added};
-    }
-    var totalAdded=0;
-    var m=unionById(expenses,rd.expenses,'exp:');
-    m.arr.sort(function(a,b){return (b.date||'').localeCompare(a.date||'')||(b.id-a.id);});
-    expenses=m.arr;totalAdded+=m.added;
-    m=unionById(oneoffEvents,rd.oneoffEvents,'ev:');oneoffEvents=m.arr;totalAdded+=m.added;
-    m=unionById(S.transferLog,rd.S&&rd.S.transferLog,'tl:');S.transferLog=m.arr;totalAdded+=m.added;
-    m=unionById(S.surplusAdjustments,rd.S&&rd.S.surplusAdjustments,'adj:');S.surplusAdjustments=m.arr;totalAdded+=m.added;
-    m=unionById(S.surplusEvents,rd.S&&rd.S.surplusEvents,'sev:');S.surplusEvents=m.arr;totalAdded+=m.added;
-    safeArr(rd.settlements).forEach(function(rs){
-      var ls=safeArr(settlements).find(function(x){return x.id===rs.id;});
-      if(!ls)return;
-      var pm=unionById(ls.payments,rs.payments,'pay:');ls.payments=pm.arr;totalAdded+=pm.added;
-    });
-    if(totalAdded>0)console.warn('[SYNC] merged '+totalAdded+' record(s) from remote instead of overwriting');
-    return totalAdded;
-  }catch(e){console.warn('[SYNC] merge failed:',e);return 0;}
-}
-var _sbRealtimeSocket=null;
-var _sbRealtimeRef=1;
-
 function sbDeviceId(){
   // Identity is per TAB, not per browser: two tabs sharing one id made each
   // tab discard the other's live updates as its own echo, then "correct" the
@@ -6357,209 +6309,16 @@ function sbBuildPayload(){
   };
 }
 
-function sbApplyRemote(remote){
-  // Apply remote data to in-memory state. Called from pull and realtime.
-  var remoteVer=remote.version||0;
-  if(remoteVer>_sbLastSeenRemoteVer)_sbLastSeenRemoteVer=remoteVer;
-  if(_sbDirty)return false;
-  if(remoteVer&&remoteVer<=_sbLastPushedVer)return false;
-  if(_sbLastLocalChange&&Date.now()-_sbLastLocalChange<5000)return false;
-  // Never let an OLDER remote overwrite newer local data (e.g. pre-refresh push failed).
-  var localVer=0;try{localVer=parseInt(localStorage.getItem('lf_ver')||'0',10)||0;}catch(e){}
-  if(remoteVer&&localVer&&remoteVer<localVer){
-    console.warn('[SYNC] remote older than local ('+remoteVer+' < '+localVer+') — re-pushing local');
-    if(typeof sbSchedulePush==='function')sbSchedulePush(localVer);
-    return false;
-  }
-  if(remoteVer&&localVer&&remoteVer===localVer)return false;
-  var d=remote.data;
-  if(!d)return false;
-  if(d.S&&typeof d.S==='object')Object.assign(S,d.S);
-  if(Array.isArray(d.streams))streams=d.streams;
-  if(Array.isArray(d.streamOverrides))streamOverrides=d.streamOverrides;
-  if(Array.isArray(d.settlements))settlements=d.settlements;
-  if(Array.isArray(d.goldPieces))goldPieces=d.goldPieces;
-  if(Array.isArray(d.properties))properties=d.properties;
-  if(Array.isArray(d.holidays))holidays=d.holidays;
-  if(Array.isArray(d.expenses))expenses=d.expenses;
-  if(Array.isArray(d.oneoffEvents))oneoffEvents=d.oneoffEvents;
-  if(Array.isArray(d.snapshots))S.snapshots=d.snapshots;
-  if(d.tickState)tickState=d.tickState;
-  if(d.parentSkips)parentSkips=d.parentSkips;
-  if(d.confirmedDebits)confirmedDebits=d.confirmedDebits;
-  if(d.openMonths)openMonths=d.openMonths;
-  if(Array.isArray(d.wishlistItems))wishlistItems=d.wishlistItems;
-  if(d.commitGroupState&&typeof d.commitGroupState==='object')commitGroupState=d.commitGroupState;
-  if(d.catColors&&typeof d.catColors==='object'){S.catColors=d.catColors;CAT_COLORS=S.catColors;}
-  if(Array.isArray(d.budgetOrder))S.budgetOrder=d.budgetOrder;
-  if(typeof syncHolidayBudgets==='function')syncHolidayBudgets();
-  try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState,catColors:S.catColors,budgetOrder:S.budgetOrder}));}catch(ex){console.warn('save',ex);}
-  try{if(remoteVer)localStorage.setItem('lf_ver',String(remoteVer));}catch(ex){}
-  _undoStack.length=0;_redoStack.length=0;_undoLast=null;if(typeof updateUndoButtons==='function')updateUndoButtons();
-  return true;
-}
 
-async function sbLegacyPush(preStampedVer){
-  if(_sbSyncing)return false;
-  _sbSyncing=true;
-  sbSetStatus('Pushing...','busy');
-  try{
-    // ── Never push over a remote this device has not seen. If the check
-    // cannot complete for ANY reason, the push is ABORTED — there is no
-    // "push anyway" path. A failed precondition stops and retries later. ──
-    var chk=await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=ver:data-%3E%3Eversion',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+(_authToken||SB_KEY)}});
-    if(!chk.ok)throw new Error('preflight HTTP '+chk.status+' — push aborted, will retry');
-    var crows=await chk.json();
-    var rVer=crows&&crows.length?parseInt(crows[0].ver||'0',10):0;
-    if(rVer&&rVer!==_sbLastSeenRemoteVer&&rVer!==_sbLastPushedVer){
-      // Remote changed since we last looked: fetch it and merge its records first
-      var full=await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=data',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+(_authToken||SB_KEY)}});
-      if(!full.ok)throw new Error('preflight fetch HTTP '+full.status+' — push aborted, will retry');
-      var frows=await full.json();
-      if(frows&&frows.length&&frows[0].data){
-        sbMergeRemoteIntoLocal(frows[0].data);
-        _sbLastSeenRemoteVer=rVer;
-        preStampedVer=null; // stamp a fresh, newest version for the merged state
-      }
-    }
-    var payload=sbBuildPayload();
-    if(preStampedVer)payload.version=preStampedVer;
-    _sbLastPushedVer=payload.version;
-    _sbLastLocalChange=Date.now();
-    var res=await fetch(SB_URL+'/rest/v1/'+SB_TABLE,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+(_authToken||SB_KEY),'Prefer':'resolution=merge-duplicates,return=representation'},
-      body:JSON.stringify({id:SB_ROW_ID,data:payload,updated_at:new Date().toISOString()})
-    });
-    if(!res.ok){var e=await res.text();throw new Error('HTTP '+res.status+': '+e.slice(0,120));}
-    _sbLastSeenRemoteVer=payload.version; // remote now equals what we produced
-    try{localStorage.setItem('lf_data',JSON.stringify(payload.data));localStorage.setItem('lf_ver',String(payload.version));}catch(ls){}
-    sbSetStatus('Synced at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
-    if(typeof pushFinanceSummary==='function')pushFinanceSummary();
-  }catch(e){
-    console.warn('SB push:',e.message);
-    sbSetStatus('Push failed: '+e.message,'err');
-    _sbSyncing=false;
-    return false;
-  }
-  _sbSyncing=false;
-  return true;
-}
-
-async function sbLegacyPull(){
-  if(_sbSyncing)return false;
-  if(_sbLastLocalChange&&Date.now()-_sbLastLocalChange<5000)return false;
-  _sbSyncing=true;
-  sbSetStatus('Fetching...','busy');
-  try{
-    var res=await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=data,updated_at',{
-      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+(_authToken||SB_KEY)}
-    });
-    if(!res.ok)throw new Error('HTTP '+res.status);
-    var rows=await res.json();
-    if(!rows||!rows.length){sbSetStatus('No data yet','ok');_sbSyncing=false;return false;}
-    var remote=rows[0].data;
-    if(remote&&remote.version)_sbLastSeenRemoteVer=remote.version;
-    var changed=false;
-    if(!_sbDirty){
-      changed=sbApplyRemote(remote);
-      if(changed)sbSetStatus('Pulled at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
-      else sbSetStatus('Up to date','ok');
-    }else{
-      sbSetStatus('Up to date','ok');
-    }
-    _sbSyncing=false;return changed;
-  }catch(e){
-    console.warn('SB pull:',e.message);
-    sbSetStatus('Pull failed: '+e.message,'err');
-    _sbSyncing=false;return false;
-  }
-}
-
-// ── Public sync API: dispatches to the record engine after migration, ──
-// ── or to the legacy whole-blob engine before it. ──
-function sbSchedulePush(preStampedVer){
-  if(_frActive){frSchedulePush();return;}
-  _sbDirty=true;
-  _sbLastLocalChange=Date.now();
-  clearTimeout(_sbPushTimer);
-  _sbPushTimer=setTimeout(async function(){
-    var ok=await sbLegacyPush(preStampedVer);
-    if(ok){_sbDirty=false;}
-    else{setTimeout(function(){sbSchedulePush(preStampedVer);},3000);}
-  },500);
-}
-async function sbPush(preStampedVer){
-  if(_frActive)return frPushNow();
-  return sbLegacyPush(preStampedVer);
-}
-async function sbPull(){
-  if(_frActive)return frReconcile();
-  return sbLegacyPull();
-}
-function sbPushNow(){
-  if(_frActive){frPushNow();return;}
-  clearTimeout(_sbPushTimer);_sbDirty=false;_sbSyncing=false;_sbLastLocalChange=Date.now();sbLegacyPush();
-}
+// ── Public sync API: the per-record engine is the only engine. ──
+// (The legacy whole-blob engine, its clock-based versioning and the one-time
+//  migration were removed on 2026-11-09; the old finance_data row stays as a
+//  frozen, read-only backup on the server.)
+function sbSchedulePush(){frSchedulePush();}
+async function sbPush(){return frPushNow();}
+async function sbPull(){return frReconcile();}
+function sbPushNow(){frPushNow();}
 function sbPullNow(){sbPull().then(function(changed){if(changed)showView(currentPage);});}
-
-// ─── Legacy Supabase Realtime via WebSocket (pre-migration only) ───────────
-function sbLegacyRealtime(){
-  if(_frActive)return;
-  try{
-    var wsUrl=SB_URL.replace('https://','wss://')+'/realtime/v1/websocket?apikey='+(_authToken||SB_KEY)+'&vsn=1.0.0';
-    var ws=new WebSocket(wsUrl);
-    _sbRealtimeSocket=ws;
-
-    ws.onopen=function(){
-      console.log('[RT] Connected');
-      // Join the channel for our specific row
-      ws.send(JSON.stringify({
-        topic:'realtime:public:'+SB_TABLE+':id=eq.'+SB_ROW_ID,
-        event:'phx_join',
-        payload:{},
-        ref:String(_sbRealtimeRef++)
-      }));
-      sbSetStatus('Live','ok');
-    };
-
-    ws.onmessage=function(evt){
-      try{
-        var msg=JSON.parse(evt.data);
-        // Respond to heartbeat
-        if(msg.event==='heartbeat'||msg.topic==='phoenix'){
-          ws.send(JSON.stringify({topic:'phoenix',event:'heartbeat',payload:{},ref:String(_sbRealtimeRef++)}));
-          return;
-        }
-        // Handle INSERT or UPDATE on our table
-        if((msg.event==='INSERT'||msg.event==='UPDATE')&&msg.payload&&msg.payload.record){
-          var record=msg.payload.record;
-          var remote=record.data;
-          if(!remote)return;
-          // Ignore changes pushed by this device to avoid overwriting in-flight edits
-          if(remote.deviceId===sbDeviceId())return;
-          if(_sbDirty)return;
-          var changed=sbApplyRemote(remote);
-          if(changed){
-            sbSetStatus('Live update at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
-            safeShowView(currentPage);
-          }
-        }
-      }catch(e){console.warn('[RT] message error',e);}
-    };
-
-    ws.onerror=function(e){console.warn('[RT] error',e);sbSetStatus('Realtime error','err');};
-
-    ws.onclose=function(){
-      if(_frActive)return; // engine switched mid-session; new realtime owns the socket now
-      console.log('[RT] Disconnected — reconnecting in 5s');
-      sbSetStatus('Reconnecting...','busy');
-      setTimeout(sbLegacyRealtime,5000);
-    };
-  }catch(e){
-    console.warn('[RT] Failed to start realtime:',e);
-  }
-}
 
 // ═══════════════════════════════════════════════════════════════════════
 // PER-RECORD SYNC ENGINE (v120)
@@ -6569,7 +6328,7 @@ function sbLegacyRealtime(){
 // that writes unconditionally. A failed precondition refetches that one
 // row, reapplies the local edit on top, and retries.
 // ═══════════════════════════════════════════════════════════════════════
-var _frActive=false;try{_frActive=localStorage.getItem('lf_fr_active')==='1';}catch(e){}
+var _frActive=true; // single engine; no migration gate
 var _frShadow={};        // 'kind:rid' -> {json: canonical data, ver, deleted}
 var _frPending={};       // 'kind:rid' -> 1  (local changes not yet confirmed by server)
 var _frPushing=false,_frQueued=false,_frPushTimer=null,_frMeta=null,_frRT=null;
@@ -7003,200 +6762,6 @@ function frStartRealtime(){
     _frRT=ch;
   }catch(e){console.warn('[FR-RT] failed to start:',e);}
 }
-// ── One-time migration: old single blob → per-record rows. ──────────────
-// Cuts over ONLY after verifying every record survived, byte for byte.
-// The old finance_data row is never written again; it stays as a frozen backup.
-function frEnsureIds(){
-  var n=0;
-  FR_KINDS.forEach(function(def){
-    safeArr(def[1]()).forEach(function(rec){
-      if(rec&&(rec.id===undefined||rec.id===null||rec.id==='')){rec.id='m'+Date.now()+'_'+(n++);}
-    });
-  });
-  if(n)frLocalSave();
-}
-var FR_TOMB_KINDS={exp:1,ev:1,tl:1,adj:1,sev:1};
-async function frEnsureRow(w){
-  // Make the server row match w exactly: plain insert if absent, otherwise a
-  // guarded conditional update. Never relies on upsert semantics.
-  var cur=await frGetRow(w.kind,w.rid);
-  for(var a=0;a<4;a++){
-    if(!cur){
-      var res=await frFetch(SB_URL+'/rest/v1/finance_records',{method:'POST',headers:frHdr({'Prefer':'return=representation'}),body:JSON.stringify(lfStamp({kind:w.kind,rid:String(w.rid),data:w.data||{},ver:1,deleted:!!w.deleted,device:sbDeviceId(),updated_at:new Date().toISOString()}))});
-      if(res.ok)return true;
-      if(res.status===409){cur=await frGetRow(w.kind,w.rid);continue;}
-      throw new Error('insert HTTP '+res.status);
-    }
-    if(!!cur.deleted===!!w.deleted&&frCanon(cur.data)===frCanon(w.data))return true;
-    var r2=await frFetch(SB_URL+'/rest/v1/finance_records?kind=eq.'+encodeURIComponent(w.kind)+'&rid=eq.'+encodeURIComponent(w.rid)+'&ver=eq.'+cur.ver,{method:'PATCH',headers:frHdr({'Prefer':'return=representation'}),body:JSON.stringify({data:w.data||{},ver:cur.ver+1,deleted:!!w.deleted,device:sbDeviceId(),updated_at:new Date().toISOString()})});
-    if(!r2.ok)throw new Error('update HTTP '+r2.status);
-    var rows2=await r2.json();
-    if(rows2.length)return true;
-    cur=await frGetRow(w.kind,w.rid); // someone moved it: reload and retry
-  }
-  return false;
-}
-async function frSyncWanted(wanted,existing){
-  // Bring the server to exactly `wanted`: batch-insert what's missing,
-  // guarded-update what differs. Returns true if a batch insert hit the
-  // table-missing case.
-  var toInsert=[],toFix=[];
-  Object.keys(wanted).forEach(function(key){
-    var w=wanted[key],e=existing[key];
-    if(!e)toInsert.push(key);
-    else if(!!e.deleted!==!!w.deleted||frCanon(e.data)!==frCanon(w.data))toFix.push(key);
-  });
-  for(var i=0;i<toInsert.length;i+=40){
-    var slice=toInsert.slice(i,i+40);
-    var batch=slice.map(function(key){var w=wanted[key];return lfStamp({kind:w.kind,rid:String(w.rid),data:w.data||{},ver:1,deleted:!!w.deleted,device:sbDeviceId(),updated_at:new Date().toISOString()});});
-    var res=await frFetch(SB_URL+'/rest/v1/finance_records',{method:'POST',headers:frHdr({'Prefer':'return=minimal'}),body:JSON.stringify(batch)});
-    if(res.status===404)return 'no-table';
-    if(res.status===409){
-      // concurrent writer created some of these: settle each row individually
-      for(var j=0;j<slice.length;j++)await frEnsureRow(wanted[slice[j]]);
-      continue;
-    }
-    if(!res.ok)throw new Error('insert HTTP '+res.status);
-  }
-  for(var k=0;k<toFix.length;k++)await frEnsureRow(wanted[toFix[k]]);
-  return 'ok';
-}
-async function frJoinMigrated(metaData){
-  // Another device already migrated (or the marker reappeared): never
-  // migrate over live data — adopt it and reconcile.
-  _frMeta=metaData||{};
-  _frActive=true;
-  try{localStorage.setItem('lf_fr_active','1');}catch(e){}
-  try{if(_sbRealtimeSocket)_sbRealtimeSocket.close();}catch(e){}
-  try{var ch=await frReconcile();if(ch)frRefreshView();}catch(e){console.warn('[FR] join reconcile:',e.message);}
-  frStartRealtime();
-  sbSetStatus('Per-record sync live','ok');
-  return true;
-}
-async function frMigrate(){
-  try{
-    sbSetStatus('Migrating to per-record storage...','busy');
-    frEnsureIds();
-    var wanted=frCollectRecords();
-    // Port legacy deletion tombstones as deleted rows so deletes never resurrect
-    safeArr(S.deletedIds).forEach(function(k){
-      var ci=k.indexOf(':');if(ci<1)return;
-      var kind=k.slice(0,ci),rid=k.slice(ci+1);
-      if(!FR_TOMB_KINDS[kind])return;
-      var key=kind+':'+rid;
-      if(!wanted[key])wanted[key]={kind:kind,rid:rid,data:{},deleted:true};
-    });
-    // Look at what's on the server first. If a cutover marker exists, another
-    // device (or an earlier run) already migrated: JOIN it, never overwrite it.
-    var existingRows;
-    try{existingRows=await frFetchAllRows();}
-    catch(fe){sbSetStatus('New tables not reachable — run supabase-records-setup.sql once','err');return false;}
-    var existing={};existingRows.forEach(function(r){existing[r.kind+':'+r.rid]=r;});
-    if(existing['sing:_meta']&&!existing['sing:_meta'].deleted)return frJoinMigrated(existing['sing:_meta'].data);
-    var st=await frSyncWanted(wanted,existing);
-    if(st==='no-table'){sbSetStatus('New tables not set up yet — run supabase-records-setup.sql once','err');return false;}
-    // ── Verification gate: no cutover unless EVERYTHING matches ──
-    var problems=frVerifyMigration(wanted,await frFetchAllRows());
-    if(problems.length){
-      console.warn('[FR] migration verify round 1:',problems);
-      // settle every row individually, then verify again
-      var existing2={};(await frFetchAllRows()).forEach(function(r){existing2[r.kind+':'+r.rid]=r;});
-      if(existing2['sing:_meta']&&!existing2['sing:_meta'].deleted)return frJoinMigrated(existing2['sing:_meta'].data);
-      await frSyncWanted(wanted,existing2);
-      problems=frVerifyMigration(wanted,await frFetchAllRows());
-    }
-    if(problems.length){
-      sbSetStatus('Migration NOT applied: verification failed','err');
-      alert('Migration verification failed — the app is still running safely on the old storage. Nothing was changed or lost.\n\nDetails:\n'+problems.slice(0,10).join('\n'));
-      return false;
-    }
-    // Verified: write the cutover marker
-    var counts={};Object.keys(wanted).forEach(function(k){var kd=wanted[k].kind;counts[kd]=(counts[kd]||0)+1;});
-    _frMeta={migratedAt:new Date().toISOString(),device:sbDeviceId(),counts:counts};
-    var mok=await frEnsureRow({kind:'sing',rid:'_meta',data:_frMeta,deleted:false});
-    if(!mok)throw new Error('could not write cutover marker');
-    Object.keys(wanted).forEach(function(key){
-      var w=wanted[key];
-      _frShadow[key]={json:frCanon(w.data),ver:_frShadow[key]?_frShadow[key].ver:1,deleted:!!w.deleted};
-    });
-    _frActive=true;
-    try{localStorage.setItem('lf_fr_active','1');}catch(e){}
-    try{if(_sbRealtimeSocket)_sbRealtimeSocket.close();}catch(e){}
-    // shadow versions must reflect server truth
-    (await frFetchAllRows()).forEach(function(r){_frShadow[r.kind+':'+r.rid]={json:frCanon(r.data),ver:r.ver,deleted:r.deleted};});
-    frStartRealtime();
-    var total=Object.keys(wanted).length;
-    sbSetStatus('Migrated ✓ per-record sync live','ok');
-    console.log('[FR] migration complete:',counts);
-    alert('Storage upgraded ✓\n\n'+total+' records verified and moved to per-record storage. Every record was checked individually: counts match, no ids missing, contents identical.\n\nYour old data was NOT deleted — it stays frozen on the server as a permanent extra backup.\n\nOpen the app once on your other devices so they pick up the new version.');
-    return true;
-  }catch(e){
-    console.warn('[FR] migration failed:',e);
-    sbSetStatus('Migration failed: '+e.message+' (still on old storage)','err');
-    return false;
-  }
-}
-function frVerifyMigration(wanted,serverRows){
-  var problems=[];
-  var srv={};serverRows.forEach(function(r){srv[r.kind+':'+r.rid]=r;});
-  Object.keys(wanted).forEach(function(key){
-    var w=wanted[key],r=srv[key];
-    if(!r){problems.push('missing on server: '+key);return;}
-    if(!!w.deleted!==!!r.deleted){problems.push('deleted flag mismatch: '+key);return;}
-    if(!w.deleted&&frCanon(w.data)!==frCanon(r.data)){
-      problems.push('content mismatch: '+key);
-      console.warn('[FR] mismatch '+key+'\n local: '+frCanon(w.data).slice(0,400)+'\n server: '+frCanon(r.data).slice(0,400));
-    }
-  });
-  Object.keys(srv).forEach(function(key){
-    if(key==='sing:_meta')return;
-    if(!wanted[key])problems.push('unexpected on server: '+key);
-  });
-  return problems;
-}
-// ── Watchdog: a device still on the old cached app version writes the old
-// row; detect that and offer a one-tap import of its records. ──
-function frShowOldBanner(dev,ts){
-  if(document.getElementById('fr-old-banner'))return;
-  var b=document.createElement('div');
-  b.id='fr-old-banner';
-  b.style.cssText='position:fixed;bottom:84px;left:12px;right:12px;max-width:720px;margin:0 auto;z-index:9999;background:#3a2f14;color:#f5e9c9;border:1.5px solid #d9a53f;border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.4;display:flex;gap:10px;align-items:center;flex-wrap:wrap;box-shadow:0 6px 20px rgba(0,0,0,.55)';
-  var t=new Date(ts);
-  b.innerHTML='<span style="flex:1">⚠ A device still on the OLD app version ('+(dev||'unknown')+') saved data at '+t.toLocaleString()+'. Its changes are not in the new storage yet.</span>';
-  var imp=document.createElement('button');imp.className='btn btn-sm btn-p';imp.textContent='Import its records';
-  imp.onclick=function(){frImportOldRow(ts);};
-  var dis=document.createElement('button');dis.className='btn btn-sm';dis.textContent='Dismiss';
-  dis.onclick=function(){try{localStorage.setItem('lf_fr_oldseen',String(new Date(ts).getTime()));}catch(e){}b.remove();};
-  b.appendChild(imp);b.appendChild(dis);
-  document.body.appendChild(b);
-}
-async function frImportOldRow(ts){
-  try{
-    var res=await frFetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=data',{headers:frHdr()});
-    if(!res.ok)throw new Error('HTTP '+res.status);
-    var rows=await res.json();
-    if(!rows.length)return alert('Old data row not found.');
-    var added=sbMergeRemoteIntoLocal(rows[0].data)||0;
-    try{localStorage.setItem('lf_fr_oldseen',String(new Date(ts).getTime()));}catch(e){}
-    var b=document.getElementById('fr-old-banner');if(b)b.remove();
-    autosave();
-    safeShowView(currentPage);
-    alert(added?('Imported '+added+' record(s) from the old-version device. Now update that device: open the app on it and refresh.'):'No new records found to import (settings-only changes are not auto-imported). Update that device: open the app on it and refresh.');
-  }catch(e){alert('Import failed: '+e.message);}
-}
-async function frWatchOldRow(){
-  if(!_frActive)return;
-  try{
-    var res=await frFetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=updated_at,dev:data-%3E%3EdeviceId',{headers:frHdr()});
-    if(!res.ok)return;
-    var rows=await res.json();
-    if(!rows.length)return;
-    var t=new Date(rows[0].updated_at).getTime();
-    var migrated=_frMeta&&_frMeta.migratedAt?new Date(_frMeta.migratedAt).getTime():0;
-    var seen=0;try{seen=parseFloat(localStorage.getItem('lf_fr_oldseen')||'0');}catch(e){}
-    if(migrated&&t>migrated+10000&&t>seen)frShowOldBanner(rows[0].dev,rows[0].updated_at);
-  }catch(e){}
-}
 function frRefreshView(){
   var active=document.activeElement;
   var isTyping=active&&(active.tagName==='INPUT'||active.tagName==='TEXTAREA'||active.tagName==='SELECT');
@@ -7213,35 +6778,9 @@ function sbInitSync(){
     if(p&&typeof p==='object'&&p.b&&!_frShadow[k])_frShadow[k]={json:p.b,ver:p.v||0,deleted:false};
   });
   (async function(){
-    var meta=null,metaErr=false;
-    try{meta=await frGetRow('sing','_meta');}catch(e){metaErr=true;console.warn('[FR] meta check:',e.message);}
-    if((meta&&!meta.deleted)||(metaErr&&_frActive)){
-      // Migrated (or previously migrated and currently offline): record engine.
-      // Never fall back to the legacy whole-blob engine once migrated.
-      _frActive=true;if(meta)_frMeta=meta.data||{};
-      try{localStorage.setItem('lf_fr_active','1');}catch(e){}
-      try{
-        var changed=await frReconcile();
-        if(changed)frRefreshView();
-      }catch(e){console.warn('[FR] reconcile:',e);sbSetStatus('Offline — will sync when back','err');}
-      frStartRealtime();
-      frWatchOldRow();setInterval(frWatchOldRow,5*60*1000);
-    }else if(_frActive){
-      // This device migrated before, but the marker read came back empty.
-      // NEVER re-migrate a migrated device: re-create the marker and rejoin.
-      console.warn('[FR] cutover marker missing on a migrated device — self-healing');
-      _frMeta=(_frMeta&&_frMeta.migratedAt)?_frMeta:{migratedAt:new Date().toISOString(),device:sbDeviceId(),selfHealed:true};
-      try{await frEnsureRow({kind:'sing',rid:'_meta',data:_frMeta,deleted:false});}catch(e){console.warn('[FR] marker heal:',e.message);}
-      try{var ch=await frReconcile();if(ch)frRefreshView();}catch(e){console.warn('[FR] heal reconcile:',e.message);}
-      frStartRealtime();
-      frWatchOldRow();setInterval(frWatchOldRow,5*60*1000);
-    }else{
-      var changed2=await sbLegacyPull();
-      if(changed2)frRefreshView();
-      var ok=await frMigrate();
-      if(!ok)sbLegacyRealtime();
-      else{frWatchOldRow();setInterval(frWatchOldRow,5*60*1000);}
-    }
+    try{var changed=await frReconcile();if(changed)frRefreshView();}
+    catch(e){console.warn('[FR] reconcile:',e);sbSetStatus('Offline — will sync when back','err');}
+    frStartRealtime();
     setTimeout(pushFinanceSummary,2000);
   })();
 }
