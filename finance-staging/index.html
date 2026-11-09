@@ -1121,6 +1121,18 @@ function getCurRate(c){
 function toJOD(n,c){return n*getCurRate(c);}
 function toRMB(n,c){return toJOD(n,c)*S.jod2rmb;}
 function today(){return new Date();}
+// ── Date stamping follows the PRIMARY clock (Settings → primary time zone), not UTC. ──
+function primaryZone(){
+  try{var p=(typeof S!=='undefined'&&S)?(S.tzPrimary||1):1;
+      return p===2?((S&&S.tz2Zone)||'Asia/Shanghai'):((S&&S.tz1Zone)||'Asia/Amman');}
+  catch(e){return 'Asia/Amman';}
+}
+function dateStrIn(d,zone){
+  // YYYY-MM-DD for the instant `d` as seen in `zone`
+  try{return new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(d);}
+  catch(e){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+}
+function todayStr(){return dateStrIn(today(),primaryZone());}
 function greeting(){var h=today().getHours();return h<12?'Good morning, Laith':h<18?'Good afternoon, Laith':'Good evening, Laith';}
 function uid(){return 's'+Date.now()+Math.floor(Math.random()*9999);}
 function safeArr(x){return Array.isArray(x)?x:[];}
@@ -2289,7 +2301,7 @@ function updateHolCatField(){
     }
   }
 }
-function submitExp(){var amt=parseFloat(document.getElementById('log-amt').value);if(!amt||amt<=0)return alert('Enter a valid amount.');var holCatEl=document.getElementById('log-holcat');var holCatVal=(holCatEl&&(S.selectedCat||'').indexOf('__hol-')===0)?(holCatEl.value||'').trim():'';var entry={id:Date.now(),amount:amt,currency:S.logCur,category:S.selectedCat,date:document.getElementById('log-date').value||today().toISOString().split('T')[0],note:document.getElementById('log-note').value,holCat:holCatVal||undefined};if(editingExpId!==null){var i=expenses.findIndex(function(e){return e.id===editingExpId;});if(i>-1)expenses[i]=entry;editingExpId=null;}else expenses.unshift(entry);document.getElementById('log-amt').value='';document.getElementById('log-note').value='';var hcEl=document.getElementById('log-holcat');if(hcEl)hcEl.value='';updateSurplus();autosave();sbPushNow();renderLog();renderLogMonthlySummary();}
+function submitExp(){var amt=parseFloat(document.getElementById('log-amt').value);if(!amt||amt<=0)return alert('Enter a valid amount.');var holCatEl=document.getElementById('log-holcat');var holCatVal=(holCatEl&&(S.selectedCat||'').indexOf('__hol-')===0)?(holCatEl.value||'').trim():'';var entry={id:Date.now(),amount:amt,currency:S.logCur,category:S.selectedCat,date:document.getElementById('log-date').value||todayStr(),note:document.getElementById('log-note').value,holCat:holCatVal||undefined};if(editingExpId!==null){var i=expenses.findIndex(function(e){return e.id===editingExpId;});if(i>-1)expenses[i]=entry;editingExpId=null;}else expenses.unshift(entry);document.getElementById('log-amt').value='';document.getElementById('log-note').value='';var hcEl=document.getElementById('log-holcat');if(hcEl)hcEl.value='';updateSurplus();autosave();sbPushNow();renderLog();renderLogMonthlySummary();}
 var LF_OMNI_OFF=true; // staging: omni_finance_summary lives only in production
 async function pushFinanceSummary(){
   if(LF_OMNI_OFF)return;
@@ -2434,7 +2446,7 @@ function calcSurplusByCur(){
 function addSurplusAdj(cur,amount,note){
   amount=parseFloat(amount);if(!amount||isNaN(amount))return;
   S.surplusAdjustments=safeArr(S.surplusAdjustments);
-  S.surplusAdjustments.push({id:Date.now(),date:today().toISOString().split('T')[0],currency:cur,amount:n2(amount),note:(note||'').trim()});
+  S.surplusAdjustments.push({id:Date.now(),date:todayStr(),currency:cur,amount:n2(amount),note:(note||'').trim()});
   autosave();sbPushNow();renderCommitments();if(currentPage==='dashboard')renderDashboard();
 }
 function deleteSurplusAdj(id){
@@ -2447,14 +2459,14 @@ function settleSurplusCur(cur,kind){
   var verb=kind==='take'?'withdraw':'save';
   if(!confirm('This will '+verb+' the entire '+cur+' variance ('+n2(cur_total)+') and start it fresh from today. Manual entries stay in history but stop counting. Continue?'))return;
   S.surplusResetDates=S.surplusResetDates||{};
-  S.surplusResetDates[cur]=today().toISOString().split('T')[0];
+  S.surplusResetDates[cur]=todayStr();
   S.surplusEvents=safeArr(S.surplusEvents);
-  S.surplusEvents.push({id:Date.now(),date:today().toISOString().split('T')[0],currency:cur,amount:n2(cur_total),kind:kind});
+  S.surplusEvents.push({id:Date.now(),date:todayStr(),currency:cur,amount:n2(cur_total),kind:kind});
   autosave();sbPushNow();renderCommitments();if(currentPage==='dashboard')renderDashboard();
 }
 function resetSurplus(){
   if(!confirm('Reset surplus to zero? This marks accumulated surplus as saved.'))return;
-  S.surplusResetDate=today().toISOString().split('T')[0];
+  S.surplusResetDate=todayStr();
   autosave();sbPushNow();renderDashboard();
 }
 function deleteExp(id){
@@ -2620,7 +2632,7 @@ function renderLogHolBar(){
       var totalDaysP=Math.round((he3-hs3)/86400000)+1;
       var remDays=Math.max(1,totalDaysP-dayNum);
       var catKeyP='__hol-'+h.id+'__';
-      var todayStr=nowP.toISOString().split('T')[0];
+      var todayStr=dateStrIn(nowP,primaryZone());
       var todaySpent=n2(safeArr(expenses).filter(function(e){return e.category===catKeyP&&e.date===todayStr;}).reduce(function(a,e){return a+toTarget(e.amount,e.currency,bd.currency);},0));
       // Budget side capped by nights; time side uses calendar days
       var paceAllowed=n2(dailyRate*Math.min(dayNum,nightsP));
@@ -2677,7 +2689,7 @@ function renderLog(){
   var lml=document.getElementById('log-month-label');
   if(lml){var lvd=logViewDate();lml.textContent=MNAMES[lvd.getMonth()]+' '+lvd.getFullYear();}
   var ltb=document.getElementById('log-today-btn');if(ltb)ltb.style.display=logIsCurrentMonth()?'none':'inline-flex';
-  var ld=document.getElementById('log-date');if(ld&&!ld.value)ld.value=today().toISOString().split('T')[0];
+  var ld=document.getElementById('log-date');if(ld&&!ld.value)ld.value=todayStr();
   renderLogMonthlySummary();
   renderLogHolBar();
   renderLogBudgetBars();
@@ -2770,7 +2782,7 @@ function toggleTick(id){
           if(portionJOD>0){
             var isBoc2=acct2==='boc';
             s.payments=safeArr(s.payments);
-            s.payments.push({id:Date.now(),amtJOD:portionJOD,amtRaw:isBoc2?byAcct2.bocRaw:byAcct2.arabRaw,currency:isBoc2?'RMB':'JOD',date:today().toISOString().split('T')[0],note:MNAMES[commitMon.month-1]+' '+commitMon.year+' (auto)',type:'regular',autoRecorded:true});
+            s.payments.push({id:Date.now(),amtJOD:portionJOD,amtRaw:isBoc2?byAcct2.bocRaw:byAcct2.arabRaw,currency:isBoc2?'RMB':'JOD',date:todayStr(),note:MNAMES[commitMon.month-1]+' '+commitMon.year+' (auto)',type:'regular',autoRecorded:true});
           }
         }
       });
@@ -3527,7 +3539,7 @@ function renderProjection(){
       var msg='';
       if(pred.jod>0){var diff=got-pred.jod;var pctd=(diff/got*100);msg='Model predicted '+fJOD(pred.jod)+', you got '+fJOD(got)+' ('+(pctd>=0?'model '+Math.abs(pctd).toFixed(1)+'% pessimistic \u2014 good':'model '+Math.abs(pctd).toFixed(1)+'% optimistic \u2014 now corrected')+').';}
       S.transferLog=safeArr(S.transferLog);
-      S.transferLog.push({id:Date.now(),date:today().toISOString().split('T')[0],rmbSent:sent,jodReceived:got});
+      S.transferLog.push({id:Date.now(),date:todayStr(),rmbSent:sent,jodReceived:got});
       if(tlDefChk.checked){
         var full2=S.salaryRMBFull||0;
         var sj2=streams.find(function(x){return x.isSalaryJOD;}),sr2=streams.find(function(x){return x.isSalaryRMB;});
@@ -4307,7 +4319,7 @@ function renderGenericSettle(s,container){
   // Record payment form
   var secRec=document.createElement('div');secRec.className='sec-label';secRec.textContent='Record actual payment';container.appendChild(secRec);
   var recCard=document.createElement('div');recCard.className='card';
-  recCard.innerHTML='<div class="ig-row"><div class="ig"><label>Amount</label><input type="number" id="pay-amt-'+s.id+'" placeholder="0.00"/></div><div class="ig"><label>Currency</label><select id="pay-cur-'+s.id+'"><option value="JOD">JOD</option><option value="RMB">RMB</option><option value="GBP">GBP</option></select></div><div class="ig"><label>Date</label><input type="date" id="pay-date-'+s.id+'" value="'+today().toISOString().split('T')[0]+'"/></div><div class="ig"><label>Type</label><select id="pay-type-'+s.id+'"><option value="regular">Regular</option><option value="extra">Extra/lump sum</option></select></div></div><div class="ig"><label>Note</label><input type="text" id="pay-note-'+s.id+'" placeholder="e.g. January installment, extra agreed"/></div><button class="btn btn-sm btn-p" onclick="addPayment(\''+s.id+'\')">+ Record</button>';
+  recCard.innerHTML='<div class="ig-row"><div class="ig"><label>Amount</label><input type="number" id="pay-amt-'+s.id+'" placeholder="0.00"/></div><div class="ig"><label>Currency</label><select id="pay-cur-'+s.id+'"><option value="JOD">JOD</option><option value="RMB">RMB</option><option value="GBP">GBP</option></select></div><div class="ig"><label>Date</label><input type="date" id="pay-date-'+s.id+'" value="'+todayStr()+'"/></div><div class="ig"><label>Type</label><select id="pay-type-'+s.id+'"><option value="regular">Regular</option><option value="extra">Extra/lump sum</option></select></div></div><div class="ig"><label>Note</label><input type="text" id="pay-note-'+s.id+'" placeholder="e.g. January installment, extra agreed"/></div><button class="btn btn-sm btn-p" onclick="addPayment(\''+s.id+'\')">+ Record</button>';
   container.appendChild(recCard);
 }
 function renderMotelSettle(s,container){
@@ -4318,7 +4330,7 @@ function renderMotelSettle(s,container){
   container.appendChild(hero);
   var hg=document.createElement('div');hg.className='hg';hg.innerHTML='<div class="hc a-grn"><div class="hc-label">Received</div><div class="hc-val" style="font-size:15px">'+fJOD(received)+'</div></div><div class="hc a-red"><div class="hc-label">Still to recoup</div><div class="hc-val" style="font-size:15px">'+fJOD(Math.max(0,s.totalJOD-received))+'</div></div><div class="hc a-amb"><div class="hc-label">Invested</div><div class="hc-val" style="font-size:15px">'+fJOD(s.totalJOD)+'</div></div>';container.appendChild(hg);
   var sec=document.createElement('div');sec.className='sec-label';sec.textContent='Log income';container.appendChild(sec);
-  var logCard=document.createElement('div');logCard.className='card';logCard.innerHTML='<div class="ig-row"><div class="ig"><label>Amount (JOD)</label><input type="number" id="motel-amt" placeholder="0.00"/></div><div class="ig"><label>Date received</label><input type="date" id="motel-date" value="'+today().toISOString().split('T')[0]+'"/></div></div><div class="ig-row"><div class="ig"><label>For month (label, e.g. "January 2026 income")</label><input type="text" id="motel-label" placeholder="e.g. January 2026 income"/></div><div class="ig"><label>Status</label><select id="motel-status"><option value="received">Received</option><option value="no-payment">No payment this period</option></select></div></div><div class="ig"><label>Note</label><input type="text" id="motel-note" placeholder="e.g. Hallaj transferred 15 March"/></div><button class="btn btn-sm btn-p" onclick="addMotelEntry(\''+s.id+'\')">+ Log entry</button>';container.appendChild(logCard);
+  var logCard=document.createElement('div');logCard.className='card';logCard.innerHTML='<div class="ig-row"><div class="ig"><label>Amount (JOD)</label><input type="number" id="motel-amt" placeholder="0.00"/></div><div class="ig"><label>Date received</label><input type="date" id="motel-date" value="'+todayStr()+'"/></div></div><div class="ig-row"><div class="ig"><label>For month (label, e.g. "January 2026 income")</label><input type="text" id="motel-label" placeholder="e.g. January 2026 income"/></div><div class="ig"><label>Status</label><select id="motel-status"><option value="received">Received</option><option value="no-payment">No payment this period</option></select></div></div><div class="ig"><label>Note</label><input type="text" id="motel-note" placeholder="e.g. Hallaj transferred 15 March"/></div><button class="btn btn-sm btn-p" onclick="addMotelEntry(\''+s.id+'\')">+ Log entry</button>';container.appendChild(logCard);
   var sec2=document.createElement('div');sec2.className='sec-label';sec2.textContent='Income history';container.appendChild(sec2);
   var histCard=document.createElement('div');histCard.className='card';
   var pmts=safeArr(s.payments);if(pmts.length){pmts.forEach(function(p){var row=document.createElement('div');row.className='tr';row.innerHTML='<div style="flex:1"><div style="font-size:13px;font-weight:600">'+p.label+' <span class="tag '+(p.status==='received'?'tg-i':'tg-n')+'">'+p.status+'</span></div><div style="font-size:11px;color:var(--ink3)">'+p.date+(p.note?' - '+p.note:'')+'</div></div>'+(p.status==='received'?'<span class="tr-v pos">+'+fJOD(p.amtJOD)+'</span>':'<span class="tr-v mut">-</span>')+'<button class="btn btn-xs btn-d" style="margin-left:6px" onclick="deleteMotelEntry(\''+s.id+'\','+JSON.stringify(p.id)+')">Del</button>';histCard.appendChild(row);});}
@@ -4328,10 +4340,10 @@ function toggleHistoryPanel(id){var el=document.getElementById(id);if(el)el.styl
 function addPhase(sid){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;s.phases=safeArr(s.phases);var _npId=Date.now();if(typeof window._phaseOpen==='undefined')window._phaseOpen={};window._phaseOpen[_npId]=true;s.phases.push({id:_npId,monthly:0,currency:'JOD',account:'arab',startMon:today().getMonth()+1,startYr:today().getFullYear(),endMon:today().getMonth()+1,endYr:today().getFullYear(),oneOff:false});autosave();renderSettlement();}
 function deletePhase(sid,phid){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;s.phases=safeArr(s.phases).filter(function(p){return String(p.id)!==String(phid);});autosave();renderSettlement();}
 function updatePhase(sid,phid,key,val){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;var ph=safeArr(s.phases).find(function(p){return String(p.id)===String(phid);});if(!ph)return;ph[key]=typeof val==='boolean'?val:(isNaN(val)||key==='currency'||key==='account'?val:parseFloat(val)||parseInt(val,10));autosave();}
-function addPayment(sid){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;var amt=parseFloat(document.getElementById('pay-amt-'+sid).value);if(!amt||amt<=0)return alert('Enter a valid amount.');var cur=document.getElementById('pay-cur-'+sid).value;var amtJOD=toJOD(amt,cur);s.payments=safeArr(s.payments);s.payments.push({id:Date.now(),amtJOD:n2(amtJOD),amtRaw:amt,currency:cur,date:document.getElementById('pay-date-'+sid).value||today().toISOString().split('T')[0],note:document.getElementById('pay-note-'+sid).value,type:document.getElementById('pay-type-'+sid).value});document.getElementById('pay-amt-'+sid).value='';document.getElementById('pay-note-'+sid).value='';autosave();renderSettlement();}
+function addPayment(sid){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;var amt=parseFloat(document.getElementById('pay-amt-'+sid).value);if(!amt||amt<=0)return alert('Enter a valid amount.');var cur=document.getElementById('pay-cur-'+sid).value;var amtJOD=toJOD(amt,cur);s.payments=safeArr(s.payments);s.payments.push({id:Date.now(),amtJOD:n2(amtJOD),amtRaw:amt,currency:cur,date:document.getElementById('pay-date-'+sid).value||todayStr(),note:document.getElementById('pay-note-'+sid).value,type:document.getElementById('pay-type-'+sid).value});document.getElementById('pay-amt-'+sid).value='';document.getElementById('pay-note-'+sid).value='';autosave();renderSettlement();}
 function editPayment(sid,pid){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;var p=safeArr(s.payments).find(function(x){return String(x.id)===String(pid);});if(!p)return;var ex=document.getElementById('edit-pay-'+pid);if(ex){ex.remove();return;}var row=document.getElementById('prow-'+sid+'-'+pid);if(!row)return;var div=document.createElement('div');div.id='edit-pay-'+pid;div.className='form-box';div.style.marginTop='4px';var aI=document.createElement('input');aI.type='number';aI.value=n2(p.amtJOD);aI.style.marginBottom='7px';var nI=document.createElement('input');nI.type='text';nI.value=p.note||'';nI.style.marginBottom='7px';var sb=document.createElement('button');sb.className='btn btn-sm btn-p';sb.textContent='Save';sb.onclick=function(){p.amtJOD=parseFloat(aI.value)||p.amtJOD;p.note=nI.value;div.remove();autosave();renderSettlement();};var cb=document.createElement('button');cb.className='btn btn-sm';cb.textContent='Cancel';cb.style.marginLeft='6px';cb.onclick=function(){div.remove();};var l1=document.createElement('label');l1.textContent='Amount (JOD)';l1.style.cssText='display:block;font-size:11px;color:var(--ink3);font-weight:700;margin-bottom:3px';var l2=document.createElement('label');l2.textContent='Note';l2.style.cssText='display:block;font-size:11px;color:var(--ink3);font-weight:700;margin-bottom:3px;margin-top:4px';div.appendChild(l1);div.appendChild(aI);div.appendChild(l2);div.appendChild(nI);div.appendChild(sb);div.appendChild(cb);row.insertAdjacentElement('afterend',div);}
 function deletePayment(sid,pid){if(!confirm('Remove?'))return;var s=settlements.find(function(x){return x.id===sid;});if(!s)return;tomb('pay:'+pid);s.payments=safeArr(s.payments).filter(function(p){return String(p.id)!==String(pid);});autosave();renderSettlement();}
-function addMotelEntry(sid){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;var amt=parseFloat(document.getElementById('motel-amt').value)||0;s.payments=safeArr(s.payments);s.payments.unshift({id:Date.now(),amtJOD:amt,label:document.getElementById('motel-label').value||'Entry',date:document.getElementById('motel-date').value||today().toISOString().split('T')[0],status:document.getElementById('motel-status').value,note:document.getElementById('motel-note').value});document.getElementById('motel-amt').value='';document.getElementById('motel-label').value='';document.getElementById('motel-note').value='';autosave();renderSettlement();}
+function addMotelEntry(sid){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;var amt=parseFloat(document.getElementById('motel-amt').value)||0;s.payments=safeArr(s.payments);s.payments.unshift({id:Date.now(),amtJOD:amt,label:document.getElementById('motel-label').value||'Entry',date:document.getElementById('motel-date').value||todayStr(),status:document.getElementById('motel-status').value,note:document.getElementById('motel-note').value});document.getElementById('motel-amt').value='';document.getElementById('motel-label').value='';document.getElementById('motel-note').value='';autosave();renderSettlement();}
 function deleteMotelEntry(sid,pid){if(!confirm('Remove?'))return;var s=settlements.find(function(x){return x.id===sid;});if(!s)return;s.payments=safeArr(s.payments).filter(function(p){return String(p.id)!==String(pid);});autosave();renderSettlement();}
 
 // ═══ HOLIDAYS ═══
@@ -4433,7 +4445,7 @@ function settleEndedHolidays(){
     var dead=safeArr(S.deletedIds).indexOf('adj:'+adjId)>=0;
     if(!exists&&!dead&&Math.abs(net)>=0.01){
       S.surplusAdjustments=safeArr(S.surplusAdjustments);
-      S.surplusAdjustments.push({id:adjId,date:today().toISOString().split('T')[0],currency:cur,amount:net,note:'✈ '+(h.label||'Holiday')+' settled: '+n2(total)+' budget − '+n2(spent)+' spent'});
+      S.surplusAdjustments.push({id:adjId,date:todayStr(),currency:cur,amount:net,note:'✈ '+(h.label||'Holiday')+' settled: '+n2(total)+' budget − '+n2(spent)+' spent'});
     }
     h.varSettled=true;changed=true;
   });
@@ -4658,7 +4670,7 @@ function renderNetWorth(){
 
 // ═══ ASSETS ═══
 function addAsset(){var name=prompt('Asset name:');if(!name)return;properties.push({id:'p'+Date.now(),name:name,paid:0,value:0,share:1,area:'',notes:'',partner:'',userAdded:true});autosave();renderAssets();}
-function addGoldPiece(){goldPieces.push({id:'g'+Date.now(),type:'New piece',unit:'oz',weight:1,paidPerUnit:S.goldSpotOz,purchaseDate:today().toISOString().split('T')[0]});autosave();renderAssets();}
+function addGoldPiece(){goldPieces.push({id:'g'+Date.now(),type:'New piece',unit:'oz',weight:1,paidPerUnit:S.goldSpotOz,purchaseDate:todayStr()});autosave();renderAssets();}
 function removeAsset(id){if(!confirm('Remove?'))return;properties=properties.filter(function(p){return p.id!==id;});autosave();renderAssets();}
 function removeGold(id){if(!confirm('Remove?'))return;goldPieces=goldPieces.filter(function(g){return g.id!==id;});autosave();renderAssets();}
 function updProp(id,key,val){var p=properties.find(function(p){return p.id===id;});if(p){p[key]=isNaN(val)||['name','notes','area','partner'].indexOf(key)>=0?val:parseFloat(val);autosave();}}
@@ -5534,7 +5546,7 @@ function renderBalanceUpdate(){
       var v=parseFloat(raw);
       inp.value='';
       if(!isNaN(v)&&v>=0){
-        S[sk]=v;S[uk]=today().toISOString().split('T')[0];autosave();
+        S[sk]=v;S[uk]=todayStr();autosave();
         ad.textContent=daysAgoStr(S[uk]);ad.className='bal-item-age';
         var nowD=today();var yr2=nowD.getFullYear();var mo2=nowD.getMonth()+1;
         var ms=getStreamsForMonth(yr2,mo2);
@@ -5587,7 +5599,7 @@ function renderBalanceUpdate(){
       var v=parseFloat(raw);
       ri.value='';
       if(!isNaN(v)&&v>=0){
-        ch.amount=v;ch.updated=today().toISOString().split('T')[0];autosave();
+        ch.amount=v;ch.updated=todayStr();autosave();
         eq.textContent='updated today \u00b7 '+v.toLocaleString()+' '+ch.currency+' = '+fJOD(toJOD(v,ch.currency));
         setTimeout(function(){renderPinnedReservesCard();},0);
       }
@@ -5621,7 +5633,7 @@ function renderBalanceUpdate(){
       var amt=parseFloat(amtI.value)||0;var lbl=(lblI.value||'Reserve').trim();var cur=curS.value;
       if(!amt)return;
       S.cashHoldings=safeArr(S.cashHoldings);
-      S.cashHoldings.push({id:'r'+Date.now(),label:lbl,amount:amt,currency:cur,updated:today().toISOString().split('T')[0]});
+      S.cashHoldings.push({id:'r'+Date.now(),label:lbl,amount:amt,currency:cur,updated:todayStr()});
       autosave();renderDashboard();
     };
     var canBtn=document.createElement('button');canBtn.className='btn btn-sm';canBtn.textContent='Cancel';canBtn.onclick=function(){form.remove();};
@@ -5720,7 +5732,7 @@ function exportToCSV(){
   var blob=new Blob([csv],{type:'text/csv'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download='laith-finance-'+today().toISOString().split('T')[0]+'.csv';
+  a.download='laith-finance-'+todayStr()+'.csv';
   a.click();
 }
 function exportToPDF(){
@@ -5735,7 +5747,7 @@ function clearOldData(){
   alert('Removed '+(before-expenses.length)+' expenses and old snapshots before '+yr+'.');
   autosave();
 }
-function exportData(){try{var payload=sbBuildPayload();var blob=new Blob([JSON.stringify(payload.data,null,2)],{type:'application/json'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='laith-finance-'+today().toISOString().split('T')[0]+'.json';a.click();}catch(e){alert('Export failed: '+e.message);}}
+function exportData(){try{var payload=sbBuildPayload();var blob=new Blob([JSON.stringify(payload.data,null,2)],{type:'application/json'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='laith-finance-'+todayStr()+'.json';a.click();}catch(e){alert('Export failed: '+e.message);}}
 function importData(){document.getElementById('import-file').click();}
 function doImport(input){var file=input.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(e){try{var d=JSON.parse(e.target.result);if(d.S)Object.assign(S,d.S);if(Array.isArray(d.streams))streams=d.streams;if(Array.isArray(d.streamOverrides))streamOverrides=d.streamOverrides;if(Array.isArray(d.settlements))settlements=d.settlements;if(Array.isArray(d.goldPieces))goldPieces=d.goldPieces;if(Array.isArray(d.properties))properties=d.properties;if(Array.isArray(d.holidays))holidays=d.holidays;if(Array.isArray(d.expenses))expenses=d.expenses;if(Array.isArray(d.oneoffEvents))oneoffEvents=d.oneoffEvents;if(d.tickState&&typeof d.tickState==='object')tickState=d.tickState;if(d.confirmedDebits&&typeof d.confirmedDebits==='object')confirmedDebits=d.confirmedDebits;if(Array.isArray(d.wishlistItems))wishlistItems=d.wishlistItems;if(Array.isArray(d.parentSkips))parentSkips=d.parentSkips;if(d.commitGroupState&&typeof d.commitGroupState==='object')commitGroupState=d.commitGroupState;if(Array.isArray(d.snapshots))S.snapshots=d.snapshots;if(d.catColors)S.catColors=d.catColors;if(Array.isArray(d.budgetOrder))S.budgetOrder=d.budgetOrder;autosave();sbPushNow();showView(currentPage);alert('Imported.');}catch(err){alert('Import failed: '+err.message);}};reader.readAsText(file);}
 function resetData(){if(!confirm('Reset ALL data?'))return;localStorage.removeItem('lf_data');location.reload();}
@@ -5755,7 +5767,7 @@ function wlAddItem(){
   var note=(document.getElementById('wl-note-inp').value||'').trim();
   if(!name)return alert('Enter an item name.');
   if(!amount)return alert('Enter an amount.');
-  wishlistItems.push({id:'w'+Date.now(),name:name,amount:amount,currency:currency,note:note,scheduledYr:null,scheduledMo:null,bought:false,addedDate:today().toISOString().split('T')[0]});
+  wishlistItems.push({id:'w'+Date.now(),name:name,amount:amount,currency:currency,note:note,scheduledYr:null,scheduledMo:null,bought:false,addedDate:todayStr()});
   document.getElementById('wl-name-inp').value='';
   document.getElementById('wl-amount-inp').value='';
   document.getElementById('wl-note-inp').value='';
@@ -6037,7 +6049,7 @@ function renderNetWorthTrend(){
 function takeSnapshot(){
   var now=today();var proj=buildProjection();var row=proj[0];
   var mExp=expenses.filter(function(e){var d=new Date(e.date);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();});
-  var snap={id:Date.now(),date:now.toISOString().split('T')[0],label:MNAMES[now.getMonth()]+' '+now.getFullYear(),arabBal:S.arab,bocBal:S.boc,cashJOD:cashTotalJOD(),totalExpenses:mExp.reduce(function(a,e){return a+toRMB(e.amount,e.currency);},0),expenseCount:mExp.length,projJOD:row?row.jodBal:0,projRMB:row?row.rmbBal:0};
+  var snap={id:Date.now(),date:dateStrIn(now,primaryZone()),label:MNAMES[now.getMonth()]+' '+now.getFullYear(),arabBal:S.arab,bocBal:S.boc,cashJOD:cashTotalJOD(),totalExpenses:mExp.reduce(function(a,e){return a+toRMB(e.amount,e.currency);},0),expenseCount:mExp.length,projJOD:row?row.jodBal:0,projRMB:row?row.rmbBal:0};
   if(!Array.isArray(S.snapshots))S.snapshots=[];S.snapshots.unshift(snap);autosave();renderHistory();
 }
 function renderHistory(){
@@ -6090,7 +6102,7 @@ function exportToExcel(){
   settlements.forEach(function(s){lines.push(s.name+' - Paid: '+fJOD(settlePaid(s))+' - Remaining: '+fJOD(settleLeft(s)));safeArr(s.payments).forEach(function(p){lines.push(','+p.date+','+fJOD(p.amtJOD)+','+(p.note||''));});});
   var csv=lines.join('\n');
   var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
-  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='laith-finance-'+today().toISOString().split('T')[0]+'.csv';a.click();
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='laith-finance-'+todayStr()+'.csv';a.click();
 }
 document.addEventListener('DOMContentLoaded',function(){
   loadState();checkLock();
@@ -6152,7 +6164,7 @@ document.addEventListener('DOMContentLoaded',function(){
     try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState,catColors:S.catColors,budgetOrder:S.budgetOrder}));}catch(e){console.warn('migration save',e);}
   }
   document.querySelectorAll('.nav-item[data-view],.bi[data-view],.bi-log[data-view]').forEach(function(el){el.addEventListener('click',function(){showView(el.dataset.view);});});
-  var ld=document.getElementById('log-date');if(ld)ld.value=today().toISOString().split('T')[0];
+  var ld=document.getElementById('log-date');if(ld)ld.value=todayStr();
   renderLogCurToggle();
   var ab=document.getElementById('log-acct-boc');if(ab)ab.checked=true;
   // commitMon/calYear/calMon already initialised from _now at declaration
