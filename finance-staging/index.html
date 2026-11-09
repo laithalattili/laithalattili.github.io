@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
-<link rel="manifest" href="manifest.json">
+<!-- staging: no manifest -->
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -2290,7 +2290,9 @@ function updateHolCatField(){
   }
 }
 function submitExp(){var amt=parseFloat(document.getElementById('log-amt').value);if(!amt||amt<=0)return alert('Enter a valid amount.');var holCatEl=document.getElementById('log-holcat');var holCatVal=(holCatEl&&(S.selectedCat||'').indexOf('__hol-')===0)?(holCatEl.value||'').trim():'';var entry={id:Date.now(),amount:amt,currency:S.logCur,category:S.selectedCat,date:document.getElementById('log-date').value||today().toISOString().split('T')[0],note:document.getElementById('log-note').value,holCat:holCatVal||undefined};if(editingExpId!==null){var i=expenses.findIndex(function(e){return e.id===editingExpId;});if(i>-1)expenses[i]=entry;editingExpId=null;}else expenses.unshift(entry);document.getElementById('log-amt').value='';document.getElementById('log-note').value='';var hcEl=document.getElementById('log-holcat');if(hcEl)hcEl.value='';updateSurplus();autosave();sbPushNow();renderLog();renderLogMonthlySummary();}
+var LF_OMNI_OFF=true; // staging: omni_finance_summary lives only in production
 async function pushFinanceSummary(){
+  if(LF_OMNI_OFF)return;
   try{
     var now=today();
     var yr=now.getFullYear(),mo=now.getMonth()+1;
@@ -6180,7 +6182,7 @@ var SB_TABLE='finance_data';
 var SBC=null,_authToken=null,_hhId=null,_meId=null;
 try{
   SBC=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'lf_auth'}});
-  SBC.auth.onAuthStateChange(function(ev,sess){_authToken=sess?sess.access_token:null;});
+  SBC.auth.onAuthStateChange(function(ev,sess){_authToken=sess?sess.access_token:null;try{if(_authToken)SBC.realtime.setAuth(_authToken);}catch(e){}});
 }catch(e){console.warn('[AUTH] client init failed',e);}
 
 async function ensureAuth(){
@@ -6935,48 +6937,46 @@ function frPollWhileDown(){
   },90000);
 }
 function frStartRealtime(){
+  // Staging build: the official client handles protocol, auth and reconnects.
+  // The hand-rolled socket passed the user token as `apikey`, which Supabase rejects.
   try{
-    var wsUrl=SB_URL.replace('https://','wss://')+'/realtime/v1/websocket?apikey='+(_authToken||SB_KEY)+'&vsn=1.0.0';
-    var ws=new WebSocket(wsUrl);
-    _frRT=ws;
-    ws.onopen=function(){
-      console.log('[FR-RT] Connected');
-      _frRTUp=true;_frRTBackoff=5000;
-      clearInterval(_frPollTimer);_frPollTimer=null;
-      ws.send(JSON.stringify({topic:'realtime:public:finance_records',event:'phx_join',payload:{},ref:String(_sbRealtimeRef++)}));
-      sbSetStatus('Live','ok');
-      // Reconcile on every (re)connect: catches anything missed while offline
-      frReconcile().then(function(changed){if(changed)frRefreshView();}).catch(function(e){console.warn('[FR] reconnect reconcile:',e.message);});
-    };
-    ws.onmessage=function(evt){
+    if(!SBC){console.warn('[FR-RT] no client');return;}
+    try{SBC.realtime.setAuth(_authToken);}catch(e){}
+    if(_frRT){try{SBC.removeChannel(_frRT);}catch(e){}_frRT=null;}
+    var ch=SBC.channel('fr-records-'+Math.random().toString(36).slice(2,8));
+    ch.on('postgres_changes',{event:'*',schema:'public',table:'finance_records'},function(msg){
       try{
-        var msg=JSON.parse(evt.data);
-        if(msg.event==='heartbeat'||msg.topic==='phoenix'){
-          ws.send(JSON.stringify({topic:'phoenix',event:'heartbeat',payload:{},ref:String(_sbRealtimeRef++)}));
+        var rec=msg.new||msg.record;
+        if(!rec||!rec.kind)return;
+        if(rec.device===sbDeviceId()){
+          var ek=rec.kind+':'+rec.rid;
+          if(!_frPending[ek])_frShadow[ek]={json:frCanon(rec.data),ver:rec.ver,deleted:rec.deleted};
           return;
         }
-        if((msg.event==='INSERT'||msg.event==='UPDATE')&&msg.payload&&msg.payload.record){
-          var rec=msg.payload.record;
-          if(!rec||!rec.kind)return;
-          if(rec.device===sbDeviceId()){var ek=rec.kind+':'+rec.rid;if(!_frPending[ek])_frShadow[ek]={json:frCanon(rec.data),ver:rec.ver,deleted:rec.deleted};return;}
-          var changed=frApplyRow(rec);
-          if(changed){
-            sbSetStatus('Live update at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
-            safeShowView(currentPage);
-          }
+        var changed=frApplyRow(rec);
+        if(changed){
+          sbSetStatus('Live update at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
+          safeShowView(currentPage);
         }
       }catch(e){console.warn('[FR-RT] message error',e);}
-    };
-    ws.onerror=function(e){console.warn('[FR-RT] error',e);};
-    ws.onclose=function(){
-      _frRTUp=false;
-      // A down socket is not an alarm: writes still work and polling covers
-      // pulls. Reconnect quietly with growing spacing; don't touch the dot.
-      console.log('[FR-RT] Disconnected — reconnecting in '+Math.round(_frRTBackoff/1000)+'s');
-      frPollWhileDown();
-      setTimeout(function(){if(_frActive&&!_frRTUp)frStartRealtime();},_frRTBackoff);
-      _frRTBackoff=Math.min(90000,_frRTBackoff*2);
-    };
+    });
+    ch.subscribe(function(status,err){
+      console.log('[FR-RT] '+status+(err?(' '+err.message):''));
+      if(status==='SUBSCRIBED'){
+        _frRTUp=true;_frRTBackoff=5000;
+        clearInterval(_frPollTimer);_frPollTimer=null;
+        sbSetStatus('Live','ok');
+        frReconcile().then(function(changed){if(changed)frRefreshView();})
+                     .catch(function(e){console.warn('[FR] reconnect reconcile:',e.message);});
+      }else if(status==='CLOSED'||status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
+        if(!_frRTUp&&_frRTBackoff>60000)return; // give up noisily rather than spin
+        _frRTUp=false;
+        frPollWhileDown();
+        setTimeout(function(){if(_frActive&&!_frRTUp)frStartRealtime();},_frRTBackoff);
+        _frRTBackoff=Math.min(90000,_frRTBackoff*2);
+      }
+    });
+    _frRT=ch;
   }catch(e){console.warn('[FR-RT] failed to start:',e);}
 }
 // ── One-time migration: old single blob → per-record rows. ──────────────
