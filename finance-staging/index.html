@@ -6176,8 +6176,19 @@ document.addEventListener('DOMContentLoaded',function(){
   setTimeout(function(){if(typeof lfBootAuth==='function')lfBootAuth();},500);
   // Settle ended holidays into variance (runs after state + sync have settled)
   setTimeout(function(){try{settleEndedHolidays();}catch(e){console.warn('hol settle:',e);}},4000);
-  // Poll and visibilitychange pull disabled — Realtime handles cross-device sync
-  // These caused data-revert races with the push/echo cycle
+  // Flush on background, reconcile on return. The old warning about visibilitychange
+  // races applied to the legacy whole-blob engine; the per-record engine keeps local
+  // pending records through a reconcile, so this is safe.
+  function lfFlushNow(){
+    if(!_frActive)return;
+    try{clearTimeout(_frPushTimer);frMarkPending();if(Object.keys(_frPending).length)frPush();}catch(e){console.warn('[FR] flush',e);}
+  }
+  document.addEventListener('visibilitychange',function(){
+    if(!_frActive)return;
+    if(document.hidden){lfFlushNow();}
+    else{frReconcile().then(function(ch){if(ch)frRefreshView();}).catch(function(e){console.warn('[FR] resume reconcile:',e.message);});}
+  });
+  window.addEventListener('pagehide',lfFlushNow);
 });
 
 
@@ -6618,6 +6629,7 @@ function frFetch(url,opts,timeoutMs){
   opts=opts||{};
   var ctl=(typeof AbortController!=='undefined')?new AbortController():null;
   if(ctl)opts.signal=ctl.signal;
+  try{if(document.hidden&&!opts.keepalive)opts.keepalive=true;}catch(e){}
   var t=ctl?setTimeout(function(){try{ctl.abort();}catch(e){}},timeoutMs||15000):null;
   return fetch(url,opts).finally(function(){if(t)clearTimeout(t);});
 }
