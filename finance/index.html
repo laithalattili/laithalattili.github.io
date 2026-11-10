@@ -435,7 +435,7 @@ input:focus,select:focus{border-color:var(--ink)}
 <!-- LOCK -->
 <div id="lock-screen"><div style="text-align:center;padding:20px">
   <div class="lock-logo" id="lock-logo">Laith's Finance</div>
-  <div class="lock-sub">Enter your PIN</div>
+  <div class="lock-sub" id="lock-sub">Enter your PIN</div>
   <div class="lock-dots" id="pin-dots">
     <div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div>
     <div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div>
@@ -817,6 +817,18 @@ input:focus,select:focus{border-color:var(--ink)}
       </div>
     </div>
   </div>
+  <div class="settings-sec" id="ssec-pin">
+    <div class="settings-sec-hd" onclick="settingsToggle('pin')"><span>Change my PIN</span><span class="settings-chev">&#8250;</span></div>
+    <div class="settings-sec-body">
+      <div style="padding:12px 0">
+        <div class="ig"><label>Current PIN</label><input type="password" inputmode="numeric" maxlength="6" id="pin-old" autocomplete="off"/></div>
+        <div class="ig"><label>New PIN (6 digits)</label><input type="password" inputmode="numeric" maxlength="6" id="pin-new" autocomplete="off"/></div>
+        <div class="ig"><label>New PIN again</label><input type="password" inputmode="numeric" maxlength="6" id="pin-new2" autocomplete="off"/></div>
+        <button class="btn btn-p btn-sm" onclick="changePin()">Change PIN</button>
+        <div id="pin-change-msg" style="font-size:12px;margin-top:8px"></div>
+      </div>
+    </div>
+  </div>
   <div class="settings-sec" id="ssec-rates">
     <div class="settings-sec-hd" onclick="settingsToggle('rates')"><span>Exchange rates</span><span class="settings-chev">&#8250;</span></div>
     <div class="settings-sec-body" id="ssec-body-rates">
@@ -936,15 +948,67 @@ input:focus,select:focus{border-color:var(--ink)}
 </div></div>
 <script>
 // ═══ PIN / LOCK ═══
-var PIN='399111', LOCK_MS=3*24*60*60*1000, pinBuf='';
-function pinInput(d){
-  pinBuf+=d;
-  for(var i=0;i<6;i++)document.getElementById('pd'+i).classList.toggle('filled',i<pinBuf.length);
-  if(pinBuf.length===6){if(pinBuf===PIN)unlock();else{document.getElementById('pin-err').textContent='Incorrect PIN.';pinBuf='';setTimeout(function(){for(var i=0;i<6;i++)document.getElementById('pd'+i).classList.remove('filled');},400);}}
+var LOCK_MS=3*24*60*60*1000, pinBuf='', _pinMode='enter', _pinFirst='', _pinBusy=false;
+function pinDots(){for(var i=0;i<6;i++){var d=document.getElementById('pd'+i);if(d)d.classList.toggle('filled',i<pinBuf.length);}}
+function pinMsg(t,sub){var e=document.getElementById('pin-err');if(e)e.textContent=t||'';if(sub){var s=document.getElementById('lock-sub');if(s)s.textContent=sub;}}
+function pinReset(){pinBuf='';setTimeout(pinDots,350);}
+async function pinHashLocal(p){try{var b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('lf:'+p));return Array.from(new Uint8Array(b)).map(function(x){return x.toString(16).padStart(2,'0');}).join('');}catch(e){return null;}}
+async function pinRpc(fn,args){
+  var r=await fetch(SB_URL+'/rest/v1/rpc/'+fn,{method:'POST',headers:frHdr(),body:JSON.stringify(args)});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  return await r.json();
 }
-function pinBack(){if(pinBuf.length){pinBuf=pinBuf.slice(0,-1);for(var i=0;i<6;i++)document.getElementById('pd'+i).classList.toggle('filled',i<pinBuf.length);}}
+function pinInput(d){
+  if(_pinBusy||pinBuf.length>=6)return;
+  pinBuf+=d;pinDots();
+  if(pinBuf.length===6)pinSubmit();
+}
+async function pinSubmit(){
+  var p=pinBuf;_pinBusy=true;
+  try{
+    if(_pinMode==='create'){
+      _pinFirst=p;_pinMode='confirm';pinMsg('','Type it again to confirm');pinReset();return;
+    }
+    if(_pinMode==='confirm'){
+      if(p!==_pinFirst){_pinMode='create';_pinFirst='';pinMsg('PINs did not match. Start again.','Choose a new 6-digit PIN');pinReset();return;}
+      var res=await pinRpc('set_pin',{old_pin:null,new_pin:p});
+      if(res==='ok'){var h=await pinHashLocal(p);if(h)localStorage.setItem('lf_pin_h',h);_pinMode='enter';pinMsg('','Enter your PIN');pinBuf='';pinDots();unlock();}
+      else{_pinMode='create';_pinFirst='';pinMsg('Could not save PIN ('+res+').','Choose a new 6-digit PIN');pinReset();}
+      return;
+    }
+    var v;
+    try{v=await pinRpc('verify_pin',{p:p});}
+    catch(e){
+      var saved=localStorage.getItem('lf_pin_h'),h2=await pinHashLocal(p);
+      if(saved&&h2&&saved===h2){pinBuf='';pinDots();unlock();}
+      else{pinMsg(saved?'Incorrect PIN (offline check).':'Cannot check PIN. Go online once first.');pinReset();}
+      return;
+    }
+    if(v==='ok'){var h3=await pinHashLocal(p);if(h3)localStorage.setItem('lf_pin_h',h3);pinBuf='';pinDots();pinMsg('');unlock();}
+    else if(v==='nopin'){_pinMode='create';pinMsg('','Choose a new 6-digit PIN');pinReset();}
+    else if(v==='locked'){pinMsg('Too many tries. Wait 5 minutes.');pinReset();}
+    else if(v==='denied'){pinMsg('Please sign in first.');pinReset();}
+    else{pinMsg('Incorrect PIN.');pinReset();}
+  }finally{_pinBusy=false;}
+}
+async function changePin(){
+  var o=document.getElementById('pin-old').value,n=document.getElementById('pin-new').value,c=document.getElementById('pin-new2').value;
+  var m=document.getElementById('pin-change-msg');
+  function say(t,ok){m.textContent=t;m.style.color=ok?'var(--grn)':'var(--red)';}
+  if(!/^[0-9]{6}$/.test(n)){say('New PIN must be exactly 6 digits.');return;}
+  if(n!==c){say('The two new PINs do not match.');return;}
+  if(!/^[0-9]{6}$/.test(o)){say('Enter your current 6-digit PIN.');return;}
+  say('Saving...',true);
+  try{
+    var r=await pinRpc('set_pin',{old_pin:o,new_pin:n});
+    if(r==='ok'){var h=await pinHashLocal(n);if(h)localStorage.setItem('lf_pin_h',h);say('PIN changed.',true);['pin-old','pin-new','pin-new2'].forEach(function(i){document.getElementById(i).value='';});}
+    else if(r==='bad_old')say('Current PIN is wrong.');
+    else if(r==='locked')say('Too many tries. Wait 5 minutes.');
+    else say('Could not change PIN ('+r+').');
+  }catch(e){say('No connection. Try again online.');}
+}
 function unlock(){document.getElementById('lock-screen').classList.add('hidden');document.getElementById('app-shell').style.display='flex';localStorage.setItem('lf_lock_time',String(Date.now()));startClock();updateAppTitle();}
-function lockApp(){document.getElementById('lock-screen').classList.remove('hidden');document.getElementById('app-shell').style.display='none';pinBuf='';for(var i=0;i<6;i++)document.getElementById('pd'+i).classList.remove('filled');document.getElementById('pin-err').textContent='';}
+function lockApp(){document.getElementById('lock-screen').classList.remove('hidden');document.getElementById('app-shell').style.display='none';pinBuf='';_pinMode='enter';_pinFirst='';pinDots();pinMsg('','Enter your PIN');}
 function checkLock(){var t=localStorage.getItem('lf_lock_time');if(!t||Date.now()-parseInt(t,10)>LOCK_MS)lockApp();else unlock();}
 
 // ═══ CLOCK + AGE ═══
@@ -6237,7 +6301,7 @@ async function lfLogin(){
     sbInitSync();
   }catch(e){if(er)er.textContent=e.message||String(e);}
 }
-async function lfSignOut(){try{if(SBC)await SBC.auth.signOut();}catch(e){}try{localStorage.removeItem('lf_data');localStorage.removeItem('lf_ver');}catch(e){}location.reload();}
+async function lfSignOut(){try{if(SBC)await SBC.auth.signOut();}catch(e){}try{localStorage.removeItem('lf_data');localStorage.removeItem('lf_ver');localStorage.removeItem('lf_pin_h');localStorage.removeItem('lf_lock_time');}catch(e){}location.reload();}
 async function lfLoadMembership(){
   var s=await ensureAuth();if(!s)return false;
   _meId=s.user.id;
