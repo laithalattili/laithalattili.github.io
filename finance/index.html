@@ -2841,7 +2841,10 @@ function toggleTick(id){
           if(isAlt){acct2=byAcct2.firstAcct==='arab'?'boc':'arab';}
           else{acct2=byAcct2.firstAcct||((byAcct2.boc>0)?'boc':'arab');if(byAcct2[acct2]<=0)acct2=acct2==='arab'?'boc':'arab';}
           var portionJOD=byAcct2[acct2]||0;
-          if(portionJOD>0){
+          var _autoNote=MNAMES[commitMon.month-1]+' '+commitMon.year+' (auto)';
+          var _cur2=acct2==='boc'?'RMB':'JOD';
+          var _already=safeArr(s.payments).some(function(p){return p.autoRecorded&&p.note===_autoNote&&(p.currency||'JOD')===_cur2;});
+          if(portionJOD>0&&!_already){
             var isBoc2=acct2==='boc';
             s.payments=safeArr(s.payments);
             s.payments.push({id:Date.now(),amtJOD:portionJOD,amtRaw:isBoc2?byAcct2.bocRaw:byAcct2.arabRaw,currency:isBoc2?'RMB':'JOD',date:todayStr(),note:MNAMES[commitMon.month-1]+' '+commitMon.year+' (auto)',type:'regular',autoRecorded:true});
