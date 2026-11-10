@@ -6210,7 +6210,7 @@ var SB_TABLE='finance_data';
 // ═══════════════════════════════════════════════
 var SBC=null,_authToken=null,_hhId=null,_meId=null;
 try{
-  SBC=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'lf_auth'}});
+  SBC=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'lf_auth_prod'}});
   SBC.auth.onAuthStateChange(function(ev,sess){_authToken=sess?sess.access_token:null;try{if(_authToken)SBC.realtime.setAuth(_authToken);}catch(e){}});
 }catch(e){console.warn('[AUTH] client init failed',e);}
 
