@@ -14,6 +14,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.29.0/dist/tabler-icons.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="supabase.min.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js&quot;><\/script>')"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -417,6 +418,20 @@ input:focus,select:focus{border-color:var(--ink)}
 </style>
 </head>
 <body>
+<!-- LOGIN -->
+<div id="login-screen" style="position:fixed;inset:0;background:var(--bg);z-index:10001;display:none;align-items:center;justify-content:center">
+  <div style="width:min(360px,88vw);text-align:center">
+    <div class="lock-logo" style="margin-bottom:4px">Finance</div>
+    <div class="lock-sub" style="margin-bottom:20px">Sign in to your household</div>
+    <input id="login-email" type="email" placeholder="Email" autocomplete="username"
+      style="width:100%;padding:12px 14px;margin-bottom:10px;border:1px solid var(--brd2);border-radius:var(--r);background:var(--surf);color:var(--ink);font-family:var(--f);font-size:15px">
+    <input id="login-pass" type="password" placeholder="Password" autocomplete="current-password"
+      style="width:100%;padding:12px 14px;margin-bottom:14px;border:1px solid var(--brd2);border-radius:var(--r);background:var(--surf);color:var(--ink);font-family:var(--f);font-size:15px">
+    <button id="login-btn" onclick="lfLogin()"
+      style="width:100%;padding:12px;border:0;border-radius:var(--r);background:var(--grn);color:#fff;font-family:var(--f);font-size:15px;font-weight:600;cursor:pointer">Sign in</button>
+    <div id="login-err" style="color:var(--red);font-size:12px;min-height:18px;margin-top:12px"></div>
+      </div>
+</div>
 <!-- LOCK -->
 <div id="lock-screen"><div style="text-align:center;padding:20px">
   <div class="lock-logo" id="lock-logo">Laith's Finance</div>
@@ -1105,6 +1120,18 @@ function getCurRate(c){
 function toJOD(n,c){return n*getCurRate(c);}
 function toRMB(n,c){return toJOD(n,c)*S.jod2rmb;}
 function today(){return new Date();}
+// ── Date stamping follows the PRIMARY clock (Settings → primary time zone), not UTC. ──
+function primaryZone(){
+  try{var p=(typeof S!=='undefined'&&S)?(S.tzPrimary||1):1;
+      return p===2?((S&&S.tz2Zone)||'Asia/Shanghai'):((S&&S.tz1Zone)||'Asia/Amman');}
+  catch(e){return 'Asia/Amman';}
+}
+function dateStrIn(d,zone){
+  // YYYY-MM-DD for the instant `d` as seen in `zone`
+  try{return new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(d);}
+  catch(e){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+}
+function todayStr(){return dateStrIn(today(),primaryZone());}
 function greeting(){var h=today().getHours();return h<12?'Good morning, Laith':h<18?'Good afternoon, Laith':'Good evening, Laith';}
 function uid(){return 's'+Date.now()+Math.floor(Math.random()*9999);}
 function safeArr(x){return Array.isArray(x)?x:[];}
@@ -1337,7 +1364,6 @@ function makeSaveBtn(label){
   btn.style.cssText='margin-top:8px';
   btn.onclick=function(){
     autosave();
-    _sbSyncing=false;
     sbPush().then(function(){
       btn.textContent='✓ Saved';btn.style.background='var(--grn)';
       setTimeout(function(){btn.textContent=label||'Save';btn.style.background='';},2000);
@@ -2273,8 +2299,10 @@ function updateHolCatField(){
     }
   }
 }
-function submitExp(){var amt=parseFloat(document.getElementById('log-amt').value);if(!amt||amt<=0)return alert('Enter a valid amount.');var holCatEl=document.getElementById('log-holcat');var holCatVal=(holCatEl&&(S.selectedCat||'').indexOf('__hol-')===0)?(holCatEl.value||'').trim():'';var entry={id:Date.now(),amount:amt,currency:S.logCur,category:S.selectedCat,date:document.getElementById('log-date').value||today().toISOString().split('T')[0],note:document.getElementById('log-note').value,holCat:holCatVal||undefined};if(editingExpId!==null){var i=expenses.findIndex(function(e){return e.id===editingExpId;});if(i>-1)expenses[i]=entry;editingExpId=null;}else expenses.unshift(entry);document.getElementById('log-amt').value='';document.getElementById('log-note').value='';var hcEl=document.getElementById('log-holcat');if(hcEl)hcEl.value='';updateSurplus();autosave();sbPushNow();renderLog();renderLogMonthlySummary();}
+function submitExp(){var amt=parseFloat(document.getElementById('log-amt').value);if(!amt||amt<=0)return alert('Enter a valid amount.');var holCatEl=document.getElementById('log-holcat');var holCatVal=(holCatEl&&(S.selectedCat||'').indexOf('__hol-')===0)?(holCatEl.value||'').trim():'';var entry={id:Date.now(),amount:amt,currency:S.logCur,category:S.selectedCat,date:document.getElementById('log-date').value||todayStr(),note:document.getElementById('log-note').value,holCat:holCatVal||undefined};if(editingExpId!==null){var i=expenses.findIndex(function(e){return e.id===editingExpId;});if(i>-1)expenses[i]=entry;editingExpId=null;}else expenses.unshift(entry);document.getElementById('log-amt').value='';document.getElementById('log-note').value='';var hcEl=document.getElementById('log-holcat');if(hcEl)hcEl.value='';updateSurplus();autosave();sbPushNow();renderLog();renderLogMonthlySummary();}
+var LF_OMNI_OFF=false;
 async function pushFinanceSummary(){
+  if(LF_OMNI_OFF)return;
   try{
     var now=today();
     var yr=now.getFullYear(),mo=now.getMonth()+1;
@@ -2322,7 +2350,7 @@ async function pushFinanceSummary(){
     };
     var res=await fetch(SB_URL+'/rest/v1/omni_finance_summary',{
       method:'POST',
-      headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'resolution=merge-duplicates'},
+      headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+(_authToken||SB_KEY),'Prefer':'resolution=merge-duplicates'},
       body:JSON.stringify(payload)
     });
     if(!res.ok){var errTxt=await res.text();console.error('[OMNI] push failed HTTP '+res.status+':',errTxt.slice(0,300));}
@@ -2416,7 +2444,7 @@ function calcSurplusByCur(){
 function addSurplusAdj(cur,amount,note){
   amount=parseFloat(amount);if(!amount||isNaN(amount))return;
   S.surplusAdjustments=safeArr(S.surplusAdjustments);
-  S.surplusAdjustments.push({id:Date.now(),date:today().toISOString().split('T')[0],currency:cur,amount:n2(amount),note:(note||'').trim()});
+  S.surplusAdjustments.push({id:Date.now(),date:todayStr(),currency:cur,amount:n2(amount),note:(note||'').trim()});
   autosave();sbPushNow();renderCommitments();if(currentPage==='dashboard')renderDashboard();
 }
 function deleteSurplusAdj(id){
@@ -2429,14 +2457,14 @@ function settleSurplusCur(cur,kind){
   var verb=kind==='take'?'withdraw':'save';
   if(!confirm('This will '+verb+' the entire '+cur+' variance ('+n2(cur_total)+') and start it fresh from today. Manual entries stay in history but stop counting. Continue?'))return;
   S.surplusResetDates=S.surplusResetDates||{};
-  S.surplusResetDates[cur]=today().toISOString().split('T')[0];
+  S.surplusResetDates[cur]=todayStr();
   S.surplusEvents=safeArr(S.surplusEvents);
-  S.surplusEvents.push({id:Date.now(),date:today().toISOString().split('T')[0],currency:cur,amount:n2(cur_total),kind:kind});
+  S.surplusEvents.push({id:Date.now(),date:todayStr(),currency:cur,amount:n2(cur_total),kind:kind});
   autosave();sbPushNow();renderCommitments();if(currentPage==='dashboard')renderDashboard();
 }
 function resetSurplus(){
   if(!confirm('Reset surplus to zero? This marks accumulated surplus as saved.'))return;
-  S.surplusResetDate=today().toISOString().split('T')[0];
+  S.surplusResetDate=todayStr();
   autosave();sbPushNow();renderDashboard();
 }
 function deleteExp(id){
@@ -2602,7 +2630,7 @@ function renderLogHolBar(){
       var totalDaysP=Math.round((he3-hs3)/86400000)+1;
       var remDays=Math.max(1,totalDaysP-dayNum);
       var catKeyP='__hol-'+h.id+'__';
-      var todayStr=nowP.toISOString().split('T')[0];
+      var todayStr=dateStrIn(nowP,primaryZone());
       var todaySpent=n2(safeArr(expenses).filter(function(e){return e.category===catKeyP&&e.date===todayStr;}).reduce(function(a,e){return a+toTarget(e.amount,e.currency,bd.currency);},0));
       // Budget side capped by nights; time side uses calendar days
       var paceAllowed=n2(dailyRate*Math.min(dayNum,nightsP));
@@ -2659,7 +2687,7 @@ function renderLog(){
   var lml=document.getElementById('log-month-label');
   if(lml){var lvd=logViewDate();lml.textContent=MNAMES[lvd.getMonth()]+' '+lvd.getFullYear();}
   var ltb=document.getElementById('log-today-btn');if(ltb)ltb.style.display=logIsCurrentMonth()?'none':'inline-flex';
-  var ld=document.getElementById('log-date');if(ld&&!ld.value)ld.value=today().toISOString().split('T')[0];
+  var ld=document.getElementById('log-date');if(ld&&!ld.value)ld.value=todayStr();
   renderLogMonthlySummary();
   renderLogHolBar();
   renderLogBudgetBars();
@@ -2752,7 +2780,7 @@ function toggleTick(id){
           if(portionJOD>0){
             var isBoc2=acct2==='boc';
             s.payments=safeArr(s.payments);
-            s.payments.push({id:Date.now(),amtJOD:portionJOD,amtRaw:isBoc2?byAcct2.bocRaw:byAcct2.arabRaw,currency:isBoc2?'RMB':'JOD',date:today().toISOString().split('T')[0],note:MNAMES[commitMon.month-1]+' '+commitMon.year+' (auto)',type:'regular',autoRecorded:true});
+            s.payments.push({id:Date.now(),amtJOD:portionJOD,amtRaw:isBoc2?byAcct2.bocRaw:byAcct2.arabRaw,currency:isBoc2?'RMB':'JOD',date:todayStr(),note:MNAMES[commitMon.month-1]+' '+commitMon.year+' (auto)',type:'regular',autoRecorded:true});
           }
         }
       });
@@ -3355,10 +3383,18 @@ function enterWhatIf(){
     tickState:_deepClone(tickState),parentSkips:_deepClone(parentSkips),
     confirmedDebits:_deepClone(confirmedDebits),openMonths:_deepClone(openMonths)
   };
+  _whatIfEnterStr=snapshotState();
   _whatIfActive=true;_updateWhatIfUI();
 }
+var _whatIfEnterStr=null;
 function exitWhatIf(){
   if(!_whatIfSnapshot)return;
+  try{
+    if(_whatIfEnterStr!==null&&snapshotState()!==_whatIfEnterStr){
+      if(!confirm('You changed things while What-if mode was on. Those changes were never saved and will be discarded when you exit.\n\nExit What-if and discard them?'))return;
+    }
+  }catch(e){}
+  _whatIfEnterStr=null;
   Object.assign(S,_whatIfSnapshot.S);
   streams=_whatIfSnapshot.streams;streamOverrides=_whatIfSnapshot.streamOverrides;
   settlements=_whatIfSnapshot.settlements;goldPieces=_whatIfSnapshot.goldPieces;
@@ -3509,7 +3545,7 @@ function renderProjection(){
       var msg='';
       if(pred.jod>0){var diff=got-pred.jod;var pctd=(diff/got*100);msg='Model predicted '+fJOD(pred.jod)+', you got '+fJOD(got)+' ('+(pctd>=0?'model '+Math.abs(pctd).toFixed(1)+'% pessimistic \u2014 good':'model '+Math.abs(pctd).toFixed(1)+'% optimistic \u2014 now corrected')+').';}
       S.transferLog=safeArr(S.transferLog);
-      S.transferLog.push({id:Date.now(),date:today().toISOString().split('T')[0],rmbSent:sent,jodReceived:got});
+      S.transferLog.push({id:Date.now(),date:todayStr(),rmbSent:sent,jodReceived:got});
       if(tlDefChk.checked){
         var full2=S.salaryRMBFull||0;
         var sj2=streams.find(function(x){return x.isSalaryJOD;}),sr2=streams.find(function(x){return x.isSalaryRMB;});
@@ -4289,7 +4325,7 @@ function renderGenericSettle(s,container){
   // Record payment form
   var secRec=document.createElement('div');secRec.className='sec-label';secRec.textContent='Record actual payment';container.appendChild(secRec);
   var recCard=document.createElement('div');recCard.className='card';
-  recCard.innerHTML='<div class="ig-row"><div class="ig"><label>Amount</label><input type="number" id="pay-amt-'+s.id+'" placeholder="0.00"/></div><div class="ig"><label>Currency</label><select id="pay-cur-'+s.id+'"><option value="JOD">JOD</option><option value="RMB">RMB</option><option value="GBP">GBP</option></select></div><div class="ig"><label>Date</label><input type="date" id="pay-date-'+s.id+'" value="'+today().toISOString().split('T')[0]+'"/></div><div class="ig"><label>Type</label><select id="pay-type-'+s.id+'"><option value="regular">Regular</option><option value="extra">Extra/lump sum</option></select></div></div><div class="ig"><label>Note</label><input type="text" id="pay-note-'+s.id+'" placeholder="e.g. January installment, extra agreed"/></div><button class="btn btn-sm btn-p" onclick="addPayment(\''+s.id+'\')">+ Record</button>';
+  recCard.innerHTML='<div class="ig-row"><div class="ig"><label>Amount</label><input type="number" id="pay-amt-'+s.id+'" placeholder="0.00"/></div><div class="ig"><label>Currency</label><select id="pay-cur-'+s.id+'"><option value="JOD">JOD</option><option value="RMB">RMB</option><option value="GBP">GBP</option></select></div><div class="ig"><label>Date</label><input type="date" id="pay-date-'+s.id+'" value="'+todayStr()+'"/></div><div class="ig"><label>Type</label><select id="pay-type-'+s.id+'"><option value="regular">Regular</option><option value="extra">Extra/lump sum</option></select></div></div><div class="ig"><label>Note</label><input type="text" id="pay-note-'+s.id+'" placeholder="e.g. January installment, extra agreed"/></div><button class="btn btn-sm btn-p" onclick="addPayment(\''+s.id+'\')">+ Record</button>';
   container.appendChild(recCard);
 }
 function renderMotelSettle(s,container){
@@ -4300,7 +4336,7 @@ function renderMotelSettle(s,container){
   container.appendChild(hero);
   var hg=document.createElement('div');hg.className='hg';hg.innerHTML='<div class="hc a-grn"><div class="hc-label">Received</div><div class="hc-val" style="font-size:15px">'+fJOD(received)+'</div></div><div class="hc a-red"><div class="hc-label">Still to recoup</div><div class="hc-val" style="font-size:15px">'+fJOD(Math.max(0,s.totalJOD-received))+'</div></div><div class="hc a-amb"><div class="hc-label">Invested</div><div class="hc-val" style="font-size:15px">'+fJOD(s.totalJOD)+'</div></div>';container.appendChild(hg);
   var sec=document.createElement('div');sec.className='sec-label';sec.textContent='Log income';container.appendChild(sec);
-  var logCard=document.createElement('div');logCard.className='card';logCard.innerHTML='<div class="ig-row"><div class="ig"><label>Amount (JOD)</label><input type="number" id="motel-amt" placeholder="0.00"/></div><div class="ig"><label>Date received</label><input type="date" id="motel-date" value="'+today().toISOString().split('T')[0]+'"/></div></div><div class="ig-row"><div class="ig"><label>For month (label, e.g. "January 2026 income")</label><input type="text" id="motel-label" placeholder="e.g. January 2026 income"/></div><div class="ig"><label>Status</label><select id="motel-status"><option value="received">Received</option><option value="no-payment">No payment this period</option></select></div></div><div class="ig"><label>Note</label><input type="text" id="motel-note" placeholder="e.g. Hallaj transferred 15 March"/></div><button class="btn btn-sm btn-p" onclick="addMotelEntry(\''+s.id+'\')">+ Log entry</button>';container.appendChild(logCard);
+  var logCard=document.createElement('div');logCard.className='card';logCard.innerHTML='<div class="ig-row"><div class="ig"><label>Amount (JOD)</label><input type="number" id="motel-amt" placeholder="0.00"/></div><div class="ig"><label>Date received</label><input type="date" id="motel-date" value="'+todayStr()+'"/></div></div><div class="ig-row"><div class="ig"><label>For month (label, e.g. "January 2026 income")</label><input type="text" id="motel-label" placeholder="e.g. January 2026 income"/></div><div class="ig"><label>Status</label><select id="motel-status"><option value="received">Received</option><option value="no-payment">No payment this period</option></select></div></div><div class="ig"><label>Note</label><input type="text" id="motel-note" placeholder="e.g. Hallaj transferred 15 March"/></div><button class="btn btn-sm btn-p" onclick="addMotelEntry(\''+s.id+'\')">+ Log entry</button>';container.appendChild(logCard);
   var sec2=document.createElement('div');sec2.className='sec-label';sec2.textContent='Income history';container.appendChild(sec2);
   var histCard=document.createElement('div');histCard.className='card';
   var pmts=safeArr(s.payments);if(pmts.length){pmts.forEach(function(p){var row=document.createElement('div');row.className='tr';row.innerHTML='<div style="flex:1"><div style="font-size:13px;font-weight:600">'+p.label+' <span class="tag '+(p.status==='received'?'tg-i':'tg-n')+'">'+p.status+'</span></div><div style="font-size:11px;color:var(--ink3)">'+p.date+(p.note?' - '+p.note:'')+'</div></div>'+(p.status==='received'?'<span class="tr-v pos">+'+fJOD(p.amtJOD)+'</span>':'<span class="tr-v mut">-</span>')+'<button class="btn btn-xs btn-d" style="margin-left:6px" onclick="deleteMotelEntry(\''+s.id+'\','+JSON.stringify(p.id)+')">Del</button>';histCard.appendChild(row);});}
@@ -4310,10 +4346,10 @@ function toggleHistoryPanel(id){var el=document.getElementById(id);if(el)el.styl
 function addPhase(sid){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;s.phases=safeArr(s.phases);var _npId=Date.now();if(typeof window._phaseOpen==='undefined')window._phaseOpen={};window._phaseOpen[_npId]=true;s.phases.push({id:_npId,monthly:0,currency:'JOD',account:'arab',startMon:today().getMonth()+1,startYr:today().getFullYear(),endMon:today().getMonth()+1,endYr:today().getFullYear(),oneOff:false});autosave();renderSettlement();}
 function deletePhase(sid,phid){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;s.phases=safeArr(s.phases).filter(function(p){return String(p.id)!==String(phid);});autosave();renderSettlement();}
 function updatePhase(sid,phid,key,val){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;var ph=safeArr(s.phases).find(function(p){return String(p.id)===String(phid);});if(!ph)return;ph[key]=typeof val==='boolean'?val:(isNaN(val)||key==='currency'||key==='account'?val:parseFloat(val)||parseInt(val,10));autosave();}
-function addPayment(sid){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;var amt=parseFloat(document.getElementById('pay-amt-'+sid).value);if(!amt||amt<=0)return alert('Enter a valid amount.');var cur=document.getElementById('pay-cur-'+sid).value;var amtJOD=toJOD(amt,cur);s.payments=safeArr(s.payments);s.payments.push({id:Date.now(),amtJOD:n2(amtJOD),amtRaw:amt,currency:cur,date:document.getElementById('pay-date-'+sid).value||today().toISOString().split('T')[0],note:document.getElementById('pay-note-'+sid).value,type:document.getElementById('pay-type-'+sid).value});document.getElementById('pay-amt-'+sid).value='';document.getElementById('pay-note-'+sid).value='';autosave();renderSettlement();}
+function addPayment(sid){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;var amt=parseFloat(document.getElementById('pay-amt-'+sid).value);if(!amt||amt<=0)return alert('Enter a valid amount.');var cur=document.getElementById('pay-cur-'+sid).value;var amtJOD=toJOD(amt,cur);s.payments=safeArr(s.payments);s.payments.push({id:Date.now(),amtJOD:n2(amtJOD),amtRaw:amt,currency:cur,date:document.getElementById('pay-date-'+sid).value||todayStr(),note:document.getElementById('pay-note-'+sid).value,type:document.getElementById('pay-type-'+sid).value});document.getElementById('pay-amt-'+sid).value='';document.getElementById('pay-note-'+sid).value='';autosave();renderSettlement();}
 function editPayment(sid,pid){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;var p=safeArr(s.payments).find(function(x){return String(x.id)===String(pid);});if(!p)return;var ex=document.getElementById('edit-pay-'+pid);if(ex){ex.remove();return;}var row=document.getElementById('prow-'+sid+'-'+pid);if(!row)return;var div=document.createElement('div');div.id='edit-pay-'+pid;div.className='form-box';div.style.marginTop='4px';var aI=document.createElement('input');aI.type='number';aI.value=n2(p.amtJOD);aI.style.marginBottom='7px';var nI=document.createElement('input');nI.type='text';nI.value=p.note||'';nI.style.marginBottom='7px';var sb=document.createElement('button');sb.className='btn btn-sm btn-p';sb.textContent='Save';sb.onclick=function(){p.amtJOD=parseFloat(aI.value)||p.amtJOD;p.note=nI.value;div.remove();autosave();renderSettlement();};var cb=document.createElement('button');cb.className='btn btn-sm';cb.textContent='Cancel';cb.style.marginLeft='6px';cb.onclick=function(){div.remove();};var l1=document.createElement('label');l1.textContent='Amount (JOD)';l1.style.cssText='display:block;font-size:11px;color:var(--ink3);font-weight:700;margin-bottom:3px';var l2=document.createElement('label');l2.textContent='Note';l2.style.cssText='display:block;font-size:11px;color:var(--ink3);font-weight:700;margin-bottom:3px;margin-top:4px';div.appendChild(l1);div.appendChild(aI);div.appendChild(l2);div.appendChild(nI);div.appendChild(sb);div.appendChild(cb);row.insertAdjacentElement('afterend',div);}
 function deletePayment(sid,pid){if(!confirm('Remove?'))return;var s=settlements.find(function(x){return x.id===sid;});if(!s)return;tomb('pay:'+pid);s.payments=safeArr(s.payments).filter(function(p){return String(p.id)!==String(pid);});autosave();renderSettlement();}
-function addMotelEntry(sid){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;var amt=parseFloat(document.getElementById('motel-amt').value)||0;s.payments=safeArr(s.payments);s.payments.unshift({id:Date.now(),amtJOD:amt,label:document.getElementById('motel-label').value||'Entry',date:document.getElementById('motel-date').value||today().toISOString().split('T')[0],status:document.getElementById('motel-status').value,note:document.getElementById('motel-note').value});document.getElementById('motel-amt').value='';document.getElementById('motel-label').value='';document.getElementById('motel-note').value='';autosave();renderSettlement();}
+function addMotelEntry(sid){var s=settlements.find(function(x){return x.id===sid;});if(!s)return;var amt=parseFloat(document.getElementById('motel-amt').value)||0;s.payments=safeArr(s.payments);s.payments.unshift({id:Date.now(),amtJOD:amt,label:document.getElementById('motel-label').value||'Entry',date:document.getElementById('motel-date').value||todayStr(),status:document.getElementById('motel-status').value,note:document.getElementById('motel-note').value});document.getElementById('motel-amt').value='';document.getElementById('motel-label').value='';document.getElementById('motel-note').value='';autosave();renderSettlement();}
 function deleteMotelEntry(sid,pid){if(!confirm('Remove?'))return;var s=settlements.find(function(x){return x.id===sid;});if(!s)return;s.payments=safeArr(s.payments).filter(function(p){return String(p.id)!==String(pid);});autosave();renderSettlement();}
 
 // ═══ HOLIDAYS ═══
@@ -4415,7 +4451,7 @@ function settleEndedHolidays(){
     var dead=safeArr(S.deletedIds).indexOf('adj:'+adjId)>=0;
     if(!exists&&!dead&&Math.abs(net)>=0.01){
       S.surplusAdjustments=safeArr(S.surplusAdjustments);
-      S.surplusAdjustments.push({id:adjId,date:today().toISOString().split('T')[0],currency:cur,amount:net,note:'✈ '+(h.label||'Holiday')+' settled: '+n2(total)+' budget − '+n2(spent)+' spent'});
+      S.surplusAdjustments.push({id:adjId,date:todayStr(),currency:cur,amount:net,note:'✈ '+(h.label||'Holiday')+' settled: '+n2(total)+' budget − '+n2(spent)+' spent'});
     }
     h.varSettled=true;changed=true;
   });
@@ -4640,7 +4676,7 @@ function renderNetWorth(){
 
 // ═══ ASSETS ═══
 function addAsset(){var name=prompt('Asset name:');if(!name)return;properties.push({id:'p'+Date.now(),name:name,paid:0,value:0,share:1,area:'',notes:'',partner:'',userAdded:true});autosave();renderAssets();}
-function addGoldPiece(){goldPieces.push({id:'g'+Date.now(),type:'New piece',unit:'oz',weight:1,paidPerUnit:S.goldSpotOz,purchaseDate:today().toISOString().split('T')[0]});autosave();renderAssets();}
+function addGoldPiece(){goldPieces.push({id:'g'+Date.now(),type:'New piece',unit:'oz',weight:1,paidPerUnit:S.goldSpotOz,purchaseDate:todayStr()});autosave();renderAssets();}
 function removeAsset(id){if(!confirm('Remove?'))return;properties=properties.filter(function(p){return p.id!==id;});autosave();renderAssets();}
 function removeGold(id){if(!confirm('Remove?'))return;goldPieces=goldPieces.filter(function(g){return g.id!==id;});autosave();renderAssets();}
 function updProp(id,key,val){var p=properties.find(function(p){return p.id===id;});if(p){p[key]=isNaN(val)||['name','notes','area','partner'].indexOf(key)>=0?val:parseFloat(val);autosave();}}
@@ -5273,14 +5309,14 @@ async function loadLegacyBackups(targetEl){
   var el=targetEl||document.getElementById('backup-list');if(!el)return;
   el.innerHTML='<span style="color:var(--ink3)">Loading\u2026</span>';
   try{
-    var res=await fetch(SB_URL+'/rest/v1/finance_history?id=eq.'+SB_ROW_ID+'&select=hid,archived_at,data&order=hid.desc&limit=30',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+    var res=await fetch(SB_URL+'/rest/v1/finance_history?id=eq.'+SB_ROW_ID+'&select=hid,archived_at,data&order=hid.desc&limit=30',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+(_authToken||SB_KEY)}});
     if(res.status===404||res.status===400){el.innerHTML='<span style="color:var(--amb)">History table not set up yet \u2014 run the SQL snippet in Supabase once.</span>';return;}
     if(!res.ok)throw new Error('HTTP '+res.status);
     var rows=await res.json();
     // Also pull the current live row so the most recent sync's effect is visible too, not just archived ones.
     var liveEntry=null;
     try{
-      var lres=await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=data,updated_at',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+      var lres=await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=data,updated_at',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+(_authToken||SB_KEY)}});
       if(lres.ok){
         var lrows=await lres.json();
         if(lrows&&lrows.length){
@@ -5322,7 +5358,7 @@ async function loadLegacyBackups(targetEl){
 }
 async function restoreServerBackup(hid){
   try{
-    var res=await fetch(SB_URL+'/rest/v1/finance_history?hid=eq.'+hid+'&select=data,archived_at',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
+    var res=await fetch(SB_URL+'/rest/v1/finance_history?hid=eq.'+hid+'&select=data,archived_at',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+(_authToken||SB_KEY)}});
     if(!res.ok)throw new Error('HTTP '+res.status);
     var rows=await res.json();
     if(!rows.length){alert('Backup not found.');return;}
@@ -5516,7 +5552,7 @@ function renderBalanceUpdate(){
       var v=parseFloat(raw);
       inp.value='';
       if(!isNaN(v)&&v>=0){
-        S[sk]=v;S[uk]=today().toISOString().split('T')[0];autosave();
+        S[sk]=v;S[uk]=todayStr();autosave();
         ad.textContent=daysAgoStr(S[uk]);ad.className='bal-item-age';
         var nowD=today();var yr2=nowD.getFullYear();var mo2=nowD.getMonth()+1;
         var ms=getStreamsForMonth(yr2,mo2);
@@ -5569,7 +5605,7 @@ function renderBalanceUpdate(){
       var v=parseFloat(raw);
       ri.value='';
       if(!isNaN(v)&&v>=0){
-        ch.amount=v;ch.updated=today().toISOString().split('T')[0];autosave();
+        ch.amount=v;ch.updated=todayStr();autosave();
         eq.textContent='updated today \u00b7 '+v.toLocaleString()+' '+ch.currency+' = '+fJOD(toJOD(v,ch.currency));
         setTimeout(function(){renderPinnedReservesCard();},0);
       }
@@ -5603,7 +5639,7 @@ function renderBalanceUpdate(){
       var amt=parseFloat(amtI.value)||0;var lbl=(lblI.value||'Reserve').trim();var cur=curS.value;
       if(!amt)return;
       S.cashHoldings=safeArr(S.cashHoldings);
-      S.cashHoldings.push({id:'r'+Date.now(),label:lbl,amount:amt,currency:cur,updated:today().toISOString().split('T')[0]});
+      S.cashHoldings.push({id:'r'+Date.now(),label:lbl,amount:amt,currency:cur,updated:todayStr()});
       autosave();renderDashboard();
     };
     var canBtn=document.createElement('button');canBtn.className='btn btn-sm';canBtn.textContent='Cancel';canBtn.onclick=function(){form.remove();};
@@ -5702,7 +5738,7 @@ function exportToCSV(){
   var blob=new Blob([csv],{type:'text/csv'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download='laith-finance-'+today().toISOString().split('T')[0]+'.csv';
+  a.download='laith-finance-'+todayStr()+'.csv';
   a.click();
 }
 function exportToPDF(){
@@ -5717,7 +5753,7 @@ function clearOldData(){
   alert('Removed '+(before-expenses.length)+' expenses and old snapshots before '+yr+'.');
   autosave();
 }
-function exportData(){try{var payload=sbBuildPayload();var blob=new Blob([JSON.stringify(payload.data,null,2)],{type:'application/json'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='laith-finance-'+today().toISOString().split('T')[0]+'.json';a.click();}catch(e){alert('Export failed: '+e.message);}}
+function exportData(){try{var payload=sbBuildPayload();var blob=new Blob([JSON.stringify(payload.data,null,2)],{type:'application/json'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='laith-finance-'+todayStr()+'.json';a.click();}catch(e){alert('Export failed: '+e.message);}}
 function importData(){document.getElementById('import-file').click();}
 function doImport(input){var file=input.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(e){try{var d=JSON.parse(e.target.result);if(d.S)Object.assign(S,d.S);if(Array.isArray(d.streams))streams=d.streams;if(Array.isArray(d.streamOverrides))streamOverrides=d.streamOverrides;if(Array.isArray(d.settlements))settlements=d.settlements;if(Array.isArray(d.goldPieces))goldPieces=d.goldPieces;if(Array.isArray(d.properties))properties=d.properties;if(Array.isArray(d.holidays))holidays=d.holidays;if(Array.isArray(d.expenses))expenses=d.expenses;if(Array.isArray(d.oneoffEvents))oneoffEvents=d.oneoffEvents;if(d.tickState&&typeof d.tickState==='object')tickState=d.tickState;if(d.confirmedDebits&&typeof d.confirmedDebits==='object')confirmedDebits=d.confirmedDebits;if(Array.isArray(d.wishlistItems))wishlistItems=d.wishlistItems;if(Array.isArray(d.parentSkips))parentSkips=d.parentSkips;if(d.commitGroupState&&typeof d.commitGroupState==='object')commitGroupState=d.commitGroupState;if(Array.isArray(d.snapshots))S.snapshots=d.snapshots;if(d.catColors)S.catColors=d.catColors;if(Array.isArray(d.budgetOrder))S.budgetOrder=d.budgetOrder;autosave();sbPushNow();showView(currentPage);alert('Imported.');}catch(err){alert('Import failed: '+err.message);}};reader.readAsText(file);}
 function resetData(){if(!confirm('Reset ALL data?'))return;localStorage.removeItem('lf_data');location.reload();}
@@ -5737,7 +5773,7 @@ function wlAddItem(){
   var note=(document.getElementById('wl-note-inp').value||'').trim();
   if(!name)return alert('Enter an item name.');
   if(!amount)return alert('Enter an amount.');
-  wishlistItems.push({id:'w'+Date.now(),name:name,amount:amount,currency:currency,note:note,scheduledYr:null,scheduledMo:null,bought:false,addedDate:today().toISOString().split('T')[0]});
+  wishlistItems.push({id:'w'+Date.now(),name:name,amount:amount,currency:currency,note:note,scheduledYr:null,scheduledMo:null,bought:false,addedDate:todayStr()});
   document.getElementById('wl-name-inp').value='';
   document.getElementById('wl-amount-inp').value='';
   document.getElementById('wl-note-inp').value='';
@@ -6019,7 +6055,7 @@ function renderNetWorthTrend(){
 function takeSnapshot(){
   var now=today();var proj=buildProjection();var row=proj[0];
   var mExp=expenses.filter(function(e){var d=new Date(e.date);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();});
-  var snap={id:Date.now(),date:now.toISOString().split('T')[0],label:MNAMES[now.getMonth()]+' '+now.getFullYear(),arabBal:S.arab,bocBal:S.boc,cashJOD:cashTotalJOD(),totalExpenses:mExp.reduce(function(a,e){return a+toRMB(e.amount,e.currency);},0),expenseCount:mExp.length,projJOD:row?row.jodBal:0,projRMB:row?row.rmbBal:0};
+  var snap={id:Date.now(),date:dateStrIn(now,primaryZone()),label:MNAMES[now.getMonth()]+' '+now.getFullYear(),arabBal:S.arab,bocBal:S.boc,cashJOD:cashTotalJOD(),totalExpenses:mExp.reduce(function(a,e){return a+toRMB(e.amount,e.currency);},0),expenseCount:mExp.length,projJOD:row?row.jodBal:0,projRMB:row?row.rmbBal:0};
   if(!Array.isArray(S.snapshots))S.snapshots=[];S.snapshots.unshift(snap);autosave();renderHistory();
 }
 function renderHistory(){
@@ -6072,7 +6108,7 @@ function exportToExcel(){
   settlements.forEach(function(s){lines.push(s.name+' - Paid: '+fJOD(settlePaid(s))+' - Remaining: '+fJOD(settleLeft(s)));safeArr(s.payments).forEach(function(p){lines.push(','+p.date+','+fJOD(p.amtJOD)+','+(p.note||''));});});
   var csv=lines.join('\n');
   var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
-  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='laith-finance-'+today().toISOString().split('T')[0]+'.csv';a.click();
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='laith-finance-'+todayStr()+'.csv';a.click();
 }
 document.addEventListener('DOMContentLoaded',function(){
   loadState();checkLock();
@@ -6134,7 +6170,7 @@ document.addEventListener('DOMContentLoaded',function(){
     try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState,catColors:S.catColors,budgetOrder:S.budgetOrder}));}catch(e){console.warn('migration save',e);}
   }
   document.querySelectorAll('.nav-item[data-view],.bi[data-view],.bi-log[data-view]').forEach(function(el){el.addEventListener('click',function(){showView(el.dataset.view);});});
-  var ld=document.getElementById('log-date');if(ld)ld.value=today().toISOString().split('T')[0];
+  var ld=document.getElementById('log-date');if(ld)ld.value=todayStr();
   renderLogCurToggle();
   var ab=document.getElementById('log-acct-boc');if(ab)ab.checked=true;
   // commitMon/calYear/calMon already initialised from _now at declaration
@@ -6143,11 +6179,22 @@ document.addEventListener('DOMContentLoaded',function(){
   var sbLogo=document.getElementById('sb-logo-area');
   if(sbLogo){sbLogo.addEventListener('click',function(){if(window.innerWidth<=720)closeMob();});}
   // Supabase sync: pull on startup
-  setTimeout(function(){if(typeof sbInitSync==='function')sbInitSync();},500);
+  setTimeout(function(){if(typeof lfBootAuth==='function')lfBootAuth();},500);
   // Settle ended holidays into variance (runs after state + sync have settled)
   setTimeout(function(){try{settleEndedHolidays();}catch(e){console.warn('hol settle:',e);}},4000);
-  // Poll and visibilitychange pull disabled — Realtime handles cross-device sync
-  // These caused data-revert races with the push/echo cycle
+  // Flush on background, reconcile on return. The old warning about visibilitychange
+  // races applied to the legacy whole-blob engine; the per-record engine keeps local
+  // pending records through a reconcile, so this is safe.
+  function lfFlushNow(){
+    if(!_frActive)return;
+    try{clearTimeout(_frPushTimer);frMarkPending();if(Object.keys(_frPending).length)frPush();}catch(e){console.warn('[FR] flush',e);}
+  }
+  document.addEventListener('visibilitychange',function(){
+    if(!_frActive)return;
+    if(document.hidden){lfFlushNow();}
+    else{frReconcile().then(function(ch){if(ch)frRefreshView();}).catch(function(e){console.warn('[FR] resume reconcile:',e.message);});}
+  });
+  window.addEventListener('pagehide',lfFlushNow);
 });
 
 
@@ -6157,62 +6204,68 @@ document.addEventListener('DOMContentLoaded',function(){
 var SB_URL='https://mkvfggacecgltscdrfqv.supabase.co';
 var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rdmZnZ2FjZWNnbHRzY2RyZnF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5MjM3MDcsImV4cCI6MjA5NDQ5OTcwN30.ErSZCR9G1NlBiq5ScOL3pmhPzJd5aYk92BU1I7Rzsr4';
 var SB_TABLE='finance_data';
+
+// ═══════════════════════════════════════════════
+// AUTH: login, session, membership
+// ═══════════════════════════════════════════════
+var SBC=null,_authToken=null,_hhId=null,_meId=null;
+try{
+  SBC=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'lf_auth'}});
+  SBC.auth.onAuthStateChange(function(ev,sess){_authToken=sess?sess.access_token:null;try{if(_authToken)SBC.realtime.setAuth(_authToken);}catch(e){}});
+}catch(e){console.warn('[AUTH] client init failed',e);}
+
+async function ensureAuth(){
+  if(!SBC)return null;
+  try{var r=await SBC.auth.getSession();var s=r&&r.data?r.data.session:null;_authToken=s?s.access_token:null;return s;}
+  catch(e){console.warn('[AUTH] getSession',e);return null;}
+}
+function lfShowLogin(){var e=document.getElementById('login-screen');if(e)e.style.display='flex';}
+function lfHideLogin(){var e=document.getElementById('login-screen');if(e)e.style.display='none';}
+async function lfLogin(){
+  var em=(document.getElementById('login-email')||{}).value||'';
+  var pw=(document.getElementById('login-pass')||{}).value||'';
+  var er=document.getElementById('login-err');
+  if(er)er.textContent='Signing in...';
+  try{
+    var r=await SBC.auth.signInWithPassword({email:em.trim(),password:pw});
+    if(r.error){if(er)er.textContent=r.error.message;return;}
+    _authToken=r.data.session.access_token;
+    if(er)er.textContent='';
+    lfHideLogin();
+    await lfLoadMembership();
+    checkLock();
+    sbInitSync();
+  }catch(e){if(er)er.textContent=e.message||String(e);}
+}
+async function lfSignOut(){try{if(SBC)await SBC.auth.signOut();}catch(e){}try{localStorage.removeItem('lf_data');localStorage.removeItem('lf_ver');}catch(e){}location.reload();}
+async function lfLoadMembership(){
+  var s=await ensureAuth();if(!s)return false;
+  _meId=s.user.id;
+  try{
+    var r=await fetch(SB_URL+'/rest/v1/members?select=household_id&limit=1',{headers:frHdr()});
+    if(r.ok){var rows=await r.json();if(rows&&rows.length)_hhId=rows[0].household_id;}
+  }catch(e){console.warn('[AUTH] membership',e);}
+  if(!_hhId)console.warn('[AUTH] no household found for this user');
+  return !!_hhId;
+}
+function lfStamp(o){ if(_hhId)o.household_id=_hhId; if(_meId)o.created_by=_meId; return o; }
+async function lfBootAuth(){
+  var s=await ensureAuth();
+  if(!s){lfShowLogin();return;}
+  lfHideLogin();
+  await lfLoadMembership();
+  sbInitSync();
+}
+
 var SB_ROW_ID='laith';
-var _sbPushTimer=null;
-var _sbSyncing=false;
-var _sbDirty=false;
-var _sbDeviceId=null;
-var _sbLastLocalChange=0;
-var _sbLastPushedVer=0;
-var _sbLastSeenRemoteVer=0; // last remote version this device has fetched or produced
+var _sbPushTimer=null; // unused by the engine; harmless
+var _sbDeviceId=null;    // cached per-tab device id (see sbDeviceId)
 function tomb(key){
   // Record a typed deletion tombstone so merges never resurrect deleted records
   S.deletedIds=safeArr(S.deletedIds);
   if(S.deletedIds.indexOf(key)<0)S.deletedIds.push(key);
   if(S.deletedIds.length>800)S.deletedIds=S.deletedIds.slice(-800);
 }
-function sbMergeRemoteIntoLocal(remote){
-  // Union append-mostly money records from an unseen remote state into local,
-  // so a two-sided divergence merges losslessly instead of one side winning.
-  // Local wins on same-id conflicts (this device is the active writer).
-  try{
-    var rd=remote&&remote.data;if(!rd)return;
-    // Tombstones: union both sides first
-    var rDel=safeArr(rd.S&&rd.S.deletedIds);
-    S.deletedIds=safeArr(S.deletedIds);
-    rDel.forEach(function(k){if(S.deletedIds.indexOf(k)<0)S.deletedIds.push(k);});
-    if(S.deletedIds.length>800)S.deletedIds=S.deletedIds.slice(-800);
-    var dead={};S.deletedIds.forEach(function(k){dead[k]=true;});
-    function unionById(localArr,remoteArr,prefix){
-      var out=safeArr(localArr).filter(function(x){return x&&!dead[prefix+x.id];});
-      var have={};out.forEach(function(x){have[x.id]=true;});
-      var added=0;
-      safeArr(remoteArr).forEach(function(x){
-        if(!x||have[x.id]||dead[prefix+x.id])return;
-        out.push(x);have[x.id]=true;added++;
-      });
-      return {arr:out,added:added};
-    }
-    var totalAdded=0;
-    var m=unionById(expenses,rd.expenses,'exp:');
-    m.arr.sort(function(a,b){return (b.date||'').localeCompare(a.date||'')||(b.id-a.id);});
-    expenses=m.arr;totalAdded+=m.added;
-    m=unionById(oneoffEvents,rd.oneoffEvents,'ev:');oneoffEvents=m.arr;totalAdded+=m.added;
-    m=unionById(S.transferLog,rd.S&&rd.S.transferLog,'tl:');S.transferLog=m.arr;totalAdded+=m.added;
-    m=unionById(S.surplusAdjustments,rd.S&&rd.S.surplusAdjustments,'adj:');S.surplusAdjustments=m.arr;totalAdded+=m.added;
-    m=unionById(S.surplusEvents,rd.S&&rd.S.surplusEvents,'sev:');S.surplusEvents=m.arr;totalAdded+=m.added;
-    safeArr(rd.settlements).forEach(function(rs){
-      var ls=safeArr(settlements).find(function(x){return x.id===rs.id;});
-      if(!ls)return;
-      var pm=unionById(ls.payments,rs.payments,'pay:');ls.payments=pm.arr;totalAdded+=pm.added;
-    });
-    if(totalAdded>0)console.warn('[SYNC] merged '+totalAdded+' record(s) from remote instead of overwriting');
-    return totalAdded;
-  }catch(e){console.warn('[SYNC] merge failed:',e);return 0;}
-}
-var _sbRealtimeSocket=null;
-var _sbRealtimeRef=1;
-
 function sbDeviceId(){
   // Identity is per TAB, not per browser: two tabs sharing one id made each
   // tab discard the other's live updates as its own echo, then "correct" the
@@ -6263,209 +6316,16 @@ function sbBuildPayload(){
   };
 }
 
-function sbApplyRemote(remote){
-  // Apply remote data to in-memory state. Called from pull and realtime.
-  var remoteVer=remote.version||0;
-  if(remoteVer>_sbLastSeenRemoteVer)_sbLastSeenRemoteVer=remoteVer;
-  if(_sbDirty)return false;
-  if(remoteVer&&remoteVer<=_sbLastPushedVer)return false;
-  if(_sbLastLocalChange&&Date.now()-_sbLastLocalChange<5000)return false;
-  // Never let an OLDER remote overwrite newer local data (e.g. pre-refresh push failed).
-  var localVer=0;try{localVer=parseInt(localStorage.getItem('lf_ver')||'0',10)||0;}catch(e){}
-  if(remoteVer&&localVer&&remoteVer<localVer){
-    console.warn('[SYNC] remote older than local ('+remoteVer+' < '+localVer+') — re-pushing local');
-    if(typeof sbSchedulePush==='function')sbSchedulePush(localVer);
-    return false;
-  }
-  if(remoteVer&&localVer&&remoteVer===localVer)return false;
-  var d=remote.data;
-  if(!d)return false;
-  if(d.S&&typeof d.S==='object')Object.assign(S,d.S);
-  if(Array.isArray(d.streams))streams=d.streams;
-  if(Array.isArray(d.streamOverrides))streamOverrides=d.streamOverrides;
-  if(Array.isArray(d.settlements))settlements=d.settlements;
-  if(Array.isArray(d.goldPieces))goldPieces=d.goldPieces;
-  if(Array.isArray(d.properties))properties=d.properties;
-  if(Array.isArray(d.holidays))holidays=d.holidays;
-  if(Array.isArray(d.expenses))expenses=d.expenses;
-  if(Array.isArray(d.oneoffEvents))oneoffEvents=d.oneoffEvents;
-  if(Array.isArray(d.snapshots))S.snapshots=d.snapshots;
-  if(d.tickState)tickState=d.tickState;
-  if(d.parentSkips)parentSkips=d.parentSkips;
-  if(d.confirmedDebits)confirmedDebits=d.confirmedDebits;
-  if(d.openMonths)openMonths=d.openMonths;
-  if(Array.isArray(d.wishlistItems))wishlistItems=d.wishlistItems;
-  if(d.commitGroupState&&typeof d.commitGroupState==='object')commitGroupState=d.commitGroupState;
-  if(d.catColors&&typeof d.catColors==='object'){S.catColors=d.catColors;CAT_COLORS=S.catColors;}
-  if(Array.isArray(d.budgetOrder))S.budgetOrder=d.budgetOrder;
-  if(typeof syncHolidayBudgets==='function')syncHolidayBudgets();
-  try{localStorage.setItem('lf_data',JSON.stringify({S:S,streams:streams,streamOverrides:streamOverrides,settlements:settlements,goldPieces:goldPieces,properties:properties,holidays:holidays,expenses:expenses,oneoffEvents:oneoffEvents,snapshots:safeArr(S.snapshots),tickState:tickState,parentSkips:parentSkips,confirmedDebits:confirmedDebits,openMonths:openMonths,wishlistItems:wishlistItems,commitGroupState:commitGroupState,catColors:S.catColors,budgetOrder:S.budgetOrder}));}catch(ex){console.warn('save',ex);}
-  try{if(remoteVer)localStorage.setItem('lf_ver',String(remoteVer));}catch(ex){}
-  _undoStack.length=0;_redoStack.length=0;_undoLast=null;if(typeof updateUndoButtons==='function')updateUndoButtons();
-  return true;
-}
 
-async function sbLegacyPush(preStampedVer){
-  if(_sbSyncing)return false;
-  _sbSyncing=true;
-  sbSetStatus('Pushing...','busy');
-  try{
-    // ── Never push over a remote this device has not seen. If the check
-    // cannot complete for ANY reason, the push is ABORTED — there is no
-    // "push anyway" path. A failed precondition stops and retries later. ──
-    var chk=await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=ver:data-%3E%3Eversion',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
-    if(!chk.ok)throw new Error('preflight HTTP '+chk.status+' — push aborted, will retry');
-    var crows=await chk.json();
-    var rVer=crows&&crows.length?parseInt(crows[0].ver||'0',10):0;
-    if(rVer&&rVer!==_sbLastSeenRemoteVer&&rVer!==_sbLastPushedVer){
-      // Remote changed since we last looked: fetch it and merge its records first
-      var full=await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=data',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}});
-      if(!full.ok)throw new Error('preflight fetch HTTP '+full.status+' — push aborted, will retry');
-      var frows=await full.json();
-      if(frows&&frows.length&&frows[0].data){
-        sbMergeRemoteIntoLocal(frows[0].data);
-        _sbLastSeenRemoteVer=rVer;
-        preStampedVer=null; // stamp a fresh, newest version for the merged state
-      }
-    }
-    var payload=sbBuildPayload();
-    if(preStampedVer)payload.version=preStampedVer;
-    _sbLastPushedVer=payload.version;
-    _sbLastLocalChange=Date.now();
-    var res=await fetch(SB_URL+'/rest/v1/'+SB_TABLE,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'resolution=merge-duplicates,return=representation'},
-      body:JSON.stringify({id:SB_ROW_ID,data:payload,updated_at:new Date().toISOString()})
-    });
-    if(!res.ok){var e=await res.text();throw new Error('HTTP '+res.status+': '+e.slice(0,120));}
-    _sbLastSeenRemoteVer=payload.version; // remote now equals what we produced
-    try{localStorage.setItem('lf_data',JSON.stringify(payload.data));localStorage.setItem('lf_ver',String(payload.version));}catch(ls){}
-    sbSetStatus('Synced at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
-    if(typeof pushFinanceSummary==='function')pushFinanceSummary();
-  }catch(e){
-    console.warn('SB push:',e.message);
-    sbSetStatus('Push failed: '+e.message,'err');
-    _sbSyncing=false;
-    return false;
-  }
-  _sbSyncing=false;
-  return true;
-}
-
-async function sbLegacyPull(){
-  if(_sbSyncing)return false;
-  if(_sbLastLocalChange&&Date.now()-_sbLastLocalChange<5000)return false;
-  _sbSyncing=true;
-  sbSetStatus('Fetching...','busy');
-  try{
-    var res=await fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=data,updated_at',{
-      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
-    });
-    if(!res.ok)throw new Error('HTTP '+res.status);
-    var rows=await res.json();
-    if(!rows||!rows.length){sbSetStatus('No data yet','ok');_sbSyncing=false;return false;}
-    var remote=rows[0].data;
-    if(remote&&remote.version)_sbLastSeenRemoteVer=remote.version;
-    var changed=false;
-    if(!_sbDirty){
-      changed=sbApplyRemote(remote);
-      if(changed)sbSetStatus('Pulled at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
-      else sbSetStatus('Up to date','ok');
-    }else{
-      sbSetStatus('Up to date','ok');
-    }
-    _sbSyncing=false;return changed;
-  }catch(e){
-    console.warn('SB pull:',e.message);
-    sbSetStatus('Pull failed: '+e.message,'err');
-    _sbSyncing=false;return false;
-  }
-}
-
-// ── Public sync API: dispatches to the record engine after migration, ──
-// ── or to the legacy whole-blob engine before it. ──
-function sbSchedulePush(preStampedVer){
-  if(_frActive){frSchedulePush();return;}
-  _sbDirty=true;
-  _sbLastLocalChange=Date.now();
-  clearTimeout(_sbPushTimer);
-  _sbPushTimer=setTimeout(async function(){
-    var ok=await sbLegacyPush(preStampedVer);
-    if(ok){_sbDirty=false;}
-    else{setTimeout(function(){sbSchedulePush(preStampedVer);},3000);}
-  },500);
-}
-async function sbPush(preStampedVer){
-  if(_frActive)return frPushNow();
-  return sbLegacyPush(preStampedVer);
-}
-async function sbPull(){
-  if(_frActive)return frReconcile();
-  return sbLegacyPull();
-}
-function sbPushNow(){
-  if(_frActive){frPushNow();return;}
-  clearTimeout(_sbPushTimer);_sbDirty=false;_sbSyncing=false;_sbLastLocalChange=Date.now();sbLegacyPush();
-}
+// ── Public sync API: the per-record engine is the only engine. ──
+// (The legacy whole-blob engine, its clock-based versioning and the one-time
+//  migration were removed on 2026-11-09; the old finance_data row stays as a
+//  frozen, read-only backup on the server.)
+function sbSchedulePush(){frSchedulePush();}
+async function sbPush(){return frPushNow();}
+async function sbPull(){return frReconcile();}
+function sbPushNow(){frPushNow();}
 function sbPullNow(){sbPull().then(function(changed){if(changed)showView(currentPage);});}
-
-// ─── Legacy Supabase Realtime via WebSocket (pre-migration only) ───────────
-function sbLegacyRealtime(){
-  if(_frActive)return;
-  try{
-    var wsUrl=SB_URL.replace('https://','wss://')+'/realtime/v1/websocket?apikey='+SB_KEY+'&vsn=1.0.0';
-    var ws=new WebSocket(wsUrl);
-    _sbRealtimeSocket=ws;
-
-    ws.onopen=function(){
-      console.log('[RT] Connected');
-      // Join the channel for our specific row
-      ws.send(JSON.stringify({
-        topic:'realtime:public:'+SB_TABLE+':id=eq.'+SB_ROW_ID,
-        event:'phx_join',
-        payload:{},
-        ref:String(_sbRealtimeRef++)
-      }));
-      sbSetStatus('Live','ok');
-    };
-
-    ws.onmessage=function(evt){
-      try{
-        var msg=JSON.parse(evt.data);
-        // Respond to heartbeat
-        if(msg.event==='heartbeat'||msg.topic==='phoenix'){
-          ws.send(JSON.stringify({topic:'phoenix',event:'heartbeat',payload:{},ref:String(_sbRealtimeRef++)}));
-          return;
-        }
-        // Handle INSERT or UPDATE on our table
-        if((msg.event==='INSERT'||msg.event==='UPDATE')&&msg.payload&&msg.payload.record){
-          var record=msg.payload.record;
-          var remote=record.data;
-          if(!remote)return;
-          // Ignore changes pushed by this device to avoid overwriting in-flight edits
-          if(remote.deviceId===sbDeviceId())return;
-          if(_sbDirty)return;
-          var changed=sbApplyRemote(remote);
-          if(changed){
-            sbSetStatus('Live update at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
-            safeShowView(currentPage);
-          }
-        }
-      }catch(e){console.warn('[RT] message error',e);}
-    };
-
-    ws.onerror=function(e){console.warn('[RT] error',e);sbSetStatus('Realtime error','err');};
-
-    ws.onclose=function(){
-      if(_frActive)return; // engine switched mid-session; new realtime owns the socket now
-      console.log('[RT] Disconnected — reconnecting in 5s');
-      sbSetStatus('Reconnecting...','busy');
-      setTimeout(sbLegacyRealtime,5000);
-    };
-  }catch(e){
-    console.warn('[RT] Failed to start realtime:',e);
-  }
-}
 
 // ═══════════════════════════════════════════════════════════════════════
 // PER-RECORD SYNC ENGINE (v120)
@@ -6475,7 +6335,7 @@ function sbLegacyRealtime(){
 // that writes unconditionally. A failed precondition refetches that one
 // row, reapplies the local edit on top, and retries.
 // ═══════════════════════════════════════════════════════════════════════
-var _frActive=false;try{_frActive=localStorage.getItem('lf_fr_active')==='1';}catch(e){}
+var _frActive=true; // single engine; no migration gate
 var _frShadow={};        // 'kind:rid' -> {json: canonical data, ver, deleted}
 var _frPending={};       // 'kind:rid' -> 1  (local changes not yet confirmed by server)
 var _frPushing=false,_frQueued=false,_frPushTimer=null,_frMeta=null,_frRT=null;
@@ -6525,7 +6385,7 @@ function frSortObj(v){
 function frCanon(v){return JSON.stringify(frSortObj(v));}
 function frClean(v){try{return JSON.parse(JSON.stringify(v));}catch(e){return null;}}
 function frHdr(extra){
-  var h={'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'};
+  var h={'apikey':SB_KEY,'Authorization':'Bearer '+(_authToken||SB_KEY),'Content-Type':'application/json'};
   if(extra)Object.keys(extra).forEach(function(k){h[k]=extra[k];});
   return h;
 }
@@ -6535,6 +6395,7 @@ function frFetch(url,opts,timeoutMs){
   opts=opts||{};
   var ctl=(typeof AbortController!=='undefined')?new AbortController():null;
   if(ctl)opts.signal=ctl.signal;
+  try{if(document.hidden&&!opts.keepalive)opts.keepalive=true;}catch(e){}
   var t=ctl?setTimeout(function(){try{ctl.abort();}catch(e){}},timeoutMs||15000):null;
   return fetch(url,opts).finally(function(){if(t)clearTimeout(t);});
 }
@@ -6617,7 +6478,7 @@ async function frGuardedWrite(kind,rid,data,isDelete){
   var key=kind+':'+rid,sh=_frShadow[key];
   for(var attempt=0;attempt<4;attempt++){
     if(!sh){ // create
-      var body={kind:kind,rid:String(rid),data:data||{},ver:1,deleted:!!isDelete,device:sbDeviceId(),updated_at:new Date().toISOString()};
+      var body=lfStamp({kind:kind,rid:String(rid),data:data||{},ver:1,deleted:!!isDelete,device:sbDeviceId(),updated_at:new Date().toISOString()});
       var res=await frFetch(SB_URL+'/rest/v1/finance_records',{method:'POST',headers:frHdr({'Prefer':'return=representation'}),body:JSON.stringify(body)});
       if(res.ok){var rw=(await res.json())[0];_frShadow[key]={json:frCanon(rw.data),ver:rw.ver,deleted:rw.deleted};return true;}
       if(res.status===409){
@@ -6866,243 +6727,47 @@ function frPollWhileDown(){
   },90000);
 }
 function frStartRealtime(){
+  // The official client handles protocol, auth and reconnects.
+  // The hand-rolled socket passed the user token as `apikey`, which Supabase rejects.
   try{
-    var wsUrl=SB_URL.replace('https://','wss://')+'/realtime/v1/websocket?apikey='+SB_KEY+'&vsn=1.0.0';
-    var ws=new WebSocket(wsUrl);
-    _frRT=ws;
-    ws.onopen=function(){
-      console.log('[FR-RT] Connected');
-      _frRTUp=true;_frRTBackoff=5000;
-      clearInterval(_frPollTimer);_frPollTimer=null;
-      ws.send(JSON.stringify({topic:'realtime:public:finance_records',event:'phx_join',payload:{},ref:String(_sbRealtimeRef++)}));
-      sbSetStatus('Live','ok');
-      // Reconcile on every (re)connect: catches anything missed while offline
-      frReconcile().then(function(changed){if(changed)frRefreshView();}).catch(function(e){console.warn('[FR] reconnect reconcile:',e.message);});
-    };
-    ws.onmessage=function(evt){
+    if(!SBC){console.warn('[FR-RT] no client');return;}
+    try{SBC.realtime.setAuth(_authToken);}catch(e){}
+    if(_frRT){try{SBC.removeChannel(_frRT);}catch(e){}_frRT=null;}
+    var ch=SBC.channel('fr-records-'+Math.random().toString(36).slice(2,8));
+    ch.on('postgres_changes',{event:'*',schema:'public',table:'finance_records'},function(msg){
       try{
-        var msg=JSON.parse(evt.data);
-        if(msg.event==='heartbeat'||msg.topic==='phoenix'){
-          ws.send(JSON.stringify({topic:'phoenix',event:'heartbeat',payload:{},ref:String(_sbRealtimeRef++)}));
+        var rec=msg.new||msg.record;
+        if(!rec||!rec.kind)return;
+        if(rec.device===sbDeviceId()){
+          var ek=rec.kind+':'+rec.rid;
+          if(!_frPending[ek])_frShadow[ek]={json:frCanon(rec.data),ver:rec.ver,deleted:rec.deleted};
           return;
         }
-        if((msg.event==='INSERT'||msg.event==='UPDATE')&&msg.payload&&msg.payload.record){
-          var rec=msg.payload.record;
-          if(!rec||!rec.kind)return;
-          if(rec.device===sbDeviceId()){var ek=rec.kind+':'+rec.rid;if(!_frPending[ek])_frShadow[ek]={json:frCanon(rec.data),ver:rec.ver,deleted:rec.deleted};return;}
-          var changed=frApplyRow(rec);
-          if(changed){
-            sbSetStatus('Live update at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
-            safeShowView(currentPage);
-          }
+        var changed=frApplyRow(rec);
+        if(changed){
+          sbSetStatus('Live update at '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
+          safeShowView(currentPage);
         }
       }catch(e){console.warn('[FR-RT] message error',e);}
-    };
-    ws.onerror=function(e){console.warn('[FR-RT] error',e);};
-    ws.onclose=function(){
-      _frRTUp=false;
-      // A down socket is not an alarm: writes still work and polling covers
-      // pulls. Reconnect quietly with growing spacing; don't touch the dot.
-      console.log('[FR-RT] Disconnected — reconnecting in '+Math.round(_frRTBackoff/1000)+'s');
-      frPollWhileDown();
-      setTimeout(function(){if(_frActive&&!_frRTUp)frStartRealtime();},_frRTBackoff);
-      _frRTBackoff=Math.min(90000,_frRTBackoff*2);
-    };
+    });
+    ch.subscribe(function(status,err){
+      console.log('[FR-RT] '+status+(err?(' '+err.message):''));
+      if(status==='SUBSCRIBED'){
+        _frRTUp=true;_frRTBackoff=5000;
+        clearInterval(_frPollTimer);_frPollTimer=null;
+        sbSetStatus('Live','ok');
+        frReconcile().then(function(changed){if(changed)frRefreshView();})
+                     .catch(function(e){console.warn('[FR] reconnect reconcile:',e.message);});
+      }else if(status==='CLOSED'||status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
+        if(!_frRTUp&&_frRTBackoff>60000)return; // give up noisily rather than spin
+        _frRTUp=false;
+        frPollWhileDown();
+        setTimeout(function(){if(_frActive&&!_frRTUp)frStartRealtime();},_frRTBackoff);
+        _frRTBackoff=Math.min(90000,_frRTBackoff*2);
+      }
+    });
+    _frRT=ch;
   }catch(e){console.warn('[FR-RT] failed to start:',e);}
-}
-// ── One-time migration: old single blob → per-record rows. ──────────────
-// Cuts over ONLY after verifying every record survived, byte for byte.
-// The old finance_data row is never written again; it stays as a frozen backup.
-function frEnsureIds(){
-  var n=0;
-  FR_KINDS.forEach(function(def){
-    safeArr(def[1]()).forEach(function(rec){
-      if(rec&&(rec.id===undefined||rec.id===null||rec.id==='')){rec.id='m'+Date.now()+'_'+(n++);}
-    });
-  });
-  if(n)frLocalSave();
-}
-var FR_TOMB_KINDS={exp:1,ev:1,tl:1,adj:1,sev:1};
-async function frEnsureRow(w){
-  // Make the server row match w exactly: plain insert if absent, otherwise a
-  // guarded conditional update. Never relies on upsert semantics.
-  var cur=await frGetRow(w.kind,w.rid);
-  for(var a=0;a<4;a++){
-    if(!cur){
-      var res=await frFetch(SB_URL+'/rest/v1/finance_records',{method:'POST',headers:frHdr({'Prefer':'return=representation'}),body:JSON.stringify({kind:w.kind,rid:String(w.rid),data:w.data||{},ver:1,deleted:!!w.deleted,device:sbDeviceId(),updated_at:new Date().toISOString()})});
-      if(res.ok)return true;
-      if(res.status===409){cur=await frGetRow(w.kind,w.rid);continue;}
-      throw new Error('insert HTTP '+res.status);
-    }
-    if(!!cur.deleted===!!w.deleted&&frCanon(cur.data)===frCanon(w.data))return true;
-    var r2=await frFetch(SB_URL+'/rest/v1/finance_records?kind=eq.'+encodeURIComponent(w.kind)+'&rid=eq.'+encodeURIComponent(w.rid)+'&ver=eq.'+cur.ver,{method:'PATCH',headers:frHdr({'Prefer':'return=representation'}),body:JSON.stringify({data:w.data||{},ver:cur.ver+1,deleted:!!w.deleted,device:sbDeviceId(),updated_at:new Date().toISOString()})});
-    if(!r2.ok)throw new Error('update HTTP '+r2.status);
-    var rows2=await r2.json();
-    if(rows2.length)return true;
-    cur=await frGetRow(w.kind,w.rid); // someone moved it: reload and retry
-  }
-  return false;
-}
-async function frSyncWanted(wanted,existing){
-  // Bring the server to exactly `wanted`: batch-insert what's missing,
-  // guarded-update what differs. Returns true if a batch insert hit the
-  // table-missing case.
-  var toInsert=[],toFix=[];
-  Object.keys(wanted).forEach(function(key){
-    var w=wanted[key],e=existing[key];
-    if(!e)toInsert.push(key);
-    else if(!!e.deleted!==!!w.deleted||frCanon(e.data)!==frCanon(w.data))toFix.push(key);
-  });
-  for(var i=0;i<toInsert.length;i+=40){
-    var slice=toInsert.slice(i,i+40);
-    var batch=slice.map(function(key){var w=wanted[key];return {kind:w.kind,rid:String(w.rid),data:w.data||{},ver:1,deleted:!!w.deleted,device:sbDeviceId(),updated_at:new Date().toISOString()};});
-    var res=await frFetch(SB_URL+'/rest/v1/finance_records',{method:'POST',headers:frHdr({'Prefer':'return=minimal'}),body:JSON.stringify(batch)});
-    if(res.status===404)return 'no-table';
-    if(res.status===409){
-      // concurrent writer created some of these: settle each row individually
-      for(var j=0;j<slice.length;j++)await frEnsureRow(wanted[slice[j]]);
-      continue;
-    }
-    if(!res.ok)throw new Error('insert HTTP '+res.status);
-  }
-  for(var k=0;k<toFix.length;k++)await frEnsureRow(wanted[toFix[k]]);
-  return 'ok';
-}
-async function frJoinMigrated(metaData){
-  // Another device already migrated (or the marker reappeared): never
-  // migrate over live data — adopt it and reconcile.
-  _frMeta=metaData||{};
-  _frActive=true;
-  try{localStorage.setItem('lf_fr_active','1');}catch(e){}
-  try{if(_sbRealtimeSocket)_sbRealtimeSocket.close();}catch(e){}
-  try{var ch=await frReconcile();if(ch)frRefreshView();}catch(e){console.warn('[FR] join reconcile:',e.message);}
-  frStartRealtime();
-  sbSetStatus('Per-record sync live','ok');
-  return true;
-}
-async function frMigrate(){
-  try{
-    sbSetStatus('Migrating to per-record storage...','busy');
-    frEnsureIds();
-    var wanted=frCollectRecords();
-    // Port legacy deletion tombstones as deleted rows so deletes never resurrect
-    safeArr(S.deletedIds).forEach(function(k){
-      var ci=k.indexOf(':');if(ci<1)return;
-      var kind=k.slice(0,ci),rid=k.slice(ci+1);
-      if(!FR_TOMB_KINDS[kind])return;
-      var key=kind+':'+rid;
-      if(!wanted[key])wanted[key]={kind:kind,rid:rid,data:{},deleted:true};
-    });
-    // Look at what's on the server first. If a cutover marker exists, another
-    // device (or an earlier run) already migrated: JOIN it, never overwrite it.
-    var existingRows;
-    try{existingRows=await frFetchAllRows();}
-    catch(fe){sbSetStatus('New tables not reachable — run supabase-records-setup.sql once','err');return false;}
-    var existing={};existingRows.forEach(function(r){existing[r.kind+':'+r.rid]=r;});
-    if(existing['sing:_meta']&&!existing['sing:_meta'].deleted)return frJoinMigrated(existing['sing:_meta'].data);
-    var st=await frSyncWanted(wanted,existing);
-    if(st==='no-table'){sbSetStatus('New tables not set up yet — run supabase-records-setup.sql once','err');return false;}
-    // ── Verification gate: no cutover unless EVERYTHING matches ──
-    var problems=frVerifyMigration(wanted,await frFetchAllRows());
-    if(problems.length){
-      console.warn('[FR] migration verify round 1:',problems);
-      // settle every row individually, then verify again
-      var existing2={};(await frFetchAllRows()).forEach(function(r){existing2[r.kind+':'+r.rid]=r;});
-      if(existing2['sing:_meta']&&!existing2['sing:_meta'].deleted)return frJoinMigrated(existing2['sing:_meta'].data);
-      await frSyncWanted(wanted,existing2);
-      problems=frVerifyMigration(wanted,await frFetchAllRows());
-    }
-    if(problems.length){
-      sbSetStatus('Migration NOT applied: verification failed','err');
-      alert('Migration verification failed — the app is still running safely on the old storage. Nothing was changed or lost.\n\nDetails:\n'+problems.slice(0,10).join('\n'));
-      return false;
-    }
-    // Verified: write the cutover marker
-    var counts={};Object.keys(wanted).forEach(function(k){var kd=wanted[k].kind;counts[kd]=(counts[kd]||0)+1;});
-    _frMeta={migratedAt:new Date().toISOString(),device:sbDeviceId(),counts:counts};
-    var mok=await frEnsureRow({kind:'sing',rid:'_meta',data:_frMeta,deleted:false});
-    if(!mok)throw new Error('could not write cutover marker');
-    Object.keys(wanted).forEach(function(key){
-      var w=wanted[key];
-      _frShadow[key]={json:frCanon(w.data),ver:_frShadow[key]?_frShadow[key].ver:1,deleted:!!w.deleted};
-    });
-    _frActive=true;
-    try{localStorage.setItem('lf_fr_active','1');}catch(e){}
-    try{if(_sbRealtimeSocket)_sbRealtimeSocket.close();}catch(e){}
-    // shadow versions must reflect server truth
-    (await frFetchAllRows()).forEach(function(r){_frShadow[r.kind+':'+r.rid]={json:frCanon(r.data),ver:r.ver,deleted:r.deleted};});
-    frStartRealtime();
-    var total=Object.keys(wanted).length;
-    sbSetStatus('Migrated ✓ per-record sync live','ok');
-    console.log('[FR] migration complete:',counts);
-    alert('Storage upgraded ✓\n\n'+total+' records verified and moved to per-record storage. Every record was checked individually: counts match, no ids missing, contents identical.\n\nYour old data was NOT deleted — it stays frozen on the server as a permanent extra backup.\n\nOpen the app once on your other devices so they pick up the new version.');
-    return true;
-  }catch(e){
-    console.warn('[FR] migration failed:',e);
-    sbSetStatus('Migration failed: '+e.message+' (still on old storage)','err');
-    return false;
-  }
-}
-function frVerifyMigration(wanted,serverRows){
-  var problems=[];
-  var srv={};serverRows.forEach(function(r){srv[r.kind+':'+r.rid]=r;});
-  Object.keys(wanted).forEach(function(key){
-    var w=wanted[key],r=srv[key];
-    if(!r){problems.push('missing on server: '+key);return;}
-    if(!!w.deleted!==!!r.deleted){problems.push('deleted flag mismatch: '+key);return;}
-    if(!w.deleted&&frCanon(w.data)!==frCanon(r.data)){
-      problems.push('content mismatch: '+key);
-      console.warn('[FR] mismatch '+key+'\n local: '+frCanon(w.data).slice(0,400)+'\n server: '+frCanon(r.data).slice(0,400));
-    }
-  });
-  Object.keys(srv).forEach(function(key){
-    if(key==='sing:_meta')return;
-    if(!wanted[key])problems.push('unexpected on server: '+key);
-  });
-  return problems;
-}
-// ── Watchdog: a device still on the old cached app version writes the old
-// row; detect that and offer a one-tap import of its records. ──
-function frShowOldBanner(dev,ts){
-  if(document.getElementById('fr-old-banner'))return;
-  var b=document.createElement('div');
-  b.id='fr-old-banner';
-  b.style.cssText='position:fixed;bottom:84px;left:12px;right:12px;max-width:720px;margin:0 auto;z-index:9999;background:#3a2f14;color:#f5e9c9;border:1.5px solid #d9a53f;border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.4;display:flex;gap:10px;align-items:center;flex-wrap:wrap;box-shadow:0 6px 20px rgba(0,0,0,.55)';
-  var t=new Date(ts);
-  b.innerHTML='<span style="flex:1">⚠ A device still on the OLD app version ('+(dev||'unknown')+') saved data at '+t.toLocaleString()+'. Its changes are not in the new storage yet.</span>';
-  var imp=document.createElement('button');imp.className='btn btn-sm btn-p';imp.textContent='Import its records';
-  imp.onclick=function(){frImportOldRow(ts);};
-  var dis=document.createElement('button');dis.className='btn btn-sm';dis.textContent='Dismiss';
-  dis.onclick=function(){try{localStorage.setItem('lf_fr_oldseen',String(new Date(ts).getTime()));}catch(e){}b.remove();};
-  b.appendChild(imp);b.appendChild(dis);
-  document.body.appendChild(b);
-}
-async function frImportOldRow(ts){
-  try{
-    var res=await frFetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=data',{headers:frHdr()});
-    if(!res.ok)throw new Error('HTTP '+res.status);
-    var rows=await res.json();
-    if(!rows.length)return alert('Old data row not found.');
-    var added=sbMergeRemoteIntoLocal(rows[0].data)||0;
-    try{localStorage.setItem('lf_fr_oldseen',String(new Date(ts).getTime()));}catch(e){}
-    var b=document.getElementById('fr-old-banner');if(b)b.remove();
-    autosave();
-    safeShowView(currentPage);
-    alert(added?('Imported '+added+' record(s) from the old-version device. Now update that device: open the app on it and refresh.'):'No new records found to import (settings-only changes are not auto-imported). Update that device: open the app on it and refresh.');
-  }catch(e){alert('Import failed: '+e.message);}
-}
-async function frWatchOldRow(){
-  if(!_frActive)return;
-  try{
-    var res=await frFetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.'+SB_ROW_ID+'&select=updated_at,dev:data-%3E%3EdeviceId',{headers:frHdr()});
-    if(!res.ok)return;
-    var rows=await res.json();
-    if(!rows.length)return;
-    var t=new Date(rows[0].updated_at).getTime();
-    var migrated=_frMeta&&_frMeta.migratedAt?new Date(_frMeta.migratedAt).getTime():0;
-    var seen=0;try{seen=parseFloat(localStorage.getItem('lf_fr_oldseen')||'0');}catch(e){}
-    if(migrated&&t>migrated+10000&&t>seen)frShowOldBanner(rows[0].dev,rows[0].updated_at);
-  }catch(e){}
 }
 function frRefreshView(){
   var active=document.activeElement;
@@ -7120,35 +6785,9 @@ function sbInitSync(){
     if(p&&typeof p==='object'&&p.b&&!_frShadow[k])_frShadow[k]={json:p.b,ver:p.v||0,deleted:false};
   });
   (async function(){
-    var meta=null,metaErr=false;
-    try{meta=await frGetRow('sing','_meta');}catch(e){metaErr=true;console.warn('[FR] meta check:',e.message);}
-    if((meta&&!meta.deleted)||(metaErr&&_frActive)){
-      // Migrated (or previously migrated and currently offline): record engine.
-      // Never fall back to the legacy whole-blob engine once migrated.
-      _frActive=true;if(meta)_frMeta=meta.data||{};
-      try{localStorage.setItem('lf_fr_active','1');}catch(e){}
-      try{
-        var changed=await frReconcile();
-        if(changed)frRefreshView();
-      }catch(e){console.warn('[FR] reconcile:',e);sbSetStatus('Offline — will sync when back','err');}
-      frStartRealtime();
-      frWatchOldRow();setInterval(frWatchOldRow,5*60*1000);
-    }else if(_frActive){
-      // This device migrated before, but the marker read came back empty.
-      // NEVER re-migrate a migrated device: re-create the marker and rejoin.
-      console.warn('[FR] cutover marker missing on a migrated device — self-healing');
-      _frMeta=(_frMeta&&_frMeta.migratedAt)?_frMeta:{migratedAt:new Date().toISOString(),device:sbDeviceId(),selfHealed:true};
-      try{await frEnsureRow({kind:'sing',rid:'_meta',data:_frMeta,deleted:false});}catch(e){console.warn('[FR] marker heal:',e.message);}
-      try{var ch=await frReconcile();if(ch)frRefreshView();}catch(e){console.warn('[FR] heal reconcile:',e.message);}
-      frStartRealtime();
-      frWatchOldRow();setInterval(frWatchOldRow,5*60*1000);
-    }else{
-      var changed2=await sbLegacyPull();
-      if(changed2)frRefreshView();
-      var ok=await frMigrate();
-      if(!ok)sbLegacyRealtime();
-      else{frWatchOldRow();setInterval(frWatchOldRow,5*60*1000);}
-    }
+    try{var changed=await frReconcile();if(changed)frRefreshView();}
+    catch(e){console.warn('[FR] reconcile:',e);sbSetStatus('Offline — will sync when back','err');}
+    frStartRealtime();
     setTimeout(pushFinanceSummary,2000);
   })();
 }
@@ -7171,6 +6810,15 @@ function sbInitSync(){
         .catch(function (err) { console.warn('[SW] Registration failed:', err); });
     });
   }
+</script>
+<script>
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Enter')return;
+  var ls=document.getElementById('login-screen');
+  if(!ls||ls.style.display==='none')return;
+  var t=e.target;
+  if(t&&(t.id==='login-email'||t.id==='login-pass')){e.preventDefault();lfLogin();}
+});
 </script>
 </body>
 </html>
