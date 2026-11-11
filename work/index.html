@@ -925,7 +925,7 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
 
 <div id="pin-screen">
   <div class="pin-logo">LA</div>
-  <div class="pin-sub">LA Work Dashboard</div>
+  <div class="pin-sub" id="pin-sub">LA Work Dashboard</div>
   <div class="pin-dots">
     <div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div>
     <div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div>
@@ -946,6 +946,20 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
     <button class="pin-btn" onclick="pinDel()">⌫</button>
   </div>
   <div class="pin-error" id="pin-error"></div>
+</div>
+
+<!-- LOGIN (above the PIN screen): the real security; the PIN after it is a screen lock -->
+<div id="login-screen" style="position:fixed;inset:0;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:10001;padding:24px">
+  <div class="pin-logo">LA</div>
+  <div class="pin-sub">Sign in to LA Work Dashboard</div>
+  <input id="login-email" type="email" placeholder="Email" autocomplete="username" autocapitalize="none" spellcheck="false"
+    style="width:min(320px,86vw);padding:14px 16px;margin-bottom:12px;border-radius:12px;border:1px solid #333;background:#1c1c1e;color:#fff;font-size:16px;outline:none">
+  <input id="login-pass" type="password" placeholder="Password" autocomplete="current-password"
+    onkeydown="if(event.key==='Enter')workLogin()"
+    style="width:min(320px,86vw);padding:14px 16px;margin-bottom:16px;border-radius:12px;border:1px solid #333;background:#1c1c1e;color:#fff;font-size:16px;outline:none">
+  <button id="login-btn" onclick="workLogin()"
+    style="width:min(320px,86vw);padding:14px;border-radius:12px;border:none;background:#fff;color:#000;font-size:16px;font-weight:600;cursor:pointer">Sign in</button>
+  <div class="pin-error" id="login-err"></div>
 </div>
 
 <!-- INLINE PIN (for edit/settings) -->
@@ -1434,6 +1448,32 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
     <div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem 1rem .25rem">
       <div style="font-size:11px;color:#2f9e44;font-weight:600">✓ Unlocked &nbsp;<button onclick="lockSettingsManual()" style="font-size:10px;padding:2px 9px;background:#fff;border:1px solid var(--border);border-radius:6px;cursor:pointer;color:#495057;font-weight:400">Lock</button></div>
       <button onclick="settingsToggleAll()" id="settings-collapse-btn" style="font-size:11px;padding:5px 14px;border:1px solid var(--border);border-radius:var(--rsm);background:#fff;color:#495057;cursor:pointer;font-weight:600">⊟ Collapse All</button>
+    </div>
+    <!-- My account -->
+    <div class="settings-group-header">🔐 My account</div>
+    <div class="settings-section">
+      <div class="settings-section-title" onclick="toggleSettingsSection('my_account___pin',this)">
+        My PIN &amp; account
+        <span id="ss-chev-my_account___pin" style="font-size:12px;transition:transform .2s;display:inline-block">▼</span>
+      </div>
+      <div class="settings-section-body" id="ss-body-my_account___pin">
+        <div style="padding:.75rem 1rem">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Your PIN is checked by the database and is the same in every app you can sign in to.</div>
+          <div style="display:flex;flex-direction:column;gap:8px;max-width:260px">
+            <input type="password" id="wk-pin-old" maxlength="6" inputmode="numeric" placeholder="Current PIN" autocomplete="off"
+              style="font-size:14px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;letter-spacing:4px">
+            <input type="password" id="wk-pin-new" maxlength="6" inputmode="numeric" placeholder="New PIN (6 digits)" autocomplete="off"
+              style="font-size:14px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;letter-spacing:4px">
+            <input type="password" id="wk-pin-new2" maxlength="6" inputmode="numeric" placeholder="New PIN again" autocomplete="off"
+              style="font-size:14px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;letter-spacing:4px">
+            <button onclick="changeMyPin()" style="font-size:12px;padding:7px;border-radius:7px;background:#212529;color:#fff;border:none;cursor:pointer;font-weight:600">Change PIN</button>
+            <div id="wk-pin-msg" style="font-size:11px;min-height:15px"></div>
+          </div>
+          <div style="border-top:1px solid var(--border3);margin-top:10px;padding-top:10px">
+            <button onclick="if(confirm('Sign out of this device? You will need your email and password to sign in again.'))workSignOut()" style="font-size:12px;padding:7px 14px;border-radius:7px;background:#fff;color:#c92a2a;border:1px solid #ffc9c9;cursor:pointer;font-weight:600">Sign out of this device</button>
+          </div>
+        </div>
+      </div>
     </div>
     <!-- Schedule & Timetable -->
     <div class="settings-group-header">📅 Schedule &amp; Timetable</div>
@@ -2494,12 +2534,46 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
       </div>
     </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase.min.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js&quot;><\/script>')"></script>
 <script>
 // ── SUPABASE ───────────────────────────────────────────
 const SUPA_URL='https://mkvfggacecgltscdrfqv.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rdmZnZ2FjZWNnbHRzY2RyZnF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5MjM3MDcsImV4cCI6MjA5NDQ5OTcwN30.ErSZCR9G1NlBiq5ScOL3pmhPzJd5aYk92BU1I7Rzsr4';
-const supa=supabase.createClient(SUPA_URL,SUPA_KEY);
+// If the library cannot load at all, the app must not die: every supa.* call then
+// resolves to {data:null,error} so the existing offline paths (local data, sync queue) take over.
+function _offlineStub(){
+  const err={message:'Sign-in library did not load. Check your connection and reload.'};
+  const res={data:null,error:err};
+  const handler={
+    get(_t,p){
+      if(p==='then')return function(ok){return Promise.resolve(res).then(ok);};
+      if(p==='auth')return {
+        getSession:async()=>({data:{session:null},error:null}),
+        signInWithPassword:async()=>({data:null,error:err}),
+        signOut:async()=>({error:null}),
+        onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}})
+      };
+      if(p==='realtime')return {setAuth(){}};
+      return new Proxy(function(){},handler);
+    },
+    apply(){return new Proxy(function(){},handler);}
+  };
+  return new Proxy(function(){},handler);
+}
+window._supaMissing=false;
+const supa=(function(){
+  try{
+    if(typeof supabase!=='undefined'&&supabase.createClient)
+      return supabase.createClient(SUPA_URL,SUPA_KEY,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'work_auth_prod'}});
+  }catch(e){console.warn('supabase init failed',e);}
+  window._supaMissing=true;
+  return _offlineStub();
+})();
+// Keep the realtime socket on the signed-in user's token (RLS hides rows from the anon identity).
+try{supa.auth.onAuthStateChange(function(ev,sess){
+  try{if(sess&&sess.access_token)supa.realtime.setAuth(sess.access_token);}catch(e){}
+  if(ev==='SIGNED_OUT'&&typeof showLogin==='function')showLogin();
+});}catch(e){}
 const SUPA_TABLE='work_app_data';
 
 // Keys that should sync to Supabase (everything important)
@@ -2649,7 +2723,6 @@ function hideSyncLoader(){
 window._LOGO_URI="data:image/jpeg;base64,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ACNVtjuU3JOSxML6kvpxzPIiCiz39pI+FvDW/LvpKt9uTStd+6eJreyck3PbOfpul9VAMwv0S6xLiyq4JgYtbUqN8upXxS4lP2o7SvX2WoeX2R8xPHDlt0ukaxSZmdXCBi2Pw06nSI0oqcm/5W1aCm0K9htw+Q15mB49Ybl1omQZ93tTlg6XW1SV2mxqR4bl1KfsuvJH2WvUJ9f61XDD7fScsvkb3Su1S+peaR+qN7gKg45a0GPh9qcRx4t+RlqT5AqA0keg17CrzFfllttlpDLLaG20JCUISNBIHYAD0FfqqZ5eVTjjopSlVWKUpQKUpQKUpQKUpQKUpQKjP7DY+lyUGWpceLMcW7JhsS3G47q1Ha1FsHXzHudaB9d1JqVMtnpGmOKwxFjtxozLbLLSAhtttISlCQNAADyA9qyUpUJKUpQKUpQKUpQKUpQKUpQKUpQKj2fYbjmc2ByyZLbm5kVXzIP2XGV+i0KHdKh7ipDSpls7hZtTmNdC2EXqLNzjLLrmkS1K1ZYVxP7mMkeSnB5OrHlyPoB2q4kpCUhKQAB2AHpX2lTlnll7RMZPRSlKqkpSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlApSlB//2Q==";
 
 // ── CONSTANTS ─────────────────────────────────────────
-const CORRECT_PIN='399111';
 const PIN_REMEMBER_MS=7*24*60*60*1000;
 const SIG='\n\n——\nLaith Alattili | 雷斯·阿拉提利\nHousemaster of Hawking House | 舍监 (院长)\nEngineering Design and Technology Teacher | 工程设计与技术教师\n\nWAS Changzhou | 常州威雅学校\nNo.9 Huanhu North Road, Wujin District, Changzhou, Jiangsu, P.R. China\n中国江苏省常州市武进区环湖北路9号\n📞 +86 135 8456 3483 | www.waiscz.com';
 const AOR_START=new Date('2026-04-28');
@@ -2730,36 +2803,87 @@ function getAllStudentsWithTutor(){
   });
 }
 
-// ── PIN ───────────────────────────────────────────────
-let pinEntry='';
+// ── LOGIN + PIN ───────────────────────────────────────
+// Login (Supabase Auth) is the real security: without a session the database returns nothing.
+// The 6-digit PIN is a screen lock checked BY THE DATABASE (verify_pin / set_pin, one PIN per person,
+// shared by every app). The PIN is never stored in this page. A SHA-256 of the last good PIN is kept
+// on this device (work_pin_h) and accepted only when the database cannot be reached.
+let pinEntry='',_pinMode='enter',_pinFirst='',_pinBusy=false,_workOffline=false,_loginBusy=false;
 function checkPinRemember(){
-  try{const ts=parseInt(localStorage.getItem('pin_ts')||'0');if(Date.now()-ts<PIN_REMEMBER_MS)return true;}catch(e){}return false;
+  try{const ts=parseInt(localStorage.getItem('work_pin_ts')||'0');if(Date.now()-ts<PIN_REMEMBER_MS)return true;}catch(e){}return false;
 }
-function setPinRemember(){try{localStorage.setItem('pin_ts',String(Date.now()));}catch(e){}}
+function setPinRemember(){try{localStorage.setItem('work_pin_ts',String(Date.now()));}catch(e){}}
+function _pinMsg(t,sub){
+  const e=document.getElementById('pin-error');if(e)e.textContent=t||'';
+  if(sub){const s=document.getElementById('pin-sub');if(s)s.textContent=sub;}
+}
+async function _pinHashLocal(p){
+  try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('wk:'+p));
+    return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}catch(e){return null;}
+}
+async function _pinRpc(fn,args){const r=await supa.rpc(fn,args);if(r.error)throw r.error;return r.data;}
+// Returns 'ok' | 'bad' | 'nopin' | 'locked' | 'denied' | 'offline'
+async function _pinVerify(p){
+  try{return await _pinRpc('verify_pin',{p:p});}
+  catch(e){
+    const saved=localStorage.getItem('work_pin_h'),h=await _pinHashLocal(p);
+    if(saved&&h&&saved===h)return 'ok';
+    return saved?'bad':'offline';
+  }
+}
 function lockApp(){
   // Clear the remembered session so PIN is required again
-  try{localStorage.removeItem('pin_ts');}catch(e){}
-  // Clear any PIN entry state
-  pinEntry='';
+  try{localStorage.removeItem('work_pin_ts');}catch(e){}
+  pinEntry='';_pinMode='enter';_pinFirst='';
   updatePinDots('pd',0);
-  document.getElementById('pin-error').textContent='';
-  // Hide app, show PIN screen
+  _pinMsg('','LA Work Dashboard');
   document.getElementById('main-app').style.display='none';
   document.getElementById('sticky-header').classList.remove('visible');
   document.getElementById('pin-screen').style.display='flex';
 }
-function pinPress(d){
-  if(pinEntry.length>=6)return;
-  pinEntry+=d;updatePinDots('pd',pinEntry.length);
-  if(pinEntry.length===6)setTimeout(()=>{
-    if(pinEntry===CORRECT_PIN){setPinRemember();document.getElementById('pin-screen').style.display='none';showSyncLoader();const _supaTimeout=setTimeout(()=>{hideSyncLoader();if(document.getElementById('main-app').style.display!=='block'){document.getElementById('main-app').style.display='block';document.getElementById('sticky-header').classList.add('visible');initApp();}},5000);supaLoad().then(()=>{clearTimeout(_supaTimeout);hideSyncLoader();document.getElementById('main-app').style.display='block';document.getElementById('sticky-header').classList.add('visible');initApp();});}
-    else{document.getElementById('pin-error').textContent='Incorrect PIN.';pinEntry='';updatePinDots('pd',0);setTimeout(()=>document.getElementById('pin-error').textContent='',2000);}
-  },200);
+// PIN accepted: pull the cloud copy, then start the app (5 s cap so a slow network never blocks you)
+function _unlockWork(){
+  setPinRemember();
+  document.getElementById('pin-screen').style.display='none';
+  showSyncLoader();
+  const _supaTimeout=setTimeout(()=>{hideSyncLoader();if(document.getElementById('main-app').style.display!=='block'){document.getElementById('main-app').style.display='block';document.getElementById('sticky-header').classList.add('visible');initApp();}},5000);
+  supaLoad().then(()=>{clearTimeout(_supaTimeout);hideSyncLoader();document.getElementById('main-app').style.display='block';document.getElementById('sticky-header').classList.add('visible');initApp();});
 }
-function pinDel(){if(pinEntry.length>0){pinEntry=pinEntry.slice(0,-1);updatePinDots('pd',pinEntry.length);}}
+function pinPress(d){
+  if(_pinBusy||pinEntry.length>=6)return;
+  pinEntry+=d;updatePinDots('pd',pinEntry.length);
+  if(pinEntry.length===6)_pinSubmit();
+}
+async function _pinSubmit(){
+  const p=pinEntry;_pinBusy=true;
+  const reset=()=>{pinEntry='';setTimeout(()=>updatePinDots('pd',0),250);};
+  try{
+    if(_pinMode==='create'){_pinFirst=p;_pinMode='confirm';_pinMsg('','Type it again to confirm');reset();return;}
+    if(_pinMode==='confirm'){
+      if(p!==_pinFirst){_pinMode='create';_pinFirst='';_pinMsg('PINs did not match. Start again.','Choose a new 6-digit PIN');reset();return;}
+      let res;try{res=await _pinRpc('set_pin',{old_pin:null,new_pin:p});}catch(e){res='error';}
+      if(res==='ok'){
+        const h=await _pinHashLocal(p);if(h)localStorage.setItem('work_pin_h',h);
+        _pinMode='enter';_pinMsg('','LA Work Dashboard');pinEntry='';updatePinDots('pd',0);_unlockWork();
+      }else{_pinMode='create';_pinFirst='';_pinMsg('Could not save PIN ('+res+').','Choose a new 6-digit PIN');reset();}
+      return;
+    }
+    const v=await _pinVerify(p);
+    if(v==='ok'){
+      const h=await _pinHashLocal(p);if(h)localStorage.setItem('work_pin_h',h);
+      pinEntry='';updatePinDots('pd',0);_pinMsg('');_unlockWork();
+    }
+    else if(v==='nopin'){_pinMode='create';_pinMsg('','Choose a new 6-digit PIN');reset();}
+    else if(v==='locked'){_pinMsg('Too many tries. Wait 5 minutes.');reset();}
+    else if(v==='denied'){_pinMsg('Please sign in first.');reset();showLogin();}
+    else if(v==='offline'){_pinMsg('Cannot check PIN. Go online once first.');reset();}
+    else{_pinMsg('Incorrect PIN.');reset();setTimeout(()=>_pinMsg(''),2000);}
+  }finally{_pinBusy=false;}
+}
+function pinDel(){if(_pinBusy)return;if(pinEntry.length>0){pinEntry=pinEntry.slice(0,-1);updatePinDots('pd',pinEntry.length);}}
 function updatePinDots(pfx,n){for(let i=0;i<6;i++){const d=document.getElementById(pfx+i);if(d)d.classList.toggle('filled',i<n);}}
 
-// INLINE PIN
+// INLINE PIN (settings / protected actions) — same database check
 let ipEntry='',ipCallback=null;
 function showInlinePin(title,callback){
   ipEntry='';ipCallback=callback;
@@ -2770,14 +2894,72 @@ function showInlinePin(title,callback){
 }
 function closeInlinePin(){document.getElementById('inline-pin').classList.remove('open');ipEntry='';ipCallback=null;}
 function ipPress(d){
-  if(ipEntry.length>=6)return;
+  if(_pinBusy||ipEntry.length>=6)return;
   ipEntry+=d;updatePinDots('ip',ipEntry.length);
-  if(ipEntry.length===6)setTimeout(()=>{
-    if(ipEntry===CORRECT_PIN){const cb=ipCallback;closeInlinePin();if(cb)cb();}
-    else{document.getElementById('ip-error').textContent='Incorrect PIN.';ipEntry='';updatePinDots('ip',0);setTimeout(()=>document.getElementById('ip-error').textContent='',2000);}
-  },200);
+  if(ipEntry.length===6)_ipSubmit();
 }
-function ipDel(){if(ipEntry.length>0){ipEntry=ipEntry.slice(0,-1);updatePinDots('ip',ipEntry.length);}}
+async function _ipSubmit(){
+  const p=ipEntry;_pinBusy=true;
+  try{
+    const v=await _pinVerify(p);
+    if(v==='ok'){const cb=ipCallback;closeInlinePin();if(cb)cb();return;}
+    const msg=v==='locked'?'Too many tries. Wait 5 minutes.':v==='offline'?'Cannot check PIN offline yet.':'Incorrect PIN.';
+    const ee=document.getElementById('ip-error');if(ee)ee.textContent=msg;
+    ipEntry='';updatePinDots('ip',0);
+    setTimeout(()=>{const e2=document.getElementById('ip-error');if(e2)e2.textContent='';},2000);
+  }finally{_pinBusy=false;}
+}
+function ipDel(){if(_pinBusy)return;if(ipEntry.length>0){ipEntry=ipEntry.slice(0,-1);updatePinDots('ip',ipEntry.length);}}
+
+// LOGIN SCREEN
+function showLogin(){const e=document.getElementById('login-screen');if(e)e.style.display='flex';}
+function hideLogin(){const e=document.getElementById('login-screen');if(e)e.style.display='none';}
+async function ensureAuth(){
+  try{const r=await supa.auth.getSession();return (r&&r.data&&r.data.session)||null;}catch(e){return null;}
+}
+// A device that has signed in and set a PIN before may open offline (PIN checked against the local copy)
+function _offlineEligible(){try{return !!(localStorage.getItem('work_auth_prod')&&localStorage.getItem('work_pin_h'));}catch(e){return false;}}
+async function workLogin(){
+  if(_loginBusy)return;
+  const em=((document.getElementById('login-email')||{}).value||'').trim();
+  const pw=(document.getElementById('login-pass')||{}).value||'';
+  const er=document.getElementById('login-err');
+  if(!em||!pw){if(er)er.textContent='Enter your email and password.';return;}
+  _loginBusy=true;if(er)er.textContent='Signing in...';
+  try{
+    const r=await supa.auth.signInWithPassword({email:em,password:pw});
+    if(r.error){if(er)er.textContent=r.error.message;return;}
+    if(er)er.textContent='';
+    const pe=document.getElementById('login-pass');if(pe)pe.value='';
+    hideLogin();
+    try{supa.realtime.setAuth(r.data.session.access_token);}catch(e){}
+    _afterAuth();
+  }catch(e){if(er)er.textContent=e.message||String(e);}
+  finally{_loginBusy=false;}
+}
+async function workSignOut(){
+  try{await supa.auth.signOut();}catch(e){}
+  try{['work_pin_h','work_pin_ts','work_auth_prod'].forEach(k=>localStorage.removeItem(k));}catch(e){}
+  location.reload();
+}
+// Settings → My PIN & account
+async function changeMyPin(){
+  const g=id=>(document.getElementById(id)||{}).value||'';
+  const o=g('wk-pin-old'),n=g('wk-pin-new'),c=g('wk-pin-new2');
+  const m=document.getElementById('wk-pin-msg');
+  const say=(t,ok)=>{if(m){m.textContent=t;m.style.color=ok?'#16a34a':'#dc2626';}};
+  if(!/^[0-9]{6}$/.test(n)){say('New PIN must be exactly 6 digits.');return;}
+  if(n!==c){say('The two new PINs do not match.');return;}
+  if(!/^[0-9]{6}$/.test(o)){say('Enter your current 6-digit PIN.');return;}
+  say('Saving...',true);
+  try{
+    const r=await _pinRpc('set_pin',{old_pin:o,new_pin:n});
+    if(r==='ok'){const h=await _pinHashLocal(n);if(h)localStorage.setItem('work_pin_h',h);say('PIN changed. It now applies to every app.',true);['wk-pin-old','wk-pin-new','wk-pin-new2'].forEach(i=>{const x=document.getElementById(i);if(x)x.value='';});}
+    else if(r==='bad_old')say('Current PIN is wrong.');
+    else if(r==='locked')say('Too many tries. Wait 5 minutes.');
+    else say('Could not change PIN ('+r+').');
+  }catch(e){say('No connection. Try again online.');}
+}
 
 // ── CLOCK ─────────────────────────────────────────────
 setInterval(function(){document.querySelectorAll('[data-endms]').forEach(function(el){var endMs=parseInt(el.getAttribute('data-endms'));if(!endMs)return;var rem=endMs-Date.now();var ot=rem<0;var ab=Math.abs(rem);var mm=Math.floor(ab/60000),ss=Math.floor((ab%60000)/1000);var str=(ot?'+':'')+String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');el.textContent=str;el.style.color=ot?(rem<-120000?'#ef4444':'#f97316'):'#22c55e';});},500);
@@ -2811,6 +2993,9 @@ function _amUpdateHeaderBtns(){
 document.addEventListener('visibilitychange',function(){
   if(!document.hidden&&localStorage.getItem('am_wake_persist')==='1')_amRequestWakeLock();
 });
+</script>
+<script>
+// Clock + auto-lock live in their own script block so nothing upstream can leave them half-initialised.
 let _lastAct=Date.now();
 function _resetAct(){_lastAct=Date.now();}
 function _getAlDays(){try{const v=parseInt(localStorage.getItem('autoLockDays'));return isNaN(v)?0:v;}catch(e){return 0;}}
@@ -2818,10 +3003,10 @@ function _getSatLock(){try{return localStorage.getItem('satAutoLock')==='1';}cat
 let _satFired=false;
 function _autoLockCheck(now){
   const d=_getAlDays();
-  if(d>0&&(Date.now()-_lastAct)>d*864e5){lockApp();return;}
+  if(d>0&&(Date.now()-_lastAct)>d*864e5){if(typeof lockApp==='function')lockApp();return;}
   if(_getSatLock()){
     const isSat=now.getDay()===6,isMid=now.getHours()===0&&now.getMinutes()===0;
-    if(isSat&&isMid&&!_satFired){_satFired=true;lockApp();return;}
+    if(isSat&&isMid&&!_satFired){_satFired=true;if(typeof lockApp==='function')lockApp();return;}
     if(!isSat||!isMid)_satFired=false;
   }
 }
@@ -29050,6 +29235,8 @@ async function drainWorkInbox(){
     const dn=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     const ids=[];
     data.forEach(row=>{
+      // Idempotent: a row delivered twice (crash between save and mark-consumed) never makes a duplicate task
+      if(S.planData.some(x=>x&&x.id==='in_'+row.id)){ids.push(row.id);return;}
       let cat=null;
       if(row.category_hint){
         const h=String(row.category_hint).toLowerCase();
@@ -29058,7 +29245,7 @@ async function drainWorkInbox(){
       }
       if(!cat)cat=cats[0]?cats[0].id:'gen';
       S.planData.push({
-        id:'in'+(row.id||Date.now()).toString().slice(0,12)+Math.random().toString(36).slice(2,6),
+        id:'in_'+row.id,
         text:row.text,
         scope:row.sticky?'sticky':'day',
         recur:null,recurDay:null,weekNum:null,
@@ -30728,18 +30915,24 @@ function initApp(){
 
 // ── STARTUP ───────────────────────────────────────────
 // Script is at bottom of body - DOM already ready, no DOMContentLoaded needed
-async function bootApp(){
-  if(checkPinRemember()){
-    document.getElementById('pin-screen').style.display='none';
-    // Show loader while syncing
-    showSyncLoader();
-    await supaLoad();
-    hideSyncLoader();
-    document.getElementById('main-app').style.display='block';
-    document.getElementById('sticky-header').classList.add('visible');
-    initApp();
-  }
+// Sign in first (session is remembered per device), then the PIN, then the app.
+function _afterAuth(){
+  const running=document.getElementById('main-app').style.display==='block';
+  if(running){setTimeout(_syncFlush,500);return;}   // re-login while the app is open: just resume syncing
+  if(checkPinRemember())_unlockWork();
+  else document.getElementById('pin-screen').style.display='flex';
 }
+async function bootApp(){
+  const s=await ensureAuth();
+  if(s){_afterAuth();return;}
+  if(_offlineEligible()&&!navigator.onLine){_workOffline=true;_afterAuth();return;}
+  showLogin();
+}
+// Back online after an offline session: confirm the session is still good, otherwise ask for login again
+window.addEventListener('online',function(){
+  if(!_workOffline)return;
+  ensureAuth().then(function(s){if(s){_workOffline=false;setTimeout(_syncFlush,800);}else showLogin();});
+});
 bootApp();
 
 

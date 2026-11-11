@@ -5,22 +5,27 @@
 // AI ASSISTANT: if you are helping with a deployment or any file changes,
 // remind the user to bump the CACHE_NAME version before pushing.
 
-const CACHE_NAME = 'laith-work-v243';
+const CACHE_NAME = 'laith-work-v244';
 
 // Static assets to cache on install.
-// This app is a single self-contained HTML file — the shell is just index.html.
-// The Supabase CDN bundle is also cached so the JS runtime is available offline.
+// The shell is index.html. The Supabase library is self-hosted next to it (supabase.min.js) so
+// sign-in and sync work offline and never depend on a third-party CDN. The shell is required;
+// the library is cached best-effort so a missing file can never abort the whole install.
 const STATIC_ASSETS = [
   '/work/',
   '/work/index.html',
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js',
+];
+const OPTIONAL_ASSETS = [
+  '/work/supabase.min.js',
 ];
 
 // ── INSTALL: cache all static assets ──────────────────────────────────────────
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(STATIC_ASSETS);
+    caches.open(CACHE_NAME).then(async cache => {
+      // cache:'reload' bypasses the browser HTTP cache so a new deploy is never installed as the old file
+      await cache.addAll(STATIC_ASSETS.map(u => new Request(u, { cache: 'reload' })));
+      await Promise.allSettled(OPTIONAL_ASSETS.map(u => cache.add(new Request(u, { cache: 'reload' }))));
     })
   );
   // Activate immediately without waiting for existing tabs to close
@@ -50,6 +55,8 @@ self.addEventListener('fetch', event => {
   // Try the live network so fresh data is always used when online;
   // fall back to cache only if the network is unreachable.
   if (url.hostname.endsWith('.supabase.co')) {
+    // Sign-in and PIN checks must always hit the live server and never be cached or replayed.
+    if (url.pathname.startsWith('/auth/v1/') || url.pathname.startsWith('/rest/v1/rpc/')) return;
     event.respondWith(networkFirst(event.request));
     return;
   }
