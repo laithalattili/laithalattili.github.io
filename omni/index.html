@@ -503,6 +503,19 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
 
 <div id="ld"><div class="ld-wm">la<b>·omni</b></div><div class="spin"></div></div>
 
+<div id="login" class="gone" style="position:fixed;inset:0;z-index:9999;background:#0f0c0a;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px">
+  <div class="pin-sub">sign in</div>
+  <div class="pin-wm">la<b>·omni</b></div>
+  <input id="login-email" type="email" placeholder="Email" autocomplete="username" autocapitalize="none" spellcheck="false"
+    style="width:min(300px,84vw);padding:13px 15px;margin-bottom:10px;border-radius:12px;border:1px solid #2e261e;background:#1a1512;color:#fff;font-size:16px;outline:none">
+  <input id="login-pass" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')omniLogin()"
+    style="width:min(300px,84vw);padding:13px 15px;margin-bottom:14px;border-radius:12px;border:1px solid #2e261e;background:#1a1512;color:#fff;font-size:16px;outline:none">
+  <button id="login-btn" onclick="omniLogin()"
+    style="width:min(300px,84vw);padding:13px;border-radius:12px;border:none;background:#d47040;color:#fff;font-size:15px;font-weight:700;cursor:pointer">Sign in</button>
+  <div class="pin-err" id="login-err"></div>
+</div>
+<style>#login.gone{display:none!important}</style>
+
 <div id="pin" class="gone">
   <div class="pin-sub">la · omni</div>
   <div class="pin-wm">la<b>·omni</b></div>
@@ -1085,6 +1098,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
               </select>
             </div>
             <button class="btn-s" style="font-size:12px;margin-top:.5rem" onclick="changePIN()">Change PIN</button>
+            <button class="btn-s" style="font-size:12px;margin-top:.5rem;margin-left:.4rem;color:#e04040" onclick="omniSignOut()">Sign out</button>
           </div>
         </div>
       </div>
@@ -1406,7 +1420,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
     <button class="btn-danger" id="rh-del" style="display:none" onclick="deleteRhythm()">Delete</button>
   </div>
 </div>
-<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase.min.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js&quot;><\/script>')"></script>
 <script src="config.js" onerror="console.warn('config.js missing')"></script>
 <script>
 'use strict';
@@ -1416,11 +1430,19 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
 const _SU=typeof OMNI_SUPA_URL!=='undefined'?OMNI_SUPA_URL:'';
 const _SK=typeof OMNI_SUPA_KEY!=='undefined'?OMNI_SUPA_KEY:'';
 const _OK=!!(_SU&&_SK&&typeof supabase!=='undefined');
-const supa=_OK?supabase.createClient(_SU,_SK):{
+const supa=_OK?supabase.createClient(_SU,_SK,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'omni_auth_prod'}}):{
   from:()=>({select:async()=>({data:null}),upsert:async()=>({}),
     insert:async()=>({data:null,error:'offline'}),
-    update:async()=>({}),delete:async()=>({})})
+    update:async()=>({}),delete:async()=>({})}),
+  rpc:async()=>({data:null,error:{message:'offline'}}),
+  auth:{getSession:async()=>({data:{session:null}}),signOut:async()=>({}),
+    signInWithPassword:async()=>({data:null,error:{message:'Sign-in library did not load. Check your connection and reload.'}})}
 };
+// Realtime must carry the signed-in user's token, or closed tables send nothing.
+if(_OK){try{supa.auth.onAuthStateChange((ev,s)=>{
+  try{if(s&&s.access_token)supa.realtime.setAuth(s.access_token);}catch(e){}
+  if(ev==='SIGNED_OUT'){try{omniShowLogin();}catch(e){}}
+});}catch(e){}}
 function supaFrom(t){return _OK?supa.from(t):supa.from(t);}
 
 // ═══════════════════════════════════════════════════
@@ -1445,8 +1467,10 @@ function _sloc(){try{localStorage.setItem('omni_s',JSON.stringify(S));}catch(e){
 async function saveSetting(k,v){
   S[k]=v;_sloc();
   _refreshSUI(); // always refresh UI immediately
-  if(!_OK)return;
-  try{await supaFrom('omni_settings').upsert({key:k,value:JSON.stringify(v),updated_at:new Date().toISOString()},{onConflict:'key'});}catch(e){console.warn('saveSetting remote fail',k,e);}
+  if(!_OK)return false;
+  try{const r=await supaFrom('omni_settings').upsert({key:k,value:JSON.stringify(v),updated_at:new Date().toISOString()},{onConflict:'key'});
+    if(r&&r.error)throw r.error;return true;
+  }catch(e){console.warn('saveSetting remote fail',k,e);return false;}
 }
 function _refreshSUI(){
   const _ski=document.getElementById('s-audio-skip');if(_ski)_ski.value=localStorage.getItem('omni_audio_skip')||'5';
@@ -1514,43 +1538,117 @@ function clearSeasonOv(){localStorage.removeItem('omni_sov_'+_weekKey());el('sea
 // ═══════════════════════════════════════════════════
 // PIN
 // ═══════════════════════════════════════════════════
-let _pbuf='',_pmode='unlock',_pfirst='',_lastAct=Date.now();
-const PIN_K='omni_ph';
+// Login (Supabase Auth) is the real security. The 6-digit PIN is a screen lock checked by the
+// database (verify_pin / set_pin: one PIN per person, shared by every app). It is never stored here;
+// only a salted SHA-256 of the last good PIN is kept (omni_pin_h) for when the database is unreachable.
+let _pbuf='',_pmode='unlock',_pfirst='',_pold=null,_pchange=false,_pbusy=false,_lastAct=Date.now();
+const PIN_K='omni_pin_h';
+try{localStorage.removeItem('omni_ph');}catch(e){} // old device-only PIN, replaced by the database PIN
 async function sha256(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}
-async function setPH(p){localStorage.setItem(PIN_K,await sha256(p));}
-async function checkPH(p){const h=localStorage.getItem(PIN_K);if(!h)return true;return h===await sha256(p);}
-function hasPIN(){return!!localStorage.getItem(PIN_K);}
+async function _pinKeep(p){try{localStorage.setItem(PIN_K,await sha256('omni:'+p));}catch(e){}}
+// 'ok' | 'bad' | 'nopin' | 'locked' | 'denied' | 'offline'
+async function _pinVerify(p){
+  if(_OK){try{const r=await supa.rpc('verify_pin',{p:p});if(r.error)throw r.error;return r.data;}catch(e){}}
+  let saved=null,h=null;try{saved=localStorage.getItem(PIN_K);h=await sha256('omni:'+p);}catch(e){}
+  if(saved&&h&&saved===h)return'ok';
+  return saved?'bad':'offline';
+}
 function _ults(set){if(set)localStorage.setItem('omni_ults',Date.now());else localStorage.removeItem('omni_ults');}
 function _withinWindow(){
   const ts=+localStorage.getItem('omni_ults')||0;if(!ts)return false;
   const days=S.lockDays||0;if(days===0)return true;
   return(Date.now()-ts)<days*86400000;
 }
+function _pinHint(m){return m==='setup'?(_pchange?'Choose your new 6-digit PIN':'Set a 6-digit PIN'):m==='confirm'?'Type it again to confirm':m==='old'?'Enter your current PIN  (← to cancel)':'';}
 function showPIN(mode='unlock'){
   _pmode=mode;_pbuf='';_pfirst='';_updDots();
   el('pin-err').textContent='';
-  el('pin-hint').textContent=mode==='setup'?'Set a 6-digit PIN':mode==='confirm'?'Confirm your PIN':'';
+  el('pin-hint').textContent=_pinHint(mode);
   el('pin').classList.remove('gone');el('app').classList.remove('on');
 }
 function hidePIN(){el('pin').classList.add('gone');el('app').classList.add('on');}
 function _updDots(){for(let i=0;i<6;i++){const d=el('pd'+i);if(d)d.classList.toggle('on',i<_pbuf.length);}}
-function pp(d){if(_pbuf.length>=6)return;_pbuf+=d;_updDots();if(_pbuf.length===6)setTimeout(_handlePIN,80);}
-function pinBack(){_pbuf=_pbuf.slice(0,-1);_updDots();el('pin-err').textContent='';}
-function pinLeft(){}
+function pp(d){if(_pbusy||_pbuf.length>=6)return;_pbuf+=d;_updDots();if(_pbuf.length===6)setTimeout(_handlePIN,80);}
+function pinBack(){if(_pbusy)return;_pbuf=_pbuf.slice(0,-1);_updDots();el('pin-err').textContent='';}
+function pinLeft(){if(_pchange&&!_pbusy){_pchange=false;_pold=null;hidePIN();}}
+function _pinFail(msg,mode){el('pin-err').textContent=msg;_pbuf='';_updDots();if(mode){_pmode=mode;_pfirst='';el('pin-hint').textContent=_pinHint(mode);}}
 async function _handlePIN(){
-  if(_pmode==='unlock'){
-    if(await checkPH(_pbuf)){_ults(true);hidePIN();_afterUnlock();}
-    else{el('pin-err').textContent='Incorrect PIN';_pbuf='';_updDots();}
-  }else if(_pmode==='setup'){
-    _pfirst=_pbuf;_pbuf='';_updDots();_pmode='confirm';
-    el('pin-hint').textContent='Confirm your PIN';
-  }else{
-    if(_pbuf===_pfirst){await setPH(_pbuf);_ults(true);hidePIN();showToast('PIN set ✓');_afterUnlock();}
-    else{el('pin-err').textContent='PINs did not match';_pbuf='';_pfirst='';_pmode='setup';_updDots();el('pin-hint').textContent='Set a 6-digit PIN';}
-  }
+  if(_pbusy)return;_pbusy=true;
+  const p=_pbuf;
+  try{
+    if(_pmode==='unlock'||_pmode==='old'){
+      const v=await _pinVerify(p);
+      if(v==='ok'){
+        await _pinKeep(p);
+        if(_pmode==='old'){_pold=p;_pbuf='';_updDots();_pmode='setup';el('pin-err').textContent='';el('pin-hint').textContent=_pinHint('setup');}
+        else{_ults(true);hidePIN();_afterUnlock();}
+      }
+      else if(v==='nopin'){_pold=null;_pinFail('','setup');}
+      else if(v==='locked')_pinFail('Too many tries. Wait 5 minutes.');
+      else if(v==='denied'){_pinFail('Please sign in first.');omniShowLogin();}
+      else if(v==='offline')_pinFail('Cannot check PIN. Go online once first.');
+      else _pinFail('Incorrect PIN');
+    }else if(_pmode==='setup'){
+      _pfirst=p;_pbuf='';_updDots();_pmode='confirm';el('pin-err').textContent='';
+      el('pin-hint').textContent=_pinHint('confirm');
+    }else{
+      if(p!==_pfirst){_pinFail('PINs did not match','setup');return;}
+      let res='error';
+      try{const r=await supa.rpc('set_pin',{old_pin:_pold,new_pin:p});if(r.error)throw r.error;res=r.data;}catch(e){res='no connection';}
+      if(res==='ok'){
+        await _pinKeep(p);_ults(true);hidePIN();
+        if(_pchange){_pchange=false;_pold=null;showToast('PIN changed ✓ (applies to every app)');}
+        else{showToast('PIN set ✓');_afterUnlock();}
+      }
+      else if(res==='bad_old'){_pinFail('Current PIN was wrong','old');}
+      else if(res==='locked')_pinFail('Too many tries. Wait 5 minutes.','setup');
+      else _pinFail('Could not save PIN ('+res+')','setup');
+    }
+  }finally{_pbusy=false;}
 }
-function lockApp(){_ults(false);el('app').classList.remove('on');showPIN('unlock');}
-function changePIN(){closeSettings();setTimeout(()=>showPIN('setup'),150);}
+function lockApp(){_pchange=false;_ults(false);el('app').classList.remove('on');showPIN('unlock');}
+function changePIN(){closeSettings();_pchange=true;_pold=null;setTimeout(()=>showPIN('old'),150);}
+
+// ── LOGIN ──
+let _loginResolve=null,_loginBusy=false,_omniOffline=false;
+function omniShowLogin(){const e=el('login');if(e)e.classList.remove('gone');const l=el('ld');if(l)l.classList.add('gone');}
+function omniHideLogin(){const e=el('login');if(e)e.classList.add('gone');}
+// A device that has signed in and set a PIN before may open offline (PIN checked against the local copy).
+function _offlineEligible(){try{return!!(localStorage.getItem('omni_auth_prod')&&localStorage.getItem(PIN_K));}catch(e){return false;}}
+async function omniRequireLogin(){
+  if(!_OK){_omniOffline=true;return null;}          // library or config missing: local data only
+  let s=null;try{const r=await supa.auth.getSession();s=r&&r.data&&r.data.session;}catch(e){}
+  if(s){try{supa.realtime.setAuth(s.access_token);}catch(e){}return s;}
+  if(!navigator.onLine&&_offlineEligible()){_omniOffline=true;return null;}
+  omniShowLogin();
+  return new Promise(res=>{_loginResolve=res;});
+}
+async function omniLogin(){
+  if(_loginBusy)return;
+  const em=(el('login-email').value||'').trim(),pw=el('login-pass').value||'',er=el('login-err');
+  if(!em||!pw){er.textContent='Enter your email and password.';return;}
+  _loginBusy=true;er.textContent='Signing in...';
+  try{
+    const r=await supa.auth.signInWithPassword({email:em,password:pw});
+    if(r.error){er.textContent=r.error.message;return;}
+    er.textContent='';el('login-pass').value='';
+    try{supa.realtime.setAuth(r.data.session.access_token);}catch(e){}
+    _ults(false);                    // a fresh sign-in always asks for the PIN once
+    omniHideLogin();
+    if(_loginResolve){const f=_loginResolve;_loginResolve=null;const l=el('ld');if(l)l.classList.remove('gone');f(r.data.session);}
+  }catch(e){er.textContent=e.message||String(e);}
+  finally{_loginBusy=false;}
+}
+async function omniSignOut(){
+  if(!confirm('Sign out of this device? You will need your email and password to sign in again.'))return;
+  try{await supa.auth.signOut();}catch(e){}
+  try{['omni_auth_prod',PIN_K,'omni_ults','omni_s'].forEach(k=>localStorage.removeItem(k));}catch(e){}
+  location.reload();
+}
+window.addEventListener('online',async()=>{
+  if(!_omniOffline||!_OK)return;
+  try{const r=await supa.auth.getSession();if(r&&r.data&&r.data.session){_omniOffline=false;drainOmniInbox();}else omniShowLogin();}catch(e){}
+});
 document.addEventListener('touchstart',()=>_lastAct=Date.now(),{passive:true});
 document.addEventListener('mousedown',()=>_lastAct=Date.now());
 function _checkAutoLock(){const days=S.lockDays||0;if(days<=0)return;if((Date.now()-_lastAct)>days*86400000)lockApp();}
@@ -1869,13 +1967,16 @@ function _ttcTpToOmni(tp){
 
 async function loadOmniTasks(){
   try{
-    const{data}=await supaFrom('omni_settings').select('value').eq('key','tasks').single();
+    const{data,error}=await supaFrom('omni_settings').select('value').eq('key','tasks').single();
     if(data?.value)OTASKS=typeof data.value==='string'?JSON.parse(data.value):data.value||[];
+    // Only a confirmed load (or a confirmed "no tasks yet") lets the inbox add to the list and save it.
+    if(!error||error.code==='PGRST116')_tasksLoaded=true;
   }catch(e){}
 }
+let _tasksLoaded=false;
 async function saveOmniTasks(){
   OTASKS=OTASKS.filter(t=>t&&t.id);
-  await saveSetting('tasks',OTASKS);
+  return await saveSetting('tasks',OTASKS);
 }
 
 function getSlotsForDay(dayName){
@@ -1960,7 +2061,12 @@ async function sendToWork(text,catHint,sticky){
     return true;
   }catch(e){console.warn('sendToWork failed',e.message);return false;}
 }
+let _drainBusy=false;
 async function drainOmniInbox(){
+  // Never run before the task list has loaded: the load REPLACES the list, which used to wipe
+  // freshly delivered tasks (they showed for a moment, then vanished for good).
+  if(_drainBusy||!_tasksLoaded||!_OK)return;
+  _drainBusy=true;
   try{
     const{data,error}=await supaFrom('app_inbox')
       .select('*').eq('target_app','omni').eq('consumed',false);
@@ -1968,11 +2074,14 @@ async function drainOmniInbox(){
     if(!data||!data.length)return;
     const d=new Date();
     const dateStr=d.toLocaleDateString('en-CA');
-    const ids=[];
+    const ids=[],added=[];
     data.forEach(row=>{
+      const tid='in_'+row.id;                 // one inbox row = one task id, so redelivery cannot duplicate
+      ids.push(row.id);
+      if(OTASKS.some(t=>t&&t.id===tid))return;
       const sticky=!!row.sticky;
       OTASKS.push({
-        id:'in_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+        id:tid,
         text:row.text,
         tier:sticky?3:1,
         day:sticky?null:DS[d.getDay()],
@@ -1982,14 +2091,30 @@ async function drainOmniInbox(){
         taskTime:null,
         src:'inbox'
       });
-      ids.push(row.id);
+      added.push(tid);
     });
-    await saveOmniTasks();
-    await supaFrom('app_inbox').update({consumed:true}).in('id',ids);
-    showToast('\u2713 '+ids.length+' task'+(ids.length>1?'s':'')+' from Work');
-    try{if(_curTab==='planner')renderDay();}catch(e){}
-    try{if(_curTab==='checklists'&&typeof renderCVTasks==='function')renderCVTasks();}catch(e){}
+    if(added.length){
+      const ok=await saveOmniTasks();
+      if(!ok){OTASKS=OTASKS.filter(t=>!added.includes(t.id));return;}   // not saved: leave rows for the next try
+    }
+    const u=await supaFrom('app_inbox').update({consumed:true}).in('id',ids);
+    if(u&&u.error)console.warn('inbox consume failed',u.error.message);
+    if(added.length){
+      showToast('\u2713 '+added.length+' task'+(added.length>1?'s':'')+' from Work');
+      try{if(_curTab==='planner')renderDay();}catch(e){}
+      try{if(_curTab==='checklists'&&typeof renderCVTasks==='function')renderCVTasks();}catch(e){}
+    }
   }catch(e){console.warn('drainOmniInbox',e.message);}
+  finally{_drainBusy=false;}
+}
+// Tasks sent while Omni is open arrive without a reload: live event, plus a 60 s check and on return to the app.
+function _startInboxWatch(){
+  if(!_OK)return;
+  try{supa.channel('omni_inbox_rt')
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'app_inbox',filter:'target_app=eq.omni'},()=>drainOmniInbox())
+    .subscribe();}catch(e){}
+  setInterval(drainOmniInbox,60000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)drainOmniInbox();});
 }
 
 // ══ SHARED DONE-STATE SYNC (task_done table) ══════════════════
@@ -3768,11 +3893,13 @@ function _afterUnlock(){
 }
 
 async function init(){
-  await hydrateDoneState();_subscribeDoneRealtime();drainOmniInbox();
+  await omniRequireLogin();          // waits here on the sign-in screen when there is no session
+  await hydrateDoneState();_subscribeDoneRealtime();
   await loadSettings();
   setInterval(updateClock,1000);updateClock();
   // Load work data + tasks
   await Promise.all([loadWorkData(),loadOmniTasks()]);
+  await drainOmniInbox();_startInboxWatch();   // after the list is loaded, never before
   // Load gym data in background so gym task shows in day view without opening gym tab
   loadGym().then(()=>{
     renderDay(); // always re-render — cheap if not on planner, needed for gym task
@@ -3788,9 +3915,8 @@ async function init(){
   }
   el('ld').classList.add('gone');
   try{_defPage=localStorage.getItem('omni_dp')||'dashboard';}catch(e){}
-  if(!hasPIN())showPIN('setup');
-  else if(_withinWindow()){_ults(true);hidePIN();_afterUnlock();}
-  else showPIN('unlock');
+  if(_withinWindow()){_ults(true);hidePIN();_afterUnlock();}
+  else showPIN('unlock');   // first use on this account: the database answers "nopin" and setup follows
   // Show connection status briefly
   setTimeout(()=>{
     if(_OK&&WSLOTS.length)showToast('Synced ✓  '+WSLOTS.length+' slots loaded',2000);
