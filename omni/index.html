@@ -1667,8 +1667,11 @@ const DS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 function _p(n){return String(n).padStart(2,'0');}
 function isoWeek(d){const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const day=dt.getUTCDay()||7;dt.setUTCDate(dt.getUTCDate()+4-day);const y0=new Date(Date.UTC(dt.getUTCFullYear(),0,1));return Math.ceil(((dt-y0)/86400000+1)/7);}
 function _weekKey(){const d=new Date();return d.getFullYear()+'-W'+isoWeek(d);}
-function todayStr(){return new Date().toISOString().split('T')[0];}
-function weekStartStr(){const d=new Date();const dow=d.getDay()||7;d.setDate(d.getDate()-dow+1);return d.toISOString().split('T')[0];}
+// Calendar dates are always the LOCAL date. toISOString() is UTC, which in Shanghai is still
+// the previous day until 08:00, so tasks landed a day late and ticks counted for yesterday.
+function _ld(x){x=x||new Date();return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');}
+function todayStr(){return _ld(new Date());}
+function weekStartStr(){const d=new Date();const dow=d.getDay()||7;d.setDate(d.getDate()-dow+1);return _ld(d);}
 
 function updateClock(){
   const n=new Date();
@@ -1991,7 +1994,7 @@ function getSlotsForDay(dayName){
 function getTasksFor(dayOffset){
   const d=new Date();d.setDate(d.getDate()+dayOffset);
   const dayName=DS[d.getDay()];
-  const dateStr=d.toISOString().split('T')[0];
+  const dateStr=_ld(d);
   const wNum=isoWeek(d);         // week number of TARGET day
   const todayWNum=isoWeek(new Date()); // week number of TODAY (actual current week)
   const isSun=d.getDay()===0; // last day of ISO week (Sunday = end of ISO week)
@@ -2281,7 +2284,7 @@ function openAddTaskAtTime(slotTime){
   // Use specific date of the currently viewed day (not just day name)
   el('tm-day-mode').value='date';
   const d=new Date();d.setDate(d.getDate()+_dayOff);
-  el('tm-date').value=d.toISOString().split('T')[0];
+  el('tm-date').value=_ld(d);
   let tf=el('tm-tasktime');if(!tf){tf=document.createElement('input');tf.type='hidden';tf.id='tm-tasktime';el('task-md').appendChild(tf);}
   tf.value=slotTime;updateTaskFields();el('task-title').textContent='Add task at '+slotTime;
 }
@@ -2296,7 +2299,7 @@ function renderDay(){
 function _renderDayNow(){
   _rdTimer=null;
   const d=new Date();d.setDate(d.getDate()+_dayOff);
-  const dayName=DS[d.getDay()];const dateStr=d.toISOString().split('T')[0];
+  const dayName=DS[d.getDay()];const dateStr=_ld(d);
   const isToday=_dayOff===0;
   if(el('day-lbl'))el('day-lbl').textContent=_dayOff===0?'Today':_dayOff===-1?'Yesterday':_dayOff===1?'Tomorrow':DN[d.getDay()];
   if(el('day-sub'))el('day-sub').textContent=`${d.getDate()} ${MN[d.getMonth()]} ${d.getFullYear()} · ${dayName}`;
@@ -2557,7 +2560,7 @@ function _renderDayNow(){
   } // end if(true)
   el('day-tasks').innerHTML=th;
 }
-function _dayDate(){const d=new Date();d.setDate(d.getDate()+_dayOff);return d.toISOString().split('T')[0];}
+function _dayDate(){const d=new Date();d.setDate(d.getDate()+_dayOff);return _ld(d);}
 function toggleNight(){
   const cur=localStorage.getItem('omni_night')==='1';
   localStorage.setItem('omni_night',cur?'0':'1');
@@ -2592,7 +2595,7 @@ function _scrollToNow(){
 
 function togglePastCollapse(){
   const d=new Date();d.setDate(d.getDate()+_dayOff);
-  const dateStr=d.toISOString().split('T')[0];
+  const dateStr=_ld(d);
   const expRows=document.getElementById('past-exp-rows');
   const sumRow=document.getElementById('past-sum-row');
   const isExpanded=expRows&&expRows.style.display!=='none';
@@ -2799,9 +2802,9 @@ function openAddTask(){
   const _tal=el('tm-app-link');if(_tal)_tal.value='';
   el('tm-day-mode').value='weekday';
   el('tm-day').value='Mon';
-  const d=new Date();const ds=d.toISOString().split('T')[0];
+  const d=new Date();const ds=_ld(d);
   el('tm-date').value=ds;el('tm-from').value=ds;
-  const to=new Date(d);to.setDate(to.getDate()+6);el('tm-to').value=to.toISOString().split('T')[0];
+  const to=new Date(d);to.setDate(to.getDate()+6);el('tm-to').value=_ld(to);
   updateTaskFields();el('task-md').classList.add('on');
 }
 function openEditTask(id){
@@ -2903,7 +2906,7 @@ function _comboScore(combo,targetDate,dayName){
 
   const refDate=new Date(targetDate+'T12:00:00');
   const cutoff=new Date(refDate);cutoff.setDate(cutoff.getDate()-30);
-  const cutoffStr=cutoff.toISOString().split('T')[0];
+  const cutoffStr=_ld(cutoff);
 
   // Check items available
   const itemIds=combo.item_ids||[];
@@ -3014,7 +3017,7 @@ function renderWWeek(){
   // Grid
   let grid=`<div style="padding:.4rem .6rem .25rem;font-size:11px;color:var(--tx3)">Tap a day to choose manually.</div><div class="wog">`;
   days.forEach((d,di)=>{
-    const ds=d.toISOString().split('T')[0];
+    const ds=_ld(d);
     const isToday=d.toDateString()===today.toDateString();
     const confirmed=WLOG.find(l=>l.date===ds);
     const skips=_skipMap[ds]||[];
@@ -3036,7 +3039,7 @@ function renderWWeek(){
     <div class="sec-lbl" style="padding:0">This week</div>
   </div>`;
   days.forEach((d,di)=>{
-    const ds=d.toISOString().split('T')[0];
+    const ds=_ld(d);
     const confirmed=WLOG.find(l=>l.date===ds);
     const skips=_skipMap[ds]||[];
     const dn=shortD[di];
@@ -3214,7 +3217,7 @@ async function deleteCombo(){if(!_editComboId||!confirm('Delete?'))return;await 
 
 // ── YESTERDAY LAUNDRY CHECK ─────────────────────────────────────────────────────
 async function checkYesterdayLaundry(){
-  const y=new Date();y.setDate(y.getDate()-1);const ys=y.toISOString().split('T')[0];
+  const y=new Date();y.setDate(y.getDate()-1);const ys=_ld(y);
   const yLog=WLOG.find(l=>l.date===ys);if(!yLog)return;
   const askKey='omni_la_'+todayStr();if(localStorage.getItem(askKey))return;
   localStorage.setItem(askKey,'1');
@@ -4493,7 +4496,7 @@ async function _gtrFinish(done){
   const ov=document.getElementById('gtr-timer-ov');if(ov)ov.remove();
   if(done){
     const d=new Date();d.setDate(d.getDate()+_dayOff);
-    const dateStr=d.toISOString().split('T')[0];
+    const dateStr=_ld(d);
     _habSetDone('guitar',dateStr,true);
     await _logHabit('guitar',dateStr,{dur_min:_getGuitarCfg().dur});
     renderDay();
@@ -4514,7 +4517,7 @@ function openAddPersonalSlot(dateStr){
   document.getElementById('ps-start').value='';
   document.getElementById('ps-end').value='';
   document.getElementById('ps-recur').value='once';
-  document.getElementById('ps-date').value=dateStr||new Date().toISOString().split('T')[0];
+  document.getElementById('ps-date').value=dateStr||_ld(new Date());
   document.getElementById('ps-delete-btn').style.display='none';
   document.getElementById('ps-depart-toggle').checked=false;
   document.getElementById('ps-depart-fields').style.display='none';
@@ -5149,7 +5152,7 @@ let _liveWake=null,_liveFrozen=false;
 
 function _getLiveCtx(){
   const now=new Date();const nowM=now.getHours()*60+now.getMinutes()+now.getSeconds()/60;
-  const dayName=DS[now.getDay()];const dateStr=now.toISOString().split('T')[0];
+  const dayName=DS[now.getDay()];const dateStr=_ld(now);
   // Use _daySlots (same as renderDay) for correct slot lookup
   const ds=typeof _daySlots!=='undefined'&&_daySlots.length?_daySlots:WSLOTS.filter(s=>t2m(s.t)>=420);
   const ttc=window._ttCustomData||{};
