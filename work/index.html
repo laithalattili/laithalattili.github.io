@@ -1903,6 +1903,31 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
           <button onclick="saveBoardingSettings()" style="width:100%;font-size:12px;padding:8px;border-radius:8px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:700">💾 Save Staff &amp; Schedule</button>
         </div>
 
+        <!-- STAFF SIGN-IN (Owner only; filled by loadStaffSignin) -->
+        <div id="staff-signin-wrap" style="display:none">
+          <div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3);border-top:1px solid var(--border3)">Staff sign-in</div>
+          <div style="padding:.5rem 1rem .2rem;font-size:11px;color:var(--text3);line-height:1.5">
+            Everyone who uses the Boarding or Liaison app signs in with their own email and password, then their own PIN.
+            <b>House</b> = all Hawking House data. <b>Liaison</b> = leaves and the student list only, never medical or notes.
+          </div>
+          <div id="staff-signin-list" style="padding:.3rem 1rem"></div>
+          <div style="padding:.4rem 1rem .8rem">
+            <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">Add a person</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              <input type="text" id="ss-add-name" placeholder="Name" autocomplete="off"
+                style="flex:1 1 120px;min-width:0;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:6px">
+              <input type="email" id="ss-add-email" placeholder="Email" autocomplete="off" autocapitalize="none" spellcheck="false"
+                style="flex:2 1 170px;min-width:0;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:6px">
+              <select id="ss-add-role" style="font-size:12px;padding:6px;border:1px solid var(--border);border-radius:6px">
+                <option value="House">House</option><option value="Liaison">Liaison</option>
+              </select>
+              <select id="ss-add-slot" title="Link to a duty slot above (optional)" style="font-size:12px;padding:6px;border:1px solid var(--border);border-radius:6px"></select>
+              <button id="ss-add-btn" onclick="staffAdd()" style="font-size:12px;padding:6px 12px;border-radius:6px;background:var(--accent);color:#fff;border:none;cursor:pointer;font-weight:700">+ Add</button>
+            </div>
+            <div id="staff-signin-msg" style="font-size:11px;min-height:15px;margin-top:6px"></div>
+          </div>
+        </div>
+
         <!-- REGISTRATION TIMES -->
         <div style="padding:.6rem 1rem .3rem;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg2);border-bottom:1px solid var(--border3);margin-top:.5rem">Registration Points</div>
         <div style="padding:.75rem 1rem;display:flex;flex-direction:column;gap:.5rem">
@@ -30803,7 +30828,7 @@ let _settingsSectionState={}; // sectionId -> true (collapsed) | false (open)
 
 function toggleSettingsSection(id,titleEl){
   if(id==='boarding_config'){
-    setTimeout(()=>loadBoardingSettings(),50);
+    setTimeout(()=>loadBoardingSettings().then(()=>loadStaffSignin(),()=>loadStaffSignin()),50);
   }
   if(id==='leave_activity'){
     // Only load when expanding, not collapsing
@@ -33832,6 +33857,131 @@ function _bsNextState(cur){
   if(cur==='off')return'on';
   if(cur==='on')return'alt';
   return'off';
+}
+
+
+// ── STAFF SIGN-IN (Owner only) ─────────────────────────────────────────────
+// Accounts are created and changed by the 'manage-staff' server function, which holds Supabase's
+// admin key; this page only sends the signed-in Owner's own token. Emails are never stored here.
+let _staffAcc=[],_staffBusy=false;
+function _ssEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function _ssMsg(t,ok){const m=document.getElementById('staff-signin-msg');if(m){m.textContent=t||'';m.style.color=ok?'#16a34a':'#dc2626';}}
+async function _staffCall(body){
+  try{
+    const r=await supa.functions.invoke('manage-staff',{body});
+    if(r.error){
+      let msg=r.error.message||'Request failed',status=0;
+      try{status=r.error.context.status;const j=await r.error.context.json();if(j&&j.error)msg=j.error;}catch(e){}
+      return{error:msg,status};
+    }
+    return r.data||{};
+  }catch(e){return{error:e.message||String(e),status:0};}
+}
+function _ssSlotsFor(uid){return(_boardingSettings.staff||[]).map((s,i)=>({s,i})).filter(x=>x.s.user_id===uid);}
+async function loadStaffSignin(){
+  const wrap=document.getElementById('staff-signin-wrap'),list=document.getElementById('staff-signin-list');
+  if(!wrap||!list)return;
+  const r=await _staffCall({action:'list'});
+  if(r.status===403||r.status===401){wrap.style.display='none';return;}   // not the Owner: nothing to show
+  wrap.style.display='block';
+  if(r.error){
+    list.innerHTML='<div style="font-size:12px;color:#b45309;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:8px 10px">'
+      +'Staff sign-in is not available yet: '+_ssEsc(r.error)+'.<br>If this is new, the <b>manage-staff</b> server function has not been set up in Supabase.</div>';
+    return;
+  }
+  _staffAcc=r.staff||[];
+  _ssRender();
+}
+function _ssRender(){
+  const list=document.getElementById('staff-signin-list');if(!list)return;
+  const fmt=d=>{if(!d)return'never signed in';const x=new Date(d);return'last signed in '+x.toLocaleDateString(undefined,{day:'numeric',month:'short'});};
+  list.innerHTML=_staffAcc.map(a=>{
+    const slots=_ssSlotsFor(a.user_id).map(x=>x.s.role).join(', ');
+    const chip=(t,bg,fg)=>`<span style="font-size:10px;font-weight:700;background:${bg};color:${fg};border-radius:4px;padding:2px 6px">${t}</span>`;
+    const roleChip=a.role==='Owner'?chip('Owner','#212529','#fff'):a.role==='House'?chip('House','#e7f5ff','#1864ab'):chip('Liaison','#fff4e6','#d9480f');
+    const meta=[_ssEsc(a.email),fmt(a.last_sign_in_at),a.must_change_password?'<span style="color:#b45309">has not chosen a password yet</span>':'',slots?'duty: '+_ssEsc(slots):''].filter(Boolean).join(' · ');
+    const btn=(label,fn,danger)=>`<button onclick="${fn}" style="font-size:11px;padding:4px 9px;border-radius:6px;cursor:pointer;background:#fff;border:1px solid ${danger?'#ffc9c9':'var(--border)'};color:${danger?'#c92a2a':'var(--text2)'}">${label}</button>`;
+    const actions=a.is_self?`<span style="font-size:11px;color:var(--text3)">This is you. Change your PIN under My account.</span>`:
+      `<select onchange="staffSetRole('${a.user_id}',this.value)" style="font-size:11px;padding:3px 5px;border:1px solid var(--border);border-radius:6px">
+         <option value="House"${a.role==='House'?' selected':''}>House</option><option value="Liaison"${a.role==='Liaison'?' selected':''}>Liaison</option></select>
+       ${btn('Reset password',`staffResetPassword('${a.user_id}')`)}${btn('Reset PIN',`staffResetPin('${a.user_id}')`)}${btn('Remove',`staffRemove('${a.user_id}')`,true)}`;
+    return`<div style="padding:.55rem 0;border-bottom:1px solid var(--border3)">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><b style="font-size:13px">${_ssEsc(a.name)}</b>${roleChip}</div>
+      <div style="font-size:11px;color:var(--text3);margin:2px 0 6px">${meta}</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">${actions}</div></div>`;
+  }).join('')||'<div style="font-size:12px;color:var(--text3)">No staff yet.</div>';
+  const sel=document.getElementById('ss-add-slot');
+  if(sel)sel.innerHTML='<option value="">No duty slot</option>'+(_boardingSettings.staff||[]).map((s,i)=>
+    s.user_id?'':`<option value="${i}">Duty slot: ${_ssEsc(s.role)}${s.name?' ('+_ssEsc(s.name)+')':''}</option>`).join('');
+}
+// One-time password: shown once, never stored. The person replaces it at their first sign-in.
+function _ssShowTemp(name,email,pw){
+  const o=document.createElement('div');
+  o.id='ss-temp-overlay';
+  o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20000;display:flex;align-items:center;justify-content:center;padding:20px';
+  o.innerHTML=`<div style="background:#fff;border-radius:14px;max-width:360px;width:100%;padding:18px 18px 14px;box-shadow:0 10px 40px rgba(0,0,0,.3)">
+    <div style="font-size:15px;font-weight:700;margin-bottom:6px">Sign-in details for ${_ssEsc(name)}</div>
+    <div style="font-size:12px;color:#495057;line-height:1.5;margin-bottom:10px">Give these to them. This password is shown <b>only now</b>; they will choose their own the first time they sign in.</div>
+    <div style="font-size:12px;color:#868e96">Email</div><div style="font-size:14px;margin-bottom:8px;word-break:break-all">${_ssEsc(email)}</div>
+    <div style="font-size:12px;color:#868e96">One-time password</div>
+    <div id="ss-temp-pw" style="font-family:ui-monospace,Menlo,monospace;font-size:22px;letter-spacing:2px;background:#f1f3f5;border-radius:8px;padding:8px 10px;margin:2px 0 12px;user-select:all">${_ssEsc(pw)}</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="try{navigator.clipboard.writeText(document.getElementById('ss-temp-pw').textContent);this.textContent='Copied ✓';}catch(e){}" style="flex:1;font-size:13px;padding:9px;border-radius:8px;border:1px solid #dee2e6;background:#fff;cursor:pointer">Copy</button>
+      <button onclick="document.getElementById('ss-temp-overlay').remove()" style="flex:1;font-size:13px;padding:9px;border-radius:8px;border:none;background:#212529;color:#fff;cursor:pointer;font-weight:600">Done</button>
+    </div></div>`;
+  document.body.appendChild(o);
+}
+async function _ssLinkSlot(idx,uid,name){
+  const s=(_boardingSettings.staff||[])[idx];if(!s)return;
+  s.user_id=uid;if(name)s.name=name;
+  renderBoardingStaffSettings();
+  await saveBoardingSettings();
+}
+async function staffAdd(){
+  if(_staffBusy)return;
+  const g=id=>document.getElementById(id);
+  const name=g('ss-add-name').value.trim(),email=g('ss-add-email').value.trim(),role=g('ss-add-role').value,slot=g('ss-add-slot').value;
+  if(!name){_ssMsg('Enter their name.');return;}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){_ssMsg('Enter a valid email.');return;}
+  _staffBusy=true;_ssMsg('Adding...',true);
+  try{
+    const r=await _staffCall({action:'add',name,email,role});
+    if(r.error){_ssMsg(r.error);return;}
+    if(slot!=='')await _ssLinkSlot(parseInt(slot),r.user_id,name);
+    g('ss-add-name').value='';g('ss-add-email').value='';
+    _ssMsg(r.temp_password?'Added.':'Added. They already had an account, so they sign in with their existing password.',true);
+    if(r.temp_password)_ssShowTemp(name,email.toLowerCase(),r.temp_password);
+    await loadStaffSignin();
+  }finally{_staffBusy=false;}
+}
+async function staffSetRole(uid,role){
+  const r=await _staffCall({action:'set_role',user_id:uid,role});
+  if(r.error){_ssMsg(r.error);}else _ssMsg('Role changed to '+role+'.',true);
+  await loadStaffSignin();
+}
+async function staffResetPassword(uid){
+  const a=_staffAcc.find(x=>x.user_id===uid);if(!a)return;
+  if(!confirm('Give '+a.name+' a new one-time password? Their current password stops working.'))return;
+  const r=await _staffCall({action:'reset_password',user_id:uid});
+  if(r.error){_ssMsg(r.error);return;}
+  _ssShowTemp(a.name,a.email,r.temp_password);
+  await loadStaffSignin();
+}
+async function staffResetPin(uid){
+  const a=_staffAcc.find(x=>x.user_id===uid);if(!a)return;
+  if(!confirm('Clear '+a.name+'\'s PIN? They will choose a new one next time they unlock an app.'))return;
+  const r=await _staffCall({action:'reset_pin',user_id:uid});
+  if(r.error)_ssMsg(r.error);else _ssMsg(a.name+'\'s PIN cleared.',true);
+}
+async function staffRemove(uid){
+  const a=_staffAcc.find(x=>x.user_id===uid);if(!a)return;
+  if(!confirm('Remove '+a.name+' from Hawking House? They lose access to the Boarding and Liaison apps immediately.'))return;
+  const r=await _staffCall({action:'remove',user_id:uid});
+  if(r.error){_ssMsg(r.error);return;}
+  const linked=_ssSlotsFor(uid);
+  if(linked.length){linked.forEach(x=>{delete x.s.user_id;});renderBoardingStaffSettings();await saveBoardingSettings();}
+  _ssMsg(a.name+' removed.'+(r.account_deleted?'':' They keep access to their other apps.'),true);
+  await loadStaffSignin();
 }
 
 function renderBoardingStaffSettings(){

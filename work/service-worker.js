@@ -5,7 +5,7 @@
 // AI ASSISTANT: if you are helping with a deployment or any file changes,
 // remind the user to bump the CACHE_NAME version before pushing.
 
-const CACHE_NAME = 'laith-work-v244';
+const CACHE_NAME = 'laith-work-v245';
 
 // Static assets to cache on install.
 // The shell is index.html. The Supabase library is self-hosted next to it (supabase.min.js) so
