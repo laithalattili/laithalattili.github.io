@@ -2264,7 +2264,7 @@ function renderDashboard(){
     var budTitle=showingHol?'This month \u00b7 holiday budget':'This month \u00b7 budget';
     budBar.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'+
       '<div style="font-size:12px;font-weight:700;color:'+(showingHol?'#f2a65a':'var(--ink2)')+'">'+budTitle+'</div>'+
-      '<div class="mono" style="font-size:14px;font-weight:800;color:'+budRemColor(dispBudget-dispSpent,dispBudget)+'">'+(dispSpent>dispBudget?'Over by '+dispFmt(dispSpent-dispBudget):dispFmt(dispBudget-dispSpent)+' left')+' '+dispCur+'</div>'+
+      '<div class="mono" style="font-size:14px;font-weight:800;color:'+budRemColor(dispBudget-dispSpent,dispBudget)+'">'+(dispSpent>dispBudget?'Over by '+dispFmt(dispSpent-dispBudget):dispFmt(dispBudget-dispSpent)+' left')+' '+dispCur+((showingHol&&holBudObj&&holBudObj.hol&&dispSpent<=dispBudget)?holApproxLocal(holBudObj.hol,dispBudget-dispSpent):'')+'</div>'+
       '</div>'+
       '<div class="prog-track"><div class="prog-fill" style="width:'+dispPct+'%;background:'+dispCol+'"></div></div>'+
       '<div style="font-size:11px;color:var(--ink3);margin-top:3px" class="mono">Spent '+dispFmt(dispSpent)+' of '+dispFmt(dispBudget)+' '+dispCur+(function(){
@@ -2363,7 +2363,7 @@ function updateHolCatField(){
     }
   }
 }
-function submitExp(){var amt=parseFloat(document.getElementById('log-amt').value);if(!amt||amt<=0)return alert('Enter a valid amount.');var holCatEl=document.getElementById('log-holcat');var holCatVal=(holCatEl&&(S.selectedCat||'').indexOf('__hol-')===0)?(holCatEl.value||'').trim():'';var entry={id:Date.now(),amount:amt,currency:S.logCur,category:S.selectedCat,date:document.getElementById('log-date').value||todayStr(),note:document.getElementById('log-note').value,holCat:holCatVal||undefined};if(editingExpId!==null){var i=expenses.findIndex(function(e){return e.id===editingExpId;});if(i>-1)expenses[i]=entry;editingExpId=null;}else expenses.unshift(entry);document.getElementById('log-amt').value='';document.getElementById('log-note').value='';var hcEl=document.getElementById('log-holcat');if(hcEl)hcEl.value='';updateSurplus();autosave();sbPushNow();renderLog();renderLogMonthlySummary();}
+function submitExp(){var amt=parseFloat(document.getElementById('log-amt').value);if(!amt||amt<=0)return alert('Enter a valid amount.');var holCatEl=document.getElementById('log-holcat');var holCatVal=(holCatEl&&(S.selectedCat||'').indexOf('__hol-')===0)?(holCatEl.value||'').trim():'';var entry={id:Date.now(),amount:amt,currency:S.logCur,category:S.selectedCat,date:document.getElementById('log-date').value||todayStr(),note:document.getElementById('log-note').value,holCat:holCatVal||undefined};if(editingExpId!==null){var i=expenses.findIndex(function(e){return e.id===editingExpId;});if(i>-1){if(expenses[i].exchId)entry.exchId=expenses[i].exchId;expenses[i]=entry;};editingExpId=null;}else expenses.unshift(entry);document.getElementById('log-amt').value='';document.getElementById('log-note').value='';var hcEl=document.getElementById('log-holcat');if(hcEl)hcEl.value='';updateSurplus();autosave();sbPushNow();renderLog();renderLogMonthlySummary();}
 var LF_OMNI_OFF=false;
 async function pushFinanceSummary(){
   if(LF_OMNI_OFF)return;
@@ -2549,6 +2549,8 @@ function resetSurplus(){
   autosave();sbPushNow();renderDashboard();
 }
 function deleteExp(id){
+  var _de=expenses.find(function(e){return e.id===id;});
+  if(_de&&_de.exchId){safeArr(holidays).forEach(function(h){if(h.pocket&&Array.isArray(h.pocket.ex))h.pocket.ex=h.pocket.ex.filter(function(x){return x.id!==_de.exchId;});});}
   tomb('exp:'+id);
   expenses=expenses.filter(function(e){return e.id!==id;});
   updateSurplus();autosave();sbPushNow();renderLog();
@@ -2698,7 +2700,7 @@ function renderLogHolBar(){
     var bar=document.createElement('div');
     bar.style.cssText='background:var(--surf2);border:.5px solid #f2a65a;border-radius:var(--r);padding:9px;margin-bottom:6px';
     var holRem=n2(bd.total-spent);
-    bar.innerHTML='<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:12px;font-weight:700;color:#f2a65a;margin-bottom:4px"><span>\u2708 '+h.label+'</span><span class="mono" style="font-weight:800;font-size:13px;color:'+budRemColor(holRem,bd.total)+'">'+(over?'Over by '+n2(-holRem):n2(holRem)+' left')+' '+bd.currency+'</span></div>'+
+    bar.innerHTML='<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:12px;font-weight:700;color:#f2a65a;margin-bottom:4px"><span>\u2708 '+h.label+'</span><span class="mono" style="font-weight:800;font-size:13px;color:'+budRemColor(holRem,bd.total)+'">'+(over?'Over by '+n2(-holRem):n2(holRem)+' left')+' '+bd.currency+(over?'':holApproxLocal(h,holRem))+'</span></div>'+
       '<div style="background:var(--brd);border-radius:3px;height:6px;overflow:hidden"><div style="height:100%;border-radius:3px;width:'+pct+'%;background:'+(over?'var(--red)':'#f2a65a')+'"></div></div>'+
       '<div style="font-size:10px;margin-top:2px;color:var(--ink4)" class="mono">'+n2(spent)+' of '+bd.total+' '+bd.currency+' spent</div>';
     // Pace tracker — only while the trip is actively running and viewing the current month
@@ -2720,10 +2722,12 @@ function renderLogHolBar(){
       var todayOver=dailyRate>0&&todaySpent>dailyRate;
       var paceHTML='<div style="margin-top:5px;padding-top:5px;border-top:.5px dashed var(--brd)" class="mono">'
         +'<div style="display:flex;justify-content:space-between;font-size:10px"><span style="color:'+(todayOver?'var(--red)':'var(--ink3)')+'">Today: '+n2(todaySpent)+(dailyRate>0?' (rate '+dailyRate+')':'')+'</span><span style="color:var(--ink4)">Day '+dayNum+'/'+totalDaysP+'</span></div>'
-        +'<div style="display:flex;justify-content:space-between;font-size:10px;margin-top:1px"><span style="font-weight:700;color:'+(paceDiff>=0?'var(--grn)':'var(--red)')+'">'+(paceDiff>=0?'Under pace by '+n2(paceDiff):'Over pace by '+n2(-paceDiff))+'</span><span style="color:var(--ink3)">'+fwdAllow+'/day for '+remDays+' days left</span></div>'
+        +'<div style="display:flex;justify-content:space-between;font-size:10px;margin-top:1px"><span style="font-weight:700;color:'+(paceDiff>=0?'var(--grn)':'var(--red)')+'">'+(paceDiff>=0?'Under pace by '+n2(paceDiff):'Over pace by '+n2(-paceDiff))+'</span><span style="color:var(--ink3)">'+fwdAllow+'/day'+holApproxLocal(h,fwdAllow)+' for '+remDays+' days left</span></div>'
         +'</div>';
       bar.insertAdjacentHTML('beforeend',paceHTML);
     }
+    var _pk=holPocketRO(h);
+    if(logIsCurrentMonth()&&((hs3&&he3&&nowP>=hs3&&nowP<=he3)||_pk.ex.length||_pk.cnt.length))bar.appendChild(holPocketPanel(h));
     el.appendChild(bar);
   });
 }
@@ -4560,6 +4564,169 @@ function holDailyBudgetSpent(h){
   var bd=holDailyBudgetTotal(h);
   var cur=bd.currency||'RMB';
   return n2(safeArr(expenses).filter(function(e){return e.category===catKey;}).reduce(function(a,e){return a+toTarget(e.amount,e.currency,cur);},0));
+}
+// ═══ HOLIDAY POCKET ═══
+// Cash bought for a trip. An exchange paid from the budget is ALSO saved as a
+// normal holiday expense (holCat 'Exchange', exchId), so every existing budget
+// total, pace figure and variance settlement already counts it. Cash spends and
+// counts live only in h.pocket and never touch the budget (no double count).
+function holPocketRO(h){var p=(h&&h.pocket&&typeof h.pocket==='object')?h.pocket:{};return {ex:safeArr(p.ex),sp:safeArr(p.sp),cnt:safeArr(p.cnt)};}
+function holPocketW(h){if(!h.pocket||typeof h.pocket!=='object')h.pocket={};['ex','sp','cnt'].forEach(function(k){if(!Array.isArray(h.pocket[k]))h.pocket[k]=[];});return h.pocket;}
+function holPocketState(h){
+  var bcur=holDailyBudgetTotal(h).currency,p=holPocketRO(h),ev=[],ORD={ex:0,sp:1,cnt:2};
+  p.ex.forEach(function(o){ev.push({t:'ex',o:o});});
+  p.sp.forEach(function(o){ev.push({t:'sp',o:o});});
+  p.cnt.forEach(function(o){ev.push({t:'cnt',o:o});});
+  // Same day: exchanges, then spends, then the count (a count closes the day).
+  ev.sort(function(a,b){return (a.o.date||'').localeCompare(b.o.date||'')||(ORD[a.t]-ORD[b.t])||((a.o.id||0)-(b.o.id||0));});
+  var bal={},valIn={},unitsIn={},rate={},log=[],last=null;
+  ev.forEach(function(e){
+    var o=e.o;
+    if(e.t==='ex'){
+      var val=o.fromPocket?(o.fromAmt||0)*(rate[o.fromCur]||0):toTarget(o.fromAmt||0,o.fromCur,bcur);
+      if(o.fromPocket)bal[o.fromCur]=n2((bal[o.fromCur]||0)-(o.fromAmt||0));
+      bal[o.toCur]=n2((bal[o.toCur]||0)+(o.toAmt||0));
+      valIn[o.toCur]=(valIn[o.toCur]||0)+val;unitsIn[o.toCur]=(unitsIn[o.toCur]||0)+(o.toAmt||0);
+      if(unitsIn[o.toCur]>0)rate[o.toCur]=valIn[o.toCur]/unitsIn[o.toCur];
+      last=o.toCur;log.push({t:'ex',o:o});
+    }else if(e.t==='sp'){
+      bal[o.cur]=n2((bal[o.cur]||0)-(o.amount||0));last=o.cur;log.push({t:'sp',o:o});
+    }else{
+      var un=n2((bal[o.cur]||0)-(o.amount||0));bal[o.cur]=n2(o.amount||0);last=o.cur;log.push({t:'cnt',o:o,unacc:un});
+    }
+  });
+  return {bcur:bcur,bal:bal,rate:rate,last:last,log:log};
+}
+function holApproxLocal(h,amountInBudgetCur){
+  // "≈ 4,200 THB" for an amount in the holiday's budget currency, using the
+  // currency of the latest pocket activity. '' when there is nothing to show.
+  var st=holPocketState(h);var c=st.last,r=c&&st.rate[c];
+  if(!c||!r||c===st.bcur)return '';
+  return ' ≈ '+Math.round(amountInBudgetCur/r).toLocaleString()+' '+c;
+}
+function holPocketCurs(h){
+  var st=holPocketState(h),seen={};
+  Object.keys(st.bal).forEach(function(c){seen[c]=1;});
+  return Object.keys(seen);
+}
+function holBudgetCurs(bcur){
+  var l=[bcur,'JOD','RMB','GBP'];safeArr(S.customCurrencies).forEach(function(cc){l.push(cc.code);});
+  return l.filter(function(c,i){return c&&l.indexOf(c)===i;});
+}
+function holPocketSave(){autosave();sbPushNow();renderLog();if(currentPage==='dashboard'&&typeof renderDashboard==='function')renderDashboard();}
+function holPocketAddExchange(hid,f){
+  var h=safeArr(holidays).find(function(x){return x.id===hid;});if(!h)return;
+  var fromAmt=parseFloat(f.fromAmt),toAmt=parseFloat(f.toAmt),toCur=(f.toCur||'').trim().toUpperCase();
+  if(!(fromAmt>0)||!(toAmt>0)||!toCur)return alert('Enter what you paid, what you received, and the currency received.');
+  var fromPocket=f.from.indexOf('pocket:')===0,fromCur=fromPocket?f.from.slice(7):f.from;
+  if(fromCur===toCur)return alert('Paid and received currencies are the same.');
+  if(fromPocket){var stb=holPocketState(h);if((stb.bal[fromCur]||0)<fromAmt-0.004&&!confirm('Your pocket shows only '+n2(stb.bal[fromCur]||0)+' '+fromCur+'. Save anyway?'))return;}
+  var id=Date.now(),date=f.date||todayStr();
+  var ex={id:id,date:date,fromCur:fromCur,fromAmt:n2(fromAmt),toCur:toCur,toAmt:n2(toAmt),fromPocket:fromPocket};
+  if(!fromPocket){
+    var expId=id+1;ex.expId=expId;
+    expenses.unshift({id:expId,amount:n2(fromAmt),currency:fromCur,category:'__hol-'+h.id+'__',date:date,holCat:'Exchange',note:'Exchanged into '+n2(toAmt).toLocaleString()+' '+toCur,exchId:id});
+  }
+  holPocketW(h).ex.push(ex);
+  holPocketSave();
+}
+function holPocketAddSpend(hid,f){
+  var h=safeArr(holidays).find(function(x){return x.id===hid;});if(!h)return;
+  var amt=parseFloat(f.amount),cur=(f.cur||'').trim().toUpperCase();
+  if(!(amt>0)||!cur)return alert('Enter an amount and currency.');
+  holPocketW(h).sp.push({id:Date.now(),date:f.date||todayStr(),cur:cur,amount:n2(amt),note:(f.note||'').trim()});
+  holPocketSave();
+}
+function holPocketAddCount(hid,f){
+  var h=safeArr(holidays).find(function(x){return x.id===hid;});if(!h)return;
+  var amt=parseFloat(f.amount),cur=(f.cur||'').trim().toUpperCase();
+  if(!(amt>=0)||f.amount===''||!cur)return alert('Enter what is in your pocket now (0 is allowed).');
+  holPocketW(h).cnt.push({id:Date.now(),date:f.date||todayStr(),cur:cur,amount:n2(amt),note:(f.note||'').trim()});
+  holPocketSave();
+}
+function holPocketDelete(hid,kind,id){
+  var h=safeArr(holidays).find(function(x){return x.id===hid;});if(!h)return;
+  var p=holPocketW(h);
+  var msg=kind==='ex'?'Delete this exchange? If it was paid from the budget, its budget expense is deleted too.':'Delete this entry?';
+  if(!confirm(msg))return;
+  if(kind==='ex'){
+    var ex=p.ex.find(function(x){return x.id===id;});
+    if(ex&&ex.expId){tomb('exp:'+ex.expId);expenses=expenses.filter(function(e){return e.id!==ex.expId;});}
+  }
+  p[kind]=p[kind].filter(function(x){return x.id!==id;});
+  holPocketSave();
+}
+function holPocketPanel(h){
+  var st=holPocketState(h),bcur=st.bcur,wrap=document.createElement('div');
+  wrap.style.cssText='margin-top:7px;padding-top:7px;border-top:.5px dashed var(--brd)';
+  var curs=Object.keys(st.bal);
+  var head='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin-bottom:3px">Pocket (cash)</div>';
+  if(!curs.length){head+='<div style="font-size:11px;color:var(--ink3);margin-bottom:6px">Empty. Use Exchange when you buy local cash.</div>';}
+  else{
+    curs.forEach(function(c){
+      var r=st.rate[c],b=st.bal[c]||0;
+      head+='<div class="mono" style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;margin-bottom:2px"><span>'+b.toLocaleString()+' '+c+'</span>'
+        +'<span style="font-size:10px;font-weight:500;color:var(--ink3)">'+(r?'≈ '+n2(b*r)+' '+bcur+' · 1 '+c+' = '+(Math.round(r*10000)/10000)+' '+bcur:'')+'</span></div>';
+    });
+  }
+  wrap.innerHTML=head;
+  var btns=document.createElement('div');btns.style.cssText='display:flex;gap:6px;margin-top:4px';
+  var form=document.createElement('div');form.style.cssText='display:none;margin-top:7px;padding:8px;background:var(--surf);border-radius:var(--r);border:.5px solid var(--brd)';
+  function inp(type,ph,val,w){var i=document.createElement('input');i.type=type;i.placeholder=ph;if(val!==undefined)i.value=val;if(type==='number'){i.step='0.01';i.min='0';i.inputMode='decimal';}i.style.cssText='font-size:13px;padding:6px;'+(w?'width:'+w:'flex:1;min-width:90px');return i;}
+  function sel(opts,val){var s=document.createElement('select');s.style.cssText='font-size:13px;padding:6px';opts.forEach(function(o){var op=document.createElement('option');op.value=o[0];op.textContent=o[1];s.appendChild(op);});if(val)s.value=val;return s;}
+  function row(label,els){var r=document.createElement('div');r.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap';var l=document.createElement('span');l.style.cssText='font-size:11px;color:var(--ink3);width:70px';l.textContent=label;r.appendChild(l);els.forEach(function(e){r.appendChild(e);});return r;}
+  function curList(){var dl=document.createElement('datalist');dl.id='pkcur-'+h.id+'-'+Math.random().toString(36).slice(2,7);var l=curs.slice();safeArr(S.customCurrencies).forEach(function(cc){if(l.indexOf(cc.code)<0)l.push(cc.code);});l.forEach(function(c){var o=document.createElement('option');o.value=c;dl.appendChild(o);});return dl;}
+  function saveBtn(txt,fn){var b=document.createElement('button');b.className='btn btn-p';b.style.cssText='width:100%;justify-content:center;padding:9px';b.textContent=txt;b.onclick=fn;return b;}
+  function openForm(kind){
+    form.innerHTML='';form.style.display='block';
+    var d=inp('date','',todayStr(),'auto');
+    if(kind==='ex'){
+      var fromOpts=holBudgetCurs(bcur).map(function(c){return [c,c+' (budget)'];});
+      curs.forEach(function(c){if((st.bal[c]||0)>0)fromOpts.push(['pocket:'+c,c+' (from pocket)']);});
+      var fromSel=sel(fromOpts,bcur),fromAmt=inp('number','paid'),toAmt=inp('number','received'),dl=curList(),toCur=inp('text','e.g. THB',st.last&&st.last!==bcur?st.last:'','80px');toCur.setAttribute('list',dl.id);toCur.style.textTransform='uppercase';
+      form.appendChild(dl);
+      form.appendChild(row('Paid',[fromAmt,fromSel]));
+      form.appendChild(row('Received',[toAmt,toCur]));
+      form.appendChild(row('Date',[d]));
+      form.appendChild(saveBtn('Save exchange',function(){holPocketAddExchange(h.id,{from:fromSel.value,fromAmt:fromAmt.value,toAmt:toAmt.value,toCur:toCur.value,date:d.value});}));
+      setTimeout(function(){fromAmt.focus();},30);
+    }else{
+      var cc=curs.length?sel(curs.map(function(c){return [c,c];}),st.last&&curs.indexOf(st.last)>=0?st.last:curs[0]):inp('text','e.g. THB','','80px');
+      var a=inp('number',kind==='sp'?'amount':'cash you have now'),n=inp('text','note (optional)');
+      form.appendChild(row(kind==='sp'?'Spent':'In pocket',[a,cc]));
+      form.appendChild(row('Note',[n]));form.appendChild(row('Date',[d]));
+      form.appendChild(saveBtn(kind==='sp'?'Save cash spend':'Save count',function(){var f={amount:a.value,cur:cc.value,note:n.value,date:d.value};if(kind==='sp')holPocketAddSpend(h.id,f);else holPocketAddCount(h.id,f);}));
+      setTimeout(function(){a.focus();},30);
+    }
+    var cx=document.createElement('button');cx.className='btn btn-sm';cx.style.cssText='width:100%;justify-content:center;margin-top:5px';cx.textContent='Cancel';cx.onclick=function(){form.style.display='none';};form.appendChild(cx);
+  }
+  [['ex','Exchange'],['sp','Cash spend'],['cnt','Count pocket']].forEach(function(b){
+    var bt=document.createElement('button');bt.className='btn';bt.style.cssText='flex:1;justify-content:center;padding:11px 4px;font-size:13px;font-weight:700;border-color:#f2a65a';bt.textContent=b[1];
+    if(b[0]!=='ex'&&!curs.length){bt.disabled=true;bt.style.opacity='.45';}
+    bt.onclick=function(){openForm(b[0]);};btns.appendChild(bt);
+  });
+  wrap.appendChild(btns);
+  var hint=document.createElement('div');hint.style.cssText='font-size:10px;color:var(--ink4);margin-top:4px';hint.textContent='Card or other direct payment: use the form below with the ✈ holiday category.';
+  wrap.appendChild(hint);
+  wrap.appendChild(form);
+  if(st.log.length){
+    var tg=document.createElement('div');tg.style.cssText='font-size:11px;color:var(--ink3);margin-top:6px;cursor:pointer';tg.textContent='Pocket history ›';
+    var hist=document.createElement('div');hist.style.cssText='display:none;margin-top:4px;font-size:11px';
+    tg.onclick=function(){var o=hist.style.display!=='none';hist.style.display=o?'none':'block';tg.textContent='Pocket history '+(o?'›':'⌄');};
+    st.log.slice().reverse().forEach(function(e){
+      var o=e.o,txt;
+      if(e.t==='ex')txt='Exchanged '+o.fromAmt+' '+o.fromCur+(o.fromPocket?' (pocket)':'')+' → '+o.toAmt+' '+o.toCur;
+      else if(e.t==='sp')txt='Cash spend '+o.amount+' '+o.cur+(o.note?' · '+o.note:'');
+      else txt='Counted '+o.amount+' '+o.cur+(Math.abs(e.unacc)>=0.01?' · '+(e.unacc>0?e.unacc+' unaccounted':(-e.unacc)+' more than expected'):'')+(o.note?' · '+o.note:'');
+      var r=document.createElement('div');r.style.cssText='display:flex;gap:6px;align-items:center;padding:2px 0;border-bottom:.5px solid var(--brd)';
+      r.innerHTML='<span style="color:var(--ink4);width:74px;flex-shrink:0">'+(o.date||'')+'</span><span style="flex:1;color:var(--ink2)">'+txt+'</span>';
+      var del=document.createElement('button');del.className='btn btn-xs btn-d';del.textContent='Del';
+      del.onclick=function(){holPocketDelete(h.id,e.t,o.id);};
+      r.appendChild(del);hist.appendChild(r);
+    });
+    wrap.appendChild(tg);wrap.appendChild(hist);
+  }
+  return wrap;
 }
 function getActiveHolidays(){
   return safeArr(holidays).filter(function(h){return !h.archived&&holIsActive(h)&&safeArr(h.items).some(function(i){return i.type==='daily';});});
