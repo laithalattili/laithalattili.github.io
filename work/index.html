@@ -2964,7 +2964,7 @@ async function workLogin(){
 }
 async function workSignOut(){
   try{await supa.auth.signOut();}catch(e){}
-  try{['work_pin_h','work_pin_ts','work_auth_prod'].forEach(k=>localStorage.removeItem(k));}catch(e){}
+  try{['work_pin_h','work_pin_ts','work_auth_prod','work_owner_ok'].forEach(k=>localStorage.removeItem(k));}catch(e){}
   location.reload();
 }
 // Settings → My PIN & account
@@ -30940,10 +30940,40 @@ function initApp(){
 
 // ── STARTUP ───────────────────────────────────────────
 // Script is at bottom of body - DOM already ready, no DOMContentLoaded needed
+
+// Only the area Owner may use this app. Staff accounts sign in to the Boarding or Liaison app;
+// if one is used here, it is signed out straight away. (The database rules are the real lock;
+// this keeps the app itself private.) The answer is remembered so the app can open offline.
+async function _isAreaOwner(area,cacheKey){
+  try{
+    const r=await supa.auth.getSession();const s=r&&r.data&&r.data.session;if(!s)return false;
+    const hs=await supa.from('households').select('id').eq('name',area);if(hs.error)throw hs.error;
+    const a=hs.data&&hs.data[0];
+    let ok=false;
+    if(a){
+      const ms=await supa.from('members').select('role_id').eq('household_id',a.id).eq('user_id',s.user.id);if(ms.error)throw ms.error;
+      const m=ms.data&&ms.data[0];
+      if(m){const rr=await supa.from('roles').select('name').eq('id',m.role_id);if(rr.error)throw rr.error;
+        ok=!!(rr.data&&rr.data[0]&&rr.data[0].name==='Owner');}
+    }
+    try{localStorage.setItem(cacheKey,ok?'1':'0');}catch(e){}
+    return ok;
+  }catch(e){try{return localStorage.getItem(cacheKey)==='1';}catch(_){return false;}}
+}
 // Sign in first (session is remembered per device), then the PIN, then the app.
-function _afterAuth(){
+async function _afterAuth(){
   const running=document.getElementById('main-app').style.display==='block';
   if(running){setTimeout(_syncFlush,500);return;}   // re-login while the app is open: just resume syncing
+  const owner=_workOffline?(localStorage.getItem('work_owner_ok')==='1'):(await _isAreaOwner('Hawking House','work_owner_ok'));
+  if(!owner){
+    try{await supa.auth.signOut();}catch(e){}
+    try{['work_auth_prod','work_pin_h','work_pin_ts','work_owner_ok'].forEach(k=>localStorage.removeItem(k));}catch(e){}
+    document.getElementById('pin-screen').style.display='none';
+    showLogin();
+    const er=document.getElementById('login-err');
+    if(er)er.textContent='This app is for Laith only. Staff use the Boarding or Liaison app.';
+    return;
+  }
   if(checkPinRemember())_unlockWork();
   else document.getElementById('pin-screen').style.display='flex';
 }
@@ -34006,10 +34036,8 @@ function renderBoardingStaffSettings(){
         <input type="text" value="${s.name||''}" placeholder="${roles[s.role]||s.role} name..."
           onchange="_bsUpdateStaffName(${i},this.value)"
           style="flex:1;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;min-width:0">
-        <input type="password" value="${s.pin||''}" placeholder="6-digit PIN"
-          maxlength="6" pattern="[0-9]{6}" inputmode="numeric"
-          onchange="_bsUpdateStaffPin(${i},this.value)"
-          style="width:90px;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;flex-shrink:0;letter-spacing:3px">
+        <span title="${s.user_id?'Signs in with their own account (Staff sign-in below)':'No sign-in linked: add this person under Staff sign-in below'}"
+          style="font-size:10px;font-weight:700;flex-shrink:0;border-radius:4px;padding:3px 7px;${s.user_id?'background:#ebfbee;color:#2b8a3e':'background:#fff4e6;color:#d9480f'}">${s.user_id?'🔑 sign-in':(s.role==='HSM'?'you':'no sign-in')}</span>
       </div>
       <!-- Day grid -->
       <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden">
@@ -34061,13 +34089,6 @@ function _bsUpdateStaffName(i,val){
   if(_boardingSettings.staff[i])_boardingSettings.staff[i].name=val;
 }
 
-function _bsUpdateStaffPin(i,val){
-  // Only save if exactly 6 digits
-  if(_boardingSettings.staff[i]){
-    const clean=val.replace(/\D/g,'').slice(0,6);
-    _boardingSettings.staff[i].pin=clean;
-  }
-}
 
 function _bsCycleDay(i,day){
   const staff=_boardingSettings.staff[i];if(!staff)return;
@@ -34102,19 +34123,14 @@ function _bsRemoveLocation(i){
 }
 
 async function saveBoardingSettings(){
-  // Read staff name and PIN inputs directly (onchange may not fire on mobile before save)
+  // Read staff name inputs directly (onchange may not fire on mobile before save)
   const staffRows=document.querySelectorAll('#boarding-staff-list input[type=text]');
-  const pinRows=document.querySelectorAll('#boarding-staff-list input[type=password]');
   staffRows.forEach((inp,i)=>{
     if(_boardingSettings.staff&&_boardingSettings.staff[i])
       _boardingSettings.staff[i].name=inp.value.trim();
   });
-  pinRows.forEach((inp,i)=>{
-    if(_boardingSettings.staff&&_boardingSettings.staff[i]){
-      const clean=inp.value.replace(/\D/g,'').slice(0,6);
-      if(clean)_boardingSettings.staff[i].pin=clean;
-    }
-  });
+  // Staff now sign in with their own account and database PIN: old plaintext PINs are removed on save.
+  (_boardingSettings.staff||[]).forEach(s=>{if(s)delete s.pin;});
   // Read time fields
   const fields={
     'bs-prep-time':'prepTime','bs-hoob-time':'hoobTime',
