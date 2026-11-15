@@ -163,11 +163,31 @@
 <div id="pin-screen">
   <div class="pin-logo">🏠</div>
   <div class="pin-title">Hawking House</div>
-  <div class="pin-sub" id="pin-sub">Who are you?</div>
+  <div class="pin-sub" id="pin-sub">Loading...</div>
 
-  <!-- Step 1: Pick identity (shown when no identity selected) -->
-  <div id="pin-step-pick" style="display:flex;width:100%;max-width:320px;padding:0 24px;flex-direction:column;gap:10px">
-    <div id="pin-cards"></div>
+  <!-- Step 1: sign in with your own account -->
+  <div id="pin-step-signin" style="display:none;width:100%;max-width:320px;padding:0 24px;flex-direction:column">
+    <input id="bs-email" type="email" placeholder="Email" autocomplete="username" autocapitalize="none" spellcheck="false" style="width:100%;padding:13px 14px;margin-bottom:10px;border-radius:12px;border:1px solid #333;background:#262626;color:#fff;font-size:16px;outline:none;box-sizing:border-box">
+    <input id="bs-pass" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')bSignIn()" style="width:100%;padding:13px 14px;margin-bottom:10px;border-radius:12px;border:1px solid #333;background:#262626;color:#fff;font-size:16px;outline:none;box-sizing:border-box">
+    <button id="bs-btn" onclick="bSignIn()" style="width:100%;padding:13px;border-radius:12px;border:none;background:#fff;color:#111;font-size:15px;font-weight:700;cursor:pointer;margin-top:4px">Sign in</button>
+    <div id="bs-err" style="color:#ef4444;font-size:13px;margin-top:14px;min-height:20px;text-align:center"></div>
+  </div>
+
+  <!-- Step 1b: first sign-in, choose your own password -->
+  <div id="pin-step-pw" style="display:none;width:100%;max-width:320px;padding:0 24px;flex-direction:column">
+    <div style="font-size:13px;color:#999;text-align:center;margin-bottom:14px;line-height:1.5">You signed in with a one-time password. Choose your own now; you will use it from now on.</div>
+    <input id="bp-new" type="password" placeholder="New password (8+ characters)" autocomplete="new-password" style="width:100%;padding:13px 14px;margin-bottom:10px;border-radius:12px;border:1px solid #333;background:#262626;color:#fff;font-size:16px;outline:none;box-sizing:border-box">
+    <input id="bp-new2" type="password" placeholder="New password again" autocomplete="new-password" onkeydown="if(event.key==='Enter')bSaveNewPassword()" style="width:100%;padding:13px 14px;margin-bottom:10px;border-radius:12px;border:1px solid #333;background:#262626;color:#fff;font-size:16px;outline:none;box-sizing:border-box">
+    <button id="bp-btn" onclick="bSaveNewPassword()" style="width:100%;padding:13px;border-radius:12px;border:none;background:#fff;color:#111;font-size:15px;font-weight:700;cursor:pointer;margin-top:4px">Save password</button>
+    <div id="bp-err" style="color:#ef4444;font-size:13px;margin-top:14px;min-height:20px;text-align:center"></div>
+  </div>
+
+  <!-- Not House staff -->
+  <div id="pin-step-msg" style="display:none;width:100%;max-width:320px;padding:0 24px;flex-direction:column;align-items:center;text-align:center">
+    <div id="bm-title" style="font-size:16px;font-weight:700;color:#fff;margin-bottom:8px"></div>
+    <div id="bm-sub" style="font-size:13px;color:#999;margin-bottom:18px;line-height:1.5"></div>
+    <a id="bm-liaison" href="/liaisonhawking/" style="display:none;width:100%;padding:13px;border-radius:12px;background:#fff;color:#111;font-size:15px;font-weight:700;text-decoration:none;margin-bottom:10px;box-sizing:border-box">Open the Liaison app</a>
+    <div class="pin-switch" onclick="bSignOut()">Sign out</div>
   </div>
 
   <!-- Step 2: Enter PIN -->
@@ -196,7 +216,7 @@
       <button class="pin-btn" onclick="pinKey('⌫')">⌫</button>
     </div>
     <div id="pin-error" style="color:#ef4444;font-size:13px;margin-top:16px;min-height:20px"></div>
-    <div class="pin-switch" onclick="showPickStep()">← Back</div>
+    <div class="pin-switch" onclick="if(confirm('Sign out of this phone?'))bSignOut()">Not you? Sign out</div>
   </div>
 </div>
 
@@ -455,11 +475,35 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase.min.js" onerror="document.write('<script src=&quot;https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js&quot;><\/script>')"></script>
 <script>
 const SUPA_URL='https://mkvfggacecgltscdrfqv.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rdmZnZ2FjZWNnbHRzY2RyZnF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5MjM3MDcsImV4cCI6MjA5NDQ5OTcwN30.ErSZCR9G1NlBiq5ScOL3pmhPzJd5aYk92BU1I7Rzsr4';
-const supa=supabase.createClient(SUPA_URL,SUPA_KEY);
+// Each person signs in with their own account. If the library cannot load, every supa.* call
+// resolves to {data:null,error} so the page shows a clear message instead of crashing.
+function _offlineStub(){
+  const err={message:'Sign-in library did not load. Check your connection and reload.'};
+  const res={data:null,error:err};
+  const h={get(_t,p){
+      if(p==='then')return function(ok){return Promise.resolve(res).then(ok);};
+      if(p==='auth')return{getSession:async()=>({data:{session:null}}),signInWithPassword:async()=>({data:null,error:err}),
+        signOut:async()=>({}),updateUser:async()=>({error:err}),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}})};
+      if(p==='realtime')return{setAuth(){}};
+      return new Proxy(function(){},h);},
+    apply(){return new Proxy(function(){},h);}};
+  return new Proxy(function(){},h);
+}
+window._supaMissing=false;
+const supa=(function(){
+  try{if(typeof supabase!=='undefined'&&supabase.createClient)
+    return supabase.createClient(SUPA_URL,SUPA_KEY,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'boarding_auth_prod'}});
+  }catch(e){console.warn('supabase init failed',e);}
+  window._supaMissing=true;return _offlineStub();
+})();
+try{supa.auth.onAuthStateChange(function(ev,s){
+  try{if(s&&s.access_token)supa.realtime.setAuth(s.access_token);}catch(e){}
+  if(ev==='SIGNED_OUT'&&typeof bShowSignIn==='function'&&document.getElementById('app').style.display!=='none')location.reload();
+});}catch(e){}
 
 // ── DATA ──────────────────────────────────────────────────────
 const DEFAULT_TUTORS=[
@@ -510,25 +554,18 @@ let _regScope='boarders'; // 'boarders' | 'house'
 async function init(){
   updateClock();
   setInterval(updateClock,1000);
+  // The old "who are you?" picker identity is no longer used: identity comes from the signed-in account.
+  try{['boarding_identity','boarding_auth_ts'].forEach(k=>localStorage.removeItem(k));}catch(e){}
 
-  // Check stored identity
-  try{
-    const stored=localStorage.getItem('boarding_identity');
-    if(stored){
-      _identity=JSON.parse(stored);
-    }
-  }catch(e){}
+  await bRequireSession();                 // waits on the sign-in screen when nobody is signed in
 
-  // Load settings + people from Supabase
   await loadSettings();
   await loadPeople();
 
-  // Check session validity — skip PIN if still valid
-  if(checkBoardingSession()){
-    showApp();
-  } else {
-    showPinScreen();
-  }
+  if(!(await bResolveIdentity()))return;   // not House staff: a message is shown instead of the app
+
+  if(checkBoardingSession())showApp();
+  else showPinScreen();
 }
 
 function updateClock(){
@@ -644,125 +681,197 @@ function getStudentGrade(name){
   return'Unknown';
 }
 
-// ── IDENTITY / PIN SCREEN ─────────────────────────────────────
-let _selectedStaff=null;
-let _pinEntry='';
+// ── SIGN-IN, IDENTITY, PIN ────────────────────────────────────
+// Sign-in (Supabase Auth) is the real security: without it the database returns nothing.
+// The 6-digit PIN is a screen lock checked by the database (verify_pin / set_pin), one per person,
+// the same PIN in every app that person uses. Only a salted SHA-256 of the last good PIN is kept on
+// the device (boarding_pin_h), and only used when the database cannot be reached.
+let _pinEntry='',_pinMode='enter',_pinFirst='',_pinOld=null,_pinBusy=false;
+let _bSession=null,_bOffline=false,_bSignInResolve=null,_bBusy=false;
+const B_AREA='Hawking House';
 
-function showPinScreen(){
+function bStep(which){
+  ['pin-step-signin','pin-step-pw','pin-step-pin','pin-step-msg'].forEach(id=>{
+    const e=document.getElementById(id);if(e)e.style.display=(id===which)?'flex':'none';});
   document.getElementById('pin-screen').style.display='flex';
   document.getElementById('app').style.display='none';
-  _selectedStaff=null;
-  _pinEntry='';
-  // Always show pick step first so user confirms who they are
-  showPickStep();
+}
+function bSay(id,t,ok){const e=document.getElementById(id);if(e){e.textContent=t||'';e.style.color=ok?'#22c55e':'#ef4444';}}
+async function _bHash(p){
+  try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('bd:'+p));
+    return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}catch(e){return null;}
+}
+function bShowSignIn(msg){
+  document.getElementById('pin-sub').textContent='Sign in';
+  bStep('pin-step-signin');bSay('bs-err',msg||'');
+}
+// A phone that has signed in and unlocked before may open with no signal (PIN checked on the device).
+function _bOfflineEligible(){try{return!!(localStorage.getItem('boarding_auth_prod')&&localStorage.getItem('boarding_pin_h')&&localStorage.getItem('boarding_member'));}catch(e){return false;}}
+async function bRequireSession(){
+  let s=null;try{const r=await supa.auth.getSession();s=r&&r.data&&r.data.session;}catch(e){}
+  if(s){_bSession=s;try{supa.realtime.setAuth(s.access_token);}catch(e){}
+    if(s.user&&s.user.user_metadata&&s.user.user_metadata.must_change_password){bShowNewPassword();return new Promise(r=>{_bSignInResolve=r;});}
+    return s;}
+  if(!navigator.onLine&&_bOfflineEligible()){_bOffline=true;return null;}
+  bShowSignIn(window._supaMissing?'Sign-in library did not load. Check your connection and reload.':'');
+  return new Promise(r=>{_bSignInResolve=r;});
+}
+function _bSignedIn(s){
+  _bSession=s;try{supa.realtime.setAuth(s.access_token);}catch(e){}
+  try{localStorage.removeItem('boarding_pin_ts');}catch(e){}   // a fresh sign-in always asks for the PIN once
+  if(_bSignInResolve){const f=_bSignInResolve;_bSignInResolve=null;f(s);}
+}
+async function bSignIn(){
+  if(_bBusy)return;
+  const em=(document.getElementById('bs-email').value||'').trim(),pw=document.getElementById('bs-pass').value||'';
+  if(!em||!pw){bSay('bs-err','Enter your email and password.');return;}
+  _bBusy=true;bSay('bs-err','Signing in...',true);
+  try{
+    const r=await supa.auth.signInWithPassword({email:em,password:pw});
+    if(r.error){bSay('bs-err',r.error.message==='Invalid login credentials'?'Email or password is wrong.':r.error.message);return;}
+    document.getElementById('bs-pass').value='';bSay('bs-err','');
+    const u=r.data.session.user;
+    if(u&&u.user_metadata&&u.user_metadata.must_change_password){_bSession=r.data.session;bShowNewPassword();return;}
+    _bSignedIn(r.data.session);
+  }catch(e){bSay('bs-err',e.message||String(e));}
+  finally{_bBusy=false;}
+}
+// First sign-in with a one-time password: the person chooses their own before anything else.
+function bShowNewPassword(){
+  document.getElementById('pin-sub').textContent='Choose your own password';
+  bStep('pin-step-pw');bSay('bp-err','');
+}
+async function bSaveNewPassword(){
+  if(_bBusy)return;
+  const a=document.getElementById('bp-new').value||'',b=document.getElementById('bp-new2').value||'';
+  if(a.length<8){bSay('bp-err','Use at least 8 characters.');return;}
+  if(a!==b){bSay('bp-err','The two passwords do not match.');return;}
+  _bBusy=true;bSay('bp-err','Saving...',true);
+  try{
+    const r=await supa.auth.updateUser({password:a,data:{must_change_password:false}});
+    if(r.error){bSay('bp-err',r.error.message);return;}
+    document.getElementById('bp-new').value='';document.getElementById('bp-new2').value='';
+    const s=(await supa.auth.getSession()).data.session||_bSession;
+    _bSignedIn(s);
+  }catch(e){bSay('bp-err',e.message||String(e));}
+  finally{_bBusy=false;}
+}
+// Who is this person in Hawking House? Owner = HSM; House = their linked duty slot (AHSM/RT);
+// Liaison staff use the Liaison app instead. Kept on the device so the app can open offline.
+async function bResolveIdentity(){
+  let m=null;
+  if(_bOffline){try{m=JSON.parse(localStorage.getItem('boarding_member')||'null');}catch(e){}}
+  else{
+    try{
+      const uid=_bSession.user.id;
+      const hs=await supa.from('households').select('id,name').eq('name',B_AREA);
+      const area=hs.data&&hs.data[0];
+      if(area){
+        const ms=await supa.from('members').select('role_id,display_name').eq('household_id',area.id).eq('user_id',uid);
+        const mem=ms.data&&ms.data[0];
+        if(mem){
+          const rr=await supa.from('roles').select('name').eq('id',mem.role_id);
+          m={uid,name:mem.display_name,role:(rr.data&&rr.data[0]&&rr.data[0].name)||'?'};
+        }
+      }
+      if(m)localStorage.setItem('boarding_member',JSON.stringify(m));else localStorage.removeItem('boarding_member');
+    }catch(e){try{m=JSON.parse(localStorage.getItem('boarding_member')||'null');}catch(_){}}
+  }
+  if(!m){bMessage('This account does not have access to Hawking House.','Ask the Housemaster to add you, or sign in with another account.',false);return false;}
+  if(m.role==='Liaison'){bMessage('This account is for the Liaison app.','Open the Liaison app instead.',true);return false;}
+  const slot=(BS.staff||[]).find(s=>s.user_id===m.uid)||(m.role==='Owner'?(BS.staff||[]).find(s=>s.role==='HSM'):null);
+  _identity={name:(slot&&slot.name)||m.name,role:slot?slot.role:(m.role==='Owner'?'HSM':'House')};
+  return true;
+}
+function bMessage(title,sub,liaisonLink){
+  document.getElementById('pin-sub').textContent='';
+  document.getElementById('bm-title').textContent=title;
+  document.getElementById('bm-sub').textContent=sub;
+  document.getElementById('bm-liaison').style.display=liaisonLink?'block':'none';
+  bStep('pin-step-msg');
+}
+async function bSignOut(){
+  try{await supa.auth.signOut();}catch(e){}
+  try{['boarding_auth_prod','boarding_pin_h','boarding_pin_ts','boarding_member'].forEach(k=>localStorage.removeItem(k));}catch(e){}
+  location.reload();
 }
 
-function showPickStep(){
-  _selectedStaff=null;
-  _pinEntry='';
-  document.getElementById('pin-step-pick').style.display='flex';
-  document.getElementById('pin-step-pin').style.display='none';
-  document.getElementById('pin-sub').textContent='Who are you?';
-  renderPinCards();
-}
-
-function showPinStep(staff){
-  _selectedStaff=staff;
-  _pinEntry='';
-  document.getElementById('pin-step-pick').style.display='none';
-  document.getElementById('pin-step-pin').style.display='flex';
+// PIN screen
+function showPinScreen(){
+  _pinEntry='';_pinMode='enter';_pinFirst='';_pinOld=null;
   document.getElementById('pin-sub').textContent='Enter your PIN';
-  document.getElementById('pin-who').textContent=staff.name+' · '+staff.role;
-  document.getElementById('pin-error').textContent='';
+  document.getElementById('pin-who').textContent=_identity?(_identity.name+' · '+_identity.role):'';
+  bSay('pin-error','');
   updatePinDots();
+  bStep('pin-step-pin');
 }
-
-function renderPinCards(){
-  const el=document.getElementById('pin-cards');if(!el)return;
-  const staff=(BS.staff||[]).filter(s=>s.name&&s.name.trim()&&s.role!=='HSM');
-  console.log('renderPinCards: BS.staff=',BS.staff,'filtered=',staff.length);
-  if(!staff.length){
-    // Auto-retry once after 1.5s in case settings still loading
-    if(!window._pinRetried){
-      window._pinRetried=true;
-      el.innerHTML='<div style="text-align:center;color:#666;font-size:12px;padding:20px">Loading staff...</div>';
-      setTimeout(()=>{loadSettings().then(()=>{window._pinRetried=false;renderPinCards();});},1500);
-      return;
-    }
-    el.innerHTML=`<div style="text-align:center;color:#666;font-size:13px;padding:20px">
-      No staff configured.<br>
-      <span style="font-size:11px;color:#888;display:block;margin-top:6px">Ask the Housemaster to add staff names and save in Settings → Boarding Configuration.</span>
-      <button onclick="window._pinRetried=false;loadSettings().then(renderPinCards)" style="margin-top:12px;padding:8px 16px;border-radius:8px;border:1px solid #555;background:transparent;color:#aaa;cursor:pointer;font-size:12px">Retry</button>
-    </div>`;
-    return;
-  }
-  window._pinRetried=false;
-  const roleColors={AHSM:'#7c3aed',RT:'#0d9488'};
-  el.innerHTML=staff.map((s,i)=>`
-    <div class="pin-card" data-staff-idx="${i}">
-      <div class="pin-avatar" style="background:${roleColors[s.role]||'#c4622d'}">${s.name.charAt(0)}</div>
-      <div>
-        <div class="pin-role">${s.role}</div>
-        <div class="pin-name">${s.name}</div>
-      </div>
-    </div>`).join('');
-  el.querySelectorAll('.pin-card').forEach(card=>{
-    const i=parseInt(card.getAttribute('data-staff-idx'));
-    card.onclick=()=>showPinStep(staff[i]);
-  });
+function bChangePin(){
+  bCloseMenu();
+  _pinEntry='';_pinMode='old';_pinFirst='';_pinOld=null;
+  document.getElementById('pin-sub').textContent='Enter your current PIN';
+  bSay('pin-error','');updatePinDots();
+  bStep('pin-step-pin');
 }
-
+function lockBoarding(){bCloseMenu();try{localStorage.removeItem('boarding_pin_ts');}catch(e){}showPinScreen();}
 function pinKey(k){
-  if(k==='⌫'){
-    _pinEntry=_pinEntry.slice(0,-1);
-    updatePinDots();
-    return;
-  }
-  if(k===''||_pinEntry.length>=6)return;
-  _pinEntry+=String(k);
-  updatePinDots();
-  if(_pinEntry.length===6) setTimeout(checkPin,120);
+  if(_pinBusy)return;
+  if(k==='⌫'){_pinEntry=_pinEntry.slice(0,-1);updatePinDots();return;}
+  if(_pinEntry.length>=6)return;
+  _pinEntry+=k;updatePinDots();
+  if(_pinEntry.length===6)setTimeout(checkPin,120);
 }
-
 function updatePinDots(){
   for(let i=0;i<6;i++){
     const dot=document.getElementById('pd'+i);
     if(dot)dot.classList.toggle('filled',i<_pinEntry.length);
   }
 }
-
-function checkPin(){
-  if(!_selectedStaff)return;
-  const correctPin=String(_selectedStaff.pin||'');
-  if(!correctPin){
-    // No PIN set — allow entry without PIN
-    confirmIdentity();
-    return;
-  }
-  if(_pinEntry===correctPin){
-    document.getElementById('pin-error').textContent='';
-    confirmIdentity();
-  } else {
-    document.getElementById('pin-error').textContent='Incorrect PIN. Try again.';
-    _pinEntry='';
-    updatePinDots();
-    // Shake animation
-    const dots=document.getElementById('pin-dots');
-    dots.style.animation='none';
-    setTimeout(()=>{dots.style.animation='shake .3s ease';},10);
-  }
+function _pinShake(msg){
+  bSay('pin-error',msg);_pinEntry='';updatePinDots();
+  const dots=document.getElementById('pin-dots');
+  if(dots){dots.style.animation='none';setTimeout(()=>{dots.style.animation='shake .3s ease';},10);}
 }
-
-function confirmIdentity(){
-  if(!_selectedStaff)return;
-  _identity=_selectedStaff;
+// 'ok' | 'bad' | 'nopin' | 'locked' | 'denied' | 'offline'
+async function _pinVerify(p){
+  if(!_bOffline){try{const r=await supa.rpc('verify_pin',{p:p});if(r.error)throw r.error;return r.data;}catch(e){}}
+  const saved=localStorage.getItem('boarding_pin_h'),h=await _bHash(p);
+  if(saved&&h&&saved===h)return'ok';
+  return saved?'bad':'offline';
+}
+async function checkPin(){
+  if(_pinBusy)return;_pinBusy=true;
+  const p=_pinEntry,sub=t=>{document.getElementById('pin-sub').textContent=t;};
   try{
-    localStorage.setItem('boarding_identity',JSON.stringify(_identity));
-    localStorage.setItem('boarding_auth_ts',Date.now().toString());
-  }catch(e){}
+    if(_pinMode==='new'){_pinFirst=p;_pinEntry='';updatePinDots();_pinMode='confirm';sub('Type it again to confirm');bSay('pin-error','');return;}
+    if(_pinMode==='confirm'){
+      if(p!==_pinFirst){_pinMode='new';_pinFirst='';sub(_pinOld?'Choose your new PIN':'Choose a 6-digit PIN');_pinShake('PINs did not match. Start again.');return;}
+      let res='error';
+      try{const r=await supa.rpc('set_pin',{old_pin:_pinOld,new_pin:p});if(r.error)throw r.error;res=r.data;}catch(e){res='no connection';}
+      if(res==='ok'){
+        const h=await _bHash(p);if(h)localStorage.setItem('boarding_pin_h',h);
+        const wasChange=!!_pinOld;_pinOld=null;_pinMode='enter';_pinEntry='';updatePinDots();
+        confirmIdentity();
+        if(wasChange&&typeof showToast==='function')showToast('PIN changed. It applies to every app you use.');
+      }else{_pinMode='new';_pinFirst='';sub('Choose a 6-digit PIN');_pinShake(res==='bad_old'?'Current PIN was wrong.':res==='locked'?'Too many tries. Wait 5 minutes.':'Could not save PIN ('+res+').');}
+      return;
+    }
+    const v=await _pinVerify(p);
+    if(v==='ok'){
+      const h=await _bHash(p);if(h)localStorage.setItem('boarding_pin_h',h);
+      if(_pinMode==='old'){_pinOld=p;_pinEntry='';updatePinDots();_pinMode='new';sub('Choose your new PIN');bSay('pin-error','');return;}
+      _pinEntry='';updatePinDots();bSay('pin-error','');confirmIdentity();
+    }
+    else if(v==='nopin'){_pinOld=null;_pinMode='new';_pinEntry='';updatePinDots();sub('Choose a 6-digit PIN');bSay('pin-error','');}
+    else if(v==='locked')_pinShake('Too many tries. Wait 5 minutes.');
+    else if(v==='denied'){_pinShake('');bShowSignIn('Please sign in again.');}
+    else if(v==='offline')_pinShake('Cannot check PIN offline yet. Connect once first.');
+    else _pinShake('Incorrect PIN. Try again.');
+  }finally{_pinBusy=false;}
+}
+function confirmIdentity(){
+  try{localStorage.setItem('boarding_pin_ts',Date.now().toString());}catch(e){}
   showApp();
 }
-
 function sessionPolicyToMs(policy){
   if(policy==='always') return 0;
   if(policy==='daily')  return 24*36e5;
@@ -773,22 +882,25 @@ function sessionPolicyToMs(policy){
   if(policy==='inactivity_24') return 24*36e5;
   return 7*864e5;
 }
-
+// How long the PIN is remembered on this device (Work → Settings → Boarding Configuration).
 function checkBoardingSession(){
-  // Returns true if still within valid session (skip PIN)
-  const policy=BS.ahsmSessionPolicy||'weekly';
-  const ms=sessionPolicyToMs(policy);
-  if(ms===0) return false;
-  try{
-    const ts=parseInt(localStorage.getItem('boarding_auth_ts')||'0');
-    const identity=JSON.parse(localStorage.getItem('boarding_identity')||'null');
-    if(identity&&Date.now()-ts<ms){
-      _identity=identity;
-      return true;
-    }
-  }catch{}
-  return false;
+  const ms=sessionPolicyToMs(BS.ahsmSessionPolicy||'weekly');
+  if(ms===0)return false;
+  try{const ts=parseInt(localStorage.getItem('boarding_pin_ts')||'0');return Date.now()-ts<ms;}catch(e){return false;}
 }
+// Header name → account menu
+function bOpenMenu(){
+  bCloseMenu();
+  const o=document.createElement('div');o.id='b-menu';
+  o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:3000;display:flex;align-items:flex-end;justify-content:center';
+  o.onclick=e=>{if(e.target===o)bCloseMenu();};
+  const btn=(label,fn,red)=>`<button onclick="${fn}" style="width:100%;padding:15px;border:none;border-top:1px solid #eee;background:#fff;font-size:15px;color:${red?'#dc2626':'#111'};cursor:pointer">${label}</button>`;
+  o.innerHTML=`<div style="background:#fff;width:100%;max-width:440px;border-radius:16px 16px 0 0;overflow:hidden;padding-bottom:env(safe-area-inset-bottom)">
+    <div style="padding:14px 16px 10px;font-size:13px;color:#666">Signed in as <b style="color:#111">${(_identity&&_identity.name)||''}</b>${_identity?' · '+_identity.role:''}</div>
+    ${btn('Lock now','lockBoarding()')}${btn('Change my PIN','bChangePin()')}${btn('Sign out of this phone',"if(confirm('Sign out? You will need your email and password to sign in again.'))bSignOut()",true)}${btn('Cancel','bCloseMenu()')}</div>`;
+  document.body.appendChild(o);
+}
+function bCloseMenu(){const m=document.getElementById('b-menu');if(m)m.remove();}
 
 // ── MAIN APP ──────────────────────────────────────────────────
 function isWithinBoardingWindow(){
@@ -829,7 +941,7 @@ async function showApp(){
   app.style.display='flex';
 
   const userEl=document.getElementById('hdr-user');
-  if(userEl){userEl.textContent=_identity?`${_identity.role} · ${_identity.name.split(' ')[0]}`:'—';userEl.onclick=()=>{showPinScreen();};}
+  if(userEl){userEl.textContent=_identity?`${_identity.role} · ${_identity.name.split(' ')[0]}`:'—';userEl.onclick=()=>{bOpenMenu();};}
   // Restore star button state for default tab
   _updateBoardingStarBtn();
 

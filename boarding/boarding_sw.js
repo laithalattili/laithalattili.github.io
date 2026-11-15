@@ -1,11 +1,16 @@
 // Hawking Boarding Mini-App — Service Worker v4
-const CACHE = 'hawking-boarding-v24';
+const CACHE = 'hawking-boarding-v25';
 const ASSETS = ['./', './index.html'];
+// Self-hosted Supabase library: cached best-effort so a missing file can never break install
+const OPTIONAL = ['./supabase.min.js'];
 // Icons cached separately — missing icons won't break install
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(ASSETS))
+    caches.open(CACHE).then(async c => {
+      await c.addAll(ASSETS.map(u => new Request(u, { cache: 'reload' })));
+      await Promise.allSettled(OPTIONAL.map(u => c.add(new Request(u, { cache: 'reload' }))));
+    })
   );
   self.skipWaiting();
 });
