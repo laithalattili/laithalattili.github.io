@@ -1615,10 +1615,38 @@ function omniShowLogin(){const e=el('login');if(e)e.classList.remove('gone');con
 function omniHideLogin(){const e=el('login');if(e)e.classList.add('gone');}
 // A device that has signed in and set a PIN before may open offline (PIN checked against the local copy).
 function _offlineEligible(){try{return!!(localStorage.getItem('omni_auth_prod')&&localStorage.getItem(PIN_K));}catch(e){return false;}}
+
+// Only the area Owner may use this app. Staff accounts sign in to the Boarding or Liaison app;
+// if one is used here, it is signed out straight away. (The database rules are the real lock;
+// this keeps the app itself private.) The answer is remembered so the app can open offline.
+async function _isAreaOwner(area,cacheKey){
+  try{
+    const r=await supa.auth.getSession();const s=r&&r.data&&r.data.session;if(!s)return false;
+    const hs=await supa.from('households').select('id').eq('name',area);if(hs.error)throw hs.error;
+    const a=hs.data&&hs.data[0];
+    let ok=false;
+    if(a){
+      const ms=await supa.from('members').select('role_id').eq('household_id',a.id).eq('user_id',s.user.id);if(ms.error)throw ms.error;
+      const m=ms.data&&ms.data[0];
+      if(m){const rr=await supa.from('roles').select('name').eq('id',m.role_id);if(rr.error)throw rr.error;
+        ok=!!(rr.data&&rr.data[0]&&rr.data[0].name==='Owner');}
+    }
+    try{localStorage.setItem(cacheKey,ok?'1':'0');}catch(e){}
+    return ok;
+  }catch(e){try{return localStorage.getItem(cacheKey)==='1';}catch(_){return false;}}
+}
+async function _omniOwnerOrOut(s){
+  if(await _isAreaOwner('Personal','omni_owner_ok'))return s;
+  try{await supa.auth.signOut();}catch(e){}
+  try{['omni_auth_prod',PIN_K,'omni_ults','omni_owner_ok'].forEach(k=>localStorage.removeItem(k));}catch(e){}
+  omniShowLogin();
+  el('login-err').textContent='This app is for Laith only.';
+  return new Promise(res=>{_loginResolve=res;});
+}
 async function omniRequireLogin(){
   if(!_OK){_omniOffline=true;return null;}          // library or config missing: local data only
   let s=null;try{const r=await supa.auth.getSession();s=r&&r.data&&r.data.session;}catch(e){}
-  if(s){try{supa.realtime.setAuth(s.access_token);}catch(e){}return s;}
+  if(s){try{supa.realtime.setAuth(s.access_token);}catch(e){}return _omniOwnerOrOut(s);}
   if(!navigator.onLine&&_offlineEligible()){_omniOffline=true;return null;}
   omniShowLogin();
   return new Promise(res=>{_loginResolve=res;});
@@ -1635,6 +1663,11 @@ async function omniLogin(){
     try{supa.realtime.setAuth(r.data.session.access_token);}catch(e){}
     _ults(false);                    // a fresh sign-in always asks for the PIN once
     omniHideLogin();
+    if(!(await _isAreaOwner('Personal','omni_owner_ok'))){
+      try{await supa.auth.signOut();}catch(e){}
+      try{['omni_auth_prod','omni_owner_ok'].forEach(k=>localStorage.removeItem(k));}catch(e){}
+      omniShowLogin();er.textContent='This app is for Laith only.';return;
+    }
     if(_loginResolve){const f=_loginResolve;_loginResolve=null;const l=el('ld');if(l)l.classList.remove('gone');f(r.data.session);}
   }catch(e){er.textContent=e.message||String(e);}
   finally{_loginBusy=false;}
@@ -1642,7 +1675,7 @@ async function omniLogin(){
 async function omniSignOut(){
   if(!confirm('Sign out of this device? You will need your email and password to sign in again.'))return;
   try{await supa.auth.signOut();}catch(e){}
-  try{['omni_auth_prod',PIN_K,'omni_ults','omni_s'].forEach(k=>localStorage.removeItem(k));}catch(e){}
+  try{['omni_auth_prod',PIN_K,'omni_ults','omni_s','omni_owner_ok'].forEach(k=>localStorage.removeItem(k));}catch(e){}
   location.reload();
 }
 window.addEventListener('online',async()=>{
