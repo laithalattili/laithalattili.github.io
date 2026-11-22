@@ -26178,9 +26178,17 @@ function renderWeekTasksView(){
       return daysDiff>=0&&daysDiff<7;
     }
     if(t.scope==='recurring'){
-      // Always visible — recurrence filter applied in Day view
-      // In Plan view show if the recurring day falls in this week
-      return true;
+      // Same cadence rules as the day page, so a biweekly task shows only on its on-week
+      if(t.recur==='biweekly'){const diff=wNum-(t.weekNum||1);return diff%2===0;}
+      if(t.recur==='monthly'){
+        const taskDate=t.date?new Date(t.date+'T00:00:00'):null;
+        if(!taskDate)return true;
+        const di=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].indexOf(t.recurDay||t.day||'Mon');
+        const occ=new Date(mon);occ.setDate(mon.getDate()+Math.max(di,0));
+        const wom=d=>Math.ceil(d.getDate()/7);
+        return wom(taskDate)===wom(occ);
+      }
+      return true; // weekly
     }
     return false;
   }
@@ -26310,8 +26318,9 @@ function renderWeekTasksView(){
     // Group by day: Mon–Sun + unscheduled
     const byDay={};
     nonSticky.forEach(t=>{
-      // week-day tasks have t.day set; date tasks derive day from date; week tasks go to __none
-      const k=t.day||'__none';
+      // week-day tasks have t.day set; date tasks derive day from date; recurring tasks sit on
+      // their recurrence day (legacy ones stored it in day); only "this week" tasks go to __none
+      const k=(t.scope==='recurring'?(t.recurDay||t.day):t.day)||'__none';
       if(!byDay[k])byDay[k]=[];
       byDay[k].push(t);
     });
