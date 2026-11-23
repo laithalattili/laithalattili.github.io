@@ -144,6 +144,9 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .plan-task-row input[type=checkbox]{margin-top:3px;flex-shrink:0;width:15px;height:15px;cursor:pointer}
 .plan-task-label{flex:1;font-size:13px;color:#212529;line-height:1.4}
 .plan-task-label.done{color:#adb5bd;text-decoration:line-through}
+.prio-dots{background:none;border:none;min-width:36px;height:32px;margin:-6px -4px -6px 0;padding:0;color:#ced4da;font-size:9px;letter-spacing:1.5px;line-height:1;cursor:pointer;flex-shrink:0;align-self:center;-webkit-tap-highlight-color:transparent}
+.prio-dots.p1{color:#f59f00}.prio-dots.p2{color:#f76707}.prio-dots.p3{color:#e03131}
+.plan-task-row.p3 .plan-task-label:not(.done){font-weight:600}
 .plan-task-meta{font-size:10px;color:#adb5bd;margin-top:2px}
 .plan-task-cat-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px}
 .plan-cat-section{margin-bottom:6px}
@@ -25364,7 +25367,7 @@ function renderTodayView(){
   const _planTs=(S.planData||[]).filter(t=>{
     if(t.say||t.archived)return false; // say-points live in the To say strip, not the task list
     if(_tpAnchorFuture(t))return false; // planned into a coming period — lives in its slot
-    if(t.scope==='sticky')return true;
+    if(t.scope==='sticky')return !_stickyGone(t,_dateToStr(date));
     if(t.scope==='week')return t.weekNum===_wNumDay;
     if(t.scope==='week-day')return t.weekNum===_wNumDay&&t.day===dayName;
     if(t.scope==='day'){
@@ -25408,12 +25411,13 @@ function renderTodayView(){
     function _taskRow(t){
       const _done=localStorage.getItem(t.scope==='sticky'?('plan_done_'+t.id):('plan_done_'+t.id+'_w'+_wNum))==='1';
       const _cat=_catMap[t.cat]||{color:'#868e96'};
-      return`<div class="plan-task-row" style="background:#fff;border-radius:8px;margin-bottom:3px;border:1px solid #e9ecef">
+      return`<div class="plan-task-row${planPrio(t)?' p'+planPrio(t):''}" data-task-id="${t.id}" style="background:#fff;border-radius:8px;margin-bottom:3px;border:1px solid #e9ecef">
         <div class="plan-task-cat-dot" style="background:${_cat.color}"></div>
         <input type="checkbox" ${_done?'checked':''} onchange="planToggleDone('${t.id}')">
         <div class="plan-task-label${_done?' done':''}">
           ${t.text}${t.time?` <span style="font-size:10px;color:${_done?'#adb5bd':_cat.color};margin-left:4px">⏱${t.time}</span>`:''}
         </div>
+        ${_prioDotsHtml(t)}
       </div>`;
     }
 
@@ -25428,19 +25432,19 @@ function renderTodayView(){
       if(!_catTasks.length)return;
       _tHtml+=`<div style="font-size:10px;font-weight:700;color:${cat.color};text-transform:uppercase;letter-spacing:.05em;margin:6px 0 3px;display:flex;align-items:center;gap:5px">
         <div style="width:7px;height:7px;border-radius:50%;background:${cat.color};flex-shrink:0"></div>${cat.name}</div>`;
-      _tHtml+=_catTasks.map(_taskRow).join('');
+      _tHtml+=_prioSort(_catTasks).map(_taskRow).join('');
     });
     // Uncategorised
     const _uncat=_nonSticky.filter(t=>!t.cat||!_catMap[t.cat]);
     if(_uncat.length){
       _tHtml+=`<div style="font-size:10px;font-weight:700;color:#adb5bd;text-transform:uppercase;letter-spacing:.05em;margin:6px 0 3px">Other</div>`;
-      _tHtml+=_uncat.map(_taskRow).join('');
+      _tHtml+=_prioSort(_uncat).map(_taskRow).join('');
     }
     // Sticky at bottom with subtle separator
     if(_sticky.length){
       _tHtml+=`<div style="font-size:10px;font-weight:700;color:#7d5800;text-transform:uppercase;letter-spacing:.05em;margin:6px 0 3px;display:flex;align-items:center;gap:5px">
         <span>📌</span>Sticky</div>`;
-      _tHtml+=_sticky.map(_taskRow).join('');
+      _tHtml+=_prioSort(_sticky).map(_taskRow).join('');
     }
 
     html+=`<div style="margin-top:.75rem;padding:.5rem .25rem 0">
@@ -26380,13 +26384,14 @@ function renderWeekTasksView(){
     }
     if(t.time)metaParts.push('⏱ '+t.time);
     if(t.anchor&&!_tpAnchorFuture(t)&&!done)metaParts.push(`<span onclick="event.stopPropagation();tpGapPicker('${t.id}')" style="color:#f59f00;font-weight:700;cursor:pointer" title="The planned period passed — tap to replan">📌 planned ${_tpTraceLbl(t)} · replan</span>`);
-    return`<div class="plan-task-row">
+    return`<div class="plan-task-row${planPrio(t)?' p'+planPrio(t):''}" data-task-id="${t.id}">
       <div class="plan-task-cat-dot" style="background:${cat.color}"></div>
       <input type="checkbox" ${done?'checked':''} onchange="planToggleDone('${t.id}')">
       <div style="flex:1">
         <div class="plan-task-label${done?' done':''}">${t.text}</div>
         ${metaParts.length?`<div class="plan-task-meta">${metaParts.join(' · ')}</div>`:''}
       </div>
+      ${_prioDotsHtml(t)}
       <button onclick="tpGapPicker('${t.id}')" title="Plan into a free period" style="background:none;border:none;color:#ced4da;font-size:13px;cursor:pointer;padding:0 2px">🕐</button>
       <button onclick="planEditTask('${t.id}')" style="background:none;border:none;color:#ced4da;font-size:14px;cursor:pointer;padding:0 2px">✎</button>
     </div>`;
@@ -26436,11 +26441,17 @@ function renderWeekTasksView(){
     </div>`;
   }
   // Sticky tasks always at top
-  const sticky=weekTasks.filter(t=>t.scope==='sticky');
-  if(sticky.length){
+  // Finished sticky tasks stay visible (crossed out) for the week they were ticked, then move
+  // under "completed", where they can still be unticked.
+  const _stickyAll=weekTasks.filter(t=>t.scope==='sticky');
+  const _monS=_dateToStr(mon);
+  const sticky=_stickyAll.filter(t=>!_stickyGone(t,_monS));
+  const _stickyOld=_stickyAll.filter(t=>_stickyGone(t,_monS));
+  if(sticky.length||_stickyOld.length){
     html+=`<div class="plan-sticky-section" style="margin-top:.5rem">
       <div class="plan-sticky-hdr">📌 Sticky</div>
-      ${sticky.map(taskCard).join('')}
+      ${_prioSort(sticky).map(taskCard).join('')}
+      ${_stickyOld.length?`<div onclick="window._showDoneSticky=!window._showDoneSticky;renderWeekTasksView()" style="font-size:11px;color:#868e96;padding:.45rem .85rem;cursor:pointer">${window._showDoneSticky?'▾ Hide':'▸ Show'} completed (${_stickyOld.length})</div>${window._showDoneSticky?_stickyOld.map(taskCard).join(''):''}`:''}
     </div>`;
   }
 
@@ -26469,7 +26480,7 @@ function renderWeekTasksView(){
           <span>${DAY_FULL[day]}</span><span style="font-weight:400;font-size:11px">${dateStr}</span>
           <button onclick="planAddTask('${day}')" style="background:none;border:none;color:${isToday?'rgba(255,255,255,.7)':'#adb5bd'};font-size:16px;cursor:pointer;line-height:1;padding:0">＋</button>
         </div>
-        ${byDay[day].map(taskCard).join('')}
+        ${_prioSort(byDay[day]).map(taskCard).join('')}
       </div>`;
     });
     if(byDay['__none']&&byDay['__none'].length){
@@ -26477,7 +26488,7 @@ function renderWeekTasksView(){
         <div class="plan-day-hdr"><span>Unscheduled (this week)</span>
           <button onclick="planAddTask()" style="background:none;border:none;color:#adb5bd;font-size:16px;cursor:pointer;line-height:1;padding:0">＋</button>
         </div>
-        ${byDay['__none'].map(taskCard).join('')}
+        ${_prioSort(byDay['__none']).map(taskCard).join('')}
       </div>`;
     }
     if(!nonSticky.length&&!sticky.length){
@@ -26494,7 +26505,7 @@ function renderWeekTasksView(){
           <span style="color:var(--text);flex:1">${cat.name}</span><span style="font-size:10px;font-weight:700;color:${cat.color}">${catTasks.length}</span>
           <button onclick="planAddTask(null,'${cat.id}')" style="background:none;border:none;color:#ced4da;font-size:16px;cursor:pointer;margin-left:auto;line-height:1;padding:0">＋</button>
         </div>
-        <div class="plan-day-col">${catTasks.map(taskCard).join('')}</div>
+        <div class="plan-day-col">${_prioSort(catTasks).map(taskCard).join('')}</div>
       </div>`;
     });
     // Uncategorised
@@ -26502,7 +26513,7 @@ function renderWeekTasksView(){
     if(uncat.length){
       html+=`<div class="plan-cat-section">
         <div class="plan-cat-hdr"><span style="color:#868e96">Uncategorised</span></div>
-        <div class="plan-day-col">${uncat.map(taskCard).join('')}</div>
+        <div class="plan-day-col">${_prioSort(uncat).map(taskCard).join('')}</div>
       </div>`;
     }
     if(!nonSticky.length&&!sticky.length){
@@ -26522,6 +26533,74 @@ function setPlanView(mode){
   S._planViewMode=mode;
   saveSettings();try{localStorage.setItem('planData',JSON.stringify(S.planData||[]));localStorage.setItem('planCategories',JSON.stringify(S.planCategories||[]));}catch(e){}
   renderWeekTasksView();
+}
+
+// ── TASK PRIORITY (0–3 dots) ──────────────────────────────────────────────
+// One-off tasks keep it in t.prio. Recurring tasks keep it per occurrence, in t.prioBy keyed by the
+// Monday of the week on screen, so this week's priority does not carry to next week.
+function _prioWeekKey(){
+  const m=getWeekMondayFor(ttWeekOffset);
+  return m.getFullYear()+'-'+String(m.getMonth()+1).padStart(2,'0')+'-'+String(m.getDate()).padStart(2,'0');
+}
+function planPrio(t){
+  if(!t)return 0;
+  if(t.scope==='recurring')return(t.prioBy&&t.prioBy[_prioWeekKey()])||0;
+  return t.prio||0;
+}
+// Higher priority first WITHIN each category; categories and equal-priority tasks keep their order.
+function _prioSort(list){
+  const out=list.slice(),byCat={};
+  list.forEach((x,i)=>{const c=x.cat||'';(byCat[c]=byCat[c]||[]).push(i);});
+  Object.keys(byCat).forEach(c=>{
+    const idx=byCat[c];
+    const sorted=idx.map((i,n)=>({x:list[i],n})).sort((a,b)=>(planPrio(b.x)-planPrio(a.x))||(a.n-b.n));
+    idx.forEach((i,n)=>{out[i]=sorted[n].x;});
+  });
+  return out;
+}
+function _prioDotsHtml(t){
+  const n=planPrio(t);
+  return `<button class="prio-dots p${n}" data-prio-id="${t.id}" onclick="planCyclePrio('${t.id}',event)" title="Priority" aria-label="Priority ${n} of 3">${n?'●'.repeat(n):'○'}</button>`;
+}
+let _prioTimer=null;
+function planCyclePrio(id,ev){
+  if(ev){ev.stopPropagation();ev.preventDefault();}
+  const t=(S.planData||[]).find(x=>x.id===id);if(!t)return;
+  const n=(planPrio(t)+1)%4;
+  if(t.scope==='recurring'){
+    t.prioBy=t.prioBy||{};
+    const k=_prioWeekKey();
+    if(n)t.prioBy[k]=n;else delete t.prioBy[k];
+    const keys=Object.keys(t.prioBy).sort();                 // keep the last 12 weeks only
+    while(keys.length>12)delete t.prioBy[keys.shift()];
+    if(!Object.keys(t.prioBy).length)delete t.prioBy;
+  }else{
+    if(n)t.prio=n;else delete t.prio;
+  }
+  // Update the dots where they stand. The row does NOT move yet, so the next tap lands on the same task.
+  document.querySelectorAll('.prio-dots[data-prio-id="'+id+'"]').forEach(b=>{
+    b.className='prio-dots p'+n;b.textContent=n?'●'.repeat(n):'○';b.setAttribute('aria-label','Priority '+n+' of 3');
+    const row=b.closest('.plan-task-row');if(row){row.classList.remove('p1','p2','p3');if(n)row.classList.add('p'+n);}
+  });
+  saveSettings();try{localStorage.setItem('planData',JSON.stringify(S.planData||[]));}catch(e){}
+  clearTimeout(_prioTimer);
+  _prioTimer=setTimeout(_prioResort,1000);                   // re-sort one second after the last tap
+}
+function _prioResort(){
+  const snap=()=>{const m={},seen={};document.querySelectorAll('.plan-task-row[data-task-id]').forEach(r=>{
+    const id=r.getAttribute('data-task-id');seen[id]=(seen[id]||0)+1;m[id+'#'+seen[id]]={r,top:r.getBoundingClientRect().top};});return m;};
+  const before=snap();
+  try{renderWeekTasksView();}catch(e){}
+  try{if(ttView==='today')renderTodayView();}catch(e){}
+  const after=snap();
+  Object.keys(after).forEach(k=>{                             // slide each row from its old place to its new one
+    if(!before[k])return;
+    const dy=before[k].top-after[k].top;if(Math.abs(dy)<2)return;
+    const r=after[k].r;
+    r.style.transition='none';r.style.transform='translateY('+dy+'px)';
+    requestAnimationFrame(()=>{r.style.transition='transform .28s ease';r.style.transform='';
+      setTimeout(()=>{r.style.transition='';},320);});
+  });
 }
 
 function planToggleDone(taskId){
@@ -28777,13 +28856,13 @@ function _amContextItemsHtml(slotCat,linkedCls,label){
       if(!linkedCls)return;
       const cid=linkedCls.id||linkedCls.name;
       say=getPoints(ctx.id).filter(t=>t.sub===cid||t.sub===linkedCls.name);
-      doItems=(S.planData||[]).filter(t=>!t.say&&t.cat===ctx.id&&(t.sub===cid||t.sub===linkedCls.name)&&(t.scope==='sticky'||t.date===todayS));
+      doItems=(S.planData||[]).filter(t=>!t.say&&t.cat===ctx.id&&(t.sub===cid||t.sub===linkedCls.name)&&((t.scope==='sticky'&&!_stickyGone(t,todayS))||t.date===todayS));
       if(say.length||doItems.length)groups.push({ctx,say,doItems,key:ctx.id+'_'+cid,title:ctx.name+' \u00B7 '+linkedCls.name});
       return;
     }
     if(!ctx.ttCat||ctx.ttCat!==slotCat)return;
     say=getPoints(ctx.id);
-    doItems=(S.planData||[]).filter(t=>!t.say&&t.cat===ctx.id&&(t.scope==='sticky'||t.date===todayS));
+    doItems=(S.planData||[]).filter(t=>!t.say&&t.cat===ctx.id&&((t.scope==='sticky'&&!_stickyGone(t,todayS))||t.date===todayS));
     if(say.length||doItems.length)groups.push({ctx,say,doItems,key:ctx.id,title:ctx.name});
   });
   // Tasks planned into THIS slot (the payoff moment: the gap arrives and the
@@ -29453,7 +29532,21 @@ async function _doneFlushQueue(){
   }
 }
 // Single entry point for every done-state write
+// A sticky task stays until it is done. Once ticked it is shown crossed out for the rest of that
+// day (so it can be unticked), then drops off later days. doneAt records the local day it was ticked.
+function _stickyGone(t,viewDateStr){
+  if(!t||t.scope!=='sticky')return false;
+  let done=false;try{done=localStorage.getItem('plan_done_'+t.id)==='1';}catch(e){}
+  if(!done)return false;
+  return viewDateStr>(t.doneAt||'');      // ticked before the day on screen (or before this fix) = gone
+}
 function setDone(key,val){
+  try{
+    if(key.indexOf('plan_done_')===0){
+      const st=(S.planData||[]).find(x=>x&&x.scope==='sticky'&&('plan_done_'+x.id)===key);
+      if(st){if(val)st.doneAt=_dateToStr(new Date());else delete st.doneAt;try{_savePlanNow();}catch(e){}}
+    }
+  }catch(e){}
   try{localStorage.setItem(key,val?'1':'0');}catch(e){}
   _doneQueueAdd(key,val);
   supa.from('task_done').upsert({key,done:!!val,updated_at:new Date().toISOString()},{onConflict:'key'})
