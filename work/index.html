@@ -63,6 +63,22 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .sh-title{font-size:10px;font-weight:600;color:#444;text-transform:uppercase;letter-spacing:.06em}
 .sh-actions{display:flex;gap:6px;align-items:center;justify-content:flex-end}
 #main-app{display:none}
+.personal-pill{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;font-size:11px;color:#6d28d9;cursor:pointer;margin-right:8px}
+.personal-pill.wk{display:block;width:0;min-width:100%;font-size:8px;line-height:1.3;margin:1px 0 0;box-sizing:border-box}
+.omni-strip{padding:3px 10px 4px;background:#f5f3ff;border-top:1px solid #e9d5ff;display:flex;align-items:center;flex-wrap:wrap;gap:2px;min-width:0}
+.omni-dot{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:22px;padding:0 6px;border-radius:11px;background:#ede9fe;color:#6d28d9;font-size:13px;font-weight:800;cursor:pointer;line-height:1;flex-shrink:0}
+.omni-dot.done{color:#a78bfa;background:transparent;border:1px solid #ddd6fe}
+.omni-dot.dark{background:rgba(167,139,250,.22);color:#c4b5fd}
+#omni-pop{position:fixed;z-index:30000;max-width:260px;min-width:170px;background:#fff;border:1px solid #ddd6fe;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.22);padding:8px 0 0;font-size:13px;color:#212529}
+.omni-pop-h{font-size:10px;font-weight:700;color:#6d28d9;text-transform:uppercase;letter-spacing:.06em;padding:0 12px 4px}
+.omni-pop-row{display:flex;gap:8px;padding:5px 12px;line-height:1.35;word-break:break-word}
+.omni-pop-row.done{text-decoration:line-through;color:#adb5bd}
+.omni-pop-t{color:#868e96;font-size:11px;flex-shrink:0;padding-top:1px}
+.omni-pop-link{border-top:1px solid #f1f3f5;margin-top:4px;padding:9px 12px;color:#6d28d9;font-weight:600;cursor:pointer}
+#am-omni{margin:8px 12px 2px}
+.am-omni-card,.am-omni-tasks{display:flex;align-items:center;gap:8px;padding:9px 12px;margin-bottom:6px;border-radius:11px;background:rgba(139,92,246,.16);border:1px solid rgba(167,139,250,.35);color:#e9e5ff;font-size:13px;cursor:pointer;min-width:0}
+.am-omni-card b{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.am-omni-go{margin-left:auto;opacity:.7;flex-shrink:0}
 .app{padding:.75rem;max-width:440px;margin:0 auto;padding-bottom:80px}
 
 /* TABS */
@@ -1792,6 +1808,14 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
               <span style="font-size:13px;color:var(--text2)" id="sat-lock-lbl">Disabled</span>
             </label>
           </div>
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:.3rem">Show personal event names in Work</div>
+            <div style="font-size:11px;color:#868e96;margin-bottom:.5rem">Names of Omni events and texts of Omni tasks on the schedule and in live mode. Turn off when others can see your screen.</div>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+              <div class="tt-opt-toggle" id="omni-names-tog" onclick="toggleOmniNames()" style="flex-shrink:0"></div>
+              <span style="font-size:13px;color:var(--text2)" id="omni-names-lbl"></span>
+            </label>
+          </div>
         </div>
       </div>
     </div>
@@ -2607,7 +2631,7 @@ const SYNC_KEYS=['settings','tutors','students','archived','ttCustom','ttDefault
   'boarderRooms','hwkCollapseState','nightDuties','fridayDuties','fridayTermRange',
   'linksData','holidaysData','schoolYear','tutorMeetings','globalDefault',
   'ttCollapsePast','ttShowExtended','ttShowWeekend','settingsSections','planData','planCategories',
-  'dayStructure','dayStructureDefault','slotOutlines','categoryDefs','lessonPlans','lessonDone','tutorChecks','detLog'];
+  'dayStructure','dayStructureDefault','slotOutlines','categoryDefs','lessonPlans','lessonDone','tutorChecks','detLog','omniNamesInWork'];
 
 // UI synced separately (pin_ts stays local only — security)
 
@@ -23816,11 +23840,106 @@ function getWeekIsA(offset){
   return diff%2===0;
 }
 let PERSONAL_SLOTS=[];
+// Omni's task list, READ ONLY (Work never writes Omni data). If Omni's task storage ever moves
+// out of omni_settings/key='tasks', this loader must follow.
+let OMNI_TASKS=[];
 async function fetchPersonalSlots(){
   try{
     var r=await supa.from('omni_personal_slots').select('*');
     if(!r.error&&r.data)PERSONAL_SLOTS=r.data;
   }catch(e){console.warn('Personal slots:',e.message);}
+  try{
+    var r2=await supa.from('omni_settings').select('value').eq('key','tasks');
+    if(!r2.error&&r2.data){
+      var v=r2.data[0]&&r2.data[0].value;
+      if(typeof v==='string'){try{v=JSON.parse(v);}catch(e){v=null;}}
+      OMNI_TASKS=Array.isArray(v)?v:[];
+    }
+  }catch(e){console.warn('Omni tasks:',e.message);}
+}
+// Setting: show personal event names and task texts inside Work (default on).
+function _omniNamesOn(){try{return localStorage.getItem('omniNamesInWork')!=='0';}catch(e){return true;}}
+function _omniEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function _omniHM(s){return String(s||'').slice(0,5);}
+// Same rule Omni uses (getTasksFor): tier 3 every day; tier 1 by day when recurring, else by date,
+// else by day; tier 2 inside its from..to range.
+function _omniTaskOnDay(tk,dayName,dateStr){
+  var tier=tk.tier||1;
+  if(tier===3)return true;
+  if(tier===1){if(tk.recurring)return tk.day===dayName;if(tk.date)return tk.date===dateStr;return tk.day===dayName;}
+  if(tier===2)return !!(tk.from&&tk.to&&dateStr>=tk.from&&dateStr<=tk.to);
+  return false;
+}
+// Done state is shared through the task_done table, mirrored into localStorage by both apps.
+function _omniTaskDone(tk,dateStr){
+  try{return localStorage.getItem('omni_td_'+tk.id+((tk.tier||1)===3?'':'_'+dateStr))==='1';}catch(e){return false;}
+}
+// The one overlap rule: an event belongs to a window when it overlaps it; a task when its time is inside it.
+function omniForWindow(dayName,dateStr,s,e){
+  var events=getPersonalSlotsForDay(dayName,dateStr).filter(function(ps){
+    if(!ps.start_time||!ps.end_time)return false;
+    var ss=t2m(ps.start_time),se=t2m(ps.end_time);if(se<=ss)se=1440;   // crossing midnight: runs to 24:00
+    return ss<e&&se>s;
+  });
+  var tasks=OMNI_TASKS.filter(function(tk){
+    if(!tk||!tk.id||!tk.taskTime||!_omniTaskOnDay(tk,dayName,dateStr))return false;
+    var m=t2m(tk.taskTime);return m>=s&&m<e;
+  }).map(function(tk){return{id:tk.id,text:tk.text||'',time:tk.taskTime,done:_omniTaskDone(tk,dateStr)};});
+  return{events:events,tasks:tasks};
+}
+// kind: 'day' = name + time; 'week' = name only, never widens the column
+function _omniPillHtml(ps,kind){
+  var on=_omniNamesOn(),tm=_omniHM(ps.start_time)+'–'+_omniHM(ps.end_time);
+  var txt=kind==='week'?(on?_omniEsc(ps.title||'Personal'):tm):((on?_omniEsc(ps.title||'Personal'):'Personal')+' '+tm);
+  return '<span class="personal-pill'+(kind==='week'?' wk':'')+'" onclick="openOmni(event)"'+(on&&kind==='week'?' title="'+tm+'"':'')+'>👤 '+txt+'</span>';
+}
+function _omniDotHtml(dayName,dateStr,s,e,tasks,dark){
+  if(!tasks.length)return'';
+  var open=tasks.filter(function(x){return!x.done;}).length;
+  return '<span class="omni-dot'+(open?'':' done')+(dark?' dark':'')+'" onclick="omniDotTap(event,\''+dayName+'\',\''+dateStr+'\','+s+','+e+')" ontouchstart="event.stopPropagation()" ontouchend="event.stopPropagation()">'+(open>1?'•'+open:(open?'•':'◦'))+'</span>';
+}
+function omniPopClose(){
+  var o=document.getElementById('omni-pop');if(o)o.remove();
+  document.removeEventListener('pointerdown',_omniPopOutside,true);
+  window.removeEventListener('scroll',omniPopClose,true);
+  document.removeEventListener('keydown',_omniPopKey,true);
+}
+function _omniPopOutside(ev){var o=document.getElementById('omni-pop');if(o&&!o.contains(ev.target))omniPopClose();}
+function _omniPopKey(ev){if(ev.key==='Escape')omniPopClose();}
+function omniDotTap(ev,dayName,dateStr,s,e){
+  if(ev){ev.stopPropagation();ev.preventDefault();}
+  if(!_omniNamesOn()){openOmni();return;}          // names hidden: no task text is shown in Work
+  omniPopClose();
+  var tasks=omniForWindow(dayName,dateStr,s,e).tasks;if(!tasks.length)return;
+  var o=document.createElement('div');o.id='omni-pop';
+  o.innerHTML='<div class="omni-pop-h">Personal tasks</div>'
+    +tasks.map(function(x){return '<div class="omni-pop-row'+(x.done?' done':'')+'"><span class="omni-pop-t">'+_omniEsc(x.time)+'</span><span>'+_omniEsc(x.text)+'</span></div>';}).join('')
+    +'<div class="omni-pop-link" onclick="omniPopClose();openOmni()">Open Omni ↗</div>';
+  document.body.appendChild(o);
+  var r=(ev&&ev.currentTarget&&ev.currentTarget.getBoundingClientRect)?ev.currentTarget.getBoundingClientRect():{left:20,bottom:120,top:100};
+  var w=o.offsetWidth,h=o.offsetHeight,vw=window.innerWidth,vh=window.innerHeight;
+  var left=Math.max(8,Math.min(r.left,vw-w-8)),top=r.bottom+6;
+  if(top+h>vh-8)top=Math.max(8,r.top-h-6);
+  o.style.left=left+'px';o.style.top=top+'px';
+  setTimeout(function(){
+    document.addEventListener('pointerdown',_omniPopOutside,true);
+    window.addEventListener('scroll',omniPopClose,true);
+    document.addEventListener('keydown',_omniPopKey,true);
+  },0);
+}
+function toggleOmniNames(){
+  try{localStorage.setItem('omniNamesInWork',_omniNamesOn()?'0':'1');}catch(e){}
+  _updateOmniNamesUI();omniPopClose();
+  // Scrub every drawn name first (including the hidden week grid and a closed live panel),
+  // so that switching names off leaves none in the page.
+  try{document.querySelectorAll('.personal-pill,.omni-strip,#am-omni').forEach(function(x){x.remove();});}catch(e){}
+  try{renderTimetable();}catch(e){}
+  try{if(typeof _amOpen!=='undefined'&&_amOpen)_amOmniSync();}catch(e){}
+}
+function _updateOmniNamesUI(){
+  var on=_omniNamesOn();
+  var tog=document.getElementById('omni-names-tog');if(tog)tog.classList.toggle('on',on);
+  var lbl=document.getElementById('omni-names-lbl');if(lbl)lbl.textContent=on?'Shown — event names and task texts appear in Work':'Hidden — Work only says “Personal”';
 }
 function getPersonalSlotsForDay(dayName,dateStr){
   return PERSONAL_SLOTS.filter(function(s){
@@ -25201,11 +25320,10 @@ function renderTodayView(){
       timeDisplay=`<span style="font-size:10px;color:${tx};opacity:.8;line-height:1.2">${tStart}–${tEnd}</span>`;
     }
 
-    const pSlots=getPersonalSlotsForDay(dayName,slotDateStr).filter(function(p){
-      var ss=t2m(p.start_time),se=t2m(p.end_time),cs=t2m(tStart),ce=t2m(tEnd);
-      return ss<ce&&se>cs;
-    });
-    const pHtml=pSlots.length?'<div style="padding:3px 10px 4px;background:#f5f3ff;border-top:1px solid #e9d5ff">'+pSlots.map(function(p){return '<span class="personal-pill" onclick="openOmni(event)">👤 '+p.start_time+'–'+p.end_time+'</span>';}).join('')+'</div>':'';
+    const _oS=t2m(tStart),_oE=(t2m(tEnd)>t2m(tStart))?t2m(tEnd):1440;
+    const _om=omniForWindow(dayName,slotDateStr,_oS,_oE);
+    const pSlots=_om.events;
+    const pHtml=(pSlots.length||_om.tasks.length)?'<div class="omni-strip">'+pSlots.map(function(p){return _omniPillHtml(p,'day');}).join('')+_omniDotHtml(dayName,slotDateStr,_oS,_oE,_om.tasks)+'</div>':'';
 
     html+=`<div class="${slotClass}" id="tslot-${idx}" style="border:none;margin-bottom:3px;border-radius:6px;overflow:hidden">
       <div onclick="toggleTodayNote(${idx},'${dayName}')"
@@ -25610,8 +25728,8 @@ function renderTimetable(){
       const _longPress=`_lpStart(event,${idx},'${d}')`;
       const _longPressEnd=`_lpEnd(event)`;
       if(!cell){
-        const _pSlotsE=getPersonalSlotsForDay(d,dayDateStrs[activeDays.indexOf(d)]).filter(function(ps){const ss=t2m(ps.start_time),se=t2m(ps.end_time),cs=t2m(getSlotTime(idx));const ce=idx+1<SLOTS.length?t2m(getSlotTime(idx+1)):cs+30;return ss<ce&&se>cs;});
-        const _pHtmlE=_pSlotsE.length?_pSlotsE.map(function(ps){return '<span class="personal-pill" onclick="openOmni(event)">👤 '+ps.start_time+'–'+ps.end_time+'</span>';}).join(''):'';
+        const _pSlotsE=omniForWindow(d,dayDateStrs[activeDays.indexOf(d)],t2m(getSlotTime(idx)),idx+1<SLOTS.length?t2m(getSlotTime(idx+1)):t2m(getSlotTime(idx))+30).events;
+        const _pHtmlE=_pSlotsE.map(function(ps){return _omniPillHtml(ps,'week');}).join('');
         h+=`${tdOpen}<div class="tt-inner${ttEditMode?' editable':''}" onclick="${_cellClick}"></div>`+_pHtmlE+`</td>`;return;
       }
 
@@ -25645,8 +25763,8 @@ function renderTimetable(){
         h+=`<div style="background:#dcfce7;color:#166534;border-radius:3px;padding:2px 4px;font-size:9px;cursor:pointer;line-height:1.3;flex:1" onclick="openSlotRemainder(${idx},'${d}',${offset})">Free</div>`;
         h+='</div></td>';
       } else {
-      const _pSlots=getPersonalSlotsForDay(d,dayDateStrs[activeDays.indexOf(d)]).filter(function(ps){const ss=t2m(ps.start_time),se=t2m(ps.end_time),cs=t2m(getSlotTime(idx));const ce=idx+1<SLOTS.length?t2m(getSlotTime(idx+1)):cs+30;return ss<ce&&se>cs;});
-      const _pHtml=_pSlots.length?_pSlots.map(function(ps){return '<span class="personal-pill" onclick="openOmni(event)">👤 '+ps.start_time+'–'+ps.end_time+'</span>';}).join(''):'';
+      const _pSlots=omniForWindow(d,dayDateStrs[activeDays.indexOf(d)],t2m(getSlotTime(idx)),idx+1<SLOTS.length?t2m(getSlotTime(idx+1)):t2m(getSlotTime(idx))+30).events;
+      const _pHtml=_pSlots.map(function(ps){return _omniPillHtml(ps,'week');}).join('');
       const _spanCls=isCleanSpan?' span-cell':'';
       // Flag badges — same truth the day view shows, so a flagged slot is
       // visible from the week grid too (stale flags were invisible here before)
@@ -31906,6 +32024,7 @@ function _updateSatUI(){
   const on=localStorage.getItem('satAutoLock')==='1';
   const tog=document.getElementById('sat-lock-tog');if(tog)tog.classList.toggle('on',on);
   const lbl=document.getElementById('sat-lock-lbl');if(lbl)lbl.textContent=on?'Enabled — locks every Saturday at midnight':'Disabled';
+  try{_updateOmniNamesUI();}catch(e){}
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -36680,9 +36799,10 @@ function _amPeekEvents(){
       if(c.tutor_check)flags.push('👁 Tutor check');
     }
     const planned=_tpForWindow(ds,stM,etM);
-    const hasContent=(c&&c.l)||flags.length||planned.length;
+    const _omP=omniForWindow(dn,ds,stM,etM),_omHas=_omP.events.length||_omP.tasks.length;
+    const hasContent=(c&&c.l)||flags.length||planned.length||_omHas;
     if(!hasContent)continue;
-    if(c&&c.tp==='sleep'&&!flags.length&&!planned.length)continue; // sleep rows are noise in a preview
+    if(c&&c.tp==='sleep'&&!flags.length&&!planned.length&&!_omHas)continue; // sleep rows are noise in a preview
     prev={st,et,stM,etM,label:(c&&c.l)||'Free',cat:getCat((c&&(c.cat||c.tp))||'free'),flags,planned,cellL:c&&c.l,cellTp:c&&c.tp,rootIdx:i,endIdx:i,_custEt:!!(c&&c.customEndTime)};
     out.push(prev);
   }
@@ -36693,11 +36813,13 @@ function _amPeekOpen(){
   if(!events.length){showToastMsg('Nothing left today to preview','#6b7280');return;}
   _amPeek={i:0,events,baseSlot:(()=>{try{return (amGetCtx()||{}).slotIdx??-2;}catch(e){return -2;}})()};
   _amPeekRender();
+  try{_amOmniSync();}catch(e){}
 }
 function _amPeekNav(d){
   if(!_amPeek)return;
   _amPeek.i=Math.max(0,Math.min(_amPeek.events.length-1,_amPeek.i+d));
   _amPeekRender();
+  try{_amOmniSync();}catch(e){}
 }
 function _amPeekClose(){
   _amPeek=null;
@@ -37444,7 +37566,36 @@ function _amDayPillTick(){
     </div>`).join('')}
   </div>`).join('');
 }
+// Personal events and Omni tasks for the slot on screen (now, or the one being previewed).
+function _amOmniWindow(){
+  if(_amPeek&&_amPeek.events&&_amPeek.events[_amPeek.i]){const ev=_amPeek.events[_amPeek.i];return{s:ev.stM,e:ev.etM};}
+  const n=new Date(),nm=n.getHours()*60+n.getMinutes();
+  let ci=-1;for(let i=0;i<SLOTS.length;i++)if(nm>=t2m(getSlotTime(i)))ci=i;
+  if(ci<0)return{s:0,e:SLOTS.length?t2m(getSlotTime(0)):1440};
+  return{s:t2m(getSlotTime(ci)),e:ci+1<SLOTS.length?t2m(getSlotTime(ci+1)):1440};
+}
+function _amOmniSync(){
+  const body=document.getElementById('am-body');if(!body)return;
+  let cur=document.getElementById('am-omni');
+  if(typeof _fireOpen!=='undefined'&&_fireOpen){if(cur)cur.remove();return;}
+  const w=_amOmniWindow(),dn=DN[new Date().getDay()],ds=_todayStr();
+  const om=omniForWindow(dn,ds,w.s,w.e),on=_omniNamesOn();
+  const sig=JSON.stringify([w.s,w.e,on,om.events.map(p=>[p.id,p.title,p.start_time,p.end_time]),om.tasks.map(x=>[x.id,x.text,x.time,x.done])]);
+  if(!om.events.length&&!om.tasks.length){if(cur)cur.remove();return;}
+  if(cur&&cur.parentNode===body&&cur.getAttribute('data-sig')===sig)return;
+  if(cur)cur.remove();
+  cur=document.createElement('div');cur.id='am-omni';cur.setAttribute('data-sig',sig);
+  cur.innerHTML=om.events.map(p=>'<div class="am-omni-card" onclick="openOmni(event)" ontouchstart="event.stopPropagation()" ontouchend="event.stopPropagation()">👤 Personal'
+      +(on?' · <b>'+_omniEsc(p.title||'')+'</b>':'')+' · '+_omniHM(p.start_time)+'–'+_omniHM(p.end_time)+'<span class="am-omni-go">↗</span></div>').join('')
+    +(om.tasks.length?'<div class="am-omni-tasks" onclick="omniDotTap(event,\''+dn+'\',\''+ds+'\','+w.s+','+w.e+')" ontouchstart="event.stopPropagation()" ontouchend="event.stopPropagation()">'
+      +_omniDotHtml(dn,ds,w.s,w.e,om.tasks,true)+'<span>'+om.tasks.length+' personal task'+(om.tasks.length>1?'s':'')+' at this time</span></div>':'');
+  body.insertBefore(cur,body.firstChild);
+}
 function amRender(){
+  _amRenderCore();
+  try{_amOmniSync();}catch(e){}
+}
+function _amRenderCore(){
   const ctx=amGetCtx();_updateLiveBtn();_amAutoCheck();_amDayPillTick();
   const body=document.getElementById('am-body');if(!body)return;
   if(_fireOpen){if(!document.getElementById('am-fire-section'))_renderFireRegister();return;}
