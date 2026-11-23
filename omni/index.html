@@ -123,6 +123,9 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
 @keyframes blink{50%{opacity:.1}}
 .hdr-date{font-size:10px;color:#4a3e30;margin-top:2px;letter-spacing:.03em}
 .hdr-r{display:flex;align-items:center;justify-content:flex-end;gap:3px;flex-shrink:0}
+#sync-row{display:none;justify-content:center;padding:0 12px 6px}
+#sync-pill{font-size:12px;font-weight:700;color:#1a1208;background:#f0a030;border:0;border-radius:20px;padding:6px 14px;min-height:30px;letter-spacing:.01em}
+#sync-pill:active{transform:scale(.96)}
 .hbtn{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);color:#8a7a68;transition:all .12s;flex-shrink:0;padding:0}
 .hbtn:active{background:rgba(255,255,255,.12);transform:scale(.9)}
 .hbtn.lit{color:#f0c040;background:rgba(240,192,64,.1);border-color:rgba(240,192,64,.2)}
@@ -552,6 +555,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
         <button class="hbtn" onclick="openSettings()" title="Settings"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 100-6 3 3 0 000 6zm8-3l1.8-1-1.5-2.6-2 .6a7 7 0 00-1.7-1L16 5h-3l-.6 2a7 7 0 00-1.7 1l-2-.6L7.2 10 9 11v2l-1.8 1 1.5 2.6 2-.6a7 7 0 001.7 1L13 19h3l.6-2a7 7 0 001.7-1l2 .6 1.5-2.6L20 13v-1z"/></svg></button>
       </div>
     </div>
+    <div id="sync-row"><button id="sync-pill" onclick="_qTapPill()" title="Changes kept on this device until they reach the database. Tap to retry now."></button></div>
     <div class="hdr-r2" id="hdr-r2">
       <div id="tz-clocks" style="display:flex;align-items:center;gap:0;flex:1;overflow:hidden"></div>
       <div class="hdr-age" id="hdr-age"></div>
@@ -1443,7 +1447,215 @@ if(_OK){try{supa.auth.onAuthStateChange((ev,s)=>{
   try{if(s&&s.access_token)supa.realtime.setAuth(s.access_token);}catch(e){}
   if(ev==='SIGNED_OUT'){try{omniShowLogin();}catch(e){}}
 });}catch(e){}}
-function supaFrom(t){return _OK?supa.from(t):supa.from(t);}
+// ═══════════════════════════════════════════════════
+// SAFE SAVES (one write layer for every table)
+// A write that cannot reach the database is kept on this device (localStorage 'omni_q'),
+// retried oldest-first until it lands, and shown in the header as "waiting to sync".
+// A write the database refuses is reported in a toast and never retried.
+// ═══════════════════════════════════════════════════
+const _QK='omni_q',_QDK='omni_q_dead',_QMAX=500;
+// Untouched: the inbox checks its own errors, and ticks already have their own queue (_doneQueue).
+const _QPASS={app_inbox:1,task_done:1};
+// Life Manager tables: written only after a "does it exist yet?" read, so a blind replay could
+// duplicate. Never queued; a failure is reported instead.
+const _QREPORT={reading_log:1,watch_log:1,course_log:1,films:1,film_plan:1,yearly_queue:1};
+// Tables whose id is a uuid (checked in the database, 23 Nov 2026): the app makes the id itself,
+// so an insert can be replayed safely (a second arrival is a duplicate key = already saved).
+const _QUUID={omni_checklist_instances:1,omni_checklist_items:1,omni_checklist_templates:1,omni_checklist_ticks:1,
+  omni_gym_audio:1,omni_gym_exercises:1,omni_gym_programme:1,omni_gym_sessions:1,omni_gym_sets:1,omni_habit_log:1,
+  omni_outfit_combinations:1,omni_outfit_log:1,omni_pack_categories:1,omni_pack_items:1,omni_pack_list_items:1,
+  omni_pack_lists:1,omni_pack_periods:1,omni_pack_ticks:1,omni_personal_slots:1,omni_rhythm_log:1,omni_rhythms:1,
+  omni_running_log:1,omni_schedule_feed:1,omni_wardrobe_item_log:1,omni_wardrobe_items:1};
+// No id column; a row is its own key (item + category).
+const _QNATKEY={omni_pack_item_tags:1};
+const _QCH=['eq','neq','gt','gte','lt','lte','is','in','not','or','match','filter','select','single','maybeSingle','limit','order'];
+const _QSHAPE={select:1,single:1,maybeSingle:1,limit:1,order:1};
+let _qAuth=false,_qFlushP=null,_qSeq=0,_qLastT='',_qLastAt=0,_qSoonT=null;
+const _qLanded={};
+
+function supaFrom(t,o){
+  if(!_OK||_QPASS[t])return supa.from(t);
+  const w={select:(...a)=>supa.from(t).select(...a)};
+  ['insert','upsert','update','delete'].forEach(m=>{w[m]=(...a)=>_qChain(t,[[m,a]],o||{});});
+  return w;
+}
+// Records the chain (insert → eq → select → single …) and runs it when awaited, like the real client.
+function _qChain(t,steps,o){
+  let p=null;const c={},seq=++_qSeq;
+  _QCH.forEach(m=>{c[m]=(...a)=>{steps.push([m,a]);return c;};});
+  const run=()=>p||(p=_qRun(t,steps,o,seq));
+  c.then=(f,r)=>run().then(f,r);c.catch=r=>run().catch(r);c.finally=f=>run().finally(f);
+  return c;
+}
+function _uid(){
+  try{if(crypto.randomUUID)return crypto.randomUUID();}catch(e){}
+  const b=new Uint8Array(16);crypto.getRandomValues(b);b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;
+  const h=Array.from(b).map(x=>x.toString(16).padStart(2,'0')).join('');
+  return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);
+}
+function _qGet(){try{const q=JSON.parse(localStorage.getItem(_QK)||'[]');return Array.isArray(q)?q:[];}catch(e){return[];}}
+function _qSet(q){
+  try{if(q.length)localStorage.setItem(_QK,JSON.stringify(q));else localStorage.removeItem(_QK);}
+  catch(e){return false;}
+  _qPill();return true;
+}
+function _qDrop(id){_qSet(_qGet().filter(x=>x.id!==id));}
+function _qDead(it,res){
+  try{let d=JSON.parse(localStorage.getItem(_QDK)||'[]');if(!Array.isArray(d))d=[];
+    d.push({id:it.id,table:it.table,steps:it.steps,ts:it.ts,at:Date.now(),err:_qMsg(res)});
+    localStorage.setItem(_QDK,JSON.stringify(d.slice(-50)));}catch(e){}
+}
+function _qMsg(res){const e=res&&res.error;return String((e&&(e.message||e.details||e.code))||'unknown error').slice(0,140);}
+function _qToast(m){
+  const n=Date.now();if(m===_qLastT&&n-_qLastAt<3000)return;
+  _qLastT=m;_qLastAt=n;try{showToast(m,3800);}catch(e){}
+}
+function _qSetKey(t,steps){
+  if(t!=='omni_settings'||steps[0][0]!=='upsert')return null;
+  const d=steps[0][1][0];return d&&!Array.isArray(d)&&typeof d.key==='string'?d.key:null;
+}
+// Settings keys that have an unsent save on this device (the server copy of these is stale).
+function _qSetKeys(){const m={};_qGet().forEach(x=>{if(x.table==='omni_settings'&&x.key)m[x.key]=1;});return m;}
+function _qReplayable(t,steps){
+  if(steps[0][0]!=='insert'||_QNATKEY[t])return true;
+  const d=steps[0][1][0],rows=Array.isArray(d)?d:[d];
+  return rows.length>0&&rows.every(r=>r&&r.id!=null);
+}
+// ok = landed · rej = database said no · auth = session expired · net = could not reach the database
+function _qKind(res,replayedInsert){
+  if(!res||!res.error)return'ok';
+  const s=res.status|0,c=String(res.error.code||'');
+  if(replayedInsert&&(s===409||c==='23505'))return'ok';        // the first attempt landed
+  if(s===401||c==='PGRST301')return'auth';
+  if(!s||s>=500||s===408||s===429)return'net';
+  return'rej';
+}
+async function _qHasSession(){
+  try{const r=await supa.auth.getSession();return!!(r&&r.data&&r.data.session);}catch(e){return false;}
+}
+function _qNeedLogin(){_qAuth=true;if(navigator.onLine!==false){try{omniShowLogin();}catch(e){}}}
+async function _qSend(t,steps,replay){
+  let tm=null;
+  try{
+    let b=supa.from(t),ac=null;
+    const arm=()=>{if(ac||typeof AbortController==='undefined'||typeof b.abortSignal!=='function')return;
+      ac=new AbortController();tm=setTimeout(()=>{try{ac.abort();}catch(e){}},45000);b=b.abortSignal(ac.signal);};
+    for(const[m,a]of steps){
+      if(replay&&_QSHAPE[m])continue;                            // a replay does not need the row read back
+      if(m==='single'||m==='maybeSingle')arm();
+      b=b[m](...a);
+    }
+    arm();
+    const r=await b;
+    return r||{data:null,error:{message:'No response'},status:0};
+  }catch(e){return{data:null,error:{message:(e&&e.message)||String(e)},count:null,status:0,statusText:''};}
+  finally{if(tm)clearTimeout(tm);}
+}
+// What the caller gets back for a parked write: the rows it sent, so "swap the temporary row for
+// the saved one" keeps working.
+function _qEcho(steps,queued){
+  const m=steps[0][0],d=steps[0][1][0];let data=null;
+  if((m==='insert'||m==='upsert')&&steps.some(s=>s[0]==='select')){
+    const one=steps.some(s=>s[0]==='single'||s[0]==='maybeSingle');
+    data=one?(Array.isArray(d)?d[0]:d):(Array.isArray(d)?d:[d]);
+  }
+  return{data,error:null,count:null,status:0,statusText:'',queued:!!queued};
+}
+function _qFail(msg){return{data:null,error:{message:msg,code:'omni_not_saved'},count:null,status:0,statusText:''};}
+function _qPark(t,steps,seq){
+  const key=_qSetKey(t,steps);
+  if(key!=null&&(_qLanded[key]||0)>seq)return _qEcho(steps,false);   // a newer save of this setting already landed
+  let q=_qGet();
+  if(key!=null)q=q.filter(x=>!(x.table==='omni_settings'&&x.key===key)); // newer value replaces the older one
+  if(q.length>=_QMAX){_qToast('Not saved: too many changes are already waiting to sync');return _qFail('Sync queue is full');}
+  const it={id:_uid(),table:t,steps,ts:Date.now()};if(key!=null)it.key=key;
+  q.push(it);
+  if(!_qSet(q)){_qToast('Not saved: no connection, and no room on this device to keep it');return _qFail('No connection');}
+  _qSoon();
+  return _qEcho(steps,true);
+}
+async function _qRun(t,steps,o,seq){
+  const m=steps[0][0];
+  if(m==='insert'&&_QUUID[t]){
+    const a=steps[0][1],d=a[0],add=r=>(r&&typeof r==='object'&&r.id==null)?{...r,id:_uid()}:r;
+    a[0]=Array.isArray(d)?d.map(add):add(d);
+  }
+  const report=!!_QREPORT[t]||!!o.nq;
+  const replay=!report&&_qReplayable(t,steps);
+  // Older waiting changes go first, so a parent row always lands before its children.
+  if(_qGet().length){await _qFlush();if(replay&&_qGet().length)return _qPark(t,steps,seq);}
+  let kind,res;
+  if(await _qHasSession()){res=await _qSend(t,steps,false);kind=_qKind(res,false);}
+  else{res={data:null,error:{message:'Not signed in',code:'PGRST301'},count:null,status:401,statusText:''};kind='auth';}
+  if(kind==='ok'){
+    const key=_qSetKey(t,steps);
+    if(key!=null){_qLanded[key]=Math.max(_qLanded[key]||0,seq);
+      const q=_qGet(),q2=q.filter(x=>!(x.table==='omni_settings'&&x.key===key));if(q2.length!==q.length)_qSet(q2);}
+    if(_qGet().length)_qFlush();
+    return res;
+  }
+  if(kind==='rej'){_qToast('Could not save: '+_qMsg(res));return res;}
+  if(kind==='auth')_qNeedLogin();
+  if(replay)return _qPark(t,steps,seq);
+  if(!o.nq)_qToast(kind==='auth'?'Not saved: please sign in again':'Not saved: no connection');
+  return res;
+}
+// A short blip should not wait for the 60 s timer: one early retry after something is parked.
+function _qSoon(){if(_qSoonT)return;_qSoonT=setTimeout(()=>{_qSoonT=null;_qFlush();},5000);}
+function _qFlush(force){
+  if(_qFlushP)return _qFlushP;
+  _qFlushP=_qFlushRun(!!force).catch(e=>{console.warn('sync',e);}).then(()=>{_qFlushP=null;_qPill();});
+  return _qFlushP;
+}
+async function _qFlushRun(force){
+  if(!_OK||!_qGet().length)return;
+  if(_qAuth&&!force)return;                                      // waiting for sign-in
+  try{if(localStorage.getItem('omni_owner_ok')==='0')return;}catch(e){}
+  if(!(await _qHasSession())){_qNeedLogin();return;}
+  _qAuth=false;
+  let sent=0;
+  for(;;){
+    const q=_qGet();if(!q.length)break;
+    const it=q[0];
+    const res=await _qSend(it.table,it.steps,true);
+    const k=_qKind(res,it.steps[0][0]==='insert');
+    if(k==='ok'){_qDrop(it.id);sent++;continue;}
+    if(k==='rej'){_qDrop(it.id);_qDead(it,res);_qToast('A waiting change was refused: '+_qMsg(res));continue;}
+    if(k==='auth'){_qNeedLogin();break;}
+    if((res.status|0)>=500){                                      // the server answered but is failing: give up after 10 tries
+      it.tries=(it.tries||0)+1;
+      if(it.tries>=10){_qDrop(it.id);_qDead(it,res);_qToast('A waiting change could not be saved: '+_qMsg(res));continue;}
+      _qSet(_qGet().map(x=>x.id===it.id?it:x));
+    }
+    break;                                                       // could not reach the database: keep everything, try later
+  }
+  if(sent&&!_qGet().length){_qToast('All changes synced ✓');_qDrained();}
+}
+function _qDrained(){
+  // Opened without a connection: the task list on screen is the copy kept on this device.
+  // Now that it has been sent, load properly and let the inbox deliver.
+  try{if(!_tasksLoaded)loadOmniTasks().then(()=>{
+    try{if(_curTab==='planner')renderDay();}catch(e){}
+    try{drainOmniInbox();}catch(e){}
+  });}catch(e){}
+}
+function _qPill(){
+  try{const n=_qGet().length,r=document.getElementById('sync-row'),p=document.getElementById('sync-pill');
+    if(!r||!p)return;r.style.display=n?'flex':'none';p.textContent='⏳ '+n+' waiting to sync';}catch(e){}
+}
+function _qTapPill(){
+  _qToast('Trying to sync…');
+  _qFlush(true).then(()=>{if(_qGet().length)_qToast(_qAuth?'Sign in to sync your changes':'Still no connection. Will keep trying.');});
+}
+window.addEventListener('online',()=>{_qFlush(true);});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)_qFlush(true);});
+setInterval(()=>{_qFlush();},60000);
+window.addEventListener('DOMContentLoaded',_qPill);
+// After signing in again (or a refreshed session), send what was waiting. Deferred: the auth
+// client must not be called from inside its own event.
+if(_OK){try{supa.auth.onAuthStateChange(ev=>{
+  if(ev==='SIGNED_IN'||ev==='TOKEN_REFRESHED')setTimeout(()=>{_qFlush(true);},1500);
+});}catch(e){}}
 
 // ═══════════════════════════════════════════════════
 // SETTINGS
@@ -1454,7 +1666,7 @@ async function loadSettings(){
   if(!_OK)return;
   try{
     const{data}=await supaFrom('omni_settings').select('key,value');
-    if(data)data.forEach(r=>{try{S[r.key]=JSON.parse(r.value);}catch(e){S[r.key]=r.value;}});
+    if(data){const _qk=_qSetKeys();data.forEach(r=>{if(_qk[r.key])return;try{S[r.key]=JSON.parse(r.value);}catch(e){S[r.key]=r.value;}});}
     _sloc();
     // Apply synced theme from another device (localStorage gave instant paint; remote wins)
     if(S.theme&&S.theme!==(localStorage.getItem('omni_theme')||'default')){
@@ -1464,11 +1676,12 @@ async function loadSettings(){
   }catch(e){}
 }
 function _sloc(){try{localStorage.setItem('omni_s',JSON.stringify(S));}catch(e){}}
-async function saveSetting(k,v){
+async function saveSetting(k,v,strict){
   S[k]=v;_sloc();
   _refreshSUI(); // always refresh UI immediately
   if(!_OK)return false;
-  try{const r=await supaFrom('omni_settings').upsert({key:k,value:JSON.stringify(v),updated_at:new Date().toISOString()},{onConflict:'key'});
+  // Not strict: a save that cannot reach the database is queued on this device and counts as kept (true).
+  try{const r=await supaFrom('omni_settings',strict?{nq:1}:null).upsert({key:k,value:JSON.stringify(v),updated_at:new Date().toISOString()},{onConflict:'key'});
     if(r&&r.error)throw r.error;return true;
   }catch(e){console.warn('saveSetting remote fail',k,e);return false;}
 }
@@ -1673,9 +1886,11 @@ async function omniLogin(){
   finally{_loginBusy=false;}
 }
 async function omniSignOut(){
-  if(!confirm('Sign out of this device? You will need your email and password to sign in again.'))return;
+  let _n=_qGet().length;
+  if(_n){try{await _qFlush(true);}catch(e){}_n=_qGet().length;}
+  if(!confirm((_n?_n+(_n===1?' change has':' changes have')+' not reached the database yet and will be lost. ':'')+'Sign out of this device? You will need your email and password to sign in again.'))return;
   try{await supa.auth.signOut();}catch(e){}
-  try{['omni_auth_prod',PIN_K,'omni_ults','omni_s','omni_owner_ok'].forEach(k=>localStorage.removeItem(k));}catch(e){}
+  try{['omni_auth_prod',PIN_K,'omni_ults','omni_s','omni_owner_ok',_QK,_QDK].forEach(k=>localStorage.removeItem(k));}catch(e){}
   location.reload();
 }
 window.addEventListener('online',async()=>{
@@ -2004,15 +2219,22 @@ function _ttcTpToOmni(tp){
 async function loadOmniTasks(){
   try{
     const{data,error}=await supaFrom('omni_settings').select('value').eq('key','tasks').single();
-    if(data?.value)OTASKS=typeof data.value==='string'?JSON.parse(data.value):data.value||[];
+    if(_qSetKeys().tasks){if(Array.isArray(S.tasks)){OTASKS=S.tasks;_tasksLocal=true;}}   // unsent edit on this device: the server copy is stale
+    else if(data?.value)OTASKS=typeof data.value==='string'?JSON.parse(data.value):data.value||[];
+    else if(error&&error.code!=='PGRST116')_tasksFromDevice();
     // Only a confirmed load (or a confirmed "no tasks yet") lets the inbox add to the list and save it.
     if(!error||error.code==='PGRST116')_tasksLoaded=true;
-  }catch(e){}
+  }catch(e){_tasksFromDevice();}
 }
-let _tasksLoaded=false;
-async function saveOmniTasks(){
+let _tasksLoaded=false,_tasksLocal=false;
+// Server unreachable: show the last list this device saw, so an offline edit builds on it.
+function _tasksFromDevice(){if(!_tasksLoaded&&Array.isArray(S.tasks)){OTASKS=S.tasks;_tasksLocal=true;}}
+async function saveOmniTasks(strict){
   OTASKS=OTASKS.filter(t=>t&&t.id);
-  return await saveSetting('tasks',OTASKS);
+  // The whole list is saved as one value. If it never loaded and this device has no copy, saving
+  // now would replace the real list with only what is on screen.
+  if(_OK&&!_tasksLoaded&&!_tasksLocal){showToast('Not saved: your tasks have not loaded. Check the connection and reopen.',4000);return false;}
+  return await saveSetting('tasks',OTASKS,strict);
 }
 
 function getSlotsForDay(dayName){
@@ -2130,7 +2352,7 @@ async function drainOmniInbox(){
       added.push(tid);
     });
     if(added.length){
-      const ok=await saveOmniTasks();
+      const ok=await saveOmniTasks(true);   // true = must really reach the database, not just the queue
       if(!ok){OTASKS=OTASKS.filter(t=>!added.includes(t.id));return;}   // not saved: leave rows for the next try
     }
     const u=await supaFrom('app_inbox').update({consumed:true}).in('id',ids);
@@ -3215,8 +3437,8 @@ async function saveItem(){
   const payload={name,category:cat,season:el('im-season').value,wash_needed:isL&&el('im-wash').checked,iron_needed:isL&&el('im-iron').checked,exclude:el('im-excl').checked,photo_url:_photoB64||null};
   if(_editItemId){
     const i=WITEMS.findIndex(x=>x.id===_editItemId);if(i>=0)WITEMS[i]={...WITEMS[i],...payload};
-    closeItemModal();renderWItems();_skipMap={};_dashSkips=[];showToast('Updated ✓');
-    if(_OK)supaFrom('omni_wardrobe_items').update(payload).eq('id',_editItemId).catch(e=>console.warn(e));
+    const _eid=_editItemId;closeItemModal();renderWItems();_skipMap={};_dashSkips=[];showToast('Updated ✓');
+    if(_OK)supaFrom('omni_wardrobe_items').update(payload).eq('id',_eid).catch(e=>console.warn(e));
   }else{
     const tmpId='tmp_'+Date.now();const newItem={id:tmpId,...payload};WITEMS.push(newItem);
     closeItemModal();renderWItems();_skipMap={};_dashSkips=[];showToast('Added ✓');
@@ -3238,8 +3460,8 @@ async function saveCombo(){
   const payload={name,context:el('cm-ctx').value,season:el('cm-season').value,item_ids,rec_days};
   if(_editComboId){
     const i=WCOMBOS.findIndex(c=>c.id===_editComboId);if(i>=0)WCOMBOS[i]={...WCOMBOS[i],...payload};
-    closeComboModal();renderWCombos();_skipMap={};_dashSkips=[];showToast('Updated ✓');
-    if(_OK)supaFrom('omni_outfit_combinations').update(payload).eq('id',_editComboId).catch(e=>console.warn(e));
+    const _eid=_editComboId;closeComboModal();renderWCombos();_skipMap={};_dashSkips=[];showToast('Updated ✓');
+    if(_OK)supaFrom('omni_outfit_combinations').update(payload).eq('id',_eid).catch(e=>console.warn(e));
   }else{
     const tmpId='tmp_'+Date.now();WCOMBOS.push({id:tmpId,...payload});
     closeComboModal();renderWCombos();_skipMap={};_dashSkips=[];showToast('Added ✓');
@@ -3365,7 +3587,7 @@ async function loadGym(){
     ]);
     if(p.data)GPROG=p.data;if(e.data)GEX=e.data;if(s.data)GSESS=s.data;
     if(GSESS.length){const ids=GSESS.slice(0,5).map(x=>x.id);const{data:sets}=await supaFrom('omni_gym_sets').select('*').in('session_id',ids);if(sets)GSETS=sets;}
-    if(!GPROG)await _seedGym();
+    if(!GPROG&&!p.error)await _seedGym();
   }catch(e){console.warn('Gym load',e);}
   _gLoaded=true;
 }
@@ -3521,8 +3743,8 @@ async function saveExercise(){
   const p={name,session_type:el('ex-type').value,sets:+el('ex-sets').value||3,reps:+el('ex-reps').value||12,unit:unit(),programme_id:GPROG?.id,position:_editExId?GEX.find(e=>e.id===_editExId)?.position||0:GEX.length};
   if(_editExId){
     const i=GEX.findIndex(e=>e.id===_editExId);if(i>=0)GEX[i]={...GEX[i],...p};
-    closeExModal();renderGymProg();showToast('Updated ✓');
-    if(_OK)supaFrom('omni_gym_exercises').update(p).eq('id',_editExId).catch(e=>console.warn(e));
+    const _eid=_editExId;closeExModal();renderGymProg();showToast('Updated ✓');
+    if(_OK)supaFrom('omni_gym_exercises').update(p).eq('id',_eid).catch(e=>console.warn(e));
   }else{
     const tmpId='tmp_'+Date.now();GEX.push({id:tmpId,...p});
     closeExModal();renderGymProg();showToast('Added ✓');
@@ -3638,8 +3860,8 @@ async function saveRhythm(){
   const freq=el('rh-freq').value;
   if(_editRhId){
     const i=RHYTHMS.findIndex(r=>r.id===_editRhId);if(i>=0)RHYTHMS[i]={...RHYTHMS[i],title,frequency:freq};
-    closeRhModal();renderCVRhythms();showToast('Updated ✓');
-    if(_OK)supaFrom('omni_rhythms').update({title,frequency:freq}).eq('id',_editRhId).catch(e=>console.warn(e));
+    const _eid=_editRhId;closeRhModal();renderCVRhythms();showToast('Updated ✓');
+    if(_OK)supaFrom('omni_rhythms').update({title,frequency:freq}).eq('id',_eid).catch(e=>console.warn(e));
   }else{
     const tmpId='tmp_'+Date.now();RHYTHMS.push({id:tmpId,title,frequency:freq});
     closeRhModal();renderCVRhythms();showToast('Added ✓');
@@ -3930,6 +4152,7 @@ function _afterUnlock(){
 
 async function init(){
   await omniRequireLogin();          // waits here on the sign-in screen when there is no session
+  await Promise.race([_qFlush(true),new Promise(r=>setTimeout(r,8000))]);   // unsent changes first, so the loads below see them
   await hydrateDoneState();_subscribeDoneRealtime();
   await loadSettings();
   setInterval(updateClock,1000);updateClock();
