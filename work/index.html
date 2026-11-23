@@ -23835,6 +23835,17 @@ let ttEditMode=false;
 let ttCustom={};   // week-specific overrides: key 'absWeek_slot_day' (once/biweekly)
 let ttDefaults={}; // weekly defaults per slot: key 'slot_day' — what Reset returns to
 let ttView='full';
+// Scroll the schedule to "now" only when the user navigates (opens the tab, switches Day/Week,
+// changes day or week). Background re-renders (the 60 s refresh, sync, edits) keep the scroll position.
+let _ttScrollToNow=true;
+function _ttAfterRender(getEl,keepY){
+  if(_ttScrollToNow){
+    _ttScrollToNow=false;
+    setTimeout(()=>{const s=getEl();if(s&&s.scrollIntoView)s.scrollIntoView({behavior:'smooth',block:'center'});},100);
+  }else if(keepY!=null){
+    requestAnimationFrame(()=>{if(Math.abs(window.scrollY-keepY)>2)window.scrollTo(0,keepY);});
+  }
+}
 let ttShowAll=false;
 let tdDayOffset=0;
 // Past slot collapse preference (saved)
@@ -24021,6 +24032,7 @@ function ttPickDay(dayName,weekOffset){
 function ttGoNow(){ttWeekOffset=0;tdDayOffset=0;renderTimetable();}
 function ttNavWeek(dir){
   if(ttEditMode)lockEditMode();
+  _ttScrollToNow=true;
   if(ttView==='today'){
     // In Day view: shift tdDayOffset by 7 so the displayed day follows the week
     tdDayOffset+=dir*7;
@@ -24036,6 +24048,7 @@ function ttNavWeek(dir){
 }
 function tdNavDay(dir){
   tdDayOffset+=dir;
+  _ttScrollToNow=true;
   _syncWeekToSelectedDay();
   renderTimetable();
 }
@@ -24746,6 +24759,7 @@ function _syncViewToggles(){
 }
 function setTTView(v,btn){
   if(v==='free'||v==='week')v='full'; // Free and Plan views removed from this toggle
+  _ttScrollToNow=true;
   ttView=v;
   if(v==='today')tdDayOffset=0;
   // Two toggles (sticky top + floating pill) always show the same state
@@ -25014,6 +25028,7 @@ function _dayPointsSummaryHtml(dayName,offset){
     ${panels.join('')}</div>`;
 }
 function renderTodayView(){
+  const _keepY=window.scrollY;
   const info=getTodayViewDay();
   // Clear expanded past slots when day changes
   if(window._lastTodayDay!==tdDayOffset){_expandedPast.clear();window._lastTodayDay=tdDayOffset;}
@@ -25318,7 +25333,7 @@ function renderTodayView(){
   }
 
   el.innerHTML=_dayPointsSummaryHtml(dayName,offset)+html;
-  if(curIdx>=0)setTimeout(()=>{const s=document.getElementById('tslot-'+curIdx);if(s)s.scrollIntoView({behavior:'smooth',block:'center'});},100);
+  _ttAfterRender(()=>curIdx>=0?document.getElementById('tslot-'+curIdx):null,_keepY);
 }
 
 function toggleTodayNote(idx,day){const a=document.getElementById('tnote-'+idx);if(a)a.classList.toggle('open');}
@@ -25388,6 +25403,7 @@ function _syncStickyTops(){
 
 // ── MAIN RENDER ───────────────────────────────────────
 function renderTimetable(){
+  const _keepY=window.scrollY;
   _syncStickyTops();
   _syncViewToggles();
   var _off=(ttWeekOffset!==0||tdDayOffset!==0);
@@ -25668,9 +25684,7 @@ function renderTimetable(){
     tableWrap2.onscroll=function(){theadWrap.scrollLeft=tableWrap2.scrollLeft;};
   }
 
-  if(curIdx>=0){
-    setTimeout(()=>{const rows=document.querySelectorAll('#tt-table tbody tr');if(rows[curIdx])rows[curIdx].scrollIntoView({behavior:'smooth',block:'center'});},100);
-  }
+  _ttAfterRender(()=>curIdx>=0?document.querySelectorAll('#tt-table tbody tr')[curIdx]:null,_keepY);
 }
 
 
@@ -29765,7 +29779,7 @@ function showTab(name,btn){
   document.getElementById('tab-'+name).classList.add('active');if(btn)btn.classList.add('active');
   _activeMainTab=name;
   try{setTimeout(_syncHeaderHeight,50);}catch(e){} // re-measure sticky layer heights for the tab now visible
-  if(name==='sched')renderTimetable();
+  if(name==='sched'){_ttScrollToNow=true;renderTimetable();}
   if(name==='workflows')showWorkflowList();
   if(name==='lists'){renderHawkingList();renderTeachingTab();}
   updateGlobalDefaultBtn();
