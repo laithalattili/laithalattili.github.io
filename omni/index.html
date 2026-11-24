@@ -253,6 +253,12 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
 .wd-add{min-width:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center;font-size:18px;line-height:1;color:var(--tx2);background:none;border:none;padding:0;margin:-6px 2px -6px 0;flex-shrink:0}
 .wd-hdr{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .wd-hdr.lp-hold{background:var(--bg3)}
+.prio-dots{display:inline-flex;align-items:center;justify-content:center;gap:3px;min-width:32px;min-height:32px;margin:-7px -6px -7px 2px;padding:0 4px;background:none;border:0;flex-shrink:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.prio-dots i{display:block;width:7px;height:7px;border-radius:50%;background:currentColor}
+.prio-dots.p0{color:var(--tx4)}.prio-dots.p0 i{background:none;border:1.5px solid currentColor;box-sizing:border-box;opacity:.55}
+.prio-dots.p1{color:#f59f00}.prio-dots.p2{color:#f76707}.prio-dots.p3{color:#e03131}
+.prio-b{font-weight:600!important}
+.prio-today{font-size:11px;color:var(--tx4);flex-shrink:0}
 .slot-add{min-width:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center;font-size:20px;font-weight:400;line-height:1;color:var(--tx2);background:none;border:none;padding:0;margin:-6px -4px -6px 0;flex-shrink:0}
 .srch-grp{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--tx3);padding:12px 1rem 4px}
 .srch-row{display:block;width:100%;text-align:left;padding:10px 1rem;min-height:44px;background:none;border:none;border-bottom:.5px solid var(--bd);font-size:14px;color:var(--tx);font-family:var(--font)}
@@ -264,13 +270,15 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
 .lp-opt{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:13px 1rem;min-height:48px;background:none;border:none;border-bottom:.5px solid var(--bd);font-size:14px;color:var(--tx);font-family:var(--font)}
 .lp-opt:active{background:var(--bg3)}
 .lp-opt span{font-size:18px;width:24px;text-align:center}
-.slot.free-slot{background:#f4fbf4;border-color:#d0ebd0}
+.slot.free-slot{background:transparent;border-color:transparent;border-bottom:1px dashed var(--bd);border-radius:0}
+.slot.free-slot .slot-tr{color:var(--tx4)}
 .slot.commitment-slot{background:rgba(184,88,40,.04);border-color:rgba(184,88,40,.15)}
 .slot.duty-slot{background:rgba(124,58,237,.04);border-color:rgba(124,58,237,.12)}
 .slot.sleep-slot{background:#f0eee8;border-color:#ddd8cf;opacity:.6}
-.slot.personal-slot{background:rgba(100,110,220,.07);border-color:rgba(100,110,220,.25);border-left:3px solid rgba(100,110,220,.5)}
-.slot.personal-slot .slot-lbl{color:#5060a0;font-weight:500}
-.slot.personal-slot .slot-tr{color:#7080b0}
+.slot.personal-slot{background:rgba(79,70,229,.12);border-color:rgba(79,70,229,.32);border-left:5px solid #4f46e5}
+.slot.personal-slot .slot-lbl{color:var(--tx);font-weight:700}
+.slot.personal-slot .slot-tr{color:#4338ca;font-weight:600}
+.ps-clash{display:block;font-size:11px;font-weight:600;color:#c92a2a;margin-top:2px;line-height:1.3}
 .slot.sleep-slot .slot-tr{color:var(--tx4)}
 .slot.now{
   border-color:var(--acc);border-width:2px;
@@ -1937,7 +1945,7 @@ async function omniSignOut(){
   if(_n){try{await _qFlush(true);}catch(e){}_n=_qGet().length;}
   if(!confirm((_n?_n+(_n===1?' change has':' changes have')+' not reached the database yet and will be lost. ':'')+'Sign out of this device? You will need your email and password to sign in again.'))return;
   try{await supa.auth.signOut();}catch(e){}
-  try{['omni_auth_prod',PIN_K,'omni_ults','omni_s','omni_owner_ok',_QK,_QDK].forEach(k=>localStorage.removeItem(k));}catch(e){}
+  try{['omni_auth_prod',PIN_K,'omni_ults','omni_s','omni_owner_ok',_QK,_QDK,'omni_wtt'].forEach(k=>localStorage.removeItem(k));}catch(e){}
   location.reload();
 }
 window.addEventListener('online',async()=>{
@@ -2125,10 +2133,15 @@ async function loadWorkData(){
   try{
     // Load plan tasks + categories
     const{data:wd}=await supaFrom('work_app_data').select('key,value')
-      .in('key',['settings','ttCustom','globalDefault','slotTimes']);
+      .in('key',['settings','ttCustom','ttDefaults','dayStructure','globalDefault','slotTimes']);
     if(wd){
+      let _ds=null,_dsKey=null,_w1=null,_td=null,_tc=null,_ov=null;
       wd.forEach(row=>{
-        const v=typeof row.value==='string'?JSON.parse(row.value):row.value;
+        let v;try{v=typeof row.value==='string'?JSON.parse(row.value):row.value;}catch(e){v=row.value;}
+        if(row.key==='settings'&&v){if(Array.isArray(v.dayStructure)&&v.dayStructure.length)_ds=v.dayStructure;if(v['tt-w1-date'])_w1=v['tt-w1-date'];if(v.slotTimesOverride&&typeof v.slotTimesOverride==='object')_ov=v.slotTimesOverride;}
+        if(row.key==='dayStructure'&&Array.isArray(v)&&v.length)_dsKey=v;
+        if(row.key==='ttDefaults'&&v&&typeof v==='object')_td=v;
+        if(row.key==='ttCustom'&&v&&typeof v==='object')_tc=v;
         if(row.key==='settings'){
           WTASKS=(v.planData||[]).filter(t=>!t.say&&!t.archived); // points (say) stay in the work app
           WCATS=v.planCategories||WCATS;
@@ -2143,13 +2156,13 @@ async function loadWorkData(){
         if(row.key==='ttCustom'&&v){
           _applyTtCustom(v);
         }
-        if(row.key==='slotTimes'&&Array.isArray(v)&&v.length){
-          _rebuildWSlots(v);
-        }
+        // 'slotTimes' is no longer read: Work stopped syncing it, so the stored copy can be stale.
+        // Work's own slot list comes from its settings (dayStructure), applied after this loop.
         if(row.key==='globalDefault'&&v){
           window._workGlobalDefault=v;
         }
       });
+      if(wd.length)_wttApply({c:_tc,d:_td,w1:_w1,ds:_ds||_dsKey,ov:_ov},true);
     }else{console.warn('work_app_data: no data');}
     // Load personal slots defined in Omni
     try{
@@ -2192,6 +2205,7 @@ function _applyTtCustom(ttCustom){
 
 // Get the label/type for a slot on a specific date, applying any ttCustom override
 function _schoolWeekNum(dateStr){
+  return _workWeekNum(dateStr);   // v20: Work's own week numbering (old code below no longer runs)
   if(window._termStart){
     const ts=window._termStart;
     // Try to extract a date string from various formats
@@ -2271,6 +2285,97 @@ function _ttcTpToOmni(tp){
   return map[tp.toLowerCase()]||tp;
 }
 
+
+// ── Work timetable, looked up exactly as the Work app does ──
+// Work slot index: 0–6 night rows, then the daytime rows (Work's dayStructure, or the factory list),
+// then 23:00. Keys are '<week>_<slot>_<Day>' (one-week changes) and '<slot>_<Day>' (weekly timetable).
+window._ttDefaultsData=undefined;   // undefined = never loaded on this device (then the old grid is shown)
+function _wttApply(w,save){
+  if(!w)return;
+  if(w.c&&typeof w.c==='object')window._ttCustomData=w.c;
+  window._ttDefaultsData=(w.d&&typeof w.d==='object')?w.d:{};
+  window._workW1=w.w1||null;
+  const day=(Array.isArray(w.ds)&&w.ds.length?w.ds:WSLOTS_STATIC.slice(7,30)).map(r=>({t:r.t})).filter(r=>/^\d\d:\d\d$/.test(r.t));
+  _rebuildWSlots([...day,{t:WSLOTS_STATIC[30].t}]);
+  // Slots keep Work's original time as their key (that is how Work stores entries) but are shown,
+  // and timed, at the time set in Work's settings, exactly like Work's getSlotTime().
+  const ov=(w.ov&&typeof w.ov==='object')?w.ov:{},ok=t=>typeof t==='string'&&/^\d\d:\d\d$/.test(t);
+  window._wOrigOf={};window._wDispOf={};let moved=false;
+  WSLOTS=WSLOTS.map(r=>{const d=ov[r.t];if(!ok(d)||d===r.t)return r;window._wOrigOf[d]=r.t;window._wDispOf[r.t]=d;moved=true;return{...r,t:d,_o:r.t};});
+  if(moved)WSLOTS.sort((a,b)=>t2m(a.t)-t2m(b.t));
+  if(save){try{localStorage.setItem('omni_wtt',JSON.stringify({c:window._ttCustomData||{},d:window._ttDefaultsData,w1:window._workW1,ds:w.ds||null,ov:w.ov||null,at:Date.now()}));}catch(e){}}
+}
+// Last timetable seen on this device, so an offline start shows it rather than the old grid.
+try{const _c=JSON.parse(localStorage.getItem('omni_wtt')||'null');if(_c&&_c.d)_wttApply(_c,false);}catch(e){}
+
+// A personal event that overlaps a busy Work slot (not free, not sleep) says so on its own line.
+function _psClash(sl,evts){
+  const a=t2m(sl.time),b0=t2m(sl.end||sl.endTime||'00:00'),b=b0>a?b0:a+1;
+  const names=[];
+  (evts||[]).forEach(w=>{
+    if(w.src!=='work'||!w.label||['free','sleep','personal'].includes(w.tp))return;
+    const s=t2m(w.time),e0=t2m(w.end||w.endTime||'00:00'),e=e0>s?e0:1440;
+    if(s<b&&e>a&&names.indexOf(w.label)<0)names.push(w.label);
+  });
+  if(!names.length)return'';
+  const esc=x=>String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  return '<span class="ps-clash">\u26A0 Overlaps '+esc(names.join(', '))+'</span>';
+}
+function _workWeekNum(dateStr){
+  const raw=window._workW1||'2026-05-11';
+  let w1=new Date(raw);if(isNaN(w1))w1=new Date('2026-05-11');      // same parsing as Work's getW1Ref
+  const d=new Date(dateStr+'T12:00:00'),dow=d.getDay();
+  const mon=new Date(d);mon.setDate(d.getDate()+(dow===0?-6:1-dow));mon.setHours(0,0,0,0);
+  return Math.round((mon-w1)/(7*864e5))+1;
+}
+function _wIdxForTime(t){
+  t=(window._wOrigOf&&window._wOrigOf[t])||t;          // shown time -> Work's original time
+  if(_SLOT_TIMES.length){
+    const i=_SLOT_TIMES.findIndex(s=>s.t===t);if(i>=0)return 7+i;
+    const n=WSLOTS_STATIC.findIndex(s=>s.t===t);return(n>=0&&n<7)?n:-1;
+  }
+  return WSLOTS_STATIC.findIndex(s=>s.t===t);
+}
+function _wTimeForIdx(j){
+  if(j==null)return null;
+  const o=_SLOT_TIMES.length?(j<7?(WSLOTS_STATIC[j]?.t||null):(_SLOT_TIMES[j-7]?.t||null)):(WSLOTS_STATIC[j]?.t||null);
+  return o&&window._wDispOf&&window._wDispOf[o]||o;     // the time Work shows for that slot
+}
+// Work's getCustomForWeek
+function _wEntry(wIdx,dateStr){
+  const dn=DS[new Date(dateStr+'T12:00:00').getDay()];
+  const tc=window._ttCustomData||{},td=window._ttDefaultsData;
+  const absW=_workWeekNum(dateStr);
+  const direct=tc[absW+'_'+wIdx+'_'+dn];if(direct)return direct;
+  for(const[k,v]of Object.entries(tc)){
+    if(!v||v.recur!=='biweekly')continue;
+    const p=k.split('_');if(p.length<3)continue;
+    if(parseInt(p[1])===wIdx&&p[2]===dn&&Math.abs(absW-parseInt(p[0]))%2===0)return v;
+  }
+  const def=td&&td[wIdx+'_'+dn];
+  return def?{...def,recur:'weekly'}:null;
+}
+// What a slot shows on a date: {l, tp (Omni type), customStartTime, customEndTime, ...}
+function _wCellAt(t,dateStr){
+  const dn=DS[new Date(dateStr+'T12:00:00').getDay()];
+  const wIdx=_wIdxForTime(t);
+  let e=wIdx>=0?_wEntry(wIdx,dateStr):null;
+  if(!e){
+    const row=WSLOTS.find(s=>s.t===t)||WSLOTS_STATIC.find(s=>s.t===t);const b=row&&row[dn];
+    if(window._ttDefaultsData===undefined)e=b?{...b}:null;           // Work data never loaded here
+    else e=(b&&b.tp==='sleep')?{...b}:{l:'',tp:'free'};               // Work's getBaseCell
+  }
+  if(!e)return{l:'Free',tp:'free'};
+  const c={...e};
+  c.tp=_ttcTpToOmni(c.tp||c.cat||'free')||'free';
+  c.l=c.l||c.label||c.title||'';if(!c.l&&c.tp==='free')c.l='Free';
+  if(c.isSpanStart&&!c.customEndTime&&wIdx>=0){                      // old multi-slot entries
+    let j=wIdx+1;for(;;){const n=_wEntry(j,dateStr);if(n&&n.isSpanContinue&&n.spanStart===wIdx)j++;else break;}
+    if(j>wIdx+1){const et=_wTimeForIdx(j);if(et)c.customEndTime=et;}
+  }
+  return c;
+}
+
 async function loadOmniTasks(){
   try{
     const{data,error}=await supaFrom('omni_settings').select('value').eq('key','tasks').single();
@@ -2292,8 +2397,9 @@ async function saveOmniTasks(strict){
   return await saveSetting('tasks',OTASKS,strict);
 }
 
-function getSlotsForDay(dayName){
+function getSlotsForDay(dayName,dateStr){
   if(!WSLOTS.length)return[];
+  if(dateStr)return WSLOTS.map((s,i)=>{const c=_wCellAt(s.t,dateStr);if(!c||c.tp==='sleep'||c.isSpanContinue)return null;return{time:s.t,label:c.l,tp:c.tp,idx:i,end:c.customEndTime||null};}).filter(Boolean);
   return WSLOTS.map((s,i)=>{const c=s[dayName];if(!c||c.tp==='sleep')return null;return{time:s.t,label:c.l,tp:c.tp,idx:i};}).filter(Boolean);
 }
 
@@ -2588,6 +2694,127 @@ function openLPMenu(time,dateStr,endT){
   el('lp-menu-sh').classList.add('on');
 }
 function closeLPMenu(){el('lp-menu-sh').classList.remove('on');}
+// ── Task priority (0–3 dots), same field names as Work ──
+// prio = 1..3 on tasks that fall on one date (a dated day task, a "this week" window task).
+// prioOn = {'YYYY-MM-DD': 1..3} for tasks that come back (weekly, day-name, ongoing): one day at a time.
+// (Work keys its own per-occurrence prioBy by the week's Monday; a separate name keeps the two apart.)
+function _prioPerDay(t){const tier=t.tier||1;return tier===3||(tier===1&&(t.recurring||!t.date));}
+function _prioGet(t,ds){if(!t)return 0;return _prioPerDay(t)?((t.prioOn&&t.prioOn[ds])||0):(t.prio||0);}
+function _prioSet(t,ds,n){
+  if(_prioPerDay(t)){
+    t.prioOn=t.prioOn||{};
+    if(n)t.prioOn[ds]=n;else delete t.prioOn[ds];
+    const ks=Object.keys(t.prioOn).sort();while(ks.length>30)delete t.prioOn[ks.shift()];   // keep the newest 30 days
+    if(!Object.keys(t.prioOn).length)delete t.prioOn;
+  }else{if(n)t.prio=n;else delete t.prio;}
+}
+function _prioBtnHtml(n){return n?'<i></i>'.repeat(n):'<i></i>';}
+function _prioDayDate(){const d=new Date();d.setDate(d.getDate()+(_dayOff||0));return _ld(d);}
+// A task row: its tick box tells us the task and date (omni_td_<id>[_YYYY-MM-DD]).
+function _prioRowInfo(row,view){
+  if(row.dataset.ptid){const t=OTASKS.find(x=>x.id===row.dataset.ptid);return t?{t,ds:todayStr(),cv:true}:null;}
+  const cb=row.querySelector(':scope > [onclick*="toggleDone(\'"],:scope > [onclick*="wkTick(\'"]');if(!cb)return null;
+  const m=/(toggleDone|wkTick)\('([^']+)'(?:,this,(-?\d+))?/.exec(cb.getAttribute('onclick')||'');if(!m)return null;
+  const dk=m[2];
+  if(dk.indexOf('omni_td_')!==0)return{work:true,dk};
+  const mm=/^omni_td_(.+?)(?:_(\d{4}-\d{2}-\d{2}))?$/.exec(dk);if(!mm)return null;
+  const t=OTASKS.find(x=>x.id===mm[1]);if(!t)return{work:true,dk};
+  let ds=mm[2];
+  if(!ds){if(m[1]==='wkTick'&&m[3]!=null){const d=new Date();d.setDate(d.getDate()+(+m[3]));ds=_ld(d);}else ds=_prioDayDate();}
+  return{t,ds,dk};
+}
+function _prioIsRow(n){
+  return n&&n.nodeType===1&&(n.dataset.ptid||n.querySelector(':scope > [onclick*="toggleDone(\'"],:scope > [onclick*="wkTick(\'"]'));
+}
+function _prioDecorate(view){
+  try{
+    const roots=view==='day'?[el('day-slots'),el('day-tasks')]:view==='week'?[el('pv-week')]:[el('cv-tasks')];
+    const parents=new Set();
+    roots.forEach(root=>{
+      if(!root)return;
+      root.querySelectorAll('[data-ptid],[onclick*="toggleDone(\'omni_td_"],[onclick*="wkTick(\'omni_td_"]').forEach(x=>{
+        const row=x.dataset.ptid?x:x.parentElement;if(!row||row.dataset.prioDone)return;
+        const info=_prioRowInfo(row,view);if(!info||info.work)return;
+        row.dataset.prioDone='1';row.dataset.prioId=info.t.id;row.dataset.prioDate=info.ds;
+        const n=_prioGet(info.t,info.ds);
+        if(info.cv&&_prioPerDay(info.t)){const s=document.createElement('span');s.className='prio-today';s.textContent='today';row.appendChild(s);}
+        const b=document.createElement('button');
+        b.className='prio-dots p'+n;b.dataset.pid=info.t.id;b.dataset.pdate=info.ds;b.title='Priority';
+        b.setAttribute('aria-label','Priority '+n+' of 3');b.innerHTML=_prioBtnHtml(n);
+        b.setAttribute('onclick','_prioTap(this,event)');
+        row.appendChild(b);
+        _prioMarkText(row,n);
+        parents.add(row.parentElement);
+      });
+    });
+    parents.forEach(_prioSortRuns);
+  }catch(e){console.warn('priority',e);}
+}
+function _prioMarkText(row,n){
+  const tx=row.querySelector('.task-tx,.slot-task-tx,.wk-tx-edit,.cv-tx')||row.querySelector(':scope > span');
+  if(tx)tx.classList.toggle('prio-b',n===3);
+}
+// Higher priority first inside each run of task rows (a group); ticked rows and equal priorities stay put.
+function _prioSortRuns(parent){
+  if(!parent)return;
+  const kids=[...parent.children];let run=[];
+  const flush=()=>{
+    if(run.length>1){
+      const mov=run.filter(r=>!_prioRowDone(r));
+      const sorted=mov.map((r,i)=>({r,i,p:_prioRowPrio(r)})).sort((a,b)=>(b.p-a.p)||(a.i-b.i)).map(x=>x.r);
+      if(sorted.some((r,i)=>r!==mov[i])){
+        const marks=mov.map(r=>{const c=document.createComment('p');parent.insertBefore(c,r);return c;});
+        mov.forEach(r=>r.remove());
+        marks.forEach((c,i)=>{parent.insertBefore(sorted[i],c);c.remove();});
+      }
+    }
+    run=[];
+  };
+  kids.forEach(k=>{if(_prioIsRow(k))run.push(k);else flush();});flush();
+}
+function _prioRowPrio(r){if(!r.dataset.prioId)return 0;const t=OTASKS.find(x=>x.id===r.dataset.prioId);return _prioGet(t,r.dataset.prioDate);}
+function _prioRowDone(r){
+  if(r.dataset.ptid)return false;
+  const info=_prioRowInfo(r);const dk=info&&info.dk;
+  return !!dk&&localStorage.getItem(dk)==='1';
+}
+let _prioTimer=null;
+function _prioTap(b,ev){
+  if(ev){ev.stopPropagation();ev.preventDefault();}
+  const id=b.dataset.pid,ds=b.dataset.pdate;const t=OTASKS.find(x=>x.id===id);if(!t)return;
+  const n=(_prioGet(t,ds)+1)%4;
+  _prioSet(t,ds,n);
+  // The dots change now; the row stays where it is so the next tap lands on the same task.
+  document.querySelectorAll('.prio-dots').forEach(x=>{
+    if(x.dataset.pid!==id||(x.dataset.pdate!==ds&&_prioPerDay(t)))return;
+    x.className='prio-dots p'+n;x.innerHTML=_prioBtnHtml(n);x.setAttribute('aria-label','Priority '+n+' of 3');
+    const row=x.parentElement;if(row)_prioMarkText(row,n);
+  });
+  saveOmniTasks();
+  clearTimeout(_prioTimer);_prioTimer=setTimeout(_prioResort,1000);      // one second after the last tap
+}
+function _prioResort(){
+  _prioTimer=null;
+  const snap=()=>{const m={};document.querySelectorAll('[data-prio-id]').forEach(r=>{if(!r.offsetParent)return;
+    const k=r.dataset.prioId+'|'+r.dataset.prioDate+'|'+(r.closest('[id]')||{}).id;m[k]={r,top:r.getBoundingClientRect().top};});return m;};
+  const before=snap();
+  try{if(_curTab==='planner'){if(_pv==='week')renderWeek();else _renderDayNow();}}catch(e){}   // draw now, so the slide starts from the right place
+  try{if(_curTab==='checklists'&&typeof renderCVTasks==='function')renderCVTasks();}catch(e){}
+  const after=snap();
+  Object.keys(after).forEach(k=>{                                          // slide from the old place to the new one
+    if(!before[k])return;const dy=before[k].top-after[k].top;if(Math.abs(dy)<2)return;
+    const r=after[k].r;r.style.transition='none';r.style.transform='translateY('+dy+'px)';
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{r.style.transition='transform .28s ease';r.style.transform='';
+      setTimeout(()=>{r.style.transition='';},320);}));
+  });
+}
+// Add the dots after every redraw of the planner and the Checklists task list.
+(function(){
+  const hook=(name,view)=>{const f=window[name];if(typeof f!=='function')return;
+    window[name]=function(){const r=f.apply(this,arguments);_prioDecorate(view);return r;};};
+  hook('_renderDayNow','day');hook('renderWeek','week');hook('renderCVTasks','cv');   // renderDay only schedules _renderDayNow
+})();
+
 // ── Search (what is already on this device; other tabs load on first search) ──
 let _srchT=null,_srchLoading=false;
 function openSearch(){
@@ -2625,7 +2852,7 @@ function _srchNotes(q){
       const text=(Array.isArray(blocks)?blocks:[]).map(b=>b&&b.text||'').join(' · ').trim();
       if(!text||text.toLowerCase().indexOf(q)<0)continue;
       const idx=+m[1],ds=m[2];
-      let lbl='Notes';try{const d=new Date(ds+'T00:00:00');const c=WSLOTS[idx]&&WSLOTS[idx][DS[d.getDay()]];if(c&&c.l)lbl=c.l;}catch(e){}
+      let lbl='Notes';try{const d=new Date(ds+'T00:00:00');const c=WSLOTS[idx]&&_wCellAt(WSLOTS[idx].t,ds);if(c&&c.l&&c.tp!=='free')lbl=c.l;}catch(e){}
       out.push({t:text,s:ds+(WSLOTS[idx]?' · '+WSLOTS[idx].t:'')+' · '+lbl,go:()=>openNotes(idx,ds,lbl),sort:ds});
     }
   }catch(e){}
@@ -3089,21 +3316,18 @@ function _renderDayNow(){
   // Work app indices match the full WSLOTS or _SLOT_TIMES array starting from 00:00
   const _fullSlots=_SLOT_TIMES.length>0?_SLOT_TIMES:WSLOTS;
   const _timeToWorkIdx={};
-  _fullSlots.forEach((s,i)=>{_timeToWorkIdx[s.t]=i;});
+  WSLOTS.forEach(s=>{const k=_wIdxForTime(s.t);if(k>=0)_timeToWorkIdx[s.t]=k;});
 
   for(let ii=0;ii<_daySlots.length;ii++){
     if(skippedSlots.has(ii))continue;
     const s=_daySlots[ii];
     const wtIdx=_timeToWorkIdx[s.t]??-1;
     if(wtIdx<0)continue;
-    const key=schoolWeek+'_'+wtIdx+'_'+dayName;
-    const rawOv=ttc[key];
-    const ov=rawOv&&typeof _eventMatchesWeek==='function'&&_eventMatchesWeek(rawOv,schoolWeek)?rawOv:null;
-    const base=s[dayName];
+    const ov=_wCellAt(s.t,dateStr);const base=null;
     if(!base&&!ov)continue;
     const realStart=ov?.customStartTime||s.t;
     // endSlotIdx is Work app index — look up time directly from _fullSlots
-    const endSlotTime=ov?.endSlotIdx!=null?(_fullSlots[ov.endSlotIdx]?.t||null):null;
+    const endSlotTime=ov?.endSlotIdx!=null?_wTimeForIdx(ov.endSlotIdx):null;
     const nextSlotTime=_daySlots[ii+1]?.t||'00:00';
     const realEnd=ov?.customEndTime||endSlotTime||nextSlotTime;
     const label=ov?(ov.l||ov.label||base?.l||''):(base?.l||'');
@@ -3228,7 +3452,7 @@ function _renderDayNow(){
           return`<div class="slot-task-row"><div class="slot-task-cb${t2.done?' on':''}" onclick="toggleDone('${t2.dk}',this);setTimeout(renderDay,50)">${t2.done?'<span style="color:var(--ok);font-size:11px">✓</span>':''}</div><div class="slot-task-tx${t2.done?' done':''}">${t2.text}</div>${rmBtn}</div>`;
         }).join('')}</div>`:'';
         const _leaveBy=ps?.sensitivity&&ps?.travel_mins!=null?_calcLeaveBy(sl.time,ps.sensitivity,ps.travel_mins):null;
-        slotsHtml+=`<div class="slot personal-slot" data-time="${sl.time}" data-end="${sl.end||sl.endTime||''}" data-date="${dateStr}"><div class="slot-hdr"><span class="slot-tr">${sl.time} <b>–${sl.end||sl.endTime}</b></span><span class="slot-pip" style="background:#7080c0"></span><span class="slot-lbl">${sl.label}</span>${_leaveBy?`<span style="font-family:var(--mono);font-size:11px;color:var(--acc);margin-left:4px">${icn('walk',11)} ${_leaveBy}</span>`:''}${ps?.app_link&&APP_LINKS[ps.app_link]?`<button onclick="openAppLink('${ps.app_link}')" title="Open ${APP_LINKS[ps.app_link].name}" style="font-size:11px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.09);border:1px solid rgba(184,88,40,.25);border-radius:5px;padding:2px 7px;margin-left:4px">${APP_LINKS[ps.app_link].name} ↗</button>`:''}<button onclick="openEditPersonalSlot('${sl.psId}')" style="font-size:11px;color:#7080c0;background:none;border:none;padding:0 4px">✎</button><button class="slot-add" onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" title="Add to this slot" style="color:#7080c0">+</button></div>${psTasksHtml}</div>`;
+        slotsHtml+=`<div class="slot personal-slot" data-time="${sl.time}" data-end="${sl.end||sl.endTime||''}" data-date="${dateStr}"><div class="slot-hdr"><span class="slot-tr">${sl.time} <b>–${sl.end||sl.endTime}</b></span><span class="slot-lbl">👤 ${sl.label}${_psClash(sl,_workEvts)}</span>${_leaveBy?`<span style="font-family:var(--mono);font-size:11px;color:var(--acc);margin-left:4px">${icn('walk',11)} ${_leaveBy}</span>`:''}${ps?.app_link&&APP_LINKS[ps.app_link]?`<button onclick="openAppLink('${ps.app_link}')" title="Open ${APP_LINKS[ps.app_link].name}" style="font-size:11px;font-weight:700;color:var(--acc);background:rgba(184,88,40,.09);border:1px solid rgba(184,88,40,.25);border-radius:5px;padding:2px 7px;margin-left:4px">${APP_LINKS[ps.app_link].name} ↗</button>`:''}<button onclick="openEditPersonalSlot('${sl.psId}')" style="font-size:11px;color:#4f46e5;background:none;border:none;padding:0 4px">✎</button><button class="slot-add" onclick="openSlotTaskPicker('${sl.time}','${dateStr}')" title="Add to this slot" style="color:#4f46e5">+</button></div>${psTasksHtml}</div>`;
         return;
       }
       // Hide free/empty work slots covered by a personal event's time range
@@ -3413,7 +3637,7 @@ function renderWeek(){
     const dayShort=short[di];
     const isToday=d.toDateString()===today.toDateString();
     const off=Math.round((d-today)/86400000);
-    const wSlots=getSlotsForDay(dayShort).filter(s=>!['free','personal'].includes(s.tp));
+    const wSlots=getSlotsForDay(dayShort,_ld(d)).filter(s=>!['free','personal'].includes(s.tp));
     const tasks=getTasksFor(off).filter(t=>!t.done);
 
     const wkSlotCol=localStorage.getItem('omni_wksc_'+off)==='1';
@@ -4370,8 +4594,8 @@ function renderCVTasks(){
     h+=`<div class="sec-lbl">Tier ${tier} — ${tl}</div><div style="margin:0 .6rem;border:1px solid var(--bd);border-radius:var(--r);overflow:hidden">`;
     tasks.forEach(t=>{
       const detail=tier===1?(t.recurring?'Weekly · '+t.day:t.date?'Date: '+t.date:'Day: '+t.day):tier===2?((t.from||'?')+' → '+(t.to||'?')):'Sticky — always shown';
-      h+=`<div style="display:flex;align-items:center;gap:8px;padding:.45rem .7rem;border-bottom:.5px solid var(--bd);background:var(--sur)">
-        <div style="flex:1"><div style="font-size:13px;color:var(--tx)">${t.text}</div><div style="font-size:11px;color:var(--tx4)">${detail}</div></div>
+      h+=`<div data-ptid="${t.id}" style="display:flex;align-items:center;gap:8px;padding:.45rem .7rem;border-bottom:.5px solid var(--bd);background:var(--sur)">
+        <div style="flex:1"><div class="cv-tx" style="font-size:13px;color:var(--tx)">${t.text}</div><div style="font-size:11px;color:var(--tx4)">${detail}</div></div>
         <button onclick="openEditTask('${t.id}')" style="font-size:12px;color:var(--tx4);background:none;border:none;padding:0">✎</button>
       </div>`;
     });
@@ -4414,10 +4638,7 @@ async function renderDash(){
   for(let i=0;i<_ds.length;i++){
     const s=_ds[i];const sm=t2m(s.t);const em=t2m(_ds[i+1]?.t||'00:00')||1440;
     if(nowM>=sm&&nowM<em){
-      const ttc=window._ttCustomData;const wIdx=window._timeToWorkIdx?.[s.t]??-1;
-      const wk=typeof _schoolWeekNum==='function'?_schoolWeekNum(dateStr):0;
-      const ov=ttc&&wIdx>=0?ttc[wk+'_'+wIdx+'_'+dayName]:null;
-      const base=s[dayName];
+      const ov=_wCellAt(s.t,dateStr);const base=null;
       const label=ov?(ov.l||ov.label||base?.l||''):base?.l||'';
       const tp=ov?_ttcTpToOmni(ov.tp||ov.cat||'free'):(base?.tp||'free');
       curSlot={label,tp,time:s.t};curStart=sm;curEnd=em;
@@ -4426,10 +4647,7 @@ async function renderDash(){
   }
   for(let i=0;i<_ds.length;i++){
     const s=_ds[i];const sm=t2m(s.t);if(sm<=nowM)continue;
-    const ttc=window._ttCustomData;const wIdx=window._timeToWorkIdx?.[s.t]??-1;
-    const wk=typeof _schoolWeekNum==='function'?_schoolWeekNum(dateStr):0;
-    const ov=ttc&&wIdx>=0?ttc[wk+'_'+wIdx+'_'+dayName]:null;
-    const base=s[dayName];
+    const ov=_wCellAt(s.t,dateStr);const base=null;
     const label=ov?(ov.l||ov.label||base?.l||''):base?.l||'';
     const tp=ov?_ttcTpToOmni(ov.tp||ov.cat||'free'):(base?.tp||'free');
     if(tp&&!['free','sleep'].includes(tp)){nxtSlot={label,tp,time:s.t};break;}
@@ -4903,11 +5121,11 @@ function _habSetSlotTime(type,dateStr,time){
 function _habPickTime(type,dateStr){
   // Show a simple time picker sheet
   const cur=_habSlotTime(type,dateStr);
-  const slots=WSLOTS.filter((_,i)=>{const d=new Date(dateStr+'T12:00:00');const dn=DS[d.getDay()];const c=WSLOTS[i]?.[dn];return c&&c.tp!=='sleep';});
+  const slots=WSLOTS.filter((_,i)=>{const c=_wCellAt(WSLOTS[i].t,dateStr);return c&&c.tp!=='sleep';});
   let h=`<div style="padding:.5rem .8rem .25rem;font-size:13px;font-weight:700;color:var(--tx)">Assign to time slot</div>`;
   if(cur){h+=`<div style="display:flex;align-items:center;gap:8px;padding:.35rem .8rem;border-bottom:.5px solid var(--bd);background:var(--sur2)"><span style="font-family:var(--mono);font-size:12px;color:var(--acc);font-weight:700">${cur}</span><span style="flex:1;font-size:12px;color:var(--tx)">Currently assigned</span><button onclick="_habSetSlotTime('${type}','${dateStr}','');closeSheet('hab-time-sh');renderDay();renderHabits('${dateStr}',DS[new Date().getDay()])" style="font-size:11px;color:var(--er);background:none;border:none;padding:0 4px">× Remove</button></div>`;}
   slots.forEach(s=>{
-    const d=new Date(dateStr+'T12:00:00');const dn=DS[d.getDay()];const c=s[dn];
+    const c=_wCellAt(s.t,dateStr);
     const endT=WSLOTS[WSLOTS.indexOf(s)+1]?.t||'';
     const isSel=s.t===cur;
     h+=`<div style="display:flex;align-items:center;gap:8px;padding:.38rem .8rem;border-bottom:.5px solid var(--bd);cursor:pointer;background:${isSel?'var(--sur2)':'var(--sur)'}" onclick="_habSetSlotTime('${type}','${dateStr}','${s.t}');closeSheet('hab-time-sh');renderDay();renderHabits('${dateStr}',DS[new Date().getDay()])">
@@ -5640,48 +5858,39 @@ function _psUpdateDepartPreview(){
 function _initPTR(){
   const scr=document.getElementById('scr');
   if(!scr)return;
-  let startY=0,currY=0,active=false,triggered=false;
-  const THRESHOLD=60;
-  const MAX_PULL=90;
-
-  // Create indicator element once
+  // A refresh needs a deliberate pull: about 130 px of finger travel, starting from a page that has
+  // been resting at the top (a scroll that only just arrived there does not count).
+  const ARM=130,MAX_PULL=80,REST_MS=300;
+  let startY=0,startX=0,active=false,armed=false,lastAway=0;
   const ind=document.createElement('div');
+  ind.id='ptr-ind';
   ind.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2000;pointer-events:none;display:flex;align-items:center;justify-content:center;height:0;overflow:hidden;background:var(--bg);border-bottom:1px solid var(--bd);transition:height .15s ease;font-size:12px;color:var(--tx3);font-weight:500';
   document.body.appendChild(ind);
-
-  let startX=0;
+  scr.addEventListener('scroll',()=>{if(scr.scrollTop>0)lastAway=Date.now();},{passive:true});
+  const reset=()=>{active=false;armed=false;ind.style.height='0';};
   scr.addEventListener('touchstart',e=>{
-    if(scr.scrollTop>0)return;
-    startY=e.touches[0].clientY;startX=e.touches[0].clientX;
-    active=true;triggered=false;
+    active=false;armed=false;
+    if(!e.touches||e.touches.length!==1||scr.scrollTop>0)return;
+    if(Date.now()-lastAway<REST_MS)return;                     // still moving from a scroll
+    startY=e.touches[0].clientY;startX=e.touches[0].clientX;active=true;
   },{passive:true});
-
   scr.addEventListener('touchmove',e=>{
     if(!active)return;
-    currY=e.touches[0].clientY;
-    const dy=currY-startY;
-    if(dy<=0||Math.abs(e.touches[0].clientX-startX)>=dy){active=false;triggered=false;ind.style.height='0';return;}   // upward or sideways: not a pull
-    // Rubberband: resistance increases as you pull further
-    const pull=Math.min(MAX_PULL,dy*0.45);
-    ind.style.height=pull+'px';
-    if(pull>=THRESHOLD*0.45){
-      ind.textContent=pull>=THRESHOLD*0.45&&pull<THRESHOLD*0.8?'Pull to refresh':'↑ Release to refresh';
-      triggered=pull>=THRESHOLD*0.45;
-    }
+    if(!e.touches||e.touches.length!==1){reset();return;}
+    const dy=e.touches[0].clientY-startY,dx=Math.abs(e.touches[0].clientX-startX);
+    if(dy<=0||dx>=dy||scr.scrollTop>0){reset();return;}         // upward, sideways or scrolled: not a pull
+    if(dy<16){ind.style.height='0';return;}
+    ind.style.height=Math.min(MAX_PULL,dy*0.45)+'px';
+    armed=dy>=ARM;
+    ind.textContent=armed?'↓ Release to refresh':'Pull to refresh';
   },{passive:true});
-
   scr.addEventListener('touchend',()=>{
-    if(!active){return;}
-    active=false;
-    if(triggered){
-      ind.style.height='44px';
-      ind.textContent='Refreshing…';
-      setTimeout(()=>location.reload(),400);
-    } else {
-      ind.style.height='0';
-    }
-    startY=0;currY=0;
+    if(!active)return;
+    const go=armed;active=false;armed=false;
+    if(go){ind.style.height='44px';ind.textContent='Refreshing…';setTimeout(()=>location.reload(),400);}
+    else ind.style.height='0';
   },{passive:true});
+  scr.addEventListener('touchcancel',reset,{passive:true});
 }
 window.addEventListener('DOMContentLoaded',_initPTR);
 // ═══════════════════════════════════════════════════
@@ -5948,9 +6157,7 @@ function _getLiveCtx(){
   const todaySlots=[];
   for(let i=0;i<ds.length;i++){
     const s=ds[i];
-    const wIdx=window._timeToWorkIdx?.[s.t]??i;
-    const ov=ttc[wk+'_'+wIdx+'_'+dayName];
-    const base=s[dayName];
+    const ov=_wCellAt(s.t,dateStr);const base=null;
     const label=ov?(ov.l||ov.label||base?.l||''):(base?.l||'');
     const tp=ov?(typeof _ttcTpToOmni==='function'?_ttcTpToOmni(ov.tp||ov.cat||'free'):'free'):(base?.tp||'free');
     const end=ov?.customEndTime||(ds[i+1]?.t||'00:00');
