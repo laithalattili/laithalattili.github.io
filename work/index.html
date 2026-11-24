@@ -144,6 +144,17 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .plan-task-row input[type=checkbox]{margin-top:3px;flex-shrink:0;width:15px;height:15px;cursor:pointer}
 .plan-task-label{flex:1;font-size:13px;color:#212529;line-height:1.4}
 .plan-task-label.done{color:#adb5bd;text-decoration:line-through}
+.aw-tag{display:inline-block;min-width:44px;text-align:center;font-size:9px;font-weight:800;letter-spacing:.04em;color:#fff;border-radius:4px;padding:2px 5px;margin-right:6px;vertical-align:1px;cursor:pointer;text-decoration:none}
+.plan-task-label.done .aw-tag{opacity:.45}
+.aw-bar{display:flex;align-items:center;gap:6px;font-size:11px;color:#495057;background:#f1f3f5;border-radius:8px;padding:6px 8px;margin:0 0 6px}
+.aw-bar .aw-tag{margin:0;cursor:default}
+.aw-bar button{margin-left:auto;border:1px solid #dee2e6;background:#fff;border-radius:6px;font-size:11px;padding:4px 9px;cursor:pointer;color:#495057}
+.qc-aw,.qc-aw-mid{display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:0 0 9px}
+.qc-aw::-webkit-scrollbar,.qc-aw-mid::-webkit-scrollbar{display:none}
+.qc-aw-mid:empty{display:none}
+.aw-chip{flex-shrink:0;min-height:32px;padding:0 11px;border-radius:16px;border:1.5px solid var(--awc);background:#fff;color:var(--awc);font-size:11px;font-weight:800;letter-spacing:.04em;cursor:pointer}
+.aw-chip.on{background:var(--awc);color:#fff}
+.aw-mid{flex-shrink:0;min-height:32px;padding:0 12px;border-radius:16px;border:1px solid #dee2e6;background:#f8f9fa;color:#343a40;font-size:13px;cursor:pointer}
 .prio-dots{background:none;border:none;min-width:36px;height:32px;margin:-6px -4px -6px 0;padding:0;color:#ced4da;font-size:9px;letter-spacing:1.5px;line-height:1;cursor:pointer;flex-shrink:0;align-self:center;-webkit-tap-highlight-color:transparent}
 .prio-dots.p1{color:#f59f00}.prio-dots.p2{color:#f76707}.prio-dots.p3{color:#e03131}
 .plan-task-row.p3 .plan-task-label:not(.done){font-weight:600}
@@ -23852,6 +23863,8 @@ async function fetchPersonalSlots(){
     if(!r.error&&r.data)PERSONAL_SLOTS=r.data;
   }catch(e){console.warn('Personal slots:',e.message);}
   try{
+    var r3=await supa.from('omni_settings').select('value').eq('key','action_words');
+    if(!r3.error&&r3.data)_awSetFromServer(r3.data[0]&&r3.data[0].value);
     var r2=await supa.from('omni_settings').select('value').eq('key','tasks');
     if(!r2.error&&r2.data){
       var v=r2.data[0]&&r2.data[0].value;
@@ -23860,6 +23873,87 @@ async function fetchPersonalSlots(){
     }
   }catch(e){console.warn('Omni tasks:',e.message);}
 }
+// ── ACTION WORDS ("CALL: Mother: rent") ─────────────────────────────────────
+// Shared spec with Omni. The task stays plain text. The text before the first colon is an action
+// word ONLY if it is on the list. Omni owns the list (omni_settings key 'action_words');
+// Work reads it and falls back to this default. Work never writes it.
+const AW_DEFAULT=[{w:'EMAIL',c:'#1c7ed6'},{w:'CALL',c:'#2f9e44'},{w:'TEXT',c:'#0c8599'},{w:'MEET',c:'#7048e8'},
+  {w:'OUT',c:'#e8590c'},{w:'IN',c:'#5c7cfa'},{w:'BUY',c:'#c2255c'},{w:'PAY',c:'#b08800'}];
+let ACTION_WORDS=AW_DEFAULT.slice();
+function _awSetFromServer(v){
+  if(typeof v==='string'){try{v=JSON.parse(v);}catch(e){v=null;}}
+  if(!Array.isArray(v)||!v.length){ACTION_WORDS=AW_DEFAULT.slice();return;}
+  const out=[];
+  v.slice(0,10).forEach(x=>{
+    const w=String((x&&x.w)||'').trim().toUpperCase();
+    const c=/^#[0-9a-fA-F]{3,8}$/.test(String((x&&x.c)||''))?x.c:'#868e96';
+    if(w&&/^[A-Z0-9 ]{1,12}$/.test(w)&&!out.some(o=>o.w===w))out.push({w,c});
+  });
+  ACTION_WORDS=out.length?out:AW_DEFAULT.slice();
+}
+// -> {w,c,rest} when the text starts with a listed action word and a colon, else null
+function awParse(text){
+  const s=String(text==null?'':text),i=s.indexOf(':');
+  if(i<1)return null;
+  const head=s.slice(0,i).trim().toUpperCase();
+  const a=ACTION_WORDS.find(x=>x.w===head);
+  return a?{w:a.w,c:a.c,rest:s.slice(i+1).replace(/^\s+/,'')}:null;
+}
+// Task text for a list row: coloured tag + the rest; unchanged when there is no action word
+function awText(text){
+  const a=awParse(text);if(!a)return text;
+  return '<span class="aw-tag" style="background:'+a.c+'" onclick="awFilter(\''+a.w+'\',event)">'+a.w+'</span>'+a.rest;
+}
+let _awFilter=null;
+function awFilter(w,ev){
+  if(ev){ev.stopPropagation();ev.preventDefault();}
+  _awFilter=(_awFilter===w)?null:w;
+  try{renderWeekTasksView();}catch(e){}
+  try{if(ttView==='today')renderTodayView();}catch(e){}
+}
+function _awPass(t){if(!_awFilter)return true;const a=awParse(t&&t.text);return !!a&&a.w===_awFilter;}
+function _awBarHtml(){
+  if(!_awFilter)return'';
+  const a=ACTION_WORDS.find(x=>x.w===_awFilter)||{c:'#868e96'};
+  return '<div class="aw-bar">Showing only <span class="aw-tag" style="background:'+a.c+'">'+_awFilter+'</span><button onclick="awFilter(null,event)">✕ Show all</button></div>';
+}
+// Quick capture: chips insert the action word; then earlier "middle parts" are offered
+function _awChipsRender(){
+  const el=document.getElementById('qc-aw');if(!el)return;
+  const cur=awParse((document.getElementById('qc-input')||{}).value||'');
+  el.innerHTML=ACTION_WORDS.map(a=>'<button type="button" class="aw-chip'+(cur&&cur.w===a.w?' on':'')+'" style="--awc:'+a.c+'" onmousedown="event.preventDefault()" onclick="awPick(\''+a.w+'\')">'+a.w+'</button>').join('');
+}
+function awPick(w){
+  const inp=document.getElementById('qc-input');if(!inp)return;
+  const cur=awParse(inp.value);
+  const rest=cur?cur.rest:inp.value.replace(/^\s+/,'');
+  inp.value=(cur&&cur.w===w)?rest:(w+': '+rest);       // tapping the active chip removes it
+  inp.focus();try{inp.setSelectionRange(inp.value.length,inp.value.length);}catch(e){}
+  try{qcOnInput();}catch(e){}
+}
+function _awMiddles(w){
+  const seen={},out=[];
+  const add=txt=>{const a=awParse(txt);if(!a||a.w!==w)return;const j=a.rest.indexOf(':');if(j<1)return;
+    const m=a.rest.slice(0,j).trim();const k=m.toLowerCase();if(m&&m.length<=30&&!seen[k]){seen[k]=1;out.push(m);}};
+  (S.planData||[]).slice().reverse().forEach(x=>add(x&&x.text));
+  (typeof OMNI_TASKS!=='undefined'?OMNI_TASKS:[]).slice().reverse().forEach(x=>add(x&&x.text));
+  return out;
+}
+function _awMidRender(){
+  const el=document.getElementById('qc-aw-mid'),inp=document.getElementById('qc-input');if(!el||!inp)return;
+  const a=awParse(inp.value);
+  if(!a||a.rest.indexOf(':')>=0){el.innerHTML='';return;}       // only while the middle part is being typed
+  const typed=a.rest.trim().toLowerCase();
+  const list=_awMiddles(a.w).filter(m=>!typed||m.toLowerCase().indexOf(typed)===0).slice(0,6);
+  el.innerHTML=list.map(m=>'<button type="button" class="aw-mid" onmousedown="event.preventDefault()" data-m="'+_omniEsc(m)+'" onclick="awPickMid(this.getAttribute(\'data-m\'))">'+_omniEsc(m)+'</button>').join('');
+}
+function awPickMid(m){
+  const inp=document.getElementById('qc-input');const a=awParse(inp.value);if(!a)return;
+  inp.value=a.w+': '+m+': ';
+  inp.focus();try{inp.setSelectionRange(inp.value.length,inp.value.length);}catch(e){}
+  try{qcOnInput();}catch(e){}
+}
+
 // Setting: show personal event names and task texts inside Work (default on).
 function _omniNamesOn(){try{return localStorage.getItem('omniNamesInWork')!=='0';}catch(e){return true;}}
 function _omniEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
@@ -25415,15 +25509,15 @@ function renderTodayView(){
         <div class="plan-task-cat-dot" style="background:${_cat.color}"></div>
         <input type="checkbox" ${_done?'checked':''} onchange="planToggleDone('${t.id}')">
         <div class="plan-task-label${_done?' done':''}">
-          ${t.text}${t.time?` <span style="font-size:10px;color:${_done?'#adb5bd':_cat.color};margin-left:4px">⏱${t.time}</span>`:''}
+          ${awText(t.text)}${t.time?` <span style="font-size:10px;color:${_done?'#adb5bd':_cat.color};margin-left:4px">⏱${t.time}</span>`:''}
         </div>
         ${_prioDotsHtml(t)}
       </div>`;
     }
 
     // Group by category, then uncategorised, then sticky at end
-    const _sticky=_planTs.filter(t=>t.scope==='sticky');
-    const _nonSticky=_planTs.filter(t=>t.scope!=='sticky');
+    const _sticky=_planTs.filter(t=>t.scope==='sticky'&&_awPass(t));
+    const _nonSticky=_planTs.filter(t=>t.scope!=='sticky'&&_awPass(t));
 
     let _tHtml='';
     // Render each category that has tasks
@@ -25449,7 +25543,7 @@ function renderTodayView(){
 
     html+=`<div style="margin-top:.75rem;padding:.5rem .25rem 0">
       <div style="font-size:10px;font-weight:700;color:#868e96;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem">Tasks</div>
-      ${_tHtml}
+      ${_awBarHtml()}${_tHtml}
       <button onclick="planAddTask('${dayName}')" style="width:100%;padding:.45rem;border:1.5px dashed var(--border);border-radius:8px;background:transparent;color:#868e96;font-size:12px;cursor:pointer;margin-top:4px">＋ Add task for this day</button>
     </div>`;
   }
@@ -26388,7 +26482,7 @@ function renderWeekTasksView(){
       <div class="plan-task-cat-dot" style="background:${cat.color}"></div>
       <input type="checkbox" ${done?'checked':''} onchange="planToggleDone('${t.id}')">
       <div style="flex:1">
-        <div class="plan-task-label${done?' done':''}">${t.text}</div>
+        <div class="plan-task-label${done?' done':''}">${awText(t.text)}</div>
         ${metaParts.length?`<div class="plan-task-meta">${metaParts.join(' · ')}</div>`:''}
       </div>
       ${_prioDotsHtml(t)}
@@ -26443,7 +26537,8 @@ function renderWeekTasksView(){
   // Sticky tasks always at top
   // Finished sticky tasks stay visible (crossed out) for the week they were ticked, then move
   // under "completed", where they can still be unticked.
-  const _stickyAll=weekTasks.filter(t=>t.scope==='sticky');
+  if(_awFilter)html+=_awBarHtml();
+  const _stickyAll=weekTasks.filter(t=>t.scope==='sticky'&&_awPass(t));
   const _monS=_dateToStr(mon);
   const sticky=_stickyAll.filter(t=>!_stickyGone(t,_monS));
   const _stickyOld=_stickyAll.filter(t=>_stickyGone(t,_monS));
@@ -26455,7 +26550,7 @@ function renderWeekTasksView(){
     </div>`;
   }
 
-  const nonSticky=weekTasks.filter(t=>t.scope!=='sticky');
+  const nonSticky=weekTasks.filter(t=>t.scope!=='sticky'&&_awPass(t));
 
   if(viewMode==='day'){
     // Group by day: Mon–Sun + unscheduled
@@ -38413,11 +38508,13 @@ try{document.getElementById('app-build-tag').textContent='build '+APP_BUILD;cons
 </div>
 <div id="qc-backdrop" onclick="closeQuickCapture()"></div>
 <div id="qc-sheet">
+  <div id="qc-aw" class="qc-aw"></div>
   <input id="qc-input" type="text" placeholder="What needs doing or saying? @ tags a student" autocomplete="off"
     oninput="qcOnInput();_atRender('qc-input','qc-at-sug')"
     onblur="setTimeout(function(){var b=document.getElementById('qc-at-sug');if(b){b.style.display='none';}},150)"
     onkeydown="if(event.key==='Enter'){if(_atOpen('qc-at-sug')){_atPickFirst('qc-input','qc-at-sug');event.preventDefault();}else qcEnter();}if(event.key==='Escape'){if(_atOpen('qc-at-sug'))_atHide('qc-at-sug');else closeQuickCapture();}">
   <div id="qc-at-sug" class="at-sug in-flow" style="display:none"></div>
+  <div id="qc-aw-mid" class="qc-aw-mid"></div>
   <div id="qc-tag" style="display:none;margin:-6px 0 10px;font-size:11px"></div>
   <div id="qc-step1">
     <button id="qc-note-btn" onclick="qcSaveNote()" style="display:none;width:100%;min-height:52px;border:none;border-radius:var(--r);background:#0f766e;color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px"></button>
@@ -38449,6 +38546,7 @@ function qcToggleSticky(){
   b.classList.toggle('on',_qcSticky);b.textContent=_qcSticky?'\u{1F4CC} Sticky \u00B7 no date':'Today';
 }
 function qcOnInput(){
+  try{_awChipsRender();_awMidRender();}catch(e){}
   var t=document.getElementById('qc-input').value;
   var hit=detectStudentInText(t);
   var el=document.getElementById('qc-tag');
@@ -38483,6 +38581,7 @@ function openQuickCapture(){
     return '<button class="qc-cat'+(ct.id===last?' last':'')+'" style="background:'+ct.color+full+'" onclick="qcPickCtx(&quot;'+ct.id+'&quot;)">'+ct.name+'</button>';
   }).join('');
   var sb=document.getElementById('qc-sticky');sb.classList.remove('on');sb.textContent='Today';
+  try{_awChipsRender();_awMidRender();}catch(e){}
   document.getElementById('qc-step1').style.display='block';
   document.getElementById('qc-step2').style.display='none';
   document.getElementById('qc-tag').style.display='none';
