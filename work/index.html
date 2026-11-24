@@ -23884,7 +23884,7 @@ function _awSetFromServer(v){
   if(typeof v==='string'){try{v=JSON.parse(v);}catch(e){v=null;}}
   if(!Array.isArray(v)||!v.length){ACTION_WORDS=AW_DEFAULT.slice();return;}
   const out=[];
-  v.slice(0,10).forEach(x=>{
+  v.slice(0,12).forEach(x=>{
     const w=String((x&&x.w)||'').trim().toUpperCase();
     const c=/^#[0-9a-fA-F]{3,8}$/.test(String((x&&x.c)||''))?x.c:'#868e96';
     if(w&&/^[A-Z0-9 ]{1,12}$/.test(w)&&!out.some(o=>o.w===w))out.push({w,c});
@@ -26642,13 +26642,15 @@ function planPrio(t){
   if(t.scope==='recurring')return(t.prioBy&&t.prioBy[_prioWeekKey()])||0;
   return t.prio||0;
 }
-// Higher priority first WITHIN each category; categories and equal-priority tasks keep their order.
+// WITHIN each category: higher priority first; then grouped by action word in the list's order
+// (untagged tasks last); otherwise the original order.
+function _awRank(x){const a=awParse(x&&x.text);if(!a)return 999;const i=ACTION_WORDS.findIndex(w=>w.w===a.w);return i<0?999:i;}
 function _prioSort(list){
   const out=list.slice(),byCat={};
   list.forEach((x,i)=>{const c=x.cat||'';(byCat[c]=byCat[c]||[]).push(i);});
   Object.keys(byCat).forEach(c=>{
     const idx=byCat[c];
-    const sorted=idx.map((i,n)=>({x:list[i],n})).sort((a,b)=>(planPrio(b.x)-planPrio(a.x))||(a.n-b.n));
+    const sorted=idx.map((i,n)=>({x:list[i],n})).sort((a,b)=>(planPrio(b.x)-planPrio(a.x))||(_awRank(a.x)-_awRank(b.x))||(a.n-b.n));
     idx.forEach((i,n)=>{out[i]=sorted[n].x;});
   });
   return out;
