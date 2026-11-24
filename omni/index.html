@@ -1160,7 +1160,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
           </div>
           <div class="ss">
             <div class="ss-title">Action words</div>
-            <div style="font-size:12px;color:var(--tx3);margin-bottom:.4rem">Start a task with one of these and a colon, e.g. CALL: Mother: Rent. The Work app uses the same list. Up to 10.</div>
+            <div style="font-size:12px;color:var(--tx3);margin-bottom:.4rem">Start a task with one of these and a colon, e.g. CALL: Mother: Rent. The Work app uses the same list, in this order. Up to 12.</div>
             <div id="aw-edit"></div>
             <div style="display:flex;gap:8px;margin-top:.5rem"><button class="btn-s" id="aw-add" style="font-size:12px;width:auto;flex:0 0 auto" onclick="_awEdAdd()">+ Add word</button><button class="btn-s" id="aw-reset" style="font-size:12px;width:auto;flex:0 0 auto" onclick="_awEdReset()">Reset to defaults</button></div>
           </div>
@@ -1745,9 +1745,11 @@ async function loadSettings(){
   try{const l=localStorage.getItem('omni_s');if(l)S=JSON.parse(l);}catch(e){}
   if(!_OK)return;
   try{
-    const{data}=await supaFrom('omni_settings').select('key,value');
+    const{data,error:_se}=await supaFrom('omni_settings').select('key,value');
+    _settingsOK=!!data&&!_se;
     if(data){const _qk=_qSetKeys();data.forEach(r=>{if(_qk[r.key])return;try{S[r.key]=JSON.parse(r.value);}catch(e){S[r.key]=r.value;}});}
     _sloc();
+    try{_awSeed();}catch(e){}
     // Apply synced theme from another device (localStorage gave instant paint; remote wins)
     if(S.theme&&S.theme!==(localStorage.getItem('omni_theme')||'default')){
       applyTheme(S.theme);
@@ -2784,19 +2786,23 @@ function livePeek(d){
 // ── Action words (spec shared with Work) ──
 // Text before the first colon, trimmed, compared without case to the list. A match is the task's
 // action word (shown in capitals as a tag); no match = no tag and the text is untouched.
-// The list lives in omni_settings 'action_words' as [{w,c}], max 10; Work reads it read-only.
-const _AW_DEF=[{w:'EMAIL',c:'#1971c2'},{w:'CALL',c:'#2f9e44'},{w:'TEXT',c:'#0c8599'},{w:'MEET',c:'#7048e8'},
-  {w:'OUT',c:'#e8590c'},{w:'IN',c:'#8d6e63'},{w:'BUY',c:'#c2255c'},{w:'PAY',c:'#b08900'}];
+// The list lives in omni_settings 'action_words' as [{w,c}], max 12; Work reads it read-only.
+// Same validation as Work: capitals, A–Z 0–9 and spaces, 1–12 characters; an empty list means the defaults.
+const _AW_DEF=[{w:'EMAIL',c:'#1c7ed6'},{w:'CALL',c:'#2f9e44'},{w:'TEXT',c:'#0c8599'},{w:'MEET',c:'#7048e8'},
+  {w:'OUT',c:'#e8590c'},{w:'IN',c:'#5c7cfa'},{w:'BUY',c:'#c2255c'},{w:'PAY',c:'#b08800'}];
+const _AW_MAX=12;
+const _AW_PAL=['#1c7ed6','#2f9e44','#0c8599','#7048e8','#e8590c','#5c7cfa','#c2255c','#b08800','#087f5b','#a61e4d','#5f3dc4','#495057'];
+function _awFreeColour(list){const used=list.map(x=>String(x.c||'').toLowerCase());return _AW_PAL.find(c=>used.indexOf(c)<0)||'#868e96';}
 function _awNorm(a){
   const seen={},out=[];
   (Array.isArray(a)?a:[]).forEach(x=>{
-    const w=x&&typeof x.w==='string'?x.w.replace(/[:<>"'&]/g,'').trim().toUpperCase().slice(0,12):'';
-    if(!w||seen[w]||out.length>=10)return;seen[w]=1;
+    const w=x&&typeof x.w==='string'?x.w.toUpperCase().replace(/[^A-Z0-9 ]/g,'').replace(/\s+/g,' ').trim().slice(0,12).trim():'';
+    if(!w||seen[w]||out.length>=_AW_MAX)return;seen[w]=1;
     out.push({w,c:/^#[0-9a-fA-F]{6}$/.test((x&&x.c)||'')?x.c.toLowerCase():'#868e96'});
   });
   return out;
 }
-function _awList(){return Array.isArray(S.action_words)?_awNorm(S.action_words):_AW_DEF;}
+function _awList(){const l=Array.isArray(S.action_words)?_awNorm(S.action_words):[];return l.length?l:_AW_DEF;}
 function _awParse(text){
   const t=String(text==null?'':text),i=t.indexOf(':');if(i<=0)return null;
   const h=t.slice(0,i).trim().toUpperCase();if(!h)return null;
@@ -2881,13 +2887,15 @@ function _awFill(m){
   _awChipsRender();
 }
 // settings editor
-let _awDraft=null;
+let _awDraft=null,_settingsOK=false;
 function _awEdRender(){
   const box=el('aw-edit');if(!box)return;
   const list=_awDraft||_awList().map(x=>({...x}));
   box.innerHTML=list.map((x,i)=>'<div class="aw-row"><input type="text" class="si" maxlength="12" value="'+_awEsc(x.w)+'" placeholder="WORD" data-i="'+i+'" onchange="_awEdSave()">'+
-    '<input type="color" value="'+x.c+'" data-i="'+i+'" onchange="_awEdSave()" title="Tag colour"><button onclick="_awEdDel('+i+')" title="Remove">\u2715</button></div>').join('')||
-    '<div style="font-size:12px;color:var(--tx3);padding:.3rem 0">No action words. Tasks show no tags.</div>';
+    '<input type="color" value="'+x.c+'" data-i="'+i+'" data-prev="'+x.c+'" onchange="_awEdColour(this)" title="Tag colour">'+
+    '<button onclick="_awEdMove('+i+',-1)" title="Move up"'+(i===0?' disabled style="opacity:.3"':'')+'>\u2191</button>'+
+    '<button onclick="_awEdMove('+i+',1)" title="Move down"'+(i===list.length-1?' disabled style="opacity:.3"':'')+'>\u2193</button>'+
+    '<button onclick="_awEdDel('+i+')" title="Remove">\u2715</button></div>').join('');
 }
 function _awEdRead(){
   return [...document.querySelectorAll('#aw-edit .aw-row')].map(r=>({w:r.querySelector('input[type=text]').value,c:r.querySelector('input[type=color]').value}));
@@ -2900,12 +2908,50 @@ async function _awEdCommit(list){
   try{_omniRedraw();}catch(e){}
 }
 function _awEdSave(){_awEdCommit(_awEdRead());}
+// One colour per word: picking a colour another word has is refused, naming that word.
+function _awEdColour(inp){
+  const i=+inp.dataset.i,c=String(inp.value).toLowerCase(),l=_awEdRead();
+  const other=l.find((x,j)=>j!==i&&String(x.c).toLowerCase()===c&&String(x.w).trim());
+  if(other){inp.value=inp.dataset.prev;showToast(String(other.w).toUpperCase()+' already uses that colour',3000);return;}
+  inp.dataset.prev=c;_awEdSave();
+}
 function _awEdDel(i){const l=_awEdRead();l.splice(i,1);_awEdCommit(l);}
+// The order here is the order of the chips and the order tasks are grouped in (in Work too).
+function _awEdMove(i,d){const l=_awEdRead(),j=i+d;if(j<0||j>=l.length)return;const t=l[i];l[i]=l[j];l[j]=t;_awEdCommit(l);}
 function _awEdAdd(){
   const l=_awEdRead();
-  if(l.length>=10){showToast('10 action words is the limit');return;}
-  _awDraft=[...l.map(x=>({w:x.w,c:x.c})),{w:'',c:'#868e96'}];_awEdRender();   // saved once a word is typed
+  if(l.length>=_AW_MAX){showToast(_AW_MAX+' action words is the limit');return;}
+  _awDraft=[...l.map(x=>({w:x.w,c:x.c})),{w:'',c:_awFreeColour(l)}];_awEdRender();   // saved once a word is typed
   const ins=document.querySelectorAll('#aw-edit input[type=text]');try{ins[ins.length-1].focus();}catch(e){}
+}
+// Added once to the saved list (agreed with Work, v23): MAKE, PREP, CHECK, PLAN in the next free palette
+// colours. Runs only after the settings really loaded; the flag 'aw_seed' is saved with the settings,
+// so a word removed later is not put back, on any device. "Reset" still gives the standard eight.
+let _awSeeding=false;
+async function _awSeed(){
+  if(!_OK||!_settingsOK||S.aw_seed||_awSeeding)return;
+  const qk=_qSetKeys();if(qk.action_words||qk.aw_seed)return;
+  _awSeeding=true;
+  try{
+    const old={EMAIL:'#1971c2',IN:'#8d6e63',PAY:'#b08900'},now={EMAIL:'#1c7ed6',IN:'#5c7cfa',PAY:'#b08800'};
+    const list=_awList().map(x=>({w:x.w,c:old[x.w]===x.c?now[x.w]:x.c}));     // v22's three slightly different defaults
+    ['MAKE','PREP','CHECK','PLAN'].forEach(w=>{if(list.length<_AW_MAX&&!list.some(x=>x.w===w))list.push({w,c:_awFreeColour(list)});});
+    const ok=await saveSetting('action_words',_awNorm(list));
+    if(ok)await saveSetting('aw_seed',1);
+    try{_awChipsRender();_awEdRender();_omniRedraw();}catch(e){}
+  }finally{_awSeeding=false;}
+}
+function _awRowRank(r){
+  let w=r.dataset.awRow;if(w==null){const e=r.querySelector('[data-aw]');w=e?e.dataset.aw:'';}
+  if(!w)return 999;const i=_awList().findIndex(x=>x.w===w);return i<0?999:i;
+}
+function _taskSort(view){
+  try{
+    const roots=view==='day'?[el('day-slots'),el('day-tasks')]:view==='week'?[el('pv-week')]:[el('cv-tasks')];
+    const parents=new Set();
+    roots.forEach(root=>{if(root)root.querySelectorAll('[data-prio-done],[data-aw-row]').forEach(r=>{if(_prioIsRow(r))parents.add(r.parentElement);});});
+    parents.forEach(_prioSortRuns);
+  }catch(e){console.warn('task sort',e);}
 }
 function _awEdReset(){if(!confirm('Put the action words back to the standard eight?'))return;_awEdCommit(_AW_DEF.map(x=>({...x})));}
 (function(){
@@ -2970,7 +3016,6 @@ function _prioDecorate(view){
         parents.add(row.parentElement);
       });
     });
-    parents.forEach(_prioSortRuns);
   }catch(e){console.warn('priority',e);}
 }
 function _prioMarkText(row,n){
@@ -2984,7 +3029,7 @@ function _prioSortRuns(parent){
   const flush=()=>{
     if(run.length>1){
       const mov=run.filter(r=>!_prioRowDone(r));
-      const sorted=mov.map((r,i)=>({r,i,p:_prioRowPrio(r)})).sort((a,b)=>(b.p-a.p)||(a.i-b.i)).map(x=>x.r);
+      const sorted=mov.map((r,i)=>({r,i,p:_prioRowPrio(r),k:_awRowRank(r)})).sort((a,b)=>(b.p-a.p)||(a.k-b.k)||(a.i-b.i)).map(x=>x.r);
       if(sorted.some((r,i)=>r!==mov[i])){
         const marks=mov.map(r=>{const c=document.createComment('p');parent.insertBefore(c,r);return c;});
         mov.forEach(r=>r.remove());
@@ -3034,7 +3079,7 @@ function _prioResort(){
 // Add the dots after every redraw of the planner and the Checklists task list.
 (function(){
   const hook=(name,view)=>{const f=window[name];if(typeof f!=='function')return;
-    window[name]=function(){const r=f.apply(this,arguments);_prioDecorate(view);_awDecorate(view);return r;};};
+    window[name]=function(){const r=f.apply(this,arguments);_prioDecorate(view);_awDecorate(view);_taskSort(view);return r;};};
   hook('_renderDayNow','day');hook('renderWeek','week');hook('renderCVTasks','cv');   // renderDay only schedules _renderDayNow
 })();
 
