@@ -29,7 +29,7 @@
 body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-height:100vh;padding-top:100px}
 
 /* PIN */
-#pin-screen{position:fixed;inset:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999}
+#pin-screen{position:fixed;inset:0;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:9999}
 .pin-logo{font-size:52px;font-weight:700;color:#fff;letter-spacing:4px;margin-bottom:6px}
 .pin-sub{font-size:13px;color:#888;margin-bottom:36px}
 .pin-dots{display:flex;gap:14px;margin-bottom:32px}
@@ -953,6 +953,15 @@ function pinDel(){window._pinDelQueue=(window._pinDelQueue||0)+1;}
 </div>
 <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 
+<div id="boot-splash" style="position:fixed;inset:0;background:#000;z-index:10002;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#888;font-size:13px;gap:14px">
+  <div class="pin-logo">LA</div><div id="boot-splash-msg">Loading…</div>
+</div>
+<script>
+// If the app has not started after 25 s, say so instead of showing a frozen screen.
+setTimeout(function(){var s=document.getElementById('boot-splash');if(!s)return;
+  var m=document.getElementById('boot-splash-msg');
+  if(m)m.innerHTML='Taking longer than usual.<br><button onclick="location.reload()" style="margin-top:10px;padding:9px 18px;border-radius:9px;border:none;background:#fff;color:#000;font-weight:700;cursor:pointer">Reload</button>';},25000);
+</script>
 <div id="pin-screen">
   <div class="pin-logo">LA</div>
   <div class="pin-sub" id="pin-sub">LA Work Dashboard</div>
@@ -2906,6 +2915,10 @@ function lockApp(){
 }
 // PIN accepted: pull the cloud copy, then start the app (5 s cap so a slow network never blocks you)
 function _unlockWork(){
+  // The PIN can be entered before the rest of this large page has finished loading:
+  // wait for the app code instead of failing with "initApp is not defined".
+  if(typeof initApp!=='function'){setTimeout(_unlockWork,150);return;}
+  _bootSplashOff();
   setPinRemember();
   document.getElementById('pin-screen').style.display='none';
   showSyncLoader();
@@ -2975,7 +2988,8 @@ async function _ipSubmit(){
 function ipDel(){if(_pinBusy)return;if(ipEntry.length>0){ipEntry=ipEntry.slice(0,-1);updatePinDots('ip',ipEntry.length);}}
 
 // LOGIN SCREEN
-function showLogin(){const e=document.getElementById('login-screen');if(e)e.style.display='flex';}
+function _bootSplashOff(){const s=document.getElementById('boot-splash');if(s)s.remove();}
+function showLogin(){_bootSplashOff();const e=document.getElementById('login-screen');if(e)e.style.display='flex';}
 function hideLogin(){const e=document.getElementById('login-screen');if(e)e.style.display='none';}
 async function ensureAuth(){
   try{const r=await supa.auth.getSession();return (r&&r.data&&r.data.session)||null;}catch(e){return null;}
@@ -25538,7 +25552,7 @@ function renderTodayView(){
     if(_sticky.length){
       _tHtml+=`<div style="font-size:10px;font-weight:700;color:#7d5800;text-transform:uppercase;letter-spacing:.05em;margin:6px 0 3px;display:flex;align-items:center;gap:5px">
         <span>📌</span>Sticky</div>`;
-      _tHtml+=_prioSort(_sticky).map(_taskRow).join('');
+      _tHtml+=_prioSortGrouped(_sticky).map(_taskRow).join('');
     }
 
     html+=`<div style="margin-top:.75rem;padding:.5rem .25rem 0">
@@ -26545,7 +26559,7 @@ function renderWeekTasksView(){
   if(sticky.length||_stickyOld.length){
     html+=`<div class="plan-sticky-section" style="margin-top:.5rem">
       <div class="plan-sticky-hdr">📌 Sticky</div>
-      ${_prioSort(sticky).map(taskCard).join('')}
+      ${_prioSortGrouped(sticky).map(taskCard).join('')}
       ${_stickyOld.length?`<div onclick="window._showDoneSticky=!window._showDoneSticky;renderWeekTasksView()" style="font-size:11px;color:#868e96;padding:.45rem .85rem;cursor:pointer">${window._showDoneSticky?'▾ Hide':'▸ Show'} completed (${_stickyOld.length})</div>${window._showDoneSticky?_stickyOld.map(taskCard).join(''):''}`:''}
     </div>`;
   }
@@ -26575,7 +26589,7 @@ function renderWeekTasksView(){
           <span>${DAY_FULL[day]}</span><span style="font-weight:400;font-size:11px">${dateStr}</span>
           <button onclick="planAddTask('${day}')" style="background:none;border:none;color:${isToday?'rgba(255,255,255,.7)':'#adb5bd'};font-size:16px;cursor:pointer;line-height:1;padding:0">＋</button>
         </div>
-        ${_prioSort(byDay[day]).map(taskCard).join('')}
+        ${_prioSortGrouped(byDay[day]).map(taskCard).join('')}
       </div>`;
     });
     if(byDay['__none']&&byDay['__none'].length){
@@ -26583,7 +26597,7 @@ function renderWeekTasksView(){
         <div class="plan-day-hdr"><span>Unscheduled (this week)</span>
           <button onclick="planAddTask()" style="background:none;border:none;color:#adb5bd;font-size:16px;cursor:pointer;line-height:1;padding:0">＋</button>
         </div>
-        ${_prioSort(byDay['__none']).map(taskCard).join('')}
+        ${_prioSortGrouped(byDay['__none']).map(taskCard).join('')}
       </div>`;
     }
     if(!nonSticky.length&&!sticky.length){
@@ -26645,6 +26659,17 @@ function planPrio(t){
 // WITHIN each category: higher priority first; then grouped by action word in the list's order
 // (untagged tasks last); otherwise the original order.
 function _awRank(x){const a=awParse(x&&x.text);if(!a)return 999;const i=ACTION_WORDS.findIndex(w=>w.w===a.w);return i<0?999:i;}
+// For lists that mix categories (planner day columns, sticky): categories in their usual order,
+// each kept together, and inside each category the same priority/type order as above.
+function _prioSortGrouped(list){
+  const order={};
+  if(S.planCategories&&S.planCategories.length)S.planCategories.forEach((c,i)=>{order[c.id]=i;});
+  else list.forEach((x,i)=>{if(!(x.cat in order))order[x.cat]=i;});   // no saved order: first appearance
+  return list.map((x,n)=>({x,n})).sort((a,b)=>{
+    const ca=order[a.x.cat]??999,cb=order[b.x.cat]??999;
+    return (ca-cb)||(planPrio(b.x)-planPrio(a.x))||(_awRank(a.x)-_awRank(b.x))||(a.n-b.n);
+  }).map(o=>o.x);
+}
 function _prioSort(list){
   const out=list.slice(),byCat={};
   list.forEach((x,i)=>{const c=x.cat||'';(byCat[c]=byCat[c]||[]).push(i);});
@@ -26718,6 +26743,47 @@ function planEditTask(id){
   const t=(S.planData||[]).find(x=>x.id===id);
   if(t)_openPlanTaskModal(t);
 }
+// ── Long-press a task row to edit (day-view task list and planner) ─────────
+// One delegated handler; starts only on the row itself, never on its checkbox, dots or buttons.
+let _ptLpTimer=null,_ptLpSuppress=false;
+function _ptLpTarget(e){
+  const el=e.target;
+  if(el.closest&&el.closest('input,button,a,.prio-dots,.aw-tag'))return null;
+  const row=el.closest&&el.closest('.plan-task-row[data-task-id]');
+  return row&&(row.closest('#tt-week-view')||row.closest('#tt-today-view'))?row:null;
+}
+function _ptLpFire(row){
+  _ptLpTimer=null;
+  if(navigator.vibrate)try{navigator.vibrate(40);}catch(e){}
+  _ptLpSuppress=true;setTimeout(()=>{_ptLpSuppress=false;},600);
+  planEditTask(row.getAttribute('data-task-id'));
+}
+document.addEventListener('touchstart',function(e){
+  const row=_ptLpTarget(e);if(!row)return;
+  const x=e.touches[0].clientX,y=e.touches[0].clientY;
+  clearTimeout(_ptLpTimer);
+  _ptLpTimer=setTimeout(()=>_ptLpFire(row),500);
+  row._lpXY=[x,y];
+},{passive:true});
+document.addEventListener('touchmove',function(e){
+  if(!_ptLpTimer)return;
+  const row=_ptLpTarget(e);
+  if(!row||!row._lpXY){clearTimeout(_ptLpTimer);_ptLpTimer=null;return;}
+  const dx=e.touches[0].clientX-row._lpXY[0],dy=e.touches[0].clientY-row._lpXY[1];
+  if(dx*dx+dy*dy>100){clearTimeout(_ptLpTimer);_ptLpTimer=null;}   // moved >10px: a scroll, not a press
+},{passive:true});
+['touchend','touchcancel'].forEach(ev=>document.addEventListener(ev,function(){
+  if(_ptLpTimer){clearTimeout(_ptLpTimer);_ptLpTimer=null;}
+},{passive:true}));
+// The tap that ends a long-press must not tick the checkbox or fire row buttons
+document.addEventListener('click',function(e){
+  if(_ptLpSuppress&&e.target.closest&&e.target.closest('.plan-task-row')){e.stopPropagation();e.preventDefault();}
+},true);
+// Desktop: right-click a row edits it
+document.addEventListener('contextmenu',function(e){
+  const row=_ptLpTarget(e);if(!row)return;
+  e.preventDefault();planEditTask(row.getAttribute('data-task-id'));
+});
 
 function _openPlanTaskModal(existing,defaultDay,defaultCat){
   const cats=(S.planCategories||[]);
@@ -31295,18 +31361,28 @@ async function _isAreaOwner(area,cacheKey){
 async function _afterAuth(){
   const running=document.getElementById('main-app').style.display==='block';
   if(running){setTimeout(_syncFlush,500);return;}   // re-login while the app is open: just resume syncing
-  const owner=_workOffline?(localStorage.getItem('work_owner_ok')==='1'):(await _isAreaOwner('Hawking House','work_owner_ok'));
-  if(!owner){
+  // A device already confirmed as Laith's goes straight on; the check is repeated in the background
+  // and signs out if it ever fails. Only a first sign-in waits for the check.
+  const cached=localStorage.getItem('work_owner_ok')==='1';
+  let owner=cached;
+  if(!_workOffline){
+    if(cached){_isAreaOwner('Hawking House','work_owner_ok').then(function(ok){if(!ok&&localStorage.getItem('work_owner_ok')==='0')_workNotOwner();});}
+    else owner=await _isAreaOwner('Hawking House','work_owner_ok');
+  }
+  if(!owner){_workNotOwner();return;}
+  if(checkPinRemember())_unlockWork();
+  else{_bootSplashOff();document.getElementById('pin-screen').style.display='flex';}
+}
+async function _workNotOwner(){
+  {
     try{await supa.auth.signOut();}catch(e){}
     try{['work_auth_prod','work_pin_h','work_pin_ts','work_owner_ok'].forEach(k=>localStorage.removeItem(k));}catch(e){}
     document.getElementById('pin-screen').style.display='none';
     showLogin();
     const er=document.getElementById('login-err');
     if(er)er.textContent='This app is for Laith only. Staff use the Boarding or Liaison app.';
-    return;
+    document.getElementById('main-app').style.display='none';
   }
-  if(checkPinRemember())_unlockWork();
-  else document.getElementById('pin-screen').style.display='flex';
 }
 async function bootApp(){
   const s=await ensureAuth();
