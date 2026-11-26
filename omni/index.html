@@ -260,6 +260,11 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
 .aw-hide{display:none!important}
 .aw-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 .5rem}
 .aw-chips:empty{display:none}
+.aw-grid{display:grid;grid-template-rows:repeat(2,auto);grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:6px}
+.aw-grid .aw-chip{padding:0 3px;font-size:11px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#oqc-sheet .aw-chips{margin-bottom:10px}
+.aw-row.aw-pe{border-bottom:2px solid var(--bd2);margin-bottom:8px}
+.aw-row .aw-col{font-size:11px;color:var(--tx4);width:16px;text-align:center;flex-shrink:0}
 .aw-chip{min-height:32px;padding:0 10px;border-radius:16px;border:1.5px solid var(--awc);background:none;color:var(--awc);font-size:12px;font-weight:700;letter-spacing:.03em}
 .aw-chip.on{background:var(--awc);color:#fff}
 .aw-sug{min-height:32px;padding:0 10px;border-radius:16px;border:1px dashed var(--bd2);background:var(--bg3);color:var(--tx2);font-size:12px}
@@ -1162,7 +1167,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
           </div>
           <div class="ss">
             <div class="ss-title">Action words</div>
-            <div style="font-size:12px;color:var(--tx3);margin-bottom:.4rem">Start a task with one of these and a colon, e.g. CALL: Mother: Rent. The Work app uses the same list, in this order. Up to 12.</div>
+            <div style="font-size:12px;color:var(--tx3);margin-bottom:.4rem">Start a task with one of these and a colon, e.g. CALL: Mother: Rent. The Work app uses the same list, in this order. Up to 12. The chips show in two rows: each numbered pair below is one column.</div>
             <div id="aw-edit"></div>
             <div style="display:flex;gap:8px;margin-top:.5rem"><button class="btn-s" id="aw-add" style="font-size:12px;width:auto;flex:0 0 auto" onclick="_awEdAdd()">+ Add word</button><button class="btn-s" id="aw-reset" style="font-size:12px;width:auto;flex:0 0 auto" onclick="_awEdReset()">Reset to defaults</button></div>
           </div>
@@ -1344,7 +1349,7 @@ body.audio-on #toast{bottom:calc(var(--nav) + var(--audio-bar-h,54px) + 10px + e
 <div class="md-wrap" id="task-md">
   <div class="md">
     <div class="md-title" id="task-title">Add Task</div>
-    <div class="aw-chips" id="aw-chips"></div>
+    <div class="aw-chips aw-grid" id="aw-chips"></div>
     <div class="inp"><label>Text</label><input type="text" id="tm-text" placeholder="Task description" autocomplete="off"></div>
     <div class="aw-chips" id="aw-sugg"></div>
     <div class="inp"><label>Tier</label>
@@ -1751,7 +1756,7 @@ async function loadSettings(){
     _settingsOK=!!data&&!_se;
     if(data){const _qk=_qSetKeys();data.forEach(r=>{if(_qk[r.key])return;try{S[r.key]=JSON.parse(r.value);}catch(e){S[r.key]=r.value;}});}
     _sloc();
-    try{_awSeed();}catch(e){}
+    try{_awSeed().then(_awOrderOnce).catch(()=>{});}catch(e){}
     // Apply synced theme from another device (localStorage gave instant paint; remote wins)
     if(S.theme&&S.theme!==(localStorage.getItem('omni_theme')||'default')){
       applyTheme(S.theme);
@@ -2650,12 +2655,12 @@ function switchPV(v){
   _pv=v;
   document.querySelectorAll('[data-pv]').forEach(b=>b.classList.toggle('on',b.dataset.pv===v));
   ['day','week','month','year'].forEach(x=>{const e=el('pv-'+x);if(e)e.style.display=x===v?'':'none';});
-  if(v==='day'){_updAnch();renderDay();}
+  if(v==='day'){_scrollNowWanted=true;_updAnch();renderDay();}
   if(v==='week'){_updAnch();renderWeek();}
   if(v==='month')renderMonth();
 }
 
-function navDay(d){_dayOff=d===0?0:_dayOff+d;_updAnch();renderDay();}
+function navDay(d){if(d===0)_scrollNowWanted=true;_dayOff=d===0?0:_dayOff+d;_updAnch();renderDay();}
 function navWeek(d){_weekOff=d===0?0:_weekOff+d;_updAnch();renderWeek();}
 // ── Swipe: change day in Day view, week in Week view (ported from Work) ──
 function _gestOverlayOpen(){
@@ -2928,20 +2933,22 @@ function _awApplyFilter(){
   bar.textContent=_awFilter?('Showing '+_awFilter+' only  \u2715  Show all'):'';
   bar.style.display=_awFilter?'flex':'none';
 }
-// task form: chips above the text box, earlier middle parts below it
+// task boxes with chips: the task form (tm) and Quick Capture (oqc)
 function _awEsc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function _awChipsRender(){
-  const box=el('aw-chips'),i=el('tm-text');if(!box||!i)return;
+const _AWT={tm:['aw-chips','tm-text','aw-sugg'],oqc:['oqc-aw','oqc-in','oqc-sugg']};
+function _awRenderFor(k){
+  const ids=_AWT[k]||_AWT.tm,box=el(ids[0]),i=el(ids[1]);if(!box||!i)return;
   const cur=_awParse(i.value);
-  box.innerHTML=_awList().map(x=>'<button type="button" class="aw-chip'+(cur&&cur.w===x.w?' on':'')+'" style="--awc:'+x.c+'" data-w="'+_awEsc(x.w)+'" onclick="_awPick(this.dataset.w)">'+_awEsc(x.w)+'</button>').join('');
-  _awSuggRender();
+  box.innerHTML=_awList().map(x=>'<button type="button" class="aw-chip'+(cur&&cur.w===x.w?' on':'')+'" style="--awc:'+x.c+'" data-w="'+_awEsc(x.w)+'" onmousedown="event.preventDefault()" onclick="_awPick(this.dataset.w,\''+k+'\')">'+_awEsc(x.w)+'</button>').join('');
+  _awSuggFor(k);
 }
-function _awPick(w){
-  const i=el('tm-text'),p=_awParse(i.value);
+function _awChipsRender(){_awRenderFor('tm');}
+function _awPick(w,k){
+  const ids=_AWT[k]||_AWT.tm,i=el(ids[1]),p=_awParse(i.value);
   if(p&&p.w===w)i.value=p.rest;                               // tapping the lit chip takes the word off
   else i.value=w+': '+(p?p.rest:i.value.trim());              // puts it at the start, replacing another action word
   try{i.focus();i.setSelectionRange(i.value.length,i.value.length);}catch(e){}
-  _awChipsRender();
+  _awRenderFor(k||'tm');
 }
 function _awHist(){try{const h=JSON.parse(localStorage.getItem('omni_aw_hist')||'{}');return h&&typeof h==='object'?h:{};}catch(e){return{};}}
 function _awMid(p){if(!p)return'';const j=p.rest.indexOf(':');return j>0?p.rest.slice(0,j).trim():'';}
@@ -2956,26 +2963,27 @@ function _awMiddles(w){                                        // most recent fi
   [...(OTASKS||[])].reverse().concat(WTASKS||[]).forEach(t=>{const p=_awParse(t&&t.text);if(p&&p.w===w)add(_awMid(p));});
   return out;
 }
-function _awSuggRender(){
-  const box=el('aw-sugg'),i=el('tm-text');if(!box||!i)return;
+function _awSuggFor(k){
+  const ids=_AWT[k]||_AWT.tm,box=el(ids[2]),i=el(ids[1]);if(!box||!i)return;
   const p=_awParse(i.value);
   if(!p||p.rest.indexOf(':')>=0){box.innerHTML='';return;}     // no action word yet, or the middle is already written
   const typed=p.rest.toLowerCase();
   const ms=_awMiddles(p.w).filter(m=>m.toLowerCase().indexOf(typed)===0).slice(0,6);
-  box.innerHTML=ms.map(m=>'<button type="button" class="aw-sug" data-m="'+_awEsc(m)+'" onclick="_awFill(this.dataset.m)">'+_awEsc(m)+'</button>').join('');
+  box.innerHTML=ms.map(m=>'<button type="button" class="aw-sug" data-m="'+_awEsc(m)+'" onmousedown="event.preventDefault()" onclick="_awFill(this.dataset.m,\''+k+'\')">'+_awEsc(m)+'</button>').join('');
 }
-function _awFill(m){
-  const i=el('tm-text'),p=_awParse(i.value);if(!p)return;
+function _awSuggRender(){_awSuggFor('tm');}
+function _awFill(m,k){
+  const ids=_AWT[k]||_AWT.tm,i=el(ids[1]),p=_awParse(i.value);if(!p)return;
   i.value=p.w+': '+m+': ';
   try{i.focus();i.setSelectionRange(i.value.length,i.value.length);}catch(e){}
-  _awChipsRender();
+  _awRenderFor(k||'tm');
 }
 // settings editor
 let _awDraft=null,_settingsOK=false;
 function _awEdRender(){
   const box=el('aw-edit');if(!box)return;
   const list=_awDraft||_awList().map(x=>({...x}));
-  box.innerHTML=list.map((x,i)=>'<div class="aw-row"><input type="text" class="si" maxlength="12" value="'+_awEsc(x.w)+'" placeholder="WORD" data-i="'+i+'" onchange="_awEdSave()">'+
+  box.innerHTML=list.map((x,i)=>'<div class="aw-row'+(i%2?' aw-pe':'')+'"><span class="aw-col" title="Column '+(Math.floor(i/2)+1)+(i%2?', bottom':', top')+'">'+(i%2?'\u2193':(Math.floor(i/2)+1))+'</span><input type="text" class="si" maxlength="12" value="'+_awEsc(x.w)+'" placeholder="WORD" data-i="'+i+'" onchange="_awEdSave()">'+
     '<input type="color" value="'+x.c+'" data-i="'+i+'" data-prev="'+x.c+'" onchange="_awEdColour(this)" title="Tag colour">'+
     '<button onclick="_awEdMove('+i+',-1)" title="Move up"'+(i===0?' disabled style="opacity:.3"':'')+'>\u2191</button>'+
     '<button onclick="_awEdMove('+i+',1)" title="Move down"'+(i===list.length-1?' disabled style="opacity:.3"':'')+'>\u2193</button>'+
@@ -3024,6 +3032,24 @@ async function _awSeed(){
     if(ok)await saveSetting('aw_seed',1);
     try{_awChipsRender();_awEdRender();_omniRedraw();}catch(e){}
   }finally{_awSeeding=false;}
+}
+
+// Put the list in the order agreed with Laith, once (v25). Words not in that order keep their place
+// after it; nothing is added or removed. The flag 'aw_order1' is saved with the settings, so a later
+// reorder in settings is never undone, on any device.
+const _AW_ORDER1=['EMAIL','TEXT','CALL','MEET','OUT','IN','BUY','PAY','MAKE','PREP','CHECK','PLAN'];
+let _awOrdering=false;
+async function _awOrderOnce(){
+  if(!_OK||!_settingsOK||S.aw_order1||_awOrdering)return;
+  const qk=_qSetKeys();if(qk.action_words||qk.aw_order1)return;
+  _awOrdering=true;
+  try{
+    const cur=_awList(),rank=w=>{const i=_AW_ORDER1.indexOf(w);return i<0?100+cur.findIndex(x=>x.w===w):i;};
+    const list=cur.slice().sort((a,b)=>rank(a.w)-rank(b.w));
+    const ok=await saveSetting('action_words',_awNorm(list));
+    if(ok)await saveSetting('aw_order1',1);
+    try{_awRenderFor('tm');_awRenderFor('oqc');_awEdRender();_omniRedraw();}catch(e){}
+  }finally{_awOrdering=false;}
 }
 function _awRowRank(r){
   let w=r.dataset.awRow;if(w==null){const e=r.querySelector('[data-aw]');w=e?e.dataset.aw:'';}
@@ -3868,7 +3894,10 @@ function _renderDayNow(){
   const nb=document.getElementById('night-btn');
   if(nb){const sn=localStorage.getItem('omni_night')==='1';nb.style.background=sn?'rgba(30,20,60,.12)':'';nb.style.borderColor=sn?'#9c8fc0':'var(--bd)';}
   // Scroll to current slot on today
-  if(isToday&&curIdx>=0)requestAnimationFrame(()=>requestAnimationFrame(_scrollToNow));
+  // Only when you open the planner / day view or go to Today. Background redraws (sync, ticks, inbox)
+  // used to land here too and pulled the page back up to the current slot every time.
+  if(isToday&&curIdx>=0&&_scrollNowWanted){_scrollNowWanted=false;requestAnimationFrame(()=>requestAnimationFrame(_scrollToNow));}
+  else if(!isToday)_scrollNowWanted=false;
 
 
   // ── HABITS SECTION ───────────────────────────────────────────────────────────
@@ -3914,6 +3943,7 @@ function _togglePastExp(dateStr){
   if(sumRow)sumRow.style.display=wasExp?'':'none';
   if(expRows)expRows.style.display=wasExp?'none':'';
 }
+let _scrollNowWanted=true;   // true at start-up
 function _scrollToNow(){
   // Use getBoundingClientRect — works regardless of DOM hierarchy
   const nowEl=document.querySelector('#day-slots .slot.now');
@@ -7376,8 +7406,10 @@ if('serviceWorker' in navigator){
 </script>
 <div id="oqc-bd" onclick="closeOmniCapture()"></div>
 <div id="oqc-sheet">
+  <div class="aw-chips aw-grid" id="oqc-aw"></div>
   <input id="oqc-in" type="text" placeholder="What needs doing?" autocomplete="off"
-    onkeydown="if(event.key==='Enter')oqcSave(1);if(event.key==='Escape')closeOmniCapture()">
+    onkeydown="if(event.key==='Enter')oqcSave(1);if(event.key==='Escape')closeOmniCapture()" oninput="_awRenderFor('oqc')">
+  <div class="aw-chips" id="oqc-sugg"></div>
   <div class="oqc-tiles">
     <button class="oqc-t" style="background:var(--acc)" onclick="oqcSave(1)">Today</button>
     <button class="oqc-t" style="background:#6b7280" onclick="oqcSave(3)">Ongoing</button>
@@ -7395,6 +7427,7 @@ function openOmniCapture(){
   document.getElementById('oqc-sheet').classList.add('on');
   var i=document.getElementById('oqc-in');
   i.value='';
+  try{_awRenderFor('oqc');}catch(e){}
   setTimeout(function(){i.focus();},240);
 }
 function closeOmniCapture(){
@@ -7404,6 +7437,7 @@ function closeOmniCapture(){
 }
 async function oqcSave(tier){
   var text=document.getElementById('oqc-in').value.trim();
+  try{_awRemember(text);}catch(e){}
   if(!text){document.getElementById('oqc-in').focus();return;}
   var d=new Date();
   OTASKS.push({
@@ -7423,6 +7457,7 @@ async function oqcSave(tier){
 }
 function oqcSendWork(catId){
   var text=document.getElementById('oqc-in').value.trim();
+  try{_awRemember(text);}catch(e){}
   if(!text){document.getElementById('oqc-in').focus();return;}
   closeOmniCapture();
   sendToWork(text,catId,false).then(function(ok){
