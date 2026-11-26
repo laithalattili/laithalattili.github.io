@@ -253,6 +253,8 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
 .wd-add{min-width:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center;font-size:18px;line-height:1;color:var(--tx2);background:none;border:none;padding:0;margin:-6px 2px -6px 0;flex-shrink:0}
 .wd-hdr{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .wd-hdr.lp-hold{background:var(--bg3)}
+.tr-hold{background:var(--bg3)!important;transition:background .2s}
+.task-row,.slot-task-row,[data-ptid]{-webkit-touch-callout:none}
 .aw-tag{display:inline-block;position:relative;font-size:11px;font-weight:700;letter-spacing:.03em;line-height:1;padding:3px 6px;border-radius:5px;margin-right:6px;vertical-align:1px;cursor:pointer;white-space:nowrap}
 .aw-tag::after{content:'';position:absolute;inset:-9px -5px}
 .aw-hide{display:none!important}
@@ -1906,7 +1908,8 @@ function changePIN(){closeSettings();_pchange=true;_pold=null;setTimeout(()=>sho
 
 // ── LOGIN ──
 let _loginResolve=null,_loginBusy=false,_omniOffline=false;
-function omniShowLogin(){const e=el('login');if(e)e.classList.remove('gone');const l=el('ld');if(l)l.classList.add('gone');}
+function omniShowLogin(){const e=el('login');if(e)e.classList.remove('gone');const l=el('ld');if(l)l.classList.add('gone');
+  try{const m=sessionStorage.getItem('omni_login_msg');if(m){sessionStorage.removeItem('omni_login_msg');const er=el('login-err');if(er)er.textContent=m;}}catch(e){}}
 function omniHideLogin(){const e=el('login');if(e)e.classList.add('gone');}
 // A device that has signed in and set a PIN before may open offline (PIN checked against the local copy).
 function _offlineEligible(){try{return!!(localStorage.getItem('omni_auth_prod')&&localStorage.getItem(PIN_K));}catch(e){return false;}}
@@ -1931,12 +1934,27 @@ async function _isAreaOwner(area,cacheKey){
   }catch(e){try{return localStorage.getItem(cacheKey)==='1';}catch(_){return false;}}
 }
 async function _omniOwnerOrOut(s){
+  // Known owner on this device: open now and check in the background (the check is three requests in a row).
+  // Only a first sign-in, with nothing remembered, waits for it.
+  let known=false;try{known=localStorage.getItem('omni_owner_ok')==='1';}catch(e){}
+  if(known){
+    _isAreaOwner('Personal','omni_owner_ok').then(ok=>{if(!ok)_omniDeny();}).catch(()=>{});
+    return s;
+  }
   if(await _isAreaOwner('Personal','omni_owner_ok'))return s;
   try{await supa.auth.signOut();}catch(e){}
   try{['omni_auth_prod',PIN_K,'omni_ults','omni_owner_ok'].forEach(k=>localStorage.removeItem(k));}catch(e){}
   omniShowLogin();
   el('login-err').textContent='This app is for Laith only.';
   return new Promise(res=>{_loginResolve=res;});
+}
+// The background check said this account is not the Owner: sign out and start again at the sign-in screen.
+// (A failed check, e.g. no connection, is not a "no": _isAreaOwner then answers from the remembered result.)
+async function _omniDeny(){
+  try{await supa.auth.signOut();}catch(e){}
+  try{['omni_auth_prod',PIN_K,'omni_ults','omni_owner_ok','omni_s',_QK,_QDK,'omni_wtt','omni_aw_hist'].forEach(k=>localStorage.removeItem(k));}catch(e){}
+  try{sessionStorage.setItem('omni_login_msg','This app is for Laith only.');}catch(e){}
+  location.reload();
 }
 async function omniRequireLogin(){
   if(!_OK){_omniOffline=true;return null;}          // library or config missing: local data only
@@ -2721,6 +2739,72 @@ function openLPMenu(time,dateStr,endT){
   el('lp-menu-sh').classList.add('on');
 }
 function closeLPMenu(){el('lp-menu-sh').classList.remove('on');}
+// ── Hold a task row (500 ms) or right-click it to edit the task. One handler for every list. ──
+// Not from the tick box, the priority dots, an action-word tag or any button; Work tasks stay tick-only.
+function _trRow(target){
+  if(!target||!target.closest)return null;
+  if(target.closest('button,a,input,textarea,select,label,.prio-dots,.aw-tag,[onclick*="toggleDone("],[onclick*="wkTick("]'))return null;
+  for(let n=target;n&&n!==document.body;n=n.parentElement){
+    if(n.nodeType===1&&_prioIsRow(n)){
+      const info=_prioRowInfo(n);
+      return info&&info.t&&!info.work?{row:n,id:info.t.id}:null;
+    }
+    if(n.classList&&(n.classList.contains('slot')||n.id==='scr'))return null;
+  }
+  return null;
+}
+function _trOpen(id){
+  if(!OTASKS.some(t=>t.id===id))return;
+  try{closeSearch();}catch(e){}
+  openEditTask(id);
+}
+(function(){
+  let tm=null,sx=0,sy=0,hit=null;
+  function clear(){if(tm){clearTimeout(tm);tm=null;}if(hit){hit.row.classList.remove('tr-hold');hit=null;}}
+  function fire(){
+    tm=null;const h=hit;hit=null;if(!h)return;h.row.classList.remove('tr-hold');
+    if(!_gestAppReady()||_gestOverlayOpen())return;
+    _lpFiredAt=Date.now();                         // swallows the click that ends the press (and any swipe)
+    try{if(navigator.vibrate)navigator.vibrate(40);}catch(e){}
+    _trOpen(h.id);
+  }
+  function onStart(e){
+    clear();
+    if(!e.touches||e.touches.length!==1||!_gestAppReady()||_gestOverlayOpen())return;
+    const h=_trRow(e.target);
+    if(!h){
+      // Held on the tick box, the dots or a tag of a task row: a long hold there does nothing at all,
+      // so the tap that ends it must not tick, change priority or filter.
+      const c=e.target&&e.target.closest&&e.target.closest('.prio-dots,.aw-tag,[onclick*="toggleDone("],[onclick*="wkTick("]');
+      if(c){sx=e.touches[0].clientX;sy=e.touches[0].clientY;tm=setTimeout(()=>{tm=null;_lpFiredAt=Date.now();},500);}
+      return;
+    }
+    sx=e.touches[0].clientX;sy=e.touches[0].clientY;hit=h;
+    tm=setTimeout(fire,500);
+    setTimeout(()=>{if(tm&&hit===h)h.row.classList.add('tr-hold');},150);
+  }
+  function onMove(e){
+    if(!tm)return;const t=e.touches&&e.touches[0];if(!t)return;
+    if(Math.abs(t.clientX-sx)>10||Math.abs(t.clientY-sy)>10)clear();     // that is a scroll
+  }
+  function onCtx(e){
+    const h=_trRow(e.target);if(!h||!_gestAppReady())return;
+    e.preventDefault();e.stopPropagation();
+    if(e.pointerType==='touch'||(e.sourceCapabilities&&e.sourceCapabilities.firesTouchEvents))return;
+    if(_lpFiredAt&&Date.now()-_lpFiredAt<800)return;
+    _trOpen(h.id);
+  }
+  function bind(){
+    if(document._trBound)return;document._trBound=true;
+    document.addEventListener('touchstart',onStart,{passive:true});
+    document.addEventListener('touchmove',onMove,{passive:true});
+    document.addEventListener('touchend',clear,{passive:true});
+    document.addEventListener('touchcancel',clear,{passive:true});
+    document.addEventListener('contextmenu',onCtx,true);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
+})();
+
 // ── Live mode: look ahead / back, personal look ──
 let _livePeek=0,_livePeekT=null,_liveList=[];
 function livePeek(d){
