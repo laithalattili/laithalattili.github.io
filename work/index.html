@@ -28886,7 +28886,7 @@ function renderClassesSettings(){
   if(sel){sel.innerHTML='<option value="">Select class to import into...</option>'+CLASSES.map(c=>`<option value="${c.id}">${c.name} (${c.students.length} students)</option>`).join('');}
   el.innerHTML=CLASSES.map(c=>`<div class="person-item">
     <div><div class="person-name">${c.name}</div><div class="person-sub">${c.grade} · ${c.students.length} students</div></div>
-    <div class="person-btns"><button class="person-btn" onclick="editClassInfo('${c.id}')">Edit</button>${c.students.length?`<button class="person-btn" style="border-color:#ffd8a8;color:#d9480f;background:#fff4e6" onclick="clearClassStudents('${c.id}')">Clear list</button>`:''}<button class="person-btn danger" onclick="deleteClass('${c.id}')">Delete</button></div>
+    <div class="person-btns">${(c.archivedStudents&&c.archivedStudents.length)?`<button class="person-btn" onclick="showClassArchive('${c.id}')">🗄 ${c.archivedStudents.length}</button>`:''}<button class="person-btn" onclick="editClassInfo('${c.id}')">Edit</button>${c.students.length?`<button class="person-btn" style="border-color:#ffd8a8;color:#d9480f;background:#fff4e6" onclick="clearClassStudents('${c.id}')">Clear list</button>`:''}<button class="person-btn danger" onclick="deleteClass('${c.id}')">Delete</button></div>
   </div>`).join('');
 }
 
@@ -29939,18 +29939,21 @@ function doBulkImport(){
   // Replace mode: start from an empty roster (seating + leave flags cleared too)
   const _repl=document.getElementById('bulk-replace-chk');
   if(_repl&&_repl.checked){
-    if(!confirm('Replace the whole list? The current '+cls.students.length+' student(s) in '+cls.name+' will be removed first.'))return;
+    if(!confirm('Replace the whole list? The current '+cls.students.length+' student(s) in '+cls.name+' move to the class archive (their notes and levels kept there), and the seating plan and leave flags are cleared.'))return;
+    cls.archivedStudents=(cls.archivedStudents||[]).concat(cls.students);
     cls.students=[];
     if(cls.seating&&Array.isArray(cls.seating.seats))cls.seating.seats=cls.seating.seats.map(()=>null);
     const _nl={};Object.entries(CLASS_LEAVE).forEach(([k,v])=>{if(!k.startsWith(targetId+'_'))_nl[k]=v;});CLASS_LEAVE=_nl;
     _repl.checked=false;
   }
-  // Merge by name: re-importing the same list UPDATES students instead of duplicating them
+  // Merge by name. Two students CAN share a name (two Jack Wangs): the nth pasted line with a
+  // name matches the nth existing student with that name, so neither is lost or overwritten.
   const _k=s=>(((s.preferred||s.firstname||'')+'|'+(s.surname||'')).toLowerCase().trim());
-  const existing=new Map();cls.students.forEach((s,i)=>existing.set(_k(s),i));
+  const byKey=new Map();cls.students.forEach((s,i)=>{const k=_k(s);if(!byKey.has(k))byKey.set(k,[]);byKey.get(k).push(i);});
+  const used=new Map();                        // key -> how many of its indices are matched so far
+  const matched=new Set(),addedRecs=[];
   let added=0,updated=0;
   lines.forEach(line=>{
-    // Try tab first, then comma
     const parts=line.includes('\t')?line.split('\t'):line.split(',');
     if(parts.length<3)return;
     const surname=(parts[0]||'').replace(/\*/g,'').trim();
@@ -29963,15 +29966,15 @@ function doBulkImport(){
     const lvRaw=(parts[6]||'').trim().toLowerCase();
     const level=lvRaw.includes('found')?1:lvRaw.includes('core')?2:lvRaw.includes('ext')?3:0;
     const rec={surname,firstname,preferred,house,gender,note,level};
-    const idx=existing.get(_k(rec));
-    if(idx!==undefined){
-      // Existing student: refresh fields, keep anything the import doesn't carry
-      cls.students[idx]={...cls.students[idx],...rec};
-      updated++;
+    const k=_k(rec),idxs=byKey.get(k)||[],n=used.get(k)||0;
+    if(n<idxs.length){
+      const idx=idxs[n];used.set(k,n+1);matched.add(idx);
+      // A blank column never erases what is already saved (plain name lists keep notes and levels)
+      const cur=cls.students[idx],upd={...cur,surname,firstname,preferred};
+      if(house)upd.house=house;if(gender)upd.gender=gender;if(note)upd.note=note;if(level)upd.level=level;
+      cls.students[idx]=upd;updated++;
     }else{
-      cls.students.push(rec);
-      existing.set(_k(rec),cls.students.length-1);
-      added++;
+      cls.students.push(rec);addedRecs.push(rec);added++;
     }
   });
   if(added||updated){
@@ -29981,10 +29984,103 @@ function doBulkImport(){
     while(cls.seating.seats.length<total)cls.seating.seats.push(null);
     saveListsData();
     document.getElementById('bulk-import-text').value='';
-    alert(`${cls.name}: ${added} added, ${updated} updated (matched by name — no duplicates created).`);
     renderClassesSettings();
     if(currentClassId===targetId)renderTeachingTab();
+    // Students not in the pasted list: decide per student (keep / archive / same person renamed)
+    const missing=cls.students.map((s,i)=>({s,i})).filter(x=>!matched.has(x.i)&&!addedRecs.includes(x.s));
+    if(missing.length)_biReview(cls,missing,addedRecs,added,updated);
+    else alert(`${cls.name}: ${added} added, ${updated} updated (matched by name — no duplicates created).`);
   }else{alert('No students could be parsed. Check the format.');}
+}
+// After a merge import: review students who were not in the pasted list.
+function _biReview(cls,missing,addedRecs,added,updated){
+  const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const full=s=>((s.preferred||s.firstname||'')+' '+(s.surname||'')).trim();
+  const o=document.createElement('div');o.id='bi-review';
+  o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20000;display:flex;align-items:center;justify-content:center;padding:16px';
+  o.innerHTML=`<div style="background:#fff;border-radius:14px;max-width:420px;width:100%;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.3)">
+    <div style="padding:16px 16px 6px"><div style="font-size:15px;font-weight:700">${esc(cls.name)}: ${missing.length} student${missing.length>1?'s':''} not in the new list</div>
+    <div style="font-size:12px;color:#495057;margin-top:4px;line-height:1.45">Archived students leave the class but keep their notes and levels, and can be restored from Settings → Classes.</div></div>
+    <div style="overflow-y:auto;padding:4px 16px" id="bi-rows">${missing.map((m,r)=>{
+      // Possible rename: a brand-new name with the same first name and surname
+      const cand=addedRecs.find(a=>a.surname.toLowerCase()===String(m.s.surname||'').toLowerCase()&&String(a.firstname||'').toLowerCase()===String(m.s.firstname||'').toLowerCase()&&(m.s.firstname||m.s.surname));
+      return`<div style="padding:9px 0;border-bottom:1px solid #f1f3f5" data-bi-row="${r}">
+        <div style="font-size:13.5px;font-weight:600">${esc(full(m.s))}</div>
+        ${cand?`<label style="display:flex;gap:7px;font-size:12px;color:#5f3dc4;margin:4px 0;align-items:center"><input type="radio" name="bi-${r}" value="merge" checked> Same student as the new “${esc(full(cand))}” (keep notes, use the new name)</label>`:''}
+        <label style="display:flex;gap:7px;font-size:12px;margin:3px 0;align-items:center"><input type="radio" name="bi-${r}" value="arch" ${cand?'':'checked'}> Archive (left the class)</label>
+        <label style="display:flex;gap:7px;font-size:12px;margin:3px 0;align-items:center"><input type="radio" name="bi-${r}" value="keep"> Keep in the class</label>
+      </div>`;}).join('')}</div>
+    <div style="display:flex;gap:8px;padding:12px 16px"><button id="bi-ok" style="flex:1;padding:11px;border-radius:9px;border:none;background:#212529;color:#fff;font-weight:700;cursor:pointer">Apply</button></div></div>`;
+  document.body.appendChild(o);
+  document.getElementById('bi-ok').onclick=function(){
+    const toArchive=[];
+    missing.forEach((m,r)=>{
+      const v=(o.querySelector('input[name="bi-'+r+'"]:checked')||{}).value||'keep';
+      if(v==='arch')toArchive.push(m.s);
+      else if(v==='merge'){
+        const cand=addedRecs.find(a=>a.surname.toLowerCase()===String(m.s.surname||'').toLowerCase()&&String(a.firstname||'').toLowerCase()===String(m.s.firstname||'').toLowerCase());
+        if(cand){
+          const old=m.s,merged={...old,surname:cand.surname,firstname:cand.firstname,preferred:cand.preferred};
+          if(cand.house)merged.house=cand.house;if(cand.gender)merged.gender=cand.gender;
+          if(cand.note)merged.note=cand.note;if(cand.level)merged.level=cand.level;
+          // The old row takes the new name; the freshly added duplicate goes; the seat follows the name
+          cls.students[cls.students.indexOf(old)]=merged;
+          const di=cls.students.indexOf(cand);if(di>=0)cls.students.splice(di,1);
+          if(cls.seating&&Array.isArray(cls.seating.seats)&&!cls.students.some(s=>s!==merged&&s.preferred===old.preferred))
+            cls.seating.seats=cls.seating.seats.map(n=>n===old.preferred?merged.preferred:n);
+        }
+      }
+    });
+    if(toArchive.length)_biArchive(cls,toArchive);
+    saveListsData();o.remove();
+    renderClassesSettings();
+    if(typeof currentClassId!=='undefined'&&currentClassId===cls.id)renderTeachingTab();
+    showToastMsg?showToastMsg(cls.name+': review applied'+(toArchive.length?', '+toArchive.length+' archived':'')):0;
+  };
+}
+// Remove students from the roster into cls.archivedStudents, keeping leave flags pointing at the
+// right people (they are keyed by position) and clearing their seats.
+function _biArchive(cls,students){
+  cls.archivedStudents=cls.archivedStudents||[];
+  const going=new Set(students);
+  const map={};let n=0;
+  cls.students.forEach((s,i)=>{if(!going.has(s))map[i]=n++;});
+  const nl={};
+  Object.entries(CLASS_LEAVE).forEach(([k,v])=>{
+    if(!k.startsWith(cls.id+'_')){nl[k]=v;return;}
+    const old=parseInt(k.slice(cls.id.length+1));
+    if(map[old]!==undefined)nl[cls.id+'_'+map[old]]=v;
+  });
+  CLASS_LEAVE=nl;
+  students.forEach(s=>{
+    cls.archivedStudents.push({...s,archivedAt:_dateToStr(new Date())});
+    if(cls.seating&&Array.isArray(cls.seating.seats)&&!cls.students.some(x=>!going.has(x)&&x.preferred===s.preferred))
+      cls.seating.seats=cls.seating.seats.map(nm=>nm===s.preferred?null:nm);
+  });
+  cls.students=cls.students.filter(s=>!going.has(s));
+}
+function restoreArchivedStudent(classId,ai){
+  const cls=getClassById(classId);if(!cls||!cls.archivedStudents||!cls.archivedStudents[ai])return;
+  const s=cls.archivedStudents.splice(ai,1)[0];delete s.archivedAt;
+  cls.students.push(s);
+  saveListsData();renderClassesSettings();
+  if(typeof currentClassId!=='undefined'&&currentClassId===classId)renderTeachingTab();
+}
+function showClassArchive(classId){
+  const cls=getClassById(classId);if(!cls)return;
+  const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const o=document.createElement('div');o.id='class-arch';
+  o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20000;display:flex;align-items:center;justify-content:center;padding:16px';
+  o.onclick=e=>{if(e.target===o)o.remove();};
+  const list=(cls.archivedStudents||[]).map((s,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f1f3f5">
+      <div style="flex:1"><div style="font-size:13.5px;font-weight:600">${esc((s.preferred||s.firstname||'')+' '+(s.surname||''))}</div>
+      <div style="font-size:11px;color:#868e96">archived ${esc(s.archivedAt||'')}${s.note?' · '+esc(s.note):''}</div></div>
+      <button onclick="restoreArchivedStudent('${cls.id}',${i});document.getElementById('class-arch').remove();showClassArchive('${cls.id}')" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid #dee2e6;background:#fff;cursor:pointer">Restore</button>
+    </div>`).join('')||'<div style="font-size:12px;color:#868e96;padding:10px 0">Nobody in the archive.</div>';
+  o.innerHTML=`<div style="background:#fff;border-radius:14px;max-width:380px;width:100%;max-height:80vh;overflow-y:auto;padding:14px 16px;box-shadow:0 10px 40px rgba(0,0,0,.3)">
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px">${esc(cls.name)} — archived students</div>${list}
+    <button onclick="document.getElementById('class-arch').remove()" style="width:100%;margin-top:10px;padding:10px;border-radius:9px;border:none;background:#212529;color:#fff;font-weight:700;cursor:pointer">Close</button></div>`;
+  document.body.appendChild(o);
 }
 
 // ── House student DOB helpers ─────────────────────────────────────
