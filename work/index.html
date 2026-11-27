@@ -166,6 +166,11 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;min-heigh
 .plan-cat-hdr{display:flex;align-items:center;gap:8px;padding:8px 11px;font-size:12.5px;font-weight:700;background:#fff;border:1px solid #eef0f2;border-bottom:none;border-radius:9px 9px 0 0}
 .plan-add-btn{width:100%;padding:.55rem;border:1.5px dashed var(--border);border-radius:8px;background:transparent;color:#868e96;font-size:12px;cursor:pointer;margin-top:.3rem}
 .plan-add-btn:active{background:#f8f9fa}
+.sticky-box{border:1px solid #ffe066;border-radius:10px;padding:4px 6px 3px;margin:10px 0 4px;background:#fffdf3}
+.sticky-box-hdr{font-size:10px;font-weight:700;color:#7d5800;text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:5px;margin:2px 2px 4px}
+.sticky-cat-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:5px;margin:5px 3px 2px;opacity:.85}
+.sticky-cat-lbl span{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.plan-sticky-section .sticky-cat-lbl{margin:6px .85rem 2px}
 .plan-sticky-section{background:#fff;border:1px solid #eef0f2;border-left:3px solid #ffd43b;border-radius:9px;margin-bottom:6px;overflow:hidden}
 .plan-sticky-hdr{padding:.5rem .85rem;font-size:11px;font-weight:700;color:#7d5800;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:6px;border-bottom:1px solid #ffe066}
 .task-text{font-size:13px;color:var(--text);line-height:1.5}
@@ -25556,9 +25561,7 @@ function renderTodayView(){
     }
     // Sticky at bottom with subtle separator
     if(_sticky.length){
-      _tHtml+=`<div style="font-size:10px;font-weight:700;color:#7d5800;text-transform:uppercase;letter-spacing:.05em;margin:6px 0 3px;display:flex;align-items:center;gap:5px">
-        <span>📌</span>Sticky</div>`;
-      _tHtml+=(_taskSortMode()==='prio'?_prioSortFlat(_sticky):_prioSortGrouped(_sticky)).map(_taskRow).join('');
+      _tHtml+=`<div class="sticky-box"><div class="sticky-box-hdr"><span>📌</span>Sticky</div>${_stickyBodyHtml(_sticky,_taskRow)}</div>`;
     }
 
     html+=`<div style="margin-top:.75rem;padding:.5rem .25rem 0">
@@ -26568,7 +26571,7 @@ function renderWeekTasksView(){
   if(sticky.length||_stickyOld.length){
     html+=`<div class="plan-sticky-section" style="margin-top:.5rem">
       <div class="plan-sticky-hdr">📌 Sticky</div>
-      ${(_taskSortMode()==='prio'?_prioSortFlat(sticky):_prioSortGrouped(sticky)).map(taskCard).join('')}
+      ${_stickyBodyHtml(sticky,taskCard)}
       ${_stickyOld.length?`<div onclick="window._showDoneSticky=!window._showDoneSticky;renderWeekTasksView()" style="font-size:11px;color:#868e96;padding:.45rem .85rem;cursor:pointer">${window._showDoneSticky?'▾ Hide':'▸ Show'} completed (${_stickyOld.length})</div>${window._showDoneSticky?_stickyOld.map(taskCard).join(''):''}`:''}
     </div>`;
   }
@@ -26679,6 +26682,23 @@ function toggleTaskSort(){
 }
 function _prioSortFlat(list){
   return list.map((x,n)=>({x,n})).sort((a,b)=>(planPrio(b.x)-planPrio(a.x))||(_awRank(a.x)-_awRank(b.x))||(a.n-b.n)).map(o=>o.x);
+}
+// Sticky block: category-first with small visible category labels (By category mode),
+// or one dots-first list (By priority mode). rowFn draws one task.
+function _stickyBodyHtml(list,rowFn){
+  if(_taskSortMode()==='prio')return _prioSortFlat(list).map(rowFn).join('');
+  const sorted=_prioSortGrouped(list),cats=S.planCategories||[];
+  let html='',last=null;
+  sorted.forEach(t=>{
+    const c=t.cat||'';
+    if(c!==last){
+      last=c;
+      const cat=cats.find(x=>x.id===c)||{name:'Other',color:'#adb5bd'};
+      html+=`<div class="sticky-cat-lbl" style="color:${cat.color}"><span style="background:${cat.color}"></span>${cat.name}</div>`;
+    }
+    html+=rowFn(t);
+  });
+  return html;
 }
 function _prioSortGrouped(list){
   const order={};
@@ -37319,10 +37339,71 @@ function _amPeekRender(){
     const all=_amPeekEvents(),nc=all.filter(e=>e.past).length;
     return dir>0?all.length>nc:nc>0;               // from live: forward needs a future slot, back a past one
   }
-  function setDrag(dx){const b=bodyEl();if(!b)return;b.style.transition='none';b.style.transform=dx?('translateX('+dx+'px)'):'';b.style.opacity=dx?String(Math.max(.55,1-Math.abs(dx)/500)):'';}
-  function settle(){const b=bodyEl();if(!b)return;b.style.transition='transform .18s ease-out,opacity .18s ease-out';b.style.transform='';b.style.opacity='';setTimeout(()=>{if(b){b.style.transition='';}},220);}
-  function slideOut(dir,fn){const b=bodyEl();if(!b){fn();return;}b.style.transition='transform .12s ease-in,opacity .12s ease-in';b.style.transform='translateX('+(dir>0?-70:70)+'px)';b.style.opacity='.45';setTimeout(fn,115);}
-  function slideIn(dir){const b=bodyEl();if(!b)return;b.style.transition='none';b.style.transform='translateX('+(dir>0?46:-46)+'px)';b.style.opacity='.6';requestAnimationFrame(()=>{b.style.transition='transform .16s ease-out,opacity .16s ease-out';b.style.transform='';b.style.opacity='';setTimeout(()=>{if(b)b.style.transition='';},200);});}
+  // ── page-style swipe: the screen follows the finger 1:1 and the neighbouring slot
+  // slides in right behind it; on release the old page leaves and the real one arrives.
+  let _cg=null,_gDir=0;
+  function W(){return (bodyEl()||{}).clientWidth||window.innerWidth;}
+  function neighbour(dir){ // what is one step away: {time,label} or {now:true}
+    if(_amPeek){
+      const i=_amPeek.i,nc=_amPeek.nowCount,ni=i+dir;
+      if((i<nc&&ni>=nc)||(i>=nc&&ni<nc))return{now:true};
+      const e=_amPeek.events[ni];return e?{time:e.st+'–'+e.et,label:e.label,past:e.past}:null;
+    }
+    const all=_amPeekEvents(),nc=all.filter(e=>e.past).length,e=all[dir>0?nc:nc-1];
+    return e?{time:e.st+'–'+e.et,label:e.label,past:e.past}:null;
+  }
+  function ghost(dir){
+    let g=document.getElementById('am-ghost');
+    if(g&&_gDir===dir)return g;
+    if(g)g.remove();
+    const b=bodyEl(),n=neighbour(dir);if(!b||!n)return null;
+    const r=b.getBoundingClientRect();
+    g=document.createElement('div');g.id='am-ghost';_gDir=dir;
+    g.style.cssText='position:fixed;top:'+r.top+'px;left:'+r.left+'px;width:'+r.width+'px;height:'+r.height+'px;background:#0d0d0d;z-index:5;pointer-events:none;display:flex;flex-direction:column;align-items:'+(dir>0?'flex-start':'flex-end')+';text-align:'+(dir>0?'left':'right')+';padding:44px 22px 0;box-sizing:border-box;will-change:transform;border-'+(dir>0?'left':'right')+':1px solid rgba(255,255,255,.08)';
+    g.innerHTML=n.now
+      ?'<div style="font-size:13px;font-weight:800;color:#22c55e;letter-spacing:.08em">● NOW</div><div style="font-size:12px;color:#64748b;margin-top:8px">back to the live view</div>'
+      :'<div style="font-size:11px;font-weight:800;letter-spacing:.08em;color:'+(n.past?'#64748b':'#f59f00')+'">'+(n.past?'EARLIER':'NEXT')+'</div>'
+        +'<div style="font-size:22px;font-weight:800;color:#e2e8f0;margin-top:10px;max-width:70%">'+_esc(n.label||'')+'</div>'
+        +'<div style="font-size:14px;color:#94a3b8;margin-top:6px">'+_esc(n.time)+'</div>';
+    (document.getElementById('am-panel')||document.body).appendChild(g);
+    return g;
+  }
+  function dropGhost(){const g=document.getElementById('am-ghost');if(g)g.remove();_gDir=0;}
+  function setDrag(dx){
+    const b=bodyEl();if(!b)return;
+    b.style.transition='none';b.style.opacity='';b.style.transform=dx?('translateX('+dx+'px)'):'';
+    const dir=dx<0?1:-1;
+    if(dx&&_cg&&_cg[dir]){const g=ghost(dir);if(g){g.style.transition='none';g.style.transform='translateX('+(dx+(dir>0?W():-W()))+'px)';}}
+    else dropGhost();
+  }
+  function settle(){
+    const b=bodyEl();if(!b)return;
+    const g=document.getElementById('am-ghost'),ease='transform .22s cubic-bezier(.2,.8,.2,1)';
+    b.style.transition=ease;b.style.transform='';b.style.opacity='';
+    if(g){g.style.transition=ease;g.style.transform='translateX('+(_gDir>0?W():-W())+'px)';}
+    setTimeout(()=>{dropGhost();if(b)b.style.transition='';},240);
+  }
+  // Commit: freeze a copy of the current page, render the new one, then move both together.
+  function pageTurn(dir,dx,fast,navigate){
+    const b=bodyEl(),panel=document.getElementById('am-panel');
+    if(!b||!panel){navigate();return;}
+    const w=W(),r=b.getBoundingClientRect(),st=b.scrollTop;
+    const old=b.cloneNode(true);
+    old.removeAttribute('id');old.querySelectorAll('[id]').forEach(e=>e.removeAttribute('id'));
+    old.style.cssText='position:fixed;top:'+r.top+'px;left:'+r.left+'px;width:'+r.width+'px;height:'+r.height+'px;overflow:hidden;background:#0d0d0d;z-index:6;pointer-events:none;transition:none;transform:translateX('+dx+'px);will-change:transform';
+    panel.appendChild(old);old.scrollTop=st;
+    dropGhost();
+    navigate();
+    b.scrollTop=0;
+    const from=dx+(dir>0?w:-w);
+    b.style.transition='none';b.style.opacity='';b.style.transform='translateX('+from+'px)';
+    void b.offsetWidth;
+    const ms=Math.round(Math.max(170,Math.min(300,Math.abs(from)/w*(fast?200:300))));
+    const ease='transform '+ms+'ms cubic-bezier(.2,.8,.2,1)';
+    b.style.transition=ease;old.style.transition=ease;
+    b.style.transform='';old.style.transform='translateX('+(dir>0?-w:w)+'px)';
+    setTimeout(()=>{old.remove();if(b){b.style.transition='';b.style.transform='';}},ms+40);
+  }
   function onStart(e){
     if(!active())return;const t=e.touches&&e.touches[0];
     if(!t||!inBody(e.target))return;
@@ -37334,13 +37415,13 @@ function _amPeekRender(){
     const dx=lx-sx,dy=ly-sy;
     if(intent===null){
       if(Math.abs(dy)>12&&Math.abs(dy)>Math.abs(dx)){intent='v';return;}       // scrolling — leave it alone
-      if(Math.abs(dx)>12&&Math.abs(dx)>Math.abs(dy)*1.2)intent='h';
+      if(Math.abs(dx)>12&&Math.abs(dx)>Math.abs(dy)*1.2){intent='h';_cg={1:canGo(1),'-1':canGo(-1)};}
       else return;
     }
     if(intent!=='h')return;
     e.preventDefault();                                                        // horizontal lock: stop the scroll fighting the drag
     const dir=dx<0?1:-1;
-    setDrag(canGo(dir)?dx*0.85:dx*0.25);                                       // resistance when there is nowhere to go
+    setDrag(_cg&&_cg[dir]?dx:dx*0.25);                                          // 1:1, rubber band when there is nowhere to go
   }
   function onEnd(e){
     if(!tracking)return;tracking=false;
@@ -37353,16 +37434,14 @@ function _amPeekRender(){
     if(!active()){settle();return;}
     if(Math.abs(dx)<48&&!fast){settle();return;}                               // not far enough — spring back
     const dir=dx<0?1:-1;
-    if(!canGo(dir)){settle();return;}
-    // Slide the old screen out, change, slide the new one in — so it reads as motion
-    const go=()=>{
+    if(!(_cg&&_cg[dir])){settle();return;}
+    pageTurn(dir,dx,fast,()=>{
       if(dir>0){ if(_amPeek)_amPeekNav(1); else _amPeekOpen(1); }
       else { if(_amPeek)_amPeekNav(-1); else _amPeekOpen(-1); }
-      slideIn(dir);
-    };
-    slideOut(dir,go);
+    });
   }
   function onCancel(){tracking=false;intent=null;settle();}
+  window._amPageTurn=pageTurn;
   function bind(){
     if(document._amSwipeBound)return;document._amSwipeBound=true;
     document.addEventListener('touchstart',onStart,{passive:true});
