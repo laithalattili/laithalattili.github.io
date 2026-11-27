@@ -255,6 +255,17 @@ input,textarea,select{font-family:var(--font);font-size:14px;color:var(--tx)}
 .wd-hdr.lp-hold{background:var(--bg3)}
 .tr-hold{background:var(--bg3)!important;transition:background .2s}
 .task-row,.slot-task-row,[data-ptid]{-webkit-touch-callout:none}
+.sticky-box{margin:0 .6rem .4rem;border:1px solid rgba(245,159,0,.45);border-radius:10px;background:rgba(245,159,0,.04);overflow:hidden}
+.sticky-hdr{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#d08700;padding:.35rem .6rem .2rem}
+.sticky-lbl{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:.3rem .6rem .1rem}
+.sticky-lbl span{width:7px;height:7px;border-radius:50%;display:inline-block}
+.flat-list{margin:0 .6rem .4rem;border:1px solid var(--bd);border-radius:10px;overflow:hidden;background:var(--sur)}
+.task-sort-btn{font-size:11px;font-weight:700;padding:4px 9px;border-radius:7px;border:1px solid var(--bd);background:var(--sur);color:var(--tx2)}
+.task-sort-btn.on{color:#e03131;border-color:rgba(224,49,49,.4)}
+#where-pill b{display:block;font-size:12px}
+#where-pill{position:absolute;left:46px;top:50%;transform:translateY(-50%);z-index:41;font-size:11px;font-weight:700;white-space:nowrap;padding:3px 7px;line-height:1.15;text-align:left;border-radius:9px;border:0;background:#18130e;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.2);transition:opacity .6s;opacity:1}
+.pt-clip{position:fixed;overflow:hidden;pointer-events:none;z-index:20}
+.pt-ghost{position:absolute;top:0;display:flex;flex-direction:column;justify-content:center;padding:0 22px;box-sizing:border-box}
 .aw-tag{display:inline-block;position:relative;font-size:11px;font-weight:700;letter-spacing:.03em;line-height:1;padding:3px 6px;border-radius:5px;margin-right:6px;vertical-align:1px;cursor:pointer;white-space:nowrap}
 .aw-tag::after{content:'';position:absolute;inset:-9px -5px}
 .aw-hide{display:none!important}
@@ -2660,7 +2671,7 @@ function switchPV(v){
   if(v==='month')renderMonth();
 }
 
-function navDay(d){if(d===0)_scrollNowWanted=true;_dayOff=d===0?0:_dayOff+d;_updAnch();renderDay();}
+function navDay(d){if(d===0)_scrollNowWanted=true;_dayOff=d===0?0:_dayOff+d;_updAnch();renderDay();try{_wherePill();}catch(e){}}
 function navWeek(d){_weekOff=d===0?0:_weekOff+d;_updAnch();renderWeek();}
 // ── Swipe: change day in Day view, week in Week view (ported from Work) ──
 function _gestOverlayOpen(){
@@ -2683,48 +2694,7 @@ function _gestSideScroller(node,dx){
   }
   return null;
 }
-(function(){
-  let sx=0,sy=0,st=0,lx=0,ly=0,tracking=false,origin=null;
-  function onStart(e){
-    tracking=false;
-    if(_curTab!=='planner'||!_gestAppReady()||_gestOverlayOpen())return;
-    if(!e.touches||e.touches.length!==1)return;
-    if(e.target&&e.target.closest&&e.target.closest('input,textarea,select'))return;
-    const t=e.touches[0];
-    sx=lx=t.clientX;sy=ly=t.clientY;st=Date.now();tracking=true;origin=e.target;
-  }
-  function onMove(e){
-    if(!tracking)return;
-    const t=e.touches&&e.touches[0];if(!t)return;
-    lx=t.clientX;ly=t.clientY;
-  }
-  function finish(x,y){
-    const dx=x-sx,dy=y-sy,dt=Date.now()-st;
-    if(dt>900)return;                          // too slow to be a swipe
-    if(Math.abs(dx)<60)return;                 // too short
-    if(Math.abs(dx)<Math.abs(dy)*1.5)return;   // too vertical
-    if(_lpFiredAt&&Date.now()-_lpFiredAt<1000)return;   // that touch was a long-press
-    if(_gestSideScroller(origin,dx))return;    // let the strip scroll instead
-    if(_curTab!=='planner'||_gestOverlayOpen())return;
-    const dir=dx<0?1:-1;                       // swipe left = forward
-    if(_pv==='week')navWeek(dir);else navDay(dir);
-  }
-  function onEnd(e){
-    if(!tracking)return;tracking=false;
-    const t=(e.changedTouches&&e.changedTouches[0])||null;
-    finish(t?t.clientX:lx,t?t.clientY:ly);
-  }
-  function onCancel(){tracking=false;}
-  function bind(){
-    if(document._omniSwipeBound)return;
-    document._omniSwipeBound=true;
-    document.addEventListener('touchstart',onStart,{passive:true});
-    document.addEventListener('touchmove',onMove,{passive:true});
-    document.addEventListener('touchend',onEnd,{passive:true});
-    document.addEventListener('touchcancel',onCancel,{passive:true});
-  }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
-})();
+// (v26: the planner swipe is the page-turn engine further down)
 
 // ── Long-press a time slot (or right-click on a computer) ──
 let _lpFiredAt=0,_lpSlot=null;
@@ -2744,6 +2714,224 @@ function openLPMenu(time,dateStr,endT){
   el('lp-menu-sh').classList.add('on');
 }
 function closeLPMenu(){el('lp-menu-sh').classList.remove('on');}
+// ── Page-turn swipe (planner day / week, live screen), as in Work v260 ──
+// The page follows the finger 1:1 once the gesture is clearly sideways; the neighbouring page slides
+// in behind it; on release the old page (a frozen copy) leaves and the real new page arrives.
+const _PT_EASE='cubic-bezier(.2,.8,.2,1)';
+function _ptFmt(d){return DS[d.getDay()]+' '+d.getDate()+' '+MN[d.getMonth()];}
+const _PT={
+  planner:{
+    active:()=>_curTab==='planner'&&(_pv==='day'||_pv==='week')&&_gestAppReady()&&!_gestOverlayOpen(),
+    page:()=>el(_pv==='week'?'pv-week':'pv-day'),
+    clip:()=>{const s=el('scr').getBoundingClientRect(),t=el('pv-tabs');const top=Math.max(s.top,t?t.getBoundingClientRect().bottom:s.top);
+      return{top,left:s.left,width:s.width,height:Math.max(0,Math.min(s.bottom,innerHeight)-top)};},
+    bg:'var(--bg)',ink:'var(--tx)',sub:'var(--tx3)',line:'var(--bd2)',
+    canGo:()=>true,
+    label:dir=>{
+      if(_pv==='week'){
+        const o=_weekOff+dir,t=new Date(),m=new Date(t);m.setDate(t.getDate()-(t.getDay()||7)+1+o*7);const s=new Date(m);s.setDate(m.getDate()+6);
+        const head=o===0?'This week':o===1?'Next week':o===-1?'Last week':(o>0?'In '+o+' weeks':(-o)+' weeks ago');
+        const rng=m.getMonth()===s.getMonth()?m.getDate()+' – '+s.getDate()+' '+MN[s.getMonth()]:m.getDate()+' '+MN[m.getMonth()]+' – '+s.getDate()+' '+MN[s.getMonth()];
+        return{tag:head,big:rng,small:''};
+      }
+      const o=_dayOff+dir,d=new Date();d.setDate(d.getDate()+o);
+      const head=o===0?'Today':o===1?'Tomorrow':o===-1?'Yesterday':d.toLocaleDateString('en-GB',{weekday:'long'});
+      return{tag:head,big:_ptFmt(d),small:''};
+    },
+    go:dir=>{
+      if(_pv==='week'){navWeek(dir);return;}
+      navDay(dir);
+      if(_rdTimer){clearTimeout(_rdTimer);_rdTimer=null;}
+      _renderDayNow();                                        // draw now, so the new page is there when it slides in
+    }
+  },
+  live:{
+    active:()=>!!_liveOpen&&!_liveFrozen,
+    page:()=>el('live-overlay'),
+    clip:()=>({top:0,left:0,width:innerWidth,height:innerHeight}),
+    bg:'#0f0c0a',ink:'#e2e8f0',sub:'#94a3b8',line:'rgba(255,255,255,.18)',
+    _at:p=>{const save=_livePeek;_livePeek=p;let c=null;try{c=_getLiveCtx();}catch(e){}const got=_livePeek;_livePeek=save;return{c,got};},
+    canGo:dir=>{const t=_livePeek+dir;if(t===0)return _livePeek!==0;const r=_PT.live._at(t);return !!r.c&&r.c.peek===t;},
+    label:dir=>{
+      const t=_livePeek+dir,r=_PT.live._at(t),c=r.c||{};
+      return{tag:t===0?'● NOW':(t>0?'NEXT':'EARLIER'),tagCol:t===0?'#22c55e':(t>0?'#f59f00':'#64748b'),
+        big:c.label||'',small:(c.st||'')+(c.et?'–'+c.et:'')};
+    },
+    go:dir=>livePeek(dir)
+  }
+};
+(function(){
+  let sx=0,sy=0,lx=0,ly=0,stT=0,tracking=false,intent=null,tgt=null,origin=null,cg=null,gDir=0,busy=false;
+  function W(){const p=tgt&&tgt.page();return(p&&p.clientWidth)||innerWidth;}
+  function clipBox(){
+    let c=document.getElementById('pt-clip');if(c)return c;
+    const r=tgt.clip();c=document.createElement('div');c.id='pt-clip';c.className='pt-clip';
+    c.style.cssText+='top:'+r.top+'px;left:'+r.left+'px;width:'+r.width+'px;height:'+r.height+'px;z-index:'+(tgt===_PT.live?805:20);
+    document.body.appendChild(c);return c;
+  }
+  function ghost(dir){
+    let g=document.getElementById('pt-ghost');
+    if(g&&gDir===dir)return g;
+    if(g)g.remove();
+    const L=tgt.label(dir),c=clipBox(),w=W();
+    g=document.createElement('div');g.id='pt-ghost';g.className='pt-ghost';gDir=dir;
+    g.style.width=w+'px';g.style.height='100%';g.style.background=tgt.bg;
+    g.style.alignItems=dir>0?'flex-start':'flex-end';g.style.textAlign=dir>0?'left':'right';   // text on the edge that enters first
+    g.style[dir>0?'borderLeft':'borderRight']='1px solid '+tgt.line;                           // hairline on the leading edge
+    const esc=x=>String(x==null?'':x).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    g.innerHTML='<div class="pt-tag" style="font-size:12px;font-weight:800;letter-spacing:.06em;color:'+(L.tagCol||'#d08700')+'">'+esc(L.tag)+'</div>'
+      +'<div class="pt-big" style="font-size:22px;font-weight:800;color:'+tgt.ink+';margin-top:8px;max-width:80%">'+esc(L.big)+'</div>'
+      +(L.small?'<div class="pt-small" style="font-size:14px;color:'+tgt.sub+';margin-top:6px">'+esc(L.small)+'</div>':'');
+    c.appendChild(g);return g;
+  }
+  function dropGhost(){const g=document.getElementById('pt-ghost');if(g)g.remove();gDir=0;}
+  function dropClip(){const c=document.getElementById('pt-clip');if(c)c.remove();gDir=0;}
+  function setDrag(dx){
+    const p=tgt.page();if(!p)return;
+    p.style.transition='none';p.style.transform=dx?'translateX('+dx+'px)':'';      // 1:1, no fading
+    const dir=dx<0?1:-1;
+    if(dx&&cg&&cg[dir]){const g=ghost(dir);if(g){g.style.transition='none';g.style.transform='translateX('+(dx+(dir>0?W():-W()))+'px)';}}
+    else dropGhost();
+  }
+  function settle(t){
+    const T=t||tgt;if(!T){dropClip();return;}
+    const p=T.page(),g=document.getElementById('pt-ghost'),ease='transform .22s '+_PT_EASE;
+    if(p){p.style.transition=ease;p.style.transform='';}
+    if(g){g.style.transition=ease;g.style.transform='translateX('+(gDir>0?W():-W())+'px)';}
+    setTimeout(()=>{dropClip();if(p)p.style.transition='';},240);
+  }
+  function pageTurn(T,dir,dx,fast){
+    const p=T.page();if(!p){T.go(dir);dropClip();return;}
+    busy=true;
+    const w=W(),c=clipBox(),cr=c.getBoundingClientRect(),r=p.getBoundingClientRect();
+    const old=p.cloneNode(true);                                                  // frozen copy of the page as it is now
+    old.removeAttribute('id');old.querySelectorAll('[id]').forEach(e=>e.removeAttribute('id'));
+    old.style.cssText='position:absolute;top:'+(r.top-cr.top)+'px;left:0;width:'+r.width+'px;height:'+r.height+'px;margin:0;display:'+(T===_PT.live?'flex':'block')+
+      ';background:'+T.bg+';pointer-events:none;transition:none;transform:translateX('+dx+'px)';
+    if(T===_PT.live){old.style.flexDirection='column';old.style.inset='';old.style.top='0';old.style.height=cr.height+'px';}
+    dropGhost();c.appendChild(old);
+    T.go(dir);                                                                    // render the real new page
+    const from=dx+(dir>0?w:-w);
+    p.style.transition='none';p.style.transform='translateX('+from+'px)';
+    void p.offsetWidth;
+    const ms=Math.round(Math.max(170,Math.min(300,Math.abs(from)/w*(fast?200:300))));
+    const ease='transform '+ms+'ms '+_PT_EASE;
+    p.style.transition=ease;old.style.transition=ease;
+    p.style.transform='';old.style.transform='translateX('+(dir>0?-w:w)+'px)';
+    setTimeout(()=>{old.remove();dropClip();p.style.transition='';p.style.transform='';busy=false;},ms+40);
+  }
+  function pick(){return _PT.live.active()?_PT.live:(_PT.planner.active()?_PT.planner:null);}
+  function onStart(e){
+    tracking=false;intent=null;
+    if(busy||!e.touches||e.touches.length!==1)return;
+    const T=pick();if(!T)return;
+    if(e.target&&e.target.closest&&e.target.closest('input,textarea,select,#live-audio-bar'))return;
+    const t=e.touches[0];sx=lx=t.clientX;sy=ly=t.clientY;stT=Date.now();tracking=true;tgt=T;origin=e.target;
+  }
+  function onMove(e){
+    if(!tracking)return;const t=e.touches&&e.touches[0];if(!t)return;
+    lx=t.clientX;ly=t.clientY;const dx=lx-sx,dy=ly-sy;
+    if(intent===null){
+      if(Math.abs(dy)>12&&Math.abs(dy)>Math.abs(dx)){intent='v';return;}                // a scroll: leave it alone
+      if(Math.abs(dx)>12&&Math.abs(dx)>Math.abs(dy)*1.2){
+        if(_lpFiredAt&&Date.now()-_lpFiredAt<1000){intent='x';return;}                  // that touch was a long-press
+        if(_gestSideScroller(origin,dx)){intent='x';return;}                             // let the strip scroll instead
+        if(!tgt.active()){intent='x';return;}
+        intent='h';cg={1:tgt.canGo(1),'-1':tgt.canGo(-1)};                               // asked once per gesture
+      }else return;
+    }
+    if(intent!=='h')return;
+    if(e.cancelable)e.preventDefault();                                                 // horizontal lock
+    const dir=dx<0?1:-1;
+    setDrag(cg[dir]?dx:dx*0.25);                                                         // quarter strength at an end
+  }
+  function onEnd(e){
+    if(!tracking)return;tracking=false;
+    if(intent!=='h'){intent=null;return;}
+    intent=null;
+    const t=(e.changedTouches&&e.changedTouches[0])||null,x=t?t.clientX:lx;
+    const dx=x-sx,dt=Date.now()-stT,fast=Math.abs(dx)>=30&&dt<250;                     // a quick flick counts
+    const dir=dx<0?1:-1;
+    if(!tgt.active()||(Math.abs(dx)<48&&!fast)||!cg[dir]){settle();return;}            // spring back
+    pageTurn(tgt,dir,dx,fast);
+  }
+  function onCancel(){if(tracking&&intent==='h')settle();tracking=false;intent=null;}
+  window._ptTurn=(name,dir,dx,fast)=>{tgt=_PT[name];cg={1:tgt.canGo(1),'-1':tgt.canGo(-1)};pageTurn(tgt,dir,dx||0,!!fast);};
+  function bind(){
+    if(document._ptBound)return;document._ptBound=true;
+    document.addEventListener('touchstart',onStart,{passive:true});
+    document.addEventListener('touchmove',onMove,{passive:false});
+    document.addEventListener('touchend',onEnd,{passive:true});
+    document.addEventListener('touchcancel',onCancel,{passive:true});
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
+})();
+
+// ── Where am I: a small pill under the date after the day changes ──
+let _wpT=null;
+function _wherePill(){
+  if(_curTab!=='planner'||_pv!=='day')return;
+  const nav=el('day-nav');if(!nav)return;
+  let p=document.getElementById('where-pill');
+  if(!p){p=document.createElement('button');p.id='where-pill';p.onclick=e=>{e.stopPropagation();navDay(0);};nav.appendChild(p);}
+  const d=new Date();d.setDate(d.getDate()+_dayOff);
+  // two short lines beside the date, so it never covers the date or a button: "+2" over "Sat 29 Nov"
+  const full=_dayOff===0?'Today':((_dayOff>0?'+':'')+_dayOff+' \u00B7 '+_ptFmt(d));
+  if(_dayOff===0)p.textContent='Today';
+  else{p.innerHTML='';const n=document.createElement('b');n.textContent=(_dayOff>0?'+':'')+_dayOff;p.appendChild(n);p.appendChild(document.createTextNode(_ptFmt(d)));}
+  p.setAttribute('aria-label',full);
+  p.title='Back to today';
+  p.style.transition='none';p.style.opacity='1';void p.offsetWidth;p.style.transition='';
+  clearTimeout(_wpT);_wpT=setTimeout(()=>{const q=document.getElementById('where-pill');if(q)q.style.opacity='.35';},2000);
+}
+
+// ── Sticky (tier 3) tasks in their own box; "By group / By priority" toggle (per device) ──
+function _taskSortMode(){try{return localStorage.getItem('omni_task_sort')==='prio'?'prio':'group';}catch(e){return'group';}}
+function toggleTaskSort(){try{localStorage.setItem('omni_task_sort',_taskSortMode()==='prio'?'group':'prio');}catch(e){}renderDay();}
+// Work's own priority for a Work task shown here (planPrio: per week for recurring tasks)
+function _workRowPrio(r){
+  try{
+    const cb=r.querySelector(':scope > [onclick*="toggleDone(\'plan_done_"]');if(!cb)return 0;
+    const dk=(/toggleDone\('([^']+)'/.exec(cb.getAttribute('onclick'))||[])[1]||'';
+    const t=(WTASKS||[]).find(x=>x&&x.id&&(dk==='plan_done_'+x.id||dk.indexOf('plan_done_'+x.id+'_')===0));if(!t)return 0;
+    if(t.scope==='recurring'){const d=new Date();d.setDate(d.getDate()+(_dayOff||0));const m=new Date(d);m.setDate(d.getDate()-((d.getDay()+6)%7));return(t.prioBy&&t.prioBy[_ld(m)])||0;}
+    return t.prio||0;
+  }catch(e){return 0;}
+}
+function _stickyLayout(){
+  try{
+    const root=el('day-tasks');if(!root||!root.firstElementChild)return;
+    const prio=_taskSortMode()==='prio';
+    const bar=root.firstElementChild.lastElementChild;
+    if(bar&&!bar.querySelector('#task-sort-btn')){
+      const b=document.createElement('button');b.id='task-sort-btn';b.className='task-sort-btn'+(prio?' on':'');
+      b.textContent='⇅ '+(prio?'By priority':'By group');b.title='Order tasks by group or by priority';b.onclick=toggleTaskSort;
+      bar.insertBefore(b,bar.firstChild);
+    }
+    const rowsOf=g=>[...g.children].filter(c=>c.classList&&c.classList.contains('task-row'));
+    const groups=[...root.children].slice(1).filter(g=>rowsOf(g).length);
+    const meta=g=>{const sp=g.firstElementChild?g.firstElementChild.querySelectorAll('span'):[];
+      return{name:((sp[1]||{}).textContent||'Other').trim(),col:sp[0]?getComputedStyle(sp[0]).backgroundColor:'#adb5bd'};};
+    const sticky=[];groups.forEach(g=>{const s=rowsOf(g).filter(r=>r.classList.contains('t3'));if(s.length)sticky.push({g,m:meta(g),rows:s});});
+    let after=root.firstElementChild;
+    if(sticky.length){
+      const box=document.createElement('div');box.className='sticky-box';box.id='sticky-box';
+      box.innerHTML='<div class="sticky-hdr">Sticky</div>';
+      sticky.forEach(x=>{
+        if(!prio&&sticky.length>1){const l=document.createElement('div');l.className='sticky-lbl';l.style.color=x.m.col;
+          l.innerHTML='<span style="background:'+x.m.col+'"></span>';l.appendChild(document.createTextNode(x.m.name));box.appendChild(l);}
+        x.rows.forEach(r=>box.appendChild(r));
+      });
+      after.after(box);after=box;
+    }
+    if(prio){
+      const flat=document.createElement('div');flat.className='flat-list';flat.id='flat-list';
+      groups.forEach(g=>{rowsOf(g).forEach(r=>flat.appendChild(r));g.style.display='none';});
+      if(flat.children.length)after.after(flat);
+    }else groups.forEach(g=>{if(!rowsOf(g).length)g.style.display='none';});
+  }catch(e){console.warn('sticky',e);}
+}
+
 // ── Hold a task row (500 ms) or right-click it to edit the task. One handler for every list. ──
 // Not from the tick box, the priority dots, an action-word tag or any button; Work tasks stay tick-only.
 function _trRow(target){
@@ -2856,20 +3044,7 @@ function livePeek(d){
       }
     }catch(e){}
   };
-  // swipe left / right on the live screen
-  let sx=0,sy=0,st=0,ok=false,org=null;
-  const bind=()=>{
-    const ov=document.getElementById('live-overlay');if(!ov||ov._peekBound)return;ov._peekBound=true;
-    ov.addEventListener('touchstart',e=>{ok=false;if(!_liveOpen||!e.touches||e.touches.length!==1)return;
-      if(e.target.closest&&e.target.closest('input,textarea,select,#live-audio-bar'))return;
-      sx=e.touches[0].clientX;sy=e.touches[0].clientY;st=Date.now();ok=true;org=e.target;},{passive:true});
-    ov.addEventListener('touchend',e=>{if(!ok)return;ok=false;const t=e.changedTouches&&e.changedTouches[0];if(!t)return;
-      const dx=t.clientX-sx,dy=t.clientY-sy;
-      if(Date.now()-st>900||Math.abs(dx)<60||Math.abs(dx)<Math.abs(dy)*1.5)return;
-      if(typeof _gestSideScroller==='function'&&_gestSideScroller(org,dx))return;
-      livePeek(dx<0?1:-1);},{passive:true});
-  };
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
+  // (v26: the live-screen swipe is the page-turn engine further down)
 })();
 
 // ── Action words (spec shared with Work) ──
@@ -3150,7 +3325,7 @@ function _prioSortRuns(parent){
   };
   kids.forEach(k=>{if(_prioIsRow(k))run.push(k);else flush();});flush();
 }
-function _prioRowPrio(r){if(!r.dataset.prioId)return 0;const t=OTASKS.find(x=>x.id===r.dataset.prioId);return _prioGet(t,r.dataset.prioDate);}
+function _prioRowPrio(r){if(!r.dataset.prioId)return _workRowPrio(r);const t=OTASKS.find(x=>x.id===r.dataset.prioId);return _prioGet(t,r.dataset.prioDate);}
 function _prioRowDone(r){
   if(r.dataset.ptid)return false;
   const info=_prioRowInfo(r);const dk=info&&info.dk;
@@ -3189,7 +3364,7 @@ function _prioResort(){
 // Add the dots after every redraw of the planner and the Checklists task list.
 (function(){
   const hook=(name,view)=>{const f=window[name];if(typeof f!=='function')return;
-    window[name]=function(){const r=f.apply(this,arguments);_prioDecorate(view);_awDecorate(view);_taskSort(view);return r;};};
+    window[name]=function(){const r=f.apply(this,arguments);_prioDecorate(view);_awDecorate(view);if(view==='day')_stickyLayout();_taskSort(view);return r;};};
   hook('_renderDayNow','day');hook('renderWeek','week');hook('renderCVTasks','cv');   // renderDay only schedules _renderDayNow
 })();
 
